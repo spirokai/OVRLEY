@@ -11,8 +11,8 @@ import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
 import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { PLAYHEAD_CENTER_X } from '../data/playheadGeometry'
-import { applyCutDraft } from '../utils/cutDrag'
-import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel, videoIdFromLaneId } from '../utils/timelineGeometry'
+import { applyCutDraft, applyCutDraftToSelection, segmentOfCut } from '../utils/cutDrag'
+import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel, videoIdFromLaneId, videoLaneId } from '../utils/timelineGeometry'
 import { resolveFitVideoClip } from '../utils/timelineViewport'
 
 import useClipDrag from './useClipDrag'
@@ -356,9 +356,19 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Cut drag - the dragged cut is shown at its draft frame until it is committed on release.
+  // Cut drag - the dragged cut is shown at its draft frame until it is committed on release. Cut markers keep the
+  // selection on press, so a press keeps its clip selected, or selects the pressed cut's segment instead.
+  const selectCutClip = useCallback(
+    (clip, cut) => {
+      const laneId = videoLaneId(clip.id)
+      if (useStore.getState().selectedClip?.laneId === laneId) return
+      selectClip({ laneId, segmentKey: segmentOfCut(clip, cut.id) })
+    },
+    [selectClip],
+  )
   const cutDrag = useCutDrag({
     moveCut: playerStore.moveCut,
+    selectCutClip,
     trimVideo: playerStore.trimVideo,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
@@ -384,7 +394,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     onRemoveVideo,
     overlaps: displayedTimeline.program.overlaps,
     program: videoSyncMode ? null : displayedTimeline.program,
-    selectedClip,
+    selectedClip: applyCutDraftToSelection(selectedClip, cutDrag.draft),
     setSelectedClip: selectClip,
     warnings: videoWarnings,
     viewEnd: viewport.viewport.viewEnd,

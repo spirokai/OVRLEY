@@ -75,6 +75,12 @@ describe('video edits in the store', () => {
     expect(() => useStore.getState().trimVideo('ride', 'end', 100)).toThrow('cannot pass a cut')
   })
 
+  test('a start trim moves a selected first segment to the part it now starts', () => {
+    useStore.getState().selectClip({ laneId: 'video:ride', segmentKey: 'start' })
+    useStore.getState().trimVideo('ride', 'start', 30)
+    expect(useStore.getState().selectedClip).toEqual({ laneId: 'video:ride', segmentKey: edits().cuts[0].id })
+  })
+
   test('keeping the cut changes nothing, and removing the video ends the question', () => {
     const cutId = useStore.getState().cutVideo('ride', 150)
     useStore.getState().setVideoSegmentExcluded('ride', cutId, true)

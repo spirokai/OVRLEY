@@ -73,6 +73,7 @@ function CutMarker({ marker }) {
       className={`group/cut absolute top-3 bottom-1 z-20 w-3 cursor-ew-resize touch-none bg-transparent outline-none ${align.area}`}
       style={marker.style}
       onDoubleClick={stopPropagation}
+      data-keeps-clip-selection
       {...marker.dragProps}
     >
       <span

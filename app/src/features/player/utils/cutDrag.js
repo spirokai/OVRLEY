@@ -4,7 +4,9 @@
  * or at the last frame. Dragging it in trims that end of the video.
  */
 
+import { segmentBeforeCut } from '@/lib/video-program/collection-edits'
 import { FIRST_SEGMENT_KEY } from '@/lib/video-program/video-segments'
+import { videoLaneId } from './timelineGeometry'
 
 const EDGE_CUT_IDS = { start: 'edge-start', end: 'edge-end' }
 
@@ -17,6 +19,35 @@ export function edgeCutSide(cutId) {
   if (cutId === EDGE_CUT_IDS.start) return 'start'
   if (cutId === EDGE_CUT_IDS.end) return 'end'
   return null
+}
+
+/**
+ * Returns the segment a pressed cut belongs to, selected when the press starts with
+ * no selection on its clip: the part an edge cut trims into, or the part before a cut.
+ * @param {{cuts: Array<{id: string}>}} clip Timeline clip.
+ * @param {string} cutId Pressed cut, edge cuts included.
+ * @returns {string} Segment key.
+ */
+export function segmentOfCut(clip, cutId) {
+  const side = edgeCutSide(cutId)
+  if (side === 'start') return FIRST_SEGMENT_KEY
+  if (side === 'end') return clip.cuts.at(-1)?.id ?? FIRST_SEGMENT_KEY
+  return segmentBeforeCut(clip, cutId)
+}
+
+/**
+ * Returns the selection to display while a cut is dragged: a dragged start edge cut
+ * hands the clip's first segment to the part it now starts, so a selected first
+ * segment follows it.
+ * @param {{laneId: string, segmentKey: string|null}|null} selection Clip selection.
+ * @param {{videoId: string, cutId: string}|null} draft Dragged cut, or null.
+ * @returns {{laneId: string, segmentKey: string|null}|null} Selection to display.
+ */
+export function applyCutDraftToSelection(selection, draft) {
+  if (draft === null || edgeCutSide(draft.cutId) !== 'start') return selection
+  const laneId = videoLaneId(draft.videoId)
+  if (selection?.laneId !== laneId || selection.segmentKey !== FIRST_SEGMENT_KEY) return selection
+  return { laneId, segmentKey: draft.cutId }
 }
 
 /**

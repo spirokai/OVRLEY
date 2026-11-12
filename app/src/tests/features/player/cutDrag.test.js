@@ -1,9 +1,27 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { applyCutDraft, clampCutFrame, listEdgeCuts } from '@/features/player/utils/cutDrag'
+import { applyCutDraft, applyCutDraftToSelection, clampCutFrame, listEdgeCuts, segmentOfCut } from '@/features/player/utils/cutDrag'
 import { cutEdits } from '@/tests/helpers/videoFixtures'
 
 // 300 frames, cut at frame 150; the part after it is excluded.
 const clip = { id: 'ride', frameCount: 300, ...cutEdits([{ id: 'cut', frame: 150, excluded: true }]) }
+
+describe('cut selection', () => {
+  test('a pressed cut belongs to the part an edge cut trims into, or to the part before a cut', () => {
+    expect(segmentOfCut(clip, 'edge-start')).toBe('start')
+    expect(segmentOfCut(clip, 'edge-end')).toBe('cut')
+    expect(segmentOfCut(clip, 'cut')).toBe('start')
+  })
+
+  test('a selected first segment follows a dragged start edge cut', () => {
+    const selection = { laneId: 'video:ride', segmentKey: 'start' }
+    expect(applyCutDraftToSelection(selection, { videoId: 'ride', cutId: 'edge-start', frame: 40 })).toEqual({
+      laneId: 'video:ride',
+      segmentKey: 'edge-start',
+    })
+    expect(applyCutDraftToSelection(selection, { videoId: 'ride', cutId: 'edge-end', frame: 280 })).toBe(selection)
+    expect(applyCutDraftToSelection(selection, null)).toBe(selection)
+  })
+})
 
 describe('edge cuts', () => {
   test('exist only at an end whose outer part is still exported', () => {

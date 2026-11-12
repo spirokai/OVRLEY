@@ -1,7 +1,8 @@
 /**
  * Horizontal drag of cut markers, including a clip's edge cuts: the cut follows the
  * pointer frame by frame and is committed once, on release, so the drag is one undo
- * step. Releasing an edge cut trims that end of the video.
+ * step. Releasing an edge cut trims that end of the video. Pressing a cut keeps its
+ * clip selected, or selects the segment it belongs to.
  */
 
 import { useCallback, useRef, useState } from 'react'
@@ -18,12 +19,13 @@ const DRAG_THRESHOLD_PX = 3
  * @param {object} options Drag inputs.
  * @param {(videoId: string, cutId: string, frame: number) => void} options.moveCut Commits a cut's new frame.
  * @param {(videoId: string, side: 'start'|'end', frame: number) => void} options.trimVideo Commits a dragged edge cut.
+ * @param {(clip: object, cut: {id: string, frame: number}) => void} options.selectCutClip Keeps or selects the pressed cut's clip.
  * @param {number} options.viewStart Visible viewport start second.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.widthPx Measured timeline width.
  * @returns {{draft: {videoId: string, cutId: string, frame: number}|null, getCutDragProps: function}} Dragged cut and marker props.
  */
-export default function useCutDrag({ moveCut, trimVideo, viewStart, viewEnd, widthPx }) {
+export default function useCutDrag({ moveCut, selectCutClip, trimVideo, viewStart, viewEnd, widthPx }) {
   const [draft, setDraft] = useState(null)
   const gestureRef = useRef(null)
   const suppressClickRef = useRef(false)
@@ -40,6 +42,7 @@ export default function useCutDrag({ moveCut, trimVideo, viewStart, viewEnd, wid
           event.stopPropagation()
           suppressClickRef.current = false
           if (event.button !== 0) return
+          selectCutClip(clip, cut)
           event.currentTarget.setPointerCapture(event.pointerId)
           gestureRef.current = { pointerId: event.pointerId, startX: event.clientX, startFrame: cut.frame, frame: cut.frame, isMoving: false }
         },
@@ -80,7 +83,7 @@ export default function useCutDrag({ moveCut, trimVideo, viewStart, viewEnd, wid
         },
       }
     },
-    [moveCut, trimVideo, viewEnd, viewStart, widthPx],
+    [moveCut, selectCutClip, trimVideo, viewEnd, viewStart, widthPx],
   )
 
   return { draft, getCutDragProps }

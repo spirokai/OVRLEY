@@ -27,7 +27,7 @@ import {
 import { requireTelemetry } from '@/lib/video-program/imported-video'
 import { DEFAULT_TRANSITION_SETTINGS, requireTransitionDefaults } from '@/lib/video-program/transition-catalog'
 import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
-import { fitCutsToFrameCount } from '@/lib/video-program/video-segments'
+import { FIRST_SEGMENT_KEY, fitCutsToFrameCount } from '@/lib/video-program/video-segments'
 import { applyCoursePlotDimensions } from '../store-utils'
 
 let fetchCodecsOnce = null
@@ -214,10 +214,18 @@ export const createVideoImportSlice = (set, get) => ({
     return cutId
   },
 
-  /** Trims the start or end of a video, excluding the outer part (see `trimVideo`). */
+  /**
+   * Trims the start or end of a video, excluding the outer part (see `trimVideo`). A
+   * start trim moves the first segment's key to the trimmed-in part, so a selected
+   * first segment follows it.
+   */
   trimVideo: (videoId, side, frame) => {
     set((draft) => {
-      trimVideo(draft, videoId, side, frame)
+      const cutId = trimVideo(draft, videoId, side, frame)
+      const selection = draft.selectedClip
+      if (side === 'start' && selection?.laneId === videoLaneId(videoId) && selection.segmentKey === FIRST_SEGMENT_KEY) {
+        selection.segmentKey = cutId
+      }
     })
   },
 
