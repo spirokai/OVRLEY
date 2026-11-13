@@ -16,6 +16,7 @@ import {
   followPlayhead,
   getMatchingFitTargetId,
   getTimelineTickStep,
+  getZoomLimits,
   panViewport,
   zoomRange,
 } from '../utils/timelineViewport'
@@ -197,6 +198,10 @@ export default function useTimelineViewport({
 
   const displayedFitTargetId = useMemo(() => getMatchingFitTargetId({ viewport, targets: fitTargets }), [fitTargets, viewport])
   const isFullTimelineVisible = displayedFitTargetId === 'all'
+  const { canZoomIn, canZoomOut } = useMemo(
+    () => getZoomLimits({ ...viewport, totalDuration, timelineMinimum, widthPx }),
+    [timelineMinimum, totalDuration, viewport, widthPx],
+  )
 
   // Fit command - applies the canonical target range selected by the toolbar.
   const fitTarget = useCallback(
@@ -339,6 +344,8 @@ export default function useTimelineViewport({
 
   // Viewport API - returns render-ready geometry plus commands for toolbar and gesture hooks.
   return {
+    canZoomIn,
+    canZoomOut,
     containerElement,
     containerRef,
     displayedFitTargetId,

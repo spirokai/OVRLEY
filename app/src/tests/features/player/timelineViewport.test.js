@@ -8,6 +8,7 @@ import {
   followPlayhead,
   getMatchingFitTargetId,
   getTimelineTickStep,
+  getZoomLimits,
   panViewport,
   rangesMatch,
   resolveFitVideoClip,
@@ -15,6 +16,16 @@ import {
 } from '@/features/player/utils/timelineViewport'
 
 describe('timelineViewport utilities', () => {
+  test('tells whether the viewport can zoom further in or out', () => {
+    const bounds = { totalDuration: 100, timelineMinimum: 0, widthPx: 500 }
+    expect(getZoomLimits({ viewStart: 0, viewEnd: 100, ...bounds })).toEqual({ canZoomIn: true, canZoomOut: false })
+    expect(getZoomLimits({ viewStart: 20, viewEnd: 60, ...bounds })).toEqual({ canZoomIn: true, canZoomOut: true })
+
+    let viewport = { viewStart: 0, viewEnd: 100 }
+    for (let step = 0; step < 20; step += 1) viewport = zoomRange({ ...viewport, pivot: 50, direction: 1, ...bounds })
+    expect(getZoomLimits({ ...viewport, ...bounds })).toEqual({ canZoomIn: false, canZoomOut: true })
+  })
+
   test('clamps and fits viewports', () => {
     expect(clampToView(150, 250, 200)).toEqual({ viewStart: 100, viewEnd: 200 })
     expect(fitToFull(2.509)).toEqual({ viewStart: 0, viewEnd: 2.509 })

@@ -118,12 +118,26 @@ function PlayerToolbar({ toolbar, videoSyncMode }) {
     <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
       <div className="flex items-center gap-1">
         <SimpleTooltip side="top" content={t('player.zoomOut', 'Zoom out')}>
-          <Button type="button" aria-label={t('player.zoomOut', 'Zoom out')} size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomOut}>
+          <Button
+            type="button"
+            aria-label={t('player.zoomOut', 'Zoom out')}
+            size="toolbar-icon"
+            variant="toolbar"
+            disabled={toolbar.zoomOut.disabled}
+            onClick={toolbar.zoomOut.onClick}
+          >
             <ZoomOut className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
         <SimpleTooltip side="top" content={t('player.zoomIn', 'Zoom in')}>
-          <Button type="button" aria-label={t('player.zoomIn', 'Zoom in')} size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomIn}>
+          <Button
+            type="button"
+            aria-label={t('player.zoomIn', 'Zoom in')}
+            size="toolbar-icon"
+            variant="toolbar"
+            disabled={toolbar.zoomIn.disabled}
+            onClick={toolbar.zoomIn.onClick}
+          >
             <ZoomIn className="h-4 w-4" />
           </Button>
         </SimpleTooltip>

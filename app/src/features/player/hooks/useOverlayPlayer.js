@@ -440,7 +440,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   // subscribes to the playhead itself.
   const { jumpToEnd, resetToStart, timelineMinimum, totalDuration } = playback
   const { isVideoMuted, toggleVideoMute } = playerStore
-  const { isFullTimelineVisible, resetView, zoomIn, zoomOut } = viewport
+  const { canZoomIn, canZoomOut, isFullTimelineVisible, resetView, zoomIn, zoomOut } = viewport
   const { canCut, cut: cutAtPlayhead, excluded: excludedAtPlayhead, toggleExcluded: toggleExcludedAtPlayhead } = videoCuts
   const toolbar = useMemo(
     () => ({
@@ -481,11 +481,13 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         stepBackward: () => stepBySeconds(-1),
         stepForward: () => stepBySeconds(1),
       },
-      zoomIn,
-      zoomOut,
+      zoomIn: { disabled: !canZoomIn, onClick: zoomIn },
+      zoomOut: { disabled: !canZoomOut, onClick: zoomOut },
     }),
     [
       canCut,
+      canZoomIn,
+      canZoomOut,
       canTrimEnd,
       canTrimStart,
       cutAtPlayhead,

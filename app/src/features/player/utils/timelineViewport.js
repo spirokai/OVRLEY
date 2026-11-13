@@ -72,6 +72,22 @@ function getMinimumZoomSpan(widthPx) {
 }
 
 /**
+ * Whether the viewport can zoom further: in until it reaches the minimum zoom span, out until it shows the whole timeline.
+ *
+ * @param {{ viewStart: number, viewEnd: number, totalDuration: number, timelineMinimum?: number, widthPx?: number }} options
+ * @returns {{ canZoomIn: boolean, canZoomOut: boolean }} Available zoom directions.
+ */
+export function getZoomLimits({ viewStart, viewEnd, totalDuration, timelineMinimum = 0, widthPx = 0 }) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
+  const span = viewEnd - viewStart
+  const minSpan = Math.min(getMinimumZoomSpan(widthPx), bounds.span)
+  return {
+    canZoomIn: span > minSpan + VIEWPORT_MATCH_EPSILON_SECONDS,
+    canZoomOut: span < bounds.span - VIEWPORT_MATCH_EPSILON_SECONDS,
+  }
+}
+
+/**
  * Zooms the viewport by a factor around a pivot point.
  *
  * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number, timelineMinimum?: number, widthPx?: number }} options
