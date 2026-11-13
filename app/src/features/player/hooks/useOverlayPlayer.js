@@ -363,10 +363,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     },
     [selectClip],
   )
+  const cutSnapTargets = useMemo(
+    () => ({ clips: displayedTimeline.clips, activityDurationSeconds: hasActivityData ? activityDurationSeconds : 0 }),
+    [activityDurationSeconds, displayedTimeline.clips, hasActivityData],
+  )
   const cutDrag = useCutDrag({
     moveCut: playerStore.moveCut,
     removeCut: playerStore.requestCutRemoval,
     selectCutClip,
+    snapTargets: cutSnapTargets,
     trimVideo: playerStore.trimVideo,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
@@ -419,12 +424,14 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     }) - PLAYHEAD_CENTER_X,
     viewport.pixelGrid,
   )
+  // One drag runs at a time: the guideline of a dragged cut, or of a dragged clip.
+  const guidelineSecond = cutDrag.snapGuidelineSecond ?? snapGuidelineSecond
   const snapGuidelineLeft =
-    snapGuidelineSecond === null
+    guidelineSecond === null
       ? null
       : roundToDevicePixel(
           secondsToViewPx({
-            second: snapGuidelineSecond,
+            second: guidelineSecond,
             viewStart: viewport.viewport.viewStart,
             viewEnd: viewport.viewport.viewEnd,
             widthPx: viewport.widthPx,

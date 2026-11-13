@@ -3,6 +3,7 @@ import {
   applyCutDraft,
   applyCutDraftToSelection,
   clampCutFrame,
+  cutSnapEdges,
   listEdgeCuts,
   segmentKeptByDroppedCut,
   segmentOfCut,
@@ -41,20 +42,28 @@ describe('outer cuts', () => {
     ]),
   }
 
-  test('the first and last cut reach the edge of the video; a cut never passes its neighbours', () => {
+  test('a cut reaches its neighbouring cuts and the video ends, never past them', () => {
     expect(clampCutFrame(twice, 'first', -20)).toBe(0)
-    expect(clampCutFrame(twice, 'first', 250)).toBe(199)
+    expect(clampCutFrame(twice, 'first', 250)).toBe(200)
+    expect(clampCutFrame(twice, 'last', 50)).toBe(100)
     expect(clampCutFrame(twice, 'last', 400)).toBe(300)
-    expect(clampCutFrame(twice, 'last', 50)).toBe(101)
-    // The only cut is both the first and the last.
-    expect(clampCutFrame(clip, 'cut', -1)).toBe(0)
-    expect(clampCutFrame(clip, 'cut', 301)).toBe(300)
   })
 
-  test('dropped on its edge, the first or last cut keeps the inner part', () => {
+  test('dropped where it closes up a part, a cut keeps the part on its other side', () => {
     expect(segmentKeptByDroppedCut(twice, 'first', 0)).toBe('first')
+    expect(segmentKeptByDroppedCut(twice, 'first', 200)).toBe('start')
+    expect(segmentKeptByDroppedCut(twice, 'last', 100)).toBe('last')
     expect(segmentKeptByDroppedCut(twice, 'last', 300)).toBe('first')
-    expect(segmentKeptByDroppedCut(twice, 'first', 1)).toBeNull()
+    expect(segmentKeptByDroppedCut(twice, 'first', 150)).toBeNull()
+  })
+
+  test('snaps to its video ends and cuts and to the other videos and the activity', () => {
+    const placed = { ...twice, offsetSeconds: 100, durationSeconds: 10, fps: { num: 30, den: 1 } }
+    const targets = { clips: [placed, { id: 'other', offsetSeconds: 120, durationSeconds: 5 }], activityDurationSeconds: 300 }
+
+    expect(cutSnapEdges(placed, 'first', targets)).toEqual([100, 110, 100 + 200 / 30, 120, 125, 0, 300])
+    // An edge cut stops before its video's cuts and does not snap to them.
+    expect(cutSnapEdges(placed, 'edge-start', { ...targets, activityDurationSeconds: 0 })).toEqual([100, 110, 120, 125])
   })
 })
 

@@ -5,6 +5,7 @@
  */
 
 import { segmentBeforeCut } from '@/lib/video-program/collection-edits'
+import { framesToSeconds } from '@/lib/video-program/frame-grid'
 import { FIRST_SEGMENT_KEY } from '@/lib/video-program/video-segments'
 import { videoLaneId } from './timelineGeometry'
 
@@ -63,27 +64,55 @@ export function listEdgeCuts(clip) {
   ]
 }
 
+/** Frames a real cut may be dragged between: its neighbouring cuts, or the video's ends. */
+function cutBounds(clip, cutId) {
+  const index = clip.cuts.findIndex((cut) => cut.id === cutId)
+  return { lower: index === 0 ? 0 : clip.cuts[index - 1].frame, upper: clip.cuts[index + 1]?.frame ?? clip.frameCount }
+}
+
 /**
- * Returns the part kept when a cut dropped at `frame` is removed: the first cut
- * dropped on frame 0 removes the start part and keeps the one after it, the last cut
- * dropped on the last frame removes the end part and keeps the one before it.
- * @param {{cuts: Array<{id: string}>, frameCount: number}} clip Timeline clip.
+ * Returns the part kept when a cut is dropped where it closes up the part on one side
+ * of it, on its neighbouring cut or the video's end: that part goes, and the part on
+ * the other side of the cut grows over it.
+ * @param {{cuts: Array<{id: string, frame: number}>, frameCount: number}} clip Timeline clip.
  * @param {string} cutId Dropped cut.
  * @param {number} frame Frame it was dropped on.
  * @returns {string|null} Key of the kept segment, or null when the cut just moves.
  */
 export function segmentKeptByDroppedCut(clip, cutId, frame) {
   if (edgeCutSide(cutId) !== null) return null
-  if (frame <= 0 && clip.cuts[0]?.id === cutId) return cutId
-  if (frame >= clip.frameCount && clip.cuts.at(-1)?.id === cutId) return segmentBeforeCut(clip, cutId)
+  const { lower, upper } = cutBounds(clip, cutId)
+  if (frame <= lower) return cutId
+  if (frame >= upper) return segmentBeforeCut(clip, cutId)
   return null
 }
 
 /**
- * Resolves the frame a dragged cut goes to. A cut stays strictly between its
- * neighbouring cuts, except that the first and last cuts reach the video's ends,
- * where dropping them removes the outer part (`segmentKeptByDroppedCut`). An edge cut
- * stops before the nearest cut, and dragging it back past its edge leaves no trim.
+ * Timeline seconds a dragged cut snaps to: its video's ends, the video's other cuts,
+ * and, as for a dragged clip, the ends of the other videos and of the activity. An
+ * edge cut does not snap to its video's cuts, which it stops before.
+ * @param {{id: string, offsetSeconds: number, durationSeconds: number, fps: number, cuts: Array<{id: string, frame: number}>}} clip Dragged cut's clip.
+ * @param {string} cutId Dragged cut.
+ * @param {{clips: Array<{id: string, offsetSeconds: number, durationSeconds: number}>, activityDurationSeconds: number}} targets
+ *   Timeline clips, and the activity duration (0 without an activity).
+ * @returns {number[]} Snap targets in timeline seconds.
+ */
+export function cutSnapEdges(clip, cutId, { clips, activityDurationSeconds }) {
+  const ownCuts = edgeCutSide(cutId) !== null ? [] : clip.cuts.filter((cut) => cut.id !== cutId)
+  return [
+    clip.offsetSeconds,
+    clip.offsetSeconds + clip.durationSeconds,
+    ...ownCuts.map((cut) => clip.offsetSeconds + framesToSeconds(cut.frame, clip.fps)),
+    ...clips.filter((other) => other.id !== clip.id).flatMap((other) => [other.offsetSeconds, other.offsetSeconds + other.durationSeconds]),
+    ...(activityDurationSeconds > 0 ? [0, activityDurationSeconds] : []),
+  ]
+}
+
+/**
+ * Resolves the frame a dragged cut goes to. A cut stays between its neighbouring cuts
+ * (or the video's ends) and may reach them, where dropping it removes the part it
+ * closes up (`segmentKeptByDroppedCut`). An edge cut stops before the nearest cut,
+ * and dragging it back past its edge leaves no trim.
  * @param {{cuts: Array<{id: string, frame: number}>, frameCount: number}} clip Timeline clip, possibly showing the dragged cut's draft.
  * @param {string} cutId Dragged cut.
  * @param {number} frame Proposed integer frame.
@@ -96,10 +125,8 @@ export function clampCutFrame(clip, cutId, frame) {
     if (side === 'start') return frame <= 0 ? null : Math.min(frame, (cuts[0]?.frame ?? clip.frameCount) - 1)
     return frame >= clip.frameCount ? null : Math.max(frame, (cuts.at(-1)?.frame ?? 0) + 1)
   }
-  const index = clip.cuts.findIndex((cut) => cut.id === cutId)
-  const lower = index === 0 ? -1 : clip.cuts[index - 1].frame
-  const upper = clip.cuts[index + 1]?.frame ?? clip.frameCount + 1
-  return Math.min(upper - 1, Math.max(lower + 1, frame))
+  const { lower, upper } = cutBounds(clip, cutId)
+  return Math.min(upper, Math.max(lower, frame))
 }
 
 function applyEdgeDraft(clip, side, { cutId, frame }) {
