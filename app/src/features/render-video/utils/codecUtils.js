@@ -4,7 +4,7 @@
  */
 
 import { ACCELERATION_OPTIONS, EXPORT_CODEC_LOOKUP, LEGACY_MP4_CODECS, OUTPUT_FORMATS, OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
-import { QUALITY_DEFAULTS, QUALITY_SLIDER_RANGE } from '../data/qualityDefaults'
+import { QUALITY_DEFAULTS, QUALITY_SLIDER_RANGE, VIDEOTOOLBOX_QUALITY_SCALE } from '../data/qualityDefaults'
 
 /** @param {string} codec Canonical export codec. @returns {boolean} Whether native QSV filter initialization is required. */
 export function isQsvFullCodec(codec) {
@@ -20,6 +20,21 @@ export function getDefaultQuality(codec) {
 /** @param {number} value CRF value or slider position. @returns {number} Reversed value within the configured slider range. */
 export function invertQualityValue(value) {
   return QUALITY_SLIDER_RANGE.min + QUALITY_SLIDER_RANGE.max - value
+}
+
+/**
+ * Formats the rate-control value on the selected encoder's own scale.
+ * VideoToolbox encoders show the 1–100 quality the backend sends them; other encoders show CRF.
+ * @param {{codec: string, qualityType: string, qualityValue: number}} settings Validated render settings.
+ * @returns {string} Display label such as `CRF 21`, `Quality 72` or `40 Mbps`.
+ */
+export function formatQualityValueLabel({ codec, qualityType, qualityValue }) {
+  if (qualityType === 'bitrate') return `${qualityValue} Mbps`
+  const qualityPerCrf = VIDEOTOOLBOX_QUALITY_SCALE.qualityPerCrf[codec]
+  if (qualityPerCrf === undefined) return `CRF ${qualityValue}`
+  const { maxQuality, maxQualityCrf } = VIDEOTOOLBOX_QUALITY_SCALE
+  const quality = Math.round(maxQuality - (qualityValue - maxQualityCrf) * qualityPerCrf)
+  return `Quality ${Math.min(maxQuality, Math.max(1, quality))}`
 }
 
 /** @param {object} settings Render settings entering the store or submission. @returns {void} */

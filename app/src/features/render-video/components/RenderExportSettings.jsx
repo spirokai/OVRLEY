@@ -245,9 +245,7 @@ export default function RenderExportSettings(ctx) {
                 </TabsList>
               </Tabs>
               <span className="rounded bg-surface-strong px-2 py-0.5 text-[0.741rem] font-semibold text-muted-foreground tabular-nums">
-                {ctx.settings.qualityType === 'quality' ? 'CRF ' : ''}
-                {ctx.settings.qualityValue}
-                {ctx.settings.qualityType === 'bitrate' ? ' Mbps' : ''}
+                {ctx.qualityValueLabel}
               </span>
             </div>
             <div className="flex justify-between text-[0.741rem] text-muted-foreground/70">
