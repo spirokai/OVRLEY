@@ -156,11 +156,12 @@ describe('useClipDrag', () => {
     act(() => {
       result.current.updateMetrics({ timelineMinimum: -10, viewEnd: 90, viewStart: -10 })
       result.current.getLaneDragProps('video:video-1').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(80, target))
-      result.current.getLaneDragProps('video:video-1').onPointerUp(createEvent(80, target))
+      // 25 px at 0.4 s per px: from 5 s to -5 s, beyond snapping distance of the activity start.
+      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(75, target))
+      result.current.getLaneDragProps('video:video-1').onPointerUp(createEvent(75, target))
     })
 
-    expect(setVideoOffset).toHaveBeenLastCalledWith('video-1', -3)
+    expect(setVideoOffset).toHaveBeenLastCalledWith('video-1', -5)
   })
 
   test('accumulates keyboard nudges per lane and commits them as one edit', () => {

@@ -4,7 +4,8 @@
 
 import { clamp } from '@/lib/utils'
 
-export const SNAP_THRESHOLD_PX = 5
+/** Snap distance on screen, in CSS pixels. */
+export const SNAP_THRESHOLD_PX = 10
 
 /**
  * Rounds a pixel value to the active device pixel grid.
@@ -86,10 +87,10 @@ export function getClipGeometry({ startSecond, durationSeconds, viewStart, viewE
 }
 
 /**
- * Snaps a proposed clip shift so that one moving clip edge lands on a fixed edge.
+ * Snaps a proposed shift of a dragged clip or cut so that one moving edge lands on a fixed edge.
  *
- * The threshold is expressed in pixels, matching react-moveable's default
- * snapThreshold, and converted to timeline seconds for the current viewport.
+ * The threshold is expressed in screen pixels and converted to timeline seconds for
+ * the current viewport.
  *
  * @param {{ proposedDelta: number, movingEdges: number[], fixedEdges: number[], viewStart: number, viewEnd: number, widthPx: number, thresholdPx?: number }} options Snap inputs.
  * @returns {{ delta: number, guidelineSecond: number|null }} Snapped shift and active guideline.

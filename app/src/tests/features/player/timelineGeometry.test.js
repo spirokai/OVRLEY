@@ -53,8 +53,12 @@ describe('timelineGeometry utilities', () => {
     const viewport = { viewEnd: 100, viewStart: 0, widthPx: 500 }
 
     expect(snapClipDelta({ ...viewport, proposedDelta: 0.5, movingEdges: [0, 20], fixedEdges: [0, 100] })).toEqual({ delta: 0, guidelineSecond: 0 })
-    expect(snapClipDelta({ ...viewport, proposedDelta: 2, movingEdges: [0, 20], fixedEdges: [0, 100] })).toEqual({ delta: 2, guidelineSecond: null })
-    expect(snapClipDelta({ ...viewport, proposedDelta: 2, movingEdges: [0, 20], fixedEdges: [0, 100], thresholdPx: 10 })).toEqual({
+    // 1 px is 0.2 s: 2.5 s is 12.5 px, past the 10 px default.
+    expect(snapClipDelta({ ...viewport, proposedDelta: 2.5, movingEdges: [0, 20], fixedEdges: [0, 100] })).toEqual({
+      delta: 2.5,
+      guidelineSecond: null,
+    })
+    expect(snapClipDelta({ ...viewport, proposedDelta: 2.5, movingEdges: [0, 20], fixedEdges: [0, 100], thresholdPx: 15 })).toEqual({
       delta: 0,
       guidelineSecond: 0,
     })
