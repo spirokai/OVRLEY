@@ -33,7 +33,7 @@ function TrimControls({ trim }) {
       ? t('player.trimVideoAfterPlayhead', 'Trim the video after the playhead')
       : t('player.trimActivityAfterPlayhead', 'Trim the activity after the playhead')
   return (
-    <div className="ml-2 flex items-center gap-1" data-keeps-clip-selection>
+    <div className="ml-2 flex items-center gap-1">
       <SimpleTooltip side="top" content={startLabel}>
         <Button
           type="button"
@@ -75,7 +75,7 @@ function VideoEditControls({ videoEdit }) {
     ? t('player.includeAtPlayhead', 'Include this part in export')
     : t('player.excludeAtPlayhead', 'Exclude this part from export')
   return (
-    <div className="ml-2 flex items-center gap-1" data-keeps-clip-selection>
+    <div className="ml-2 flex items-center gap-1">
       <SimpleTooltip side="top" content={cutLabel}>
         <Button
           type="button"

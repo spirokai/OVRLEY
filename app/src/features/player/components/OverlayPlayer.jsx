@@ -27,6 +27,7 @@ export default function OverlayPlayer({
   return (
     <div
       className="shrink-0 border-border/70 bg-black/30 px-8 py-2"
+      data-keeps-clip-selection
       onFocusCapture={onActivateKeyboardWorkspace}
       onPointerDownCapture={onActivateKeyboardWorkspace}
     >

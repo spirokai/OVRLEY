@@ -77,7 +77,6 @@ function CutMarker({ marker }) {
       aria-label={marker.label}
       className="group/cut relative h-full w-full cursor-ew-resize touch-none bg-transparent outline-none"
       onDoubleClick={stopPropagation}
-      data-keeps-clip-selection
       {...marker.dragProps}
     >
       <span
