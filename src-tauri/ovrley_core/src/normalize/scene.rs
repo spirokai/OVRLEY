@@ -9,6 +9,7 @@ use super::config::SceneConfig;
 use crate::encode::ffmpeg::catalog::{CodecSelection, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
 use ovrley_widgets::model::validation::{require_finite_f64, require_positive_f64, require_u32};
+use ovrley_widgets::widgets::route::sampling::RouteWindow;
 use serde_json::{Map, Value};
 use std::num::NonZeroU32;
 
@@ -116,7 +117,9 @@ pub struct ValidatedSceneConfig {
     pub fps: f64,
     pub start: f64,
     pub end: f64,
-    pub custom_export_range_active: Option<bool>,
+    /// Export range followed by plots that do not show the full activity. Fixed at
+    /// validation, so narrowing `start..end` to render a single frame keeps it.
+    pub export_window: Option<RouteWindow>,
     pub update_rate: NonZeroU32,
     /// Clock origin for elapsed-time widgets, including video lead-in.
     pub export_start_seconds: f64,
@@ -163,7 +166,10 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
     } else {
         start
     };
-    let custom_export_range_active = raw.custom_export_range_active;
+    let export_window = raw
+        .custom_export_range_active
+        .unwrap_or(false)
+        .then_some(RouteWindow { start, end });
     let disabled_laps = validate_disabled_laps(raw.disabled_laps, "scene.disabled_laps")?;
 
     Ok(ValidatedSceneConfig {
@@ -171,7 +177,7 @@ pub fn validate_scene_config(raw: SceneConfig) -> CoreResult<ValidatedSceneConfi
         fps,
         start,
         end,
-        custom_export_range_active,
+        export_window,
         update_rate,
         export_start_seconds,
         disabled_laps,
@@ -189,15 +195,40 @@ pub(crate) fn validate_disabled_laps(laps: Vec<usize>, field: &str) -> CoreResul
 }
 
 impl ValidatedSceneConfig {
-    pub(crate) fn plot_window(
-        &self,
-        show_full_activity: bool,
-    ) -> Option<ovrley_widgets::widgets::route::sampling::RouteWindow> {
-        (self.custom_export_range_active.unwrap_or(false) && !show_full_activity).then_some(
-            ovrley_widgets::widgets::route::sampling::RouteWindow {
-                start: self.start,
-                end: self.end,
-            },
-        )
+    pub(crate) fn plot_window(&self, show_full_activity: bool) -> Option<RouteWindow> {
+        self.export_window.filter(|_| !show_full_activity)
+    }
+
+    /// Narrows the rendered window to the single frame showing activity `second`,
+    /// keeping the export window and clock origin of the full scene. At the scene
+    /// end the frame shifts backward so the window keeps a positive duration.
+    pub fn narrow_to_frame(&mut self, second: f64) {
+        (self.start, self.end) = frame_window(self.start, self.end, self.fps, second);
+    }
+}
+
+fn frame_window(start: f64, end: f64, fps: f64, second: f64) -> (f64, f64) {
+    let frame_duration = 1.0 / fps;
+    let second = second.clamp(start, end);
+    let frame_start = second.clamp(start, (end - frame_duration).max(start));
+    let frame_end = end.min((frame_start + frame_duration).max(second + f64::EPSILON));
+    (frame_start, frame_end)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::frame_window;
+
+    #[test]
+    fn frame_window_is_one_frame_inside_the_scene() {
+        for (second, fps, expected) in [
+            (3.5, 30.0, (3.5, 3.5 + 1.0 / 30.0)),
+            (20.0, 20.0, (19.95, 20.0)),
+            (0.0, 30.0, (2.0, 2.0 + 1.0 / 30.0)),
+        ] {
+            let (start, end) = frame_window(2.0, 20.0, fps, second);
+            assert!((start - expected.0).abs() < 1e-9, "start at {second}");
+            assert!((end - expected.1).abs() < 1e-9, "end at {second}");
+        }
     }
 }

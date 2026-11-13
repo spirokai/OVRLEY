@@ -9,15 +9,14 @@ describe('render request preparation', () => {
     useStore.setState({ parsedActivity: { sample_elapsed_seconds: [0, 10, 20] }, endSecond: 20 })
   })
 
-  test.each([
-    [3.5, 30, 3.5, 3.5 + 1 / 30],
-    [3.5, 29.97, 3.5, 3.5 + 1 / 29],
-    [20, 20, 19.95, 20],
-  ])('prepares a one-frame PNG request at second %s', (selectedSecond, fps, start, end) => {
-    useStore.setState({ selectedSecond, renderSettings: { ...useStore.getState().renderSettings, fps } })
+  test('sends the full export scene with the selected PNG second', () => {
+    useStore.setState({
+      selectedSecond: 3.5,
+      renderSettings: { ...useStore.getState().renderSettings, range: { type: 'custom', from: 2, to: 12 } },
+    })
     const request = createPreviewRenderRequest(useStore.getState())
-    expect(request.config.scene).toMatchObject({ start, end, fps })
-    expect(request.second).toBe(selectedSecond)
+    expect(request.config.scene).toMatchObject({ start: 2, end: 12, custom_export_range_active: true })
+    expect(request.second).toBe(3.5)
     expect(request.parsedActivity).toBe(useStore.getState().parsedActivity)
   })
 

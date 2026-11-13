@@ -440,7 +440,7 @@ pub(crate) fn plan_batch_item(
             update_rate
         },
         export_start_seconds: offset,
-        custom_export_range_active: Some(true),
+        export_window: Some(ovrley_widgets::widgets::route::sampling::RouteWindow { start: coverage.start, end: coverage.end }),
         disabled_laps: disabled_laps.to_vec(),
     };
     let mut config = template.config.clone().with_scene(scene);

@@ -1,6 +1,5 @@
 import { captureVideoSyncTimezoneMode, createBatchCalibration } from '@/lib/video-sync'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
-import { clamp } from '@/lib/utils'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
 import { isQsvFullCodec } from './codecUtils'
 import { createBatchRenderTemplate, createRenderEffectiveConfig } from './renderConfig'
@@ -152,24 +151,6 @@ export function createRenderRequest({ editorSnapshot, settings, language, batchR
   return { target, payload, settings: acceptedSettings }
 }
 
-// PNG requests need a one-frame scene window. At the end of the activity,
-// shift it backward so the renderer still receives a positive duration.
-function buildPreviewFrameWindow({ activityDuration, previewSecond, sceneFps }) {
-  const duration = Math.max(activityDuration, 0)
-  const second = clamp(previewSecond, 0, duration)
-  const frameDuration = 1 / Math.max(Math.trunc(sceneFps), 1)
-
-  if (duration <= 0) {
-    return { start: 0, end: frameDuration }
-  }
-
-  const maxWindowStart = Math.max(duration - frameDuration, 0)
-  const start = clamp(second, 0, maxWindowStart)
-  const end = Math.min(duration, Math.max(start + frameDuration, second + Number.EPSILON))
-
-  return { start, end }
-}
-
 /** @param {object} state Captured editor snapshot. @param {string} language App language naming chart legends. @returns {object} Native preview frame inputs. */
 export function createPreviewRenderRequest(state, language) {
   if (state.parsedActivity === null) throw new Error('No parsed activity available')
@@ -183,8 +164,7 @@ export function createPreviewRenderRequest(state, language) {
     },
     language,
   )
-  const { start, end, fps } = config.scene
-  const window = buildPreviewFrameWindow({ activityDuration: end - start, previewSecond: state.selectedSecond - start, sceneFps: fps })
-  config.scene = { ...config.scene, start: start + window.start, end: start + window.end }
+  // The native renderer narrows the full export scene to the frame at `second`,
+  // keeping the export window that range-scoped plots follow.
   return { config, parsedActivity: state.parsedActivity, second: state.selectedSecond }
 }

@@ -41,7 +41,7 @@ fn minimal_scene() -> ValidatedSceneConfig {
         fps: 1.0,
         start: 0.0,
         end: 3.0,
-        custom_export_range_active: Some(false),
+        export_window: None,
         update_rate: std::num::NonZeroU32::MIN,
         export_start_seconds: 0.0,
         disabled_laps: Vec::new(),
