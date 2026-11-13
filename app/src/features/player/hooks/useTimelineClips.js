@@ -38,6 +38,19 @@ export function videoClipHeightPx() {
   return VIDEO_CLIP_HEIGHT_REM * getRootRemPx()
 }
 
+/** Half the width of a cut marker's line (`w-1` in `TimelineLane`), in pixels. */
+const CUT_LINE_HALF_WIDTH_PX = 2
+
+/**
+ * Whether an edge marker draws its line inside the clip instead of centred on the edge: the lane clips everything
+ * outside the timeline, so a line centred on an edge at the timeline's own edge would lose its outer half.
+ */
+function isEdgeLineInside(align, edgePx, widthPx) {
+  if (align === 'start') return edgePx < CUT_LINE_HALF_WIDTH_PX
+  if (align === 'end') return edgePx > widthPx - CUT_LINE_HALF_WIDTH_PX
+  return false
+}
+
 function clampPx(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
@@ -420,12 +433,15 @@ export default function useTimelineClips({
           const second = clip.offsetSeconds + sourceSecond
           const side = edgeCutSide(cut.id)
           const name = filenameFromSelectedPath(clip.path)
+          const px = secondsToViewPx({ second, viewStart, viewEnd, widthPx })
+          // An edge cut at its edge sits inside the clip; a dragged one is centred on its frame like any cut.
+          const align = cut.frame === 0 ? 'start' : cut.frame === clip.frameCount ? 'end' : 'center'
           return {
             key: `${clip.id}:${cut.id}`,
             isVisible: second >= viewStart && second <= viewEnd,
-            // An edge cut at its edge sits inside the clip; a dragged one is centred on its frame like any cut.
-            align: cut.frame === 0 ? 'start' : cut.frame === clip.frameCount ? 'end' : 'center',
-            style: { left: widthPx > 0 ? `${(secondsToViewPx({ second, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
+            align,
+            isLineInside: isEdgeLineInside(align, px, widthPx),
+            style: { left: widthPx > 0 ? `${(px / widthPx) * 100}%` : '0%' },
             label:
               side === 'start'
                 ? i18next.t('player.trimStart', { defaultValue: 'Drag to trim the start of {{name}}', name })
@@ -447,11 +463,14 @@ export default function useTimelineClips({
         : ['start', 'end']
             .map((edge) => {
               const second = edge === 'start' ? activityTrim.window.startSecond : activityTrim.window.endSecond
+              const px = secondsToViewPx({ second, viewStart, viewEnd, widthPx })
+              const align = second <= 0 ? 'start' : second >= activityDurationSeconds ? 'end' : 'center'
               return {
                 key: `activity:${edge}`,
                 isVisible: second >= viewStart && second <= viewEnd,
-                align: second <= 0 ? 'start' : second >= activityDurationSeconds ? 'end' : 'center',
-                style: { left: widthPx > 0 ? `${(secondsToViewPx({ second, viewStart, viewEnd, widthPx }) / widthPx) * 100}%` : '0%' },
+                align,
+                isLineInside: isEdgeLineInside(align, px, widthPx),
+                style: { left: widthPx > 0 ? `${(px / widthPx) * 100}%` : '0%' },
                 label:
                   edge === 'start'
                     ? i18next.t('player.trimActivityStart', 'Drag to trim the start of the activity')

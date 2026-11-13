@@ -58,10 +58,15 @@ function JoinMarker({ marker }) {
   )
 }
 
+/**
+ * Placement of a cut marker: its hit area is centred on a cut but sits inside the clip at an edge, so grabbing an edge
+ * never catches the neighbouring clip. The line is centred on the cut or edge, or inside the clip at an edge on the
+ * timeline's own edge (`isLineInside`), where the lane would clip its outer half.
+ */
 const CUT_MARKER_ALIGN = {
-  center: { area: '-translate-x-1/2', line: 'left-1/2 -translate-x-1/2' },
-  start: { area: '', line: 'left-0' },
-  end: { area: '-translate-x-full', line: 'right-0' },
+  center: { area: '-translate-x-1/2', line: 'left-1/2 -translate-x-1/2', lineInside: 'left-1/2 -translate-x-1/2' },
+  start: { area: '', line: 'left-0 -translate-x-1/2', lineInside: 'left-0' },
+  end: { area: '-translate-x-full', line: 'right-0 translate-x-1/2', lineInside: 'right-0' },
 }
 
 /**
@@ -81,7 +86,7 @@ function CutMarker({ marker }) {
     >
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-y-0 w-0.75 bg-white transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${align.line} ${
+        className={`pointer-events-none absolute inset-y-0 w-1 bg-primary transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${marker.isLineInside ? align.lineInside : align.line} ${
           marker.isDragging ? 'opacity-100' : 'opacity-0'
         }`}
       />
