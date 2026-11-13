@@ -223,9 +223,12 @@ describe('useOverlayPlayer', () => {
   test('cuts and excludes at the playhead with C and X', () => {
     useStore.setState({ selectedSecond: 15 })
     const { result } = renderHook(() => useOverlayPlayer({ activeKeyboardWorkspace: 'player', backgroundMode: 'black' }))
+    // Cut markers show only on a clip wide enough on screen to drag them apart from the clip.
+    act(() => result.current.timeline.containerProps.ref(createTimelineElement(500)))
     const press = (key) => act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key })))
     const edits = () => useStore.getState().videoEdits['video-1']
-    const markers = () => result.current.timeline.lanes.find((lane) => lane.id === 'video').cutMarkers
+    // Real cuts only: the clip's edges carry trim handles too.
+    const markers = () => result.current.timeline.lanes.find((lane) => lane.id === 'video').cutMarkers.filter((marker) => marker.onRemove !== null)
     expect(result.current.toolbar.videoEdit).toMatchObject({ isVisible: true, canCut: true, excluded: false })
 
     press('c')

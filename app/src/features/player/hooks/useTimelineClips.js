@@ -393,7 +393,7 @@ export default function useTimelineClips({
 
     // Cut markers - a hit area per cut of a clip, in the editing workspace: click to remove, drag to move. An edge
     // whose outer part is still exported is an edge cut: dragging it in trims that end. Clips too narrow on screen
-    // have no edge cuts, so they can still be moved; a dragged edge cut is in the clip's cuts.
+    // have no cut markers at all, so their whole hit area moves them; a dragged edge cut is in the clip's cuts.
     const minEdgeCutClipPx = EDGE_CUT_MIN_CLIP_REM * getRootRemPx()
     const cutMarkers = (program === null || program === undefined ? [] : sortVideosByTimeline(clips))
       .flatMap((clip) => {
@@ -404,7 +404,7 @@ export default function useTimelineClips({
           viewEnd,
           widthPx,
         }).width
-        const cuts = [...clip.cuts, ...(clipWidthPx >= minEdgeCutClipPx ? listEdgeCuts(clip) : [])]
+        const cuts = clipWidthPx >= minEdgeCutClipPx ? [...clip.cuts, ...listEdgeCuts(clip)] : []
         // A fixed order (start edge, cuts, end edge) keeps a dragged edge cut's element in place, and its pointer capture.
         const bySide = (side) => cuts.filter((cut) => edgeCutSide(cut.id) === side)
         return [...bySide('start'), ...bySide(null), ...bySide('end')].map((cut) => {

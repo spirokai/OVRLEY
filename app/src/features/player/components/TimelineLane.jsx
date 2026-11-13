@@ -122,7 +122,11 @@ function TimelineSegment({ segment }) {
       style={segment.style}
     >
       {segment.tiles.length > 0 ? (
-        <div data-testid="timeline-filmstrip" aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div
+          data-testid="timeline-filmstrip"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xs border border-primary"
+        >
           {segment.tiles.map((tile) => (
             <div key={tile.key} className="absolute inset-y-0 bg-no-repeat" style={tile.style} />
           ))}
@@ -131,7 +135,9 @@ function TimelineSegment({ segment }) {
       {segment.excluded ? (
         <div data-testid="timeline-excluded-segment" aria-hidden="true" className={`pointer-events-none absolute inset-0 z-10 ${EXCLUDED_STRIPES}`} />
       ) : null}
-      {segment.isSelected ? <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 ring-2 ring-foreground" /> : null}
+      {segment.isSelected ? (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 rounded-xs ring-2 ring-inset ring-primary" />
+      ) : null}
     </div>
   )
 }
@@ -141,7 +147,7 @@ function TimelineClipBadge({ clip }) {
   const Icon = clip.icon
   return (
     <div className="pointer-events-none absolute top-0 z-20 flex p-1" style={clip.badgeStyle}>
-      <span className="flex min-w-0 items-center gap-1 rounded-sm bg-background/80 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none text-foreground shadow-sm">
+      <span className="flex min-w-0 items-center gap-2 rounded-xs bg-background/90 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none text-foreground shadow-sm">
         <Icon className="h-3 w-3 shrink-0" strokeWidth={3} aria-hidden="true" />
         <span className="min-w-0 truncate">{clip.label}</span>
         <span className="shrink-0 tabular-nums text-muted-foreground">{clip.durationLabel}</span>
@@ -161,9 +167,9 @@ function TimelineClip({ clip }) {
       style={clip.clipStyle}
       {...clip.clipProps}
     >
-      <div
-        className={`absolute inset-0 overflow-visible ${clip.hasSelectedSegment ? '' : 'group-focus-visible:ring-2 group-focus-visible:ring-foreground'} ${clip.isSelected ? 'ring-2 ring-foreground' : ''} ${clip.clipClassName}`}
-      >
+      {/* A clip only a few pixels wide on screen still has a grabbable hit area, centred on it. */}
+      <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-full min-w-6 -translate-x-1/2" />
+      <div className={`absolute inset-0 overflow-visible ${clip.clipClassName}`}>
         {clip.segments.map((segment) => (
           <TimelineSegment key={segment.key} segment={segment} />
         ))}
@@ -193,6 +199,13 @@ function TimelineClip({ clip }) {
             <span className={`shrink-0 pl-1 tabular-nums leading-none ${clip.clipContentClassName}`}>{clip.durationLabel}</span>
           </div>
         )}
+        {/* The outline sits inside the clip, above its stripes: drawn outside, the lane below would cover its bottom side. */}
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-0 z-30 rounded-xs ring-2 ring-inset ring-primary ${
+            clip.isSelected ? '' : clip.hasSelectedSegment ? 'hidden' : 'hidden group-focus-visible:block'
+          }`}
+        />
       </div>
     </button>
   )
