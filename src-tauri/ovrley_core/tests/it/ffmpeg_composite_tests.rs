@@ -403,18 +403,20 @@ fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
 }
 
 #[test]
-fn test_8_5_videotoolbox_h264_simple_path_when_available() {
-    let built = settings_for_codec(
-        "h264_videotoolbox",
-        "10M",
-        Fps::new(30, 1).unwrap(),
-        Fps::new(30, 1).unwrap(),
-        0.0,
-    );
+fn test_8_5_videotoolbox_simple_path_hands_encoder_nv12() {
+    for codec in ["h264_videotoolbox", "hevc_videotoolbox"] {
+        let built = settings_for_codec(
+            codec,
+            "10M",
+            Fps::new(30, 1).unwrap(),
+            Fps::new(30, 1).unwrap(),
+            0.0,
+        );
 
-    assert_argument_pair(&built.output_args, "-c:v", "h264_videotoolbox");
-    assert_argument_pair(&built.output_args, "-b:v", "10M");
-    assert!(built.filter_complex.contains("format=yuv420p[out]"));
+        assert_argument_pair(&built.output_args, "-c:v", codec);
+        assert_argument_pair(&built.output_args, "-b:v", "10M");
+        assert!(built.filter_complex.contains("format=nv12[out]"));
+    }
 }
 
 #[test]
