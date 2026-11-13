@@ -67,7 +67,7 @@ fn prores_videotoolbox_defaults() -> CoreResult<()> {
         "loglevel": "info"
     }))?;
     assert_eq!(settings.extension, "mov");
-    assert_argument_pair(&settings.output_args, "-pix_fmt", "yuva444p10le");
+    assert_argument_pair(&settings.output_args, "-pix_fmt", "bgra");
     Ok(())
 }
 
