@@ -1,13 +1,14 @@
 /**
  * Horizontal drag of cut markers, including a clip's edge cuts: the cut follows the
  * pointer frame by frame and is committed once, on release, so the drag is one undo
- * step. Releasing an edge cut trims that end of the video. Pressing a cut keeps its
- * clip selected, or selects the segment it belongs to.
+ * step. Releasing an edge cut trims that end of the video; releasing the first or last
+ * cut on the video's edge removes the outer part. Pressing a cut keeps its clip
+ * selected, or selects the segment it belongs to.
  */
 
 import { useCallback, useRef, useState } from 'react'
 import { framesToSeconds, secondsToFrames } from '@/lib/video-program/frame-grid'
-import { clampCutFrame, edgeCutSide } from '../utils/cutDrag'
+import { clampCutFrame, edgeCutSide, segmentKeptByDroppedCut } from '../utils/cutDrag'
 import { viewPxToSeconds } from '../utils/timelineGeometry'
 
 const DRAG_THRESHOLD_PX = 3
@@ -19,13 +20,14 @@ const DRAG_THRESHOLD_PX = 3
  * @param {object} options Drag inputs.
  * @param {(videoId: string, cutId: string, frame: number) => void} options.moveCut Commits a cut's new frame.
  * @param {(videoId: string, side: 'start'|'end', frame: number) => void} options.trimVideo Commits a dragged edge cut.
+ * @param {(videoId: string, cutId: string, options: {keep: string}) => void} options.removeCut Removes a first or last cut dropped on its edge, keeping the inner part.
  * @param {(clip: object, cut: {id: string, frame: number}) => void} options.selectCutClip Keeps or selects the pressed cut's clip.
  * @param {number} options.viewStart Visible viewport start second.
  * @param {number} options.viewEnd Visible viewport end second.
  * @param {number} options.widthPx Measured timeline width.
  * @returns {{draft: {videoId: string, cutId: string, frame: number}|null, getCutDragProps: function}} Dragged cut and marker props.
  */
-export default function useCutDrag({ moveCut, selectCutClip, trimVideo, viewStart, viewEnd, widthPx }) {
+export default function useCutDrag({ moveCut, removeCut, selectCutClip, trimVideo, viewStart, viewEnd, widthPx }) {
   const [draft, setDraft] = useState(null)
   const gestureRef = useRef(null)
   const suppressClickRef = useRef(false)
@@ -68,8 +70,10 @@ export default function useCutDrag({ moveCut, selectCutClip, trimVideo, viewStar
           setDraft(null)
           if (gesture.frame === gesture.startFrame) return
           const side = edgeCutSide(cut.id)
-          if (side === null) moveCut(clip.id, cut.id, gesture.frame)
-          else trimVideo(clip.id, side, gesture.frame)
+          const keptSegment = segmentKeptByDroppedCut(clip, cut.id, gesture.frame)
+          if (side !== null) trimVideo(clip.id, side, gesture.frame)
+          else if (keptSegment !== null) removeCut(clip.id, cut.id, { keep: keptSegment })
+          else moveCut(clip.id, cut.id, gesture.frame)
         },
         onPointerCancel: () => {
           gestureRef.current = null
@@ -83,7 +87,7 @@ export default function useCutDrag({ moveCut, selectCutClip, trimVideo, viewStar
         },
       }
     },
-    [moveCut, selectCutClip, trimVideo, viewEnd, viewStart, widthPx],
+    [moveCut, removeCut, selectCutClip, trimVideo, viewEnd, viewStart, widthPx],
   )
 
   return { draft, getCutDragProps }

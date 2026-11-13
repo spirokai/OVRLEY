@@ -365,6 +365,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
   )
   const cutDrag = useCutDrag({
     moveCut: playerStore.moveCut,
+    removeCut: playerStore.requestCutRemoval,
     selectCutClip,
     trimVideo: playerStore.trimVideo,
     viewEnd: viewport.viewport.viewEnd,

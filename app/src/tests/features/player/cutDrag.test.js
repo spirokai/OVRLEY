@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vite-plus/test'
-import { applyCutDraft, applyCutDraftToSelection, clampCutFrame, listEdgeCuts, segmentOfCut } from '@/features/player/utils/cutDrag'
+import {
+  applyCutDraft,
+  applyCutDraftToSelection,
+  clampCutFrame,
+  listEdgeCuts,
+  segmentKeptByDroppedCut,
+  segmentOfCut,
+} from '@/features/player/utils/cutDrag'
 import { cutEdits } from '@/tests/helpers/videoFixtures'
 
 // 300 frames, cut at frame 150; the part after it is excluded.
@@ -20,6 +27,34 @@ describe('cut selection', () => {
     })
     expect(applyCutDraftToSelection(selection, { videoId: 'ride', cutId: 'edge-end', frame: 280 })).toBe(selection)
     expect(applyCutDraftToSelection(selection, null)).toBe(selection)
+  })
+})
+
+describe('outer cuts', () => {
+  // 300 frames, cut at 100 and 200.
+  const twice = {
+    id: 'ride',
+    frameCount: 300,
+    ...cutEdits([
+      { id: 'first', frame: 100 },
+      { id: 'last', frame: 200 },
+    ]),
+  }
+
+  test('the first and last cut reach the edge of the video; a cut never passes its neighbours', () => {
+    expect(clampCutFrame(twice, 'first', -20)).toBe(0)
+    expect(clampCutFrame(twice, 'first', 250)).toBe(199)
+    expect(clampCutFrame(twice, 'last', 400)).toBe(300)
+    expect(clampCutFrame(twice, 'last', 50)).toBe(101)
+    // The only cut is both the first and the last.
+    expect(clampCutFrame(clip, 'cut', -1)).toBe(0)
+    expect(clampCutFrame(clip, 'cut', 301)).toBe(300)
+  })
+
+  test('dropped on its edge, the first or last cut keeps the inner part', () => {
+    expect(segmentKeptByDroppedCut(twice, 'first', 0)).toBe('first')
+    expect(segmentKeptByDroppedCut(twice, 'last', 300)).toBe('first')
+    expect(segmentKeptByDroppedCut(twice, 'first', 1)).toBeNull()
   })
 })
 

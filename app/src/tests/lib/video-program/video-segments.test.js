@@ -106,11 +106,11 @@ describe('cut edits', () => {
     expect(segmentBeforeCut(draft.videoEdits.ride, first)).toBe('start')
     expect(segmentBeforeCut(draft.videoEdits.ride, second)).toBe(first)
 
-    removeCut(draft, 'ride', second, true)
+    removeCut(draft, 'ride', second, { excluded: true, skipOverlay: false })
     expect(draft.videoEdits.ride.cuts).toEqual([{ id: first, frame: 100 }])
     expect(draft.videoEdits.ride.segments[first]).toEqual({ excluded: true, transitionIn: fade, skipOverlay: false })
     expect(draft.videoEdits.ride.segments[second]).toBeUndefined()
-    expect(() => removeCut(draft, 'ride', 'missing', false)).toThrow(/Unknown cut/)
+    expect(() => removeCut(draft, 'ride', 'missing', { excluded: false, skipOverlay: false })).toThrow(/Unknown cut/)
   })
 
   test('segment edits require a known segment and a valid transition', () => {

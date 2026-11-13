@@ -75,14 +75,22 @@ describe('VideoDrawerContent', () => {
 
     expect(screen.getByText('Parts')).toBeInTheDocument()
     expect(screen.getAllByRole('switch', { name: /^Include in export: ride\.mp4/ })).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: /^Remove the cut at/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Remove this part/ })).not.toBeInTheDocument()
 
+    // A trimmed start: the excluded first part before the cut.
     act(() =>
-      useStore.setState((state) => ({ videoEdits: { 'video-1': { ...state.videoEdits['video-1'], ...cutEdits([{ id: 'cut-1', frame: 600 }]) } } })),
+      useStore.setState((state) => ({
+        videoEdits: { 'video-1': { ...state.videoEdits['video-1'], ...cutEdits([{ id: 'cut-1', frame: 600 }], { excluded: true }) } },
+      })),
     )
 
     expect(screen.getAllByRole('switch', { name: /^Include in export: ride\.mp4/ })).toHaveLength(2)
-    expect(screen.getAllByRole('button', { name: /^Remove the cut at/ })).toHaveLength(1)
+    expect(screen.getByRole('button', { name: 'Remove this part, joining it to the previous part' })).toBeInTheDocument()
+    // Removing the trimmed-off part restores it as part of the next one, without asking.
+    fireEvent.click(screen.getByRole('button', { name: 'Remove this part, joining it to the next part' }))
+    expect(useStore.getState().cutRemovalRequest).toBeNull()
+    expect(useStore.getState().videoEdits['video-1'].cuts).toEqual([])
+    expect(useStore.getState().videoEdits['video-1'].segments.start.excluded).toBe(false)
   })
 
   test('offers to locate the file of a selected missing video', () => {

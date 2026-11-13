@@ -31,8 +31,10 @@ export function groupVideoJoins(program) {
 
 /**
  * Builds the rows of a clip's parts in source order. A part has a transition control
- * when a join from an earlier part of the clip leads into it, and every part but the
- * first starts at a removable cut.
+ * when a join from an earlier part of the clip leads into it. Removing a part of a cut
+ * clip merges it into the part before it (the first part into the part after it),
+ * which keeps its own export and overlay state, so removing an excluded part restores
+ * that stretch as part of its neighbour.
  * @param {object} options Row inputs.
  * @param {object} options.clip Timeline clip (video joined with its edits).
  * @param {Map<string, object>} options.joinModels Transition controls keyed by join key (`useJoinTransitionModels`).
@@ -42,10 +44,18 @@ export function groupVideoJoins(program) {
  * @returns {Array<object>} Presentational rows.
  */
 export function buildVideoSegmentRows({ clip, joinModels, partJoinKeys, commands }) {
-  return listVideoSegments(clip).map((segment, index) => {
+  const segments = listVideoSegments(clip)
+  return segments.map((segment, index) => {
     const startSecond = framesToSeconds(segment.startFrame, clip.fps)
     const endSecond = framesToSeconds(segment.endFrame, clip.fps)
     const joinKey = segmentJoinKey(clip.id, segment.key)
+    // A cut's ID keys the segment after it: a part starts at its own key's cut and the first part ends at the second part's.
+    const merge =
+      index > 0
+        ? { cutId: segment.key, keep: segments[index - 1].key, into: 'previous' }
+        : segments.length > 1
+          ? { cutId: segments[1].key, keep: segments[1].key, into: 'next' }
+          : null
     return {
       key: segment.key,
       startLabel: formatClockDuration(startSecond),
@@ -56,7 +66,8 @@ export function buildVideoSegmentRows({ clip, joinModels, partJoinKeys, commands
       showsOverlay: !segment.skipOverlay,
       onShowsOverlayChange: (shows) => commands.setVideoSegmentSkipOverlay(clip.id, segment.key, !shows),
       onSeek: () => commands.seek(clip.offsetSeconds + startSecond),
-      onRemoveCut: index === 0 ? null : () => commands.requestCutRemoval(clip.id, segment.key),
+      mergesInto: merge?.into ?? null,
+      onRemove: merge === null ? null : () => commands.requestCutRemoval(clip.id, merge.cutId, { keep: merge.keep }),
     }
   })
 }

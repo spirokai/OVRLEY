@@ -349,17 +349,27 @@ export function moveCut(draft, videoId, cutId, frame) {
 }
 
 /**
- * Removes a cut, merging its two segments. The merged segment keeps the earlier
- * segment's transition and takes the given export state.
+ * Removes a cut, merging its two segments under the earlier segment's key. The merged
+ * segment starts where the earlier one does, so it keeps the earlier segment's
+ * incoming transition (merging into an excluded first part takes back the video's
+ * incoming transition from the part after it, where `trimVideo` handed it), and it
+ * takes the given export and overlay state.
  * @param {object} draft Collection draft.
  * @param {string} videoId Video ID.
  * @param {string} cutId Cut ID.
- * @param {boolean} excluded Export state of the merged segment.
+ * @param {{excluded: boolean, skipOverlay: boolean}} state Export and overlay state of the merged segment.
  */
-export function removeCut(draft, videoId, cutId, excluded) {
+export function removeCut(draft, videoId, cutId, { excluded, skipOverlay }) {
   findVideo(draft, videoId)
   const edits = draft.videoEdits[videoId]
-  edits.segments[segmentBeforeCut(edits, cutId)].excluded = excluded
+  const earlierKey = segmentBeforeCut(edits, cutId)
+  const earlier = edits.segments[earlierKey]
+  const startsTrimmedVideo = earlierKey === FIRST_SEGMENT_KEY && earlier.excluded
+  edits.segments[earlierKey] = {
+    excluded,
+    skipOverlay,
+    transitionIn: startsTrimmedVideo ? edits.segments[cutId].transitionIn : earlier.transitionIn,
+  }
   edits.cuts = edits.cuts.filter((cut) => cut.id !== cutId)
   delete edits.segments[cutId]
 }

@@ -40,7 +40,10 @@ function SegmentCard({ segment, filename }) {
   const includedLabel = t('toolbar.includeInExport', 'Include in export')
   const overlayLabel = t('toolbar.showOverlay', 'Show overlay')
   const hideOverlayLabel = t('toolbar.hideOverlay', 'Hide overlay')
-  const removeCutLabel = t('toolbar.removeCutAt', { defaultValue: 'Remove the cut at {{time}}', time: segment.startLabel })
+  const removeLabel =
+    segment.mergesInto === 'next'
+      ? t('toolbar.removePartIntoNext', 'Remove this part, joining it to the next part')
+      : t('toolbar.removePartIntoPrevious', 'Remove this part, joining it to the previous part')
   return (
     <li
       data-included={segment.included}
@@ -55,15 +58,15 @@ function SegmentCard({ segment, filename }) {
           {segment.startLabel} – {segment.endLabel}
         </button>
       </SimpleTooltip>
-      {segment.onRemoveCut !== null ? (
-        <SimpleTooltip content={removeCutLabel}>
+      {segment.onRemove !== null ? (
+        <SimpleTooltip content={removeLabel}>
           <Button
             type="button"
             variant="ghost"
             size="icon"
             className="h-7 w-7 text-muted-foreground/60 transition-colors hover:bg-surface-accent-soft hover:text-primary"
-            onClick={segment.onRemoveCut}
-            aria-label={removeCutLabel}
+            onClick={segment.onRemove}
+            aria-label={removeLabel}
           >
             <Trash2 className="size-4" />
           </Button>

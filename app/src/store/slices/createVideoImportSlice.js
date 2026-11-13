@@ -44,6 +44,17 @@ function clampPlayheadToVideos(draft, deltaSeconds) {
   draft.selectedSecond = clamp(draft.selectedSecond + deltaSeconds, timelineMinimum, totalDuration)
 }
 
+/**
+ * Removes a cut (see `removeCut`). A selected segment that goes with it stays selected
+ * as the merged segment.
+ */
+function applyCutRemoval(draft, videoId, cutId, state) {
+  const mergedKey = segmentBeforeCut(draft.videoEdits[videoId], cutId)
+  removeCut(draft, videoId, cutId, { excluded: state.excluded, skipOverlay: state.skipOverlay })
+  const selection = draft.selectedClip
+  if (selection?.laneId === videoLaneId(videoId) && selection.segmentKey === cutId) selection.segmentKey = mergedKey
+}
+
 export const createVideoImportSlice = (set, get) => ({
   importedVideos: [], // canonical imported-video entities (see createImportedVideo)
   videoEdits: {}, // undoable user edits keyed by video ID (see createVideoEdits)
@@ -237,13 +248,23 @@ export const createVideoImportSlice = (set, get) => ({
 
   /**
    * Removes a cut. Segments in the same export state merge at once; otherwise the
-   * user chooses the state of the merged segment (`resolveCutRemoval`).
+   * user chooses the state of the merged segment (`resolveCutRemoval`). With `keep`,
+   * the merged segment takes that segment's state and nothing is asked: a first or
+   * last cut dropped on its edge keeps the inner part.
+   * @param {string} videoId Video ID.
+   * @param {string} cutId Cut ID.
+   * @param {{keep?: string}} [options] Key of the segment (either side of the cut) whose state the merged segment takes.
    */
-  requestCutRemoval: (videoId, cutId) => {
+  requestCutRemoval: (videoId, cutId, { keep } = {}) => {
     const edits = get().videoEdits[videoId]
     const earlier = edits.segments[segmentBeforeCut(edits, cutId)]
+    if (keep !== undefined) {
+      const kept = edits.segments[keep]
+      set((draft) => applyCutRemoval(draft, videoId, cutId, kept))
+      return
+    }
     if (earlier.excluded === edits.segments[cutId].excluded) {
-      set((draft) => removeCut(draft, videoId, cutId, earlier.excluded))
+      set((draft) => applyCutRemoval(draft, videoId, cutId, earlier))
       return
     }
     set({ cutRemovalRequest: { videoId, cutId } })
@@ -253,7 +274,8 @@ export const createVideoImportSlice = (set, get) => ({
   resolveCutRemoval: (excluded) => {
     const { videoId, cutId } = get().cutRemovalRequest
     set((draft) => {
-      removeCut(draft, videoId, cutId, excluded)
+      const edits = draft.videoEdits[videoId]
+      applyCutRemoval(draft, videoId, cutId, { excluded, skipOverlay: edits.segments[segmentBeforeCut(edits, cutId)].skipOverlay })
       draft.cutRemovalRequest = null
     })
   },
