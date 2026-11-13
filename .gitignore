@@ -64,5 +64,6 @@ tmp/
 .agents/release-notes.md
 .agents/scratch/
 .claude/skills
+.claude/settings.local.json
 .agents/plans/
 .vite-hooks/
