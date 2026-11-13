@@ -14,7 +14,8 @@ pub struct CompositeProfile {
     pub input_args: &'static [&'static str],
     pub filter_complex: Option<&'static str>,
     pub output_args: &'static [&'static str],
-    /// Uses `{quality}` or `{videotoolbox_quality}` value placeholders.
+    /// Uses `{quality}`, `{videotoolbox_h264_quality}` or
+    /// `{videotoolbox_hevc_quality}` value placeholders.
     pub quality_args: &'static [&'static str],
     /// Uses `{bitrate}`, `{maxrate}`, and `{bufsize}` values in Mbps.
     pub bitrate_args: &'static [&'static str],
@@ -319,7 +320,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         input_args: &["-hwaccel", "videotoolbox"],
         filter_complex: Some(SOFTWARE_H264_FILTER),
         output_args: &["-prio_speed", "1"],
-        quality_args: &["-global_quality", "{videotoolbox_quality}"],
+        quality_args: &["-global_quality", "{videotoolbox_h264_quality}"],
         bitrate_args: &[
             "-b:v",
             "{bitrate}",
@@ -336,7 +337,7 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         filter_complex: Some(SOFTWARE_HEVC_FILTER),
         // Speed priority roughly doubles 4K media-engine HEVC throughput.
         output_args: &["-tag:v", "hvc1", "-prio_speed", "1"],
-        quality_args: &["-global_quality", "{videotoolbox_quality}"],
+        quality_args: &["-global_quality", "{videotoolbox_hevc_quality}"],
         bitrate_args: &[
             "-b:v",
             "{bitrate}",
