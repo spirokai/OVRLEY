@@ -576,15 +576,66 @@ export async function getVideoThumbnail(path) {
 }
 
 /**
- * Renders the timeline filmstrip of a video: `sampleCount` keyframes `intervalSeconds` apart, in one sprite sheet.
- * @param {{path: string, intervalSeconds: number, sampleCount: number, frameWidth: number, frameHeight: number, hwaccel: string|null}} request
- *   Absolute source path, sampling, frame size in pixels, and the hardware decoder (`cuda`, `vaapi`, `d3d11va`,
- *   `videotoolbox`) or null for software decoding.
- * @returns {Promise<{spriteJpegBase64: string, columns: number, rows: number}|null>} Sprite sheet (base64 JPEG, sample `i`
- *   at column `i % columns`, row `i / columns`), or null when no frame could be decoded.
+ * Which stretch of a video a filmstrip covers: the whole video, or window `window` of zoom level `level` (frames
+ * `10 s × 2^level` apart, 24 frames per window).
+ * @typedef {{kind: 'base'}|{kind: 'zoom', level: number, window: number}} FilmstripWindow
+ */
+
+/**
+ * A timeline filmstrip: a base64 JPEG with its frames side by side, sample `i` standing for the source stretch from
+ * `startSeconds + i × spacingSeconds` to the next sample.
+ * @typedef {{spriteJpegBase64: string, startSeconds: number, spacingSeconds: number, sampleCount: number}} VideoFilmstrip
+ */
+
+/**
+ * Reads a timeline filmstrip from the disk cache without decoding anything.
+ * @param {{path: string, durationSeconds: number, window: FilmstripWindow, frameWidth: number, frameHeight: number}} request
+ *   Absolute source path, the video's duration, the strip's window, and the frame size in pixels.
+ * @returns {Promise<VideoFilmstrip|null>} The cached strip, or null on a cache miss.
+ */
+export async function getCachedVideoFilmstrip(request) {
+  return invokeCommand('backend_cached_video_filmstrip', request)
+}
+
+/**
+ * Reads a timeline filmstrip from the disk cache, or decodes and caches it.
+ * @param {{path: string, durationSeconds: number, window: FilmstripWindow, frameWidth: number, frameHeight: number, hwaccel: string|null}} request
+ *   As for `getCachedVideoFilmstrip`, plus the hardware decoder (`cuda`, `vaapi`, `d3d11va`, `videotoolbox`) or null
+ *   for software decoding.
+ * @returns {Promise<VideoFilmstrip|null>} The strip, or null when no frame could be decoded.
  */
 export async function getVideoFilmstrip(request) {
   return invokeCommand('backend_video_filmstrip', request)
+}
+
+/**
+ * The filmstrip cache's size and limit, in bytes. Every cache command returns this shape.
+ * @typedef {{usedBytes: number, limitBytes: number, minLimitBytes: number, maxLimitBytes: number, limitStepBytes: number}} FilmstripCacheUsage
+ */
+
+/**
+ * Reads the filmstrip cache usage. The cache only exists in the desktop runtime.
+ * @returns {Promise<FilmstripCacheUsage>} Current usage and limit bounds.
+ */
+export function getFilmstripCache() {
+  return invokeCommand('backend_get_filmstrip_cache')
+}
+
+/**
+ * Saves and applies a new filmstrip cache limit; least recently used strips are evicted down to it.
+ * @param {number} limitBytes New limit: a multiple of `limitStepBytes` within the bounds.
+ * @returns {Promise<FilmstripCacheUsage>} Usage after eviction.
+ */
+export function setFilmstripCacheLimit(limitBytes) {
+  return invokeCommand('backend_set_filmstrip_cache_limit', { limitBytes })
+}
+
+/**
+ * Deletes every cached filmstrip. Strips already on the timeline stay until their videos leave it.
+ * @returns {Promise<FilmstripCacheUsage>} Usage after clearing.
+ */
+export function clearFilmstripCache() {
+  return invokeCommand('backend_clear_filmstrip_cache')
 }
 
 /**

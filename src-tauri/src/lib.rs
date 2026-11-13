@@ -43,6 +43,7 @@ mod project_file;
 mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
+mod filmstrip_cache;
 mod video_filmstrip;
 mod video_thumbnail;
 mod widget_preview;
@@ -119,7 +120,11 @@ pub fn run() {
             tauri_commands::backend_clear_preview_videos,
             tauri_commands::backend_get_preview_videos,
             video_thumbnail::backend_video_thumbnail,
+            video_filmstrip::backend_cached_video_filmstrip,
             video_filmstrip::backend_video_filmstrip,
+            video_filmstrip::backend_get_filmstrip_cache,
+            video_filmstrip::backend_set_filmstrip_cache_limit,
+            video_filmstrip::backend_clear_filmstrip_cache,
             tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
@@ -163,11 +168,16 @@ pub fn run() {
                 ))),
             });
 
-            let map_tile_service = map_tile_service::MapTileService::for_application_cache(
-                app.path()
-                    .app_cache_dir()
-                    .map_err(|error| error.to_string())?,
-            )?;
+            let application_cache = app
+                .path()
+                .app_cache_dir()
+                .map_err(|error| error.to_string())?;
+            app.manage(filmstrip_cache::FilmstripCache::for_application_cache(
+                &application_cache,
+                filmstrip_cache::persisted_filmstrip_cache_limit(app.handle())?,
+            )?);
+            let map_tile_service =
+                map_tile_service::MapTileService::for_application_cache(application_cache)?;
             app.state::<video_server::VideoServerHandle>()
                 .start_with_map_tile_service(map_tile_service)?;
 

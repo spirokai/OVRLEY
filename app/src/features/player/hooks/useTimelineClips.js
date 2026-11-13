@@ -9,7 +9,7 @@ import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { formatClockDuration } from '@/lib/time-format'
 import { edgeCutSide, listEdgeCuts } from '../utils/cutDrag'
-import { listFilmstripTiles } from '../utils/filmstripTiles'
+import { filmstripTileWidthPx, listFilmstripTiles } from '../utils/filmstripTiles'
 import { ACTIVITY_LANE_ID, getClipGeometry, secondsToViewPx, videoLaneId } from '../utils/timelineGeometry'
 import { getActivityAttributeLabel } from '@/lib/widget/widget-presentation'
 import { framesToSeconds } from '@/lib/video-program/frame-grid'
@@ -33,6 +33,11 @@ function getRootRemPx() {
   return Number.parseFloat(window.getComputedStyle?.(document.documentElement).fontSize) || 16
 }
 
+/** Height of a video clip in pixels: the height of its filmstrip tiles. */
+export function videoClipHeightPx() {
+  return VIDEO_CLIP_HEIGHT_REM * getRootRemPx()
+}
+
 function clampPx(value, min, max) {
   return Math.min(max, Math.max(min, value))
 }
@@ -46,8 +51,8 @@ function clipRangeStyle(fromSecond, toSecond, durationSeconds) {
  *
  * @param {object} clip Displayed video clip.
  * @param {string|null} selectedSegmentKey Selected segment of the clip.
- * @param {{filmstrip: object, clipLeftPx: number, pxPerSecond: number, tileWidthPx: number, widthPx: number}|null} filmstripView
- *   The clip's ready filmstrip and its placement in the viewport, or null when the clip shows no filmstrip.
+ * @param {{strips: object[], clipLeftPx: number, pxPerSecond: number, tileWidthPx: number, widthPx: number}|null} filmstripView
+ *   The ready strips of the clip's video and its placement in the viewport, or null when the clip shows no filmstrip.
  */
 function segmentModels(clip, selectedSegmentKey, filmstripView) {
   const segments = listVideoSegments(clip)
@@ -66,7 +71,7 @@ function segmentModels(clip, selectedSegmentKey, filmstripView) {
         filmstripView === null
           ? []
           : listFilmstripTiles({
-              filmstrip: filmstripView.filmstrip,
+              strips: filmstripView.strips,
               sourceStartSecond,
               sourceEndSecond,
               leftPx: filmstripView.clipLeftPx + sourceStartSecond * filmstripView.pxPerSecond,
@@ -78,14 +83,17 @@ function segmentModels(clip, selectedSegmentKey, filmstripView) {
   })
 }
 
-/** Filmstrip placement of a video clip, or null when its filmstrip is not ready or the clip is off screen. */
-function clipFilmstripView(clip, filmstrip, geometry, { viewStart, viewEnd, widthPx }) {
-  if (filmstrip?.status !== 'ready' || !geometry.isVisible) return null
+/**
+ * Filmstrip placement of a video clip with the ready strips of its video, or null until its base strip is ready or
+ * while the clip is off screen. Zoom windows still loading leave their tiles on the base strip.
+ */
+function clipFilmstripView(clip, strips, geometry, { viewStart, viewEnd, widthPx }) {
+  if (strips?.base?.status !== 'ready' || !geometry.isVisible) return null
   return {
-    filmstrip,
+    strips: Object.values(strips).filter((strip) => strip.status === 'ready'),
     clipLeftPx: geometry.x,
     pxPerSecond: widthPx / (viewEnd - viewStart),
-    tileWidthPx: Math.round((VIDEO_CLIP_HEIGHT_REM * getRootRemPx() * clip.resolution.width) / clip.resolution.height),
+    tileWidthPx: filmstripTileWidthPx(clip.resolution, videoClipHeightPx()),
     widthPx,
   }
 }

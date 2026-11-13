@@ -63,7 +63,9 @@ describe('useTimelineClips', () => {
   test('a video clip with a ready filmstrip shows tiles as tall as the clip, repeating a frame when zoomed in', () => {
     // 5 px per second: the 20 s clip at 5 s is 100 px wide and holds two 85 px tiles (48 px tall at 16:9).
     const { result } = renderClips({
-      filmstrips: { 'C:\\clips\\ride.mp4': { status: 'ready', spriteUrl: 'blob:ride', columns: 1, rows: 1, intervalSeconds: 20, sampleCount: 1 } },
+      filmstrips: {
+        'C:\\clips\\ride.mp4': { base: { status: 'ready', spriteUrl: 'blob:ride', startSeconds: 0, spacingSeconds: 20, sampleCount: 1 } },
+      },
     })
     const [segment] = clipModel(result, 'video:video-1').segments
 
@@ -79,8 +81,8 @@ describe('useTimelineClips', () => {
     ])
   })
 
-  test('a video clip shows no tiles until its filmstrip is ready', () => {
-    const { result } = renderClips({ filmstrips: { 'C:\\clips\\ride.mp4': { status: 'generating', jobId: 1 } } })
+  test('a video clip shows no tiles until its base strip is ready', () => {
+    const { result } = renderClips({ filmstrips: { 'C:\\clips\\ride.mp4': { base: { status: 'generating', jobId: 1 } } } })
 
     expect(clipModel(result, 'video:video-1').segments[0].tiles).toEqual([])
   })

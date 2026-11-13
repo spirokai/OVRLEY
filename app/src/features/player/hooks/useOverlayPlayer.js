@@ -21,6 +21,7 @@ import useTimelineClips from './useTimelineClips'
 import useTimelineGestures from './useTimelineGestures'
 import useTimelineViewport from './useTimelineViewport'
 import useVideoCuts from './useVideoCuts'
+import useWantedFilmstripWindows from './useWantedFilmstripWindows'
 import useVideoSyncTimeline from '@/features/video-sync/hooks/useVideoSyncTimeline'
 
 /** Elements whose clicks keep the clip selection: kept areas, and the portaled popups and dialogs they open. */
@@ -394,6 +395,12 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     selectedClip: applyCutDraftToSelection(selectedClip, cutDrag.draft),
     setSelectedClip: selectClip,
     warnings: videoWarnings,
+    viewEnd: viewport.viewport.viewEnd,
+    viewStart: viewport.viewport.viewStart,
+    widthPx: viewport.widthPx,
+  })
+  useWantedFilmstripWindows({
+    clips: timelineClips,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,
