@@ -147,8 +147,8 @@ function TimelineClipBadge({ clip }) {
   const Icon = clip.icon
   return (
     <div className="pointer-events-none absolute top-0 z-20 flex p-1" style={clip.badgeStyle}>
-      <span className="flex min-w-0 items-center gap-2 rounded-xs bg-background/90 px-1.5 py-0.5 text-[0.65rem] font-bold uppercase leading-none text-foreground shadow-sm">
-        <Icon className="h-3 w-3 shrink-0" strokeWidth={3} aria-hidden="true" />
+      <span className="flex min-w-0 items-center gap-3 rounded-xs bg-background/90 px-1.75 py-0.625 text-[0.75rem] font-bold uppercase leading-none text-foreground shadow-sm">
+        <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={3} aria-hidden="true" />
         <span className="min-w-0 truncate">{clip.label}</span>
         <span className="shrink-0 tabular-nums text-muted-foreground">{clip.durationLabel}</span>
       </span>
