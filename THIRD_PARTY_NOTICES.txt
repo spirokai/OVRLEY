@@ -65,11 +65,13 @@ Fonts
 -----
 These fonts are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org):
 
+- Bebas Neue: Copyright 2019 The Bebas Neue Project Authors (https://github.com/dharmatype/Bebas-Neue)
 - Inter: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
 - JetBrains Mono: Copyright 2020 The JetBrains Mono Project Authors
   (https://github.com/JetBrains/JetBrainsMono)
 - Oxanium: Copyright 2019 The Oxanium Project Authors (https://github.com/sevmeyer/oxanium)
 - Rajdhani: Copyright (c) 2014 Indian Type Foundry
+- Roboto Mono: Copyright 2015 The Roboto Mono Project Authors (https://github.com/googlefonts/robotomono)
 - Saira Stencil: Copyright 2020 The Saira Project Authors (https://github.com/Omnibus-Type/Saira)
 - Share Tech Mono: Copyright (c) 2012, Carrois Type Design, Ralph du Carrois, with Reserved Font
   Name 'Share'
