@@ -1,0 +1,11 @@
+[package]
+# UI-independent application logic: ported helpers and hooks, tested without a window.
+name = "ovrley_app"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.98"
+publish = false
+license = "GPL-3.0-or-later"
+
+[dependencies]
+regex = "1"

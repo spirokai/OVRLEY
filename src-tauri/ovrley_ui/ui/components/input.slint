@@ -1,0 +1,152 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { GroupPosition, GroupSurface } from "group-surface.slint";
+import { NumberInputLogic } from "logic.slint";
+
+export enum InputVariant { default, inline }
+
+// input.jsx.
+// Default: field lift, 2.25rem high, 0.75rem × 0.25rem padding, `text-sm` (the `md:` value, which
+// always applies above the window minimum), `rounded-sm`, `shadow-xs`, muted placeholder,
+// selection in `primary`, a 1px focus ring in `ring` at 50%.
+// Inline: `rounded-xs`, 1.1875rem high, 0.25rem side padding, right-aligned 0.741rem Fira Code
+// with a 0.8125rem line height, muted, no shadow; focused it shows `surface` and `foreground`.
+// Typed text keeps its case. A `number` input accepts only what `<input type="number">` lets the
+// user type. Its border is 0, as in React; `border-width` and `border-color` are overrides (D5).
+export component Input {
+    in property <InputVariant> variant: InputVariant.default;
+    in-out property <string> text;
+    in property <string> placeholder;
+    // `aria-label`: the field's accessible name.
+    in property <string> label;
+    in property <bool> number;
+    in property <bool> disabled;
+    in property <bool> read-only;
+    in property <bool> invalid;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <length> font-size: root.inline ? 0.741rem : Theme.text-sm * 1rem;
+    in property <bool> mono: root.inline;
+    in property <TextHorizontalAlignment> horizontal-alignment: root.inline ? TextHorizontalAlignment.right : TextHorizontalAlignment.left;
+    in property <color> background: root.inline && field.has-focus ? Theme.surface : transparent;
+    in property <color> text-color: root.inline && !field.has-focus ? Theme.muted-foreground : Theme.foreground;
+    in property <length> border-width: 0px;
+    in property <color> border-color: Theme.border;
+    in property <length> inset-left: root.inline ? 0.25rem : 0.75rem;
+    in property <length> inset-right: root.inset-left;
+    in property <ShadowSize> shadow: root.inline ? ShadowSize.none : ShadowSize.xs;
+
+    out property <bool> has-focus: field.has-focus;
+    callback edited(text: string);
+    callback accepted();
+    callback focus-changed(focused: bool);
+    // Keys before the field handles them; return `accept` to consume a key.
+    callback key-pressed(event: KeyEvent) -> EventResult;
+
+    // `focus()` reaches the field through `forward-focus`.
+    public function blur() {
+        field.clear-focus();
+    }
+    public function select-all() {
+        field.select-all();
+    }
+
+    property <bool> inline: root.variant == InputVariant.inline;
+    property <length> radius: (root.inline ? Theme.radius-xs : Theme.radius-sm) * 1rem;
+    // The last text a number input accepted: captured on focus and after each valid edit, and
+    // restored when other characters are typed.
+    property <string> accepted-text;
+
+    // `[&>*]:focus-visible:relative z-10`: a focused control's ring draws above its neighbours.
+    z: field.has-focus ? 1 : 0;
+    min-height: root.inline ? 1.1875rem : 2.25rem;
+    preferred-height: self.min-height;
+    max-height: self.min-height;
+    min-width: 0px;
+    horizontal-stretch: 1;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: field;
+
+    Shadow {
+        size: root.shadow;
+        radius: root.radius;
+    }
+
+    GroupSurface {
+        group-position: root.group-position;
+        radius: root.radius;
+        background: root.background;
+        border-width: root.border-width;
+        border-color: root.border-color;
+        field-lift: !root.inline;
+
+        if root.text == "" && root.placeholder != "": AppText {
+            x: root.inset-left;
+            width: parent.width - root.inset-left - root.inset-right;
+            content: root.placeholder;
+            mono: root.mono;
+            font-size: root.font-size;
+            color: Theme.muted-foreground;
+            horizontal-alignment: root.horizontal-alignment;
+            overflow: clip;
+        }
+
+        field := TextInput {
+            x: root.inset-left;
+            width: parent.width - root.inset-left - root.inset-right;
+            y: root.inline ? 0px : 0.25rem;
+            height: parent.height - 2 * self.y;
+            text <=> root.text;
+            enabled: !root.disabled;
+            read-only: root.read-only;
+            single-line: true;
+            font-family: root.mono ? Theme.font-mono : Theme.font-sans;
+            font-size: root.font-size;
+            letter-spacing: self.font-size * Theme.tracking-root;
+            color: root.text-color;
+            horizontal-alignment: root.horizontal-alignment;
+            vertical-alignment: center;
+            selection-background-color: Theme.primary;
+            selection-foreground-color: Theme.primary-foreground;
+            accessible-placeholder-text: root.placeholder;
+            accessible-label: root.label;
+
+            edited => {
+                if root.number && !NumberInputLogic.is-number-input-text(self.text) {
+                    self.text = root.accepted-text;
+                    return;
+                }
+                root.accepted-text = self.text;
+                root.edited(self.text);
+            }
+            accepted => {
+                root.accepted();
+            }
+            key-pressed(event) => {
+                root.key-pressed(event)
+            }
+            changed has-focus => {
+                if self.has-focus {
+                    root.accepted-text = self.text;
+                }
+                root.focus-changed(self.has-focus);
+            }
+        }
+
+        TouchArea {
+            enabled: root.disabled;
+            mouse-cursor: MouseCursor.not-allowed;
+        }
+    }
+
+    FocusRing {
+        // `:focus-visible` matches text fields on every focus. An invalid field also keeps its
+        // ring: in React, `reportValidity()` refocuses it (Q2 drops the bubble itself).
+        shown: field.has-focus || root.invalid;
+        ring-width: 1px;
+        radius: root.radius;
+        group-position: root.group-position;
+        ring-color: root.invalid ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+}

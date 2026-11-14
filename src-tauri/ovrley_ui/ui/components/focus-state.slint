@@ -1,0 +1,11 @@
+// Tracks `:focus-visible` for a FocusScope: the ring shows for keyboard focus only. Slint reports
+// why focus arrived; Tab navigation is keyboard focus.
+export component FocusVisible inherits FocusScope {
+    out property <bool> focus-visible;
+    focus-gained(reason) => {
+        self.focus-visible = reason == FocusReason.tab-navigation;
+    }
+    focus-lost => {
+        self.focus-visible = false;
+    }
+}

@@ -1,0 +1,9 @@
+import { FluidWindow } from "../theme/fluid-window.slint";
+
+// The app window. Phase 1 only needs it to exist (Slint generates the globals' code only for a
+// root that exports a window); Phase 2 builds the shell in it.
+export component AppWindow inherits FluidWindow {
+    title: "OVRLEY";
+    min-width: 1100px;
+    min-height: 720px;
+}

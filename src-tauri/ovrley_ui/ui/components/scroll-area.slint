@@ -1,0 +1,65 @@
+import { Theme } from "../theme/theme.slint";
+
+// A Flickable with the app's own scrollbar (utilities.css): 0.444rem wide, thumb `foreground` at
+// 40% inset by a 1px transparent border, `accent` on hover and while dragged, transparent track.
+// `thin` is `.thin-scrollbar`: 0.148rem wide, 1px radius, no inset.
+export component ScrollArea {
+    in property <bool> thin;
+    in-out property <length> content-y <=> flick.content-y;
+    out property <length> content-height: flick.content-height;
+    out property <length> visible-height: flick.height;
+
+    property <length> bar-size: (root.thin ? Theme.scrollbar-thin-size : Theme.scrollbar-size) * 1rem;
+    property <length> inset: root.thin ? 0px : 1px;
+    property <length> scroll-range: max(0px, flick.content-height - flick.height);
+    property <length> thumb-length: flick.content-height > 0px ? max(2rem, flick.height * flick.height / flick.content-height) : 0px;
+    property <length> drag-start-content-y;
+
+    // Desktop scroll areas scroll with the wheel and the scrollbar, never by dragging the content
+    // with the mouse (Slint's default), and only vertically.
+    flick := Flickable {
+        width: root.width;
+        height: root.height;
+        interactive: false;
+        content-width: self.width;
+        // The webview's styled scrollbar takes layout space only while the content overflows.
+        // Here the width would then depend on the height it produces, a binding loop, so the
+        // scrollbar's width is always reserved.
+        VerticalLayout {
+            width: root.width - root.bar-size;
+            alignment: start;
+            @children
+        }
+    }
+
+    if root.scroll-range > 0px: Rectangle {
+        x: root.width - root.bar-size;
+        width: root.bar-size;
+        height: root.height;
+
+        thumb := Rectangle {
+            x: root.inset;
+            y: (root.height - root.thumb-length) * (-flick.content-y / root.scroll-range) + root.inset;
+            width: parent.width - 2 * root.inset;
+            height: root.thumb-length - 2 * root.inset;
+            border-radius: root.thin ? 1px : Theme.scrollbar-thumb-radius * 1rem - root.inset;
+            background: thumb-touch.has-hover || thumb-touch.pressed ? Theme.scrollbar-thumb-hover : Theme.scrollbar-thumb;
+
+            thumb-touch := TouchArea {
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.down {
+                        root.drag-start-content-y = flick.content-y;
+                    }
+                }
+                moved => {
+                    if self.pressed {
+                        flick.content-y = clamp(
+                            root.drag-start-content-y - (self.mouse-y - self.pressed-y) * root.scroll-range / (root.height - root.thumb-length),
+                            -root.scroll-range,
+                            0px);
+                    }
+                }
+            }
+        }
+    }
+}

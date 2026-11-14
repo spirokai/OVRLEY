@@ -1,0 +1,38 @@
+import { Theme } from "../theme/theme.slint";
+import { GroupCorners, GroupPosition } from "group-surface.slint";
+
+// A ring outside the parent's border box, following its corner radii: Tailwind's `ring-*` box
+// shadow. Place it as the last child of the element it rings; it fills that element. In a group,
+// `group-position` squares the joined corners, as the control's own corners are.
+export component FocusRing {
+    width: 100%;
+    height: 100%;
+    in property <bool> shown;
+    in property <length> ring-width: Theme.ring-width * 1rem;
+    in property <length> radius;
+    in property <color> ring-color: Theme.ring-color;
+    // `ring-offset-*`: a gap between the element and the ring.
+    in property <length> offset;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <Orientation> group-orientation: Orientation.horizontal;
+
+    property <length> spread: root.ring-width + root.offset;
+
+    // A square corner stays square outside; a rounded one grows by the ring's spread.
+    pure function outer(corner: length) -> length {
+        corner > 0px ? corner + root.spread : 0px
+    }
+
+    if root.shown: Rectangle {
+        x: -root.ring-width - root.offset;
+        y: -root.ring-width - root.offset;
+        width: root.width + 2 * (root.ring-width + root.offset);
+        height: root.height + 2 * (root.ring-width + root.offset);
+        border-width: root.ring-width;
+        border-color: root.ring-color;
+        border-top-left-radius: root.outer(GroupCorners.top-left(root.group-position, root.group-orientation, root.radius));
+        border-top-right-radius: root.outer(GroupCorners.top-right(root.group-position, root.group-orientation, root.radius));
+        border-bottom-left-radius: root.outer(GroupCorners.bottom-left(root.group-position, root.group-orientation, root.radius));
+        border-bottom-right-radius: root.outer(GroupCorners.bottom-right(root.group-position, root.group-orientation, root.radius));
+    }
+}

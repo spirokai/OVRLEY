@@ -1,0 +1,67 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon } from "icons.slint";
+
+export enum AlertVariant { default, destructive }
+
+// alert.jsx: `rounded-xs`, bordered, 1rem × 0.75rem padding, `text-sm`, `card` fill. An optional
+// 1rem icon column with a 0.75rem gap; the icon sits 0.125rem lower. Slint has no `alert` role:
+// the alert is a live region, which is how assistive technology announces it.
+export component Alert inherits Rectangle {
+    in property <AlertVariant> variant: AlertVariant.default;
+    // An `Icons` path; empty for none.
+    in property <string> icon;
+
+    property <color> text-color: root.variant == AlertVariant.destructive ? Theme.destructive : Theme.card-foreground;
+    background: Theme.card;
+    border-width: 1px;
+    border-color: Theme.border;
+    border-radius: Theme.radius-xs * 1rem;
+    accessible-role: AccessibleRole.text;
+    accessible-live-region: assertive;
+
+    HorizontalLayout {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        padding-top: 0.75rem;
+        padding-bottom: 0.75rem;
+        spacing: root.icon != "" ? 0.75rem : 0px;
+        if root.icon != "": VerticalLayout {
+            alignment: start;
+            padding-top: 0.125rem;
+            Icon {
+                glyph: root.icon;
+                size: 1rem;
+                color: root.text-color;
+            }
+        }
+        VerticalLayout {
+            spacing: 0.125rem;
+            @children
+        }
+    }
+}
+
+// The alert's title: one line, elided, weight 500, tight tracking.
+export component AlertTitle inherits AppText {
+    in property <AlertVariant> variant: AlertVariant.default;
+    uppercase: true;
+    font-size: Theme.text-sm * 1rem;
+    font-weight: Theme.font-weight-medium;
+    tracking: Theme.tracking-tight;
+    line-height: Theme.text-sm-line-height;
+    color: root.variant == AlertVariant.destructive ? Theme.destructive : Theme.card-foreground;
+    min-height: 1rem;
+    max-lines: 1;
+    overflow: elide;
+}
+
+// The alert's description: muted (destructive: `destructive` at 90%), paragraph line height 1.625.
+export component AlertDescription inherits AppText {
+    in property <AlertVariant> variant: AlertVariant.default;
+    uppercase: true;
+    font-size: Theme.text-sm * 1rem;
+    line-height: Theme.leading-relaxed;
+    color: root.variant == AlertVariant.destructive ? Theme.destructive.transparentize(0.1) : Theme.muted-foreground;
+    wrap: word-wrap;
+}

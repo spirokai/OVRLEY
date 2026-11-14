@@ -1,0 +1,66 @@
+import { TooltipLayer } from "tooltip-layer.slint";
+import { PlacementAlign, PlacementSide } from "logic.slint";
+
+// simple-tooltip.jsx. It wraps its trigger (the slot); with no `content` it only renders the
+// trigger. It shows on pointer hover only, after `delay` (400 ms in the code; its doc comment says
+// 500), and hides at once when the pointer leaves the trigger. It sits 0.5rem from the trigger on
+// `side`, aligned `start`, `center` or `end`; `content-width` sets a width to wrap at
+// (`contentClassName` today). The bubble is drawn by the window's `TooltipLayerView`, so it is
+// never clipped and takes no input; `portal` is not ported. Flip and shift come from the shared
+// placement.
+export component SimpleTooltip inherits TouchArea {
+    in property <string> content;
+    in property <PlacementSide> side: PlacementSide.top;
+    in property <PlacementAlign> align: PlacementAlign.center;
+    in property <duration> delay: 400ms;
+    in property <length> content-width: 0px;
+
+    // The layer's serial while this tooltip shows; 0 when hidden.
+    property <int> my-serial;
+
+    function show() {
+        TooltipLayer.serial += 1;
+        root.my-serial = TooltipLayer.serial;
+        TooltipLayer.content = root.content;
+        TooltipLayer.anchor = { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height };
+        TooltipLayer.side = root.side;
+        TooltipLayer.align = root.align;
+        TooltipLayer.content-width = root.content-width;
+        TooltipLayer.shown = true;
+    }
+    function hide() {
+        if root.my-serial != 0 && TooltipLayer.serial == root.my-serial {
+            TooltipLayer.shown = false;
+        }
+        root.my-serial = 0;
+    }
+
+    min-width: layout.min-width;
+    preferred-width: layout.preferred-width;
+    min-height: layout.min-height;
+    preferred-height: layout.preferred-height;
+
+    layout := HorizontalLayout {
+        @children
+    }
+
+    Timer {
+        interval: root.delay;
+        running: root.has-hover && root.content != "" && root.my-serial == 0;
+        triggered => {
+            root.show();
+        }
+    }
+    changed has-hover => {
+        if !self.has-hover {
+            root.hide();
+        }
+    }
+    changed content => {
+        if root.content == "" {
+            root.hide();
+        } else if root.my-serial != 0 {
+            TooltipLayer.content = root.content;
+        }
+    }
+}

@@ -1,0 +1,9 @@
+// The public root plus the dev windows (feature `dev-windows`), exported from the same root so
+// `install_component_logic` works on them: the showcase, and the test harness windows, which live
+// with the tests in tests/harness/.
+export * from "index.slint";
+export { ShowcaseWindow } from "showcase/showcase-window.slint";
+export { BlurInputHarness } from "../tests/harness/blur-input-harness.slint";
+export { GradientPickerHarness } from "../tests/harness/gradient-picker-harness.slint";
+export { DialogHarness } from "../tests/harness/dialog-harness.slint";
+export { RegressionHarness } from "../tests/harness/regression-harness.slint";

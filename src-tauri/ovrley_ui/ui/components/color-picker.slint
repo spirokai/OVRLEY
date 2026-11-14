@@ -1,0 +1,348 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Slider } from "slider.slint";
+import { Input } from "input.slint";
+import { Select } from "select.slint";
+import { GroupPosition } from "group-surface.slint";
+import { Choice, ColorFormat, ColorPickerLogic, Hsv, Rgba } from "logic.slint";
+import { ComponentStrings } from "strings.slint";
+
+// color-picker.jsx: the parts `HexColorPicker` uses (Q4 drops inline mode, the alpha slider and
+// inputs, the form fields, `readOnly` and RTL). Slint has no context, so the parts take the
+// picker's state (`color`, `hsv`, `format`) from their caller, which owns it, and report changes
+// through callbacks. The eyedropper is not ported: no platform offers it to Slint (Q1).
+
+// The saturation/value area: 10rem high, crosshair cursor. Its background is the hue at full
+// saturation and value, under white fading to transparent left to right and transparent fading to
+// black top to bottom. Pressing or dragging sets saturation = x and value = 1 − y, in whole
+// percent. The thumb is 0.75rem, white, with a 2px border. The border and radius are the caller's
+// `h-40 w-full rounded-sm border border-border/60`.
+export component ColorPickerArea {
+    in property <Hsv> hsv;
+    in property <bool> disabled;
+    callback hsv-changed(hsv: Hsv);
+    callback drag-started();
+    callback drag-ended();
+
+    function update(x: length, y: length) {
+        root.hsv-changed({
+            h: root.hsv.h,
+            s: round(clamp(x / root.width, 0, 1) * 100),
+            v: round(clamp(1 - y / root.height, 0, 1) * 100),
+            a: root.hsv.a,
+        });
+    }
+
+    height: 10rem;
+    horizontal-stretch: 1;
+    opacity: root.disabled ? 0.5 : 1;
+
+    Rectangle {
+        border-radius: Theme.radius-sm * 1rem;
+        border-width: 1px;
+        border-color: Theme.border.transparentize(0.4);
+        clip: true;
+
+        Rectangle {
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
+            border-radius: Theme.radius-xs * 1rem;
+            clip: true;
+            background: ColorPickerLogic.hex-to-color(ColorPickerLogic.rgb-to-hex(ColorPickerLogic.hsv-to-rgb({ h: root.hsv.h, s: 100, v: 100, a: 1 })));
+
+            Rectangle {
+                background: @linear-gradient(90deg, #ffffff 0%, #ffffff00 100%);
+            }
+            Rectangle {
+                background: @linear-gradient(180deg, #00000000 0%, #000000 100%);
+            }
+        }
+    }
+
+    Rectangle {
+        width: 0.75rem;
+        height: 0.75rem;
+        x: root.width * root.hsv.s / 100 - self.width / 2;
+        y: root.height * (100 - root.hsv.v) / 100 - self.height / 2;
+
+        Shadow {
+            size: ShadowSize.sm;
+            radius: parent.width / 2;
+        }
+        Rectangle {
+            border-radius: parent.width / 2;
+            border-width: 2px;
+            border-color: #ffffff;
+        }
+    }
+
+    TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: MouseCursor.crosshair;
+        pointer-event(event) => {
+            if event.button != PointerEventButton.left {
+                return;
+            }
+            if event.kind == PointerEventKind.down {
+                root.drag-started();
+                root.update(self.mouse-x, self.mouse-y);
+            } else if event.kind == PointerEventKind.up {
+                root.drag-ended();
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.update(self.mouse-x, self.mouse-y);
+            }
+        }
+    }
+}
+
+// The hue slider: 0–360 in steps of 1, a 0.75rem rainbow track with 7 stops, a 1rem thumb with a
+// `primary`-at-50% border on `background`, and a 1px focus ring.
+export component ColorPickerHueSlider inherits Slider {
+    minimum: 0;
+    maximum: 360;
+    step: 1;
+    track-thickness: 0.75rem;
+    track-background: @linear-gradient(90deg, #ff0000 0%, #ffff00 16.66%, #00ff00 33.33%, #00ffff 50%, #0000ff 66.66%, #ff00ff 83.33%, #ff0000 100%);
+    range-background: transparent;
+    thumb-background: Theme.background;
+    thumb-border-color: Theme.primary.transparentize(0.5);
+    thumb-ring: false;
+}
+
+// The swatch: the colour, with the accessible label `currentColorVal`. Its size, radius, border and
+// shadow are the caller's (`size-5 rounded-xs border border-border/70 shadow-sm` in the trigger).
+export component ColorPickerSwatch {
+    in property <Rgba> color;
+    in property <ColorFormat> format;
+    in property <bool> disabled;
+
+    accessible-role: AccessibleRole.image;
+    accessible-label: ComponentStrings.current-color-val.replace-all("{{val}}", ColorPickerLogic.color-to-string(root.color, root.format));
+    opacity: root.disabled ? 0.5 : 1;
+
+    Shadow {
+        size: ShadowSize.sm;
+        radius: Theme.radius-xs * 1rem;
+    }
+    Rectangle {
+        border-radius: Theme.radius-xs * 1rem;
+        border-width: 1px;
+        border-color: Theme.border.transparentize(0.3);
+        background: ColorPickerLogic.hex-to-color(ColorPickerLogic.rgb-to-hex(root.color));
+    }
+}
+
+// The format select: HEX, RGB, HSL, HSB; 2.25rem high, 4.5rem wide, `surface`, Fira Code `text-xs`
+// uppercase (the caller's `h-9 w-18 border-border/70 bg-surface font-mono text-xs uppercase`).
+export component ColorPickerFormatSelect inherits Select {
+    in property <ColorFormat> format;
+    callback format-changed(format: ColorFormat);
+
+    items: [{ value: "hex", label: "HEX" }, { value: "rgb", label: "RGB" }, { value: "hsl", label: "HSL" }, { value: "hsb", label: "HSB" }];
+    value: root.format == ColorFormat.rgb ? "rgb" : root.format == ColorFormat.hsl ? "hsl" : root.format == ColorFormat.hsb ? "hsb" : "hex";
+    width: 4.5rem;
+    horizontal-stretch: 0;
+    background: Theme.surface;
+    border-color: Theme.border.transparentize(0.3);
+    font-size: Theme.text-xs * 1rem;
+    mono: true;
+    uppercase: true;
+    value-changed(value) => {
+        root.format-changed(value == "rgb" ? ColorFormat.rgb : value == "hsl" ? ColorFormat.hsl : value == "hsb" ? ColorFormat.hsb : ColorFormat.hex);
+    }
+}
+
+// One input of the group: 2.25rem, `surface`, centred Fira Code `text-xs` uppercase, a 1px focus
+// ring; `group-position` joins it to its neighbours. It shows `value` and reports text that
+// parses as an integer within 0..=max; other text is replaced by `value` again, as React's
+// controlled input does.
+component ChannelInput {
+    in property <float> value;
+    in property <float> max;
+    in property <string> label;
+    in property <GroupPosition> group-position;
+    in property <bool> disabled;
+    callback value-entered(value: float);
+
+    property <string> text: round(root.value) + "";
+    changed value => {
+        root.text = round(root.value) + "";
+    }
+
+    width: 3.25rem;
+    Input {
+        width: root.width;
+        text <=> root.text;
+        label: root.label;
+        placeholder: "0";
+        group-position: root.group-position;
+        disabled: root.disabled;
+        background: Theme.surface;
+        border-color: Theme.border.transparentize(0.3);
+        font-size: Theme.text-xs * 1rem;
+        mono: true;
+        horizontal-alignment: center;
+        edited(text) => {
+            let parsed = ColorPickerLogic.parse-channel(text, root.max);
+            if parsed.valid {
+                root.value-entered(parsed.value);
+            }
+            root.text = round(root.value) + "";
+        }
+    }
+}
+
+// The value input for the current format (`withoutAlpha`).
+// - hex: 9.75rem, placeholder `#000000`. While focused it keeps the typed text and applies each
+//   value that parses; on blur it shows the parsed value normalized, or the current one.
+// - rgb (0–255), hsl (hue 0–360, saturation and lightness 0–100) and hsb: each channel applies when
+//   it is an integer within range. The channels form an input group.
+export component ColorPickerInput {
+    in property <Rgba> color;
+    in property <Hsv> hsv;
+    in property <ColorFormat> format;
+    in property <bool> disabled;
+    callback color-entered(color: Rgba);
+
+    // The hex field and the three 3.25rem channels are both 9.75rem wide.
+    width: 9.75rem;
+    height: 2.25rem;
+
+    property <string> hex-value: ColorPickerLogic.rgb-to-hex(root.color);
+    // The field's text. The field's `uppercase` class shows it in capitals; Slint cannot transform
+    // displayed text, so the shown value is uppercased while typed text keeps its case.
+    property <string> hex-text;
+    property <bool> hex-focused;
+    // The parts live in the picker's popup, created after the logic is bound.
+    init => {
+        root.hex-text = root.hex-value.to-uppercase();
+    }
+    changed hex-value => {
+        if !root.hex-focused {
+            root.hex-text = root.hex-value.to-uppercase();
+        }
+    }
+
+    if root.format == ColorFormat.hex: Input {
+        width: 9.75rem;
+        text <=> root.hex-text;
+        label: ComponentStrings.hex-color-value;
+        placeholder: "#000000";
+        disabled: root.disabled;
+        background: Theme.surface;
+        border-color: Theme.border.transparentize(0.3);
+        font-size: Theme.text-xs * 1rem;
+        mono: true;
+        horizontal-alignment: center;
+        focus-changed(focused) => {
+            root.hex-focused = focused;
+            if !focused {
+                let parsed = ColorPickerLogic.parse-color-string(root.hex-text);
+                root.hex-text = (parsed.valid ? ColorPickerLogic.rgb-to-hex(parsed.color) : root.hex-value).to-uppercase();
+            }
+        }
+        edited(text) => {
+            let parsed = ColorPickerLogic.parse-color-string(text);
+            if parsed.valid {
+                root.color-entered({ r: parsed.color.r, g: parsed.color.g, b: parsed.color.b, a: root.color.a });
+            }
+        }
+    }
+
+    if root.format == ColorFormat.rgb: HorizontalLayout {
+        ChannelInput {
+            value: root.color.r;
+            max: 255;
+            label: ComponentStrings.red-color-component-0255;
+            group-position: GroupPosition.first;
+            disabled: root.disabled;
+            value-entered(v) => { root.color-entered({ r: v, g: root.color.g, b: root.color.b, a: root.color.a }); }
+        }
+        ChannelInput {
+            value: root.color.g;
+            max: 255;
+            label: ComponentStrings.green-color-component-0255;
+            group-position: GroupPosition.middle;
+            disabled: root.disabled;
+            value-entered(v) => { root.color-entered({ r: root.color.r, g: v, b: root.color.b, a: root.color.a }); }
+        }
+        ChannelInput {
+            value: root.color.b;
+            max: 255;
+            label: ComponentStrings.blue-color-component-0255;
+            group-position: GroupPosition.last;
+            disabled: root.disabled;
+            value-entered(v) => { root.color-entered({ r: root.color.r, g: root.color.g, b: v, a: root.color.a }); }
+        }
+    }
+
+    if root.format == ColorFormat.hsl: HorizontalLayout {
+        ChannelInput {
+            value: ColorPickerLogic.rgb-to-hsl(root.color).h;
+            max: 360;
+            label: ComponentStrings.hue-degree-0360;
+            group-position: GroupPosition.first;
+            disabled: root.disabled;
+            value-entered(v) => {
+                let hsl = ColorPickerLogic.rgb-to-hsl(root.color);
+                root.color-entered(ColorPickerLogic.hsl-to-rgb({ h: v, s: hsl.s, l: hsl.l }, root.color.a));
+            }
+        }
+        ChannelInput {
+            value: ColorPickerLogic.rgb-to-hsl(root.color).s;
+            max: 100;
+            label: ComponentStrings.saturation-percentage-0100;
+            group-position: GroupPosition.middle;
+            disabled: root.disabled;
+            value-entered(v) => {
+                let hsl = ColorPickerLogic.rgb-to-hsl(root.color);
+                root.color-entered(ColorPickerLogic.hsl-to-rgb({ h: hsl.h, s: v, l: hsl.l }, root.color.a));
+            }
+        }
+        ChannelInput {
+            value: ColorPickerLogic.rgb-to-hsl(root.color).l;
+            max: 100;
+            label: ComponentStrings.lightness-percentage-0100;
+            group-position: GroupPosition.last;
+            disabled: root.disabled;
+            value-entered(v) => {
+                let hsl = ColorPickerLogic.rgb-to-hsl(root.color);
+                root.color-entered(ColorPickerLogic.hsl-to-rgb({ h: hsl.h, s: hsl.s, l: v }, root.color.a));
+            }
+        }
+    }
+
+    if root.format == ColorFormat.hsb: HorizontalLayout {
+        ChannelInput {
+            value: root.hsv.h;
+            max: 360;
+            label: ComponentStrings.hue-degree-0360;
+            group-position: GroupPosition.first;
+            disabled: root.disabled;
+            value-entered(v) => { root.color-entered(ColorPickerLogic.hsv-to-rgb({ h: v, s: root.hsv.s, v: root.hsv.v, a: root.hsv.a })); }
+        }
+        ChannelInput {
+            value: root.hsv.s;
+            max: 100;
+            label: ComponentStrings.saturation-percentage-0100;
+            group-position: GroupPosition.middle;
+            disabled: root.disabled;
+            value-entered(v) => { root.color-entered(ColorPickerLogic.hsv-to-rgb({ h: root.hsv.h, s: v, v: root.hsv.v, a: root.hsv.a })); }
+        }
+        ChannelInput {
+            value: root.hsv.v;
+            max: 100;
+            label: ComponentStrings.brightness-percentage-0100;
+            group-position: GroupPosition.last;
+            disabled: root.disabled;
+            value-entered(v) => { root.color-entered(ColorPickerLogic.hsv-to-rgb({ h: root.hsv.h, s: root.hsv.s, v: v, a: root.hsv.a })); }
+        }
+    }
+}

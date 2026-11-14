@@ -1,0 +1,45 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+
+// label.jsx: 0.25rem left padding, 0.5rem gap, `text-sm`, line height 1, weight 500, uppercase,
+// pointer cursor; disabled is 50% and takes no input. `clicked` replaces `htmlFor`: the caller
+// forwards it to its control. The style properties are the call sites' overrides (D5).
+export component Label {
+    in property <string> text;
+    in property <bool> disabled;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    in property <int> font-weight: Theme.font-weight-medium;
+    in property <color> color: Theme.foreground;
+    in property <bool> uppercase: true;
+    in property <float> tracking: Theme.tracking-root;
+    in property <length> inset-left: 0.25rem;
+    callback clicked;
+
+    opacity: root.disabled ? 0.5 : 1;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    HorizontalLayout {
+        padding-left: root.inset-left;
+        spacing: 0.5rem;
+        alignment: start;
+        AppText {
+            content: root.text;
+            uppercase: root.uppercase;
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            color: root.color;
+            tracking: root.tracking;
+            line-height: Theme.leading-none;
+        }
+        @children
+    }
+
+    TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}

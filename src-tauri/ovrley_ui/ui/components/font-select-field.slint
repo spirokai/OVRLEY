@@ -1,0 +1,38 @@
+import { Theme } from "../theme/theme.slint";
+import { Label } from "label.slint";
+import { Select, SelectSize } from "select.slint";
+import { Choice, ChoiceListLogic } from "logic.slint";
+import { ComponentStrings } from "strings.slint";
+
+// font-select-field.jsx: a label (0.741rem, muted, uppercase, bold) above a `Select` whose trigger
+// is 2rem high in `text-xs`. Two groups, "Recommended" and "System", separated. It takes the two
+// lists `getFontSelectOptions` builds (Phase 5): an unknown current value is already prepended
+// and duplicates are removed.
+export component FontSelectField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> value;
+    in property <bool> disabled;
+    in property <[Choice]> recommended-options;
+    in property <[Choice]> system-options;
+    callback value-changed(value: string);
+
+    spacing: 0.25rem;
+
+    Label {
+        text: root.label;
+        disabled: root.disabled;
+        font-size: 0.741rem;
+        font-weight: Theme.font-weight-bold;
+        color: Theme.muted-foreground;
+    }
+    Select {
+        size: SelectSize.sm;
+        font-size: Theme.text-xs * 1rem;
+        disabled: root.disabled;
+        value: root.value;
+        items: ChoiceListLogic.font-select-choices(root.recommended-options, ComponentStrings.recommended, root.system-options, ComponentStrings.system);
+        value-changed(value) => {
+            root.value-changed(value);
+        }
+    }
+}

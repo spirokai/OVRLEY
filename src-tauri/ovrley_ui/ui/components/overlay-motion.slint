@@ -1,0 +1,31 @@
+import { Theme } from "../theme/theme.slint";
+import { PlacementSide } from "logic.slint";
+
+// The shared overlay enter animation (tw-animate-css): fading from 0, zooming from 0.95 and
+// sliding 0.5rem in from the side it opens on, over 150ms with `ease`. It starts when the popup's
+// content is created. Popups close at once: Slint closes a PopupWindow without waiting for an
+// exit animation.
+export component OverlayMotion {
+    in property <PlacementSide> side: PlacementSide.bottom;
+    property <float> progress: 0;
+    property <length> slide: Theme.overlay-enter-slide * 1rem * (1 - self.progress);
+
+    init => {
+        self.progress = 1;
+    }
+    animate progress { duration: Theme.overlay-enter-duration; easing: ease; }
+
+    width: 100%;
+    height: 100%;
+    opacity: self.progress;
+
+    Rectangle {
+        x: root.side == PlacementSide.left ? root.slide : root.side == PlacementSide.right ? -root.slide : 0px;
+        y: root.side == PlacementSide.top ? root.slide : root.side == PlacementSide.bottom ? -root.slide : 0px;
+        width: root.width;
+        height: root.height;
+        transform-scale-x: (Theme.overlay-enter-scale + (1 - Theme.overlay-enter-scale) * root.progress) * 100%;
+        transform-scale-y: self.transform-scale-x;
+        @children
+    }
+}

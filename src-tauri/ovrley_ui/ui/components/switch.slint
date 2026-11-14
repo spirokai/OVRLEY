@@ -1,0 +1,83 @@
+import { Theme } from "../theme/theme.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+
+// switch.jsx: a 1.15rem × 2rem track, fully rounded, `primary` when checked and `input` when not;
+// a 1rem thumb, `primary-foreground` when checked and `foreground` when not, travelling 100% of
+// its width minus 0.148rem. Space and Enter toggle it.
+export component Switch {
+    in property <bool> checked;
+    in property <bool> disabled;
+    callback checked-changed(checked: bool);
+
+    width: 2rem;
+    height: 1.15rem;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.switch;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-enabled: !root.disabled;
+    accessible-action-default => {
+        root.checked-changed(!root.checked);
+    }
+
+    Shadow {
+        size: ShadowSize.xs;
+        radius: root.height / 2;
+    }
+    Rectangle {
+        border-radius: root.height / 2;
+        background: root.checked ? Theme.primary : Theme.input;
+        border-width: 1px;
+        border-color: focus.focus-visible ? Theme.ring : transparent;
+        animate background { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+
+        Rectangle {
+            width: 1rem;
+            height: 1rem;
+            // The 1px transparent border insets the thumb inside the track.
+            x: 1px + (root.checked ? self.width - 0.148rem : 0px);
+            y: (parent.height - self.height) / 2;
+            border-radius: self.width / 2;
+            background: root.checked ? Theme.primary-foreground : Theme.foreground;
+            animate x { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+        }
+    }
+    TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                focus.focus();
+            }
+        }
+        clicked => {
+            root.checked-changed(!root.checked);
+        }
+    }
+    // Pointer presses focus it through the touch area: a scope with `focus-on-click` would
+    // swallow the first press.
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        focus-on-click: false;
+        enabled: !root.disabled;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.checked-changed(!root.checked);
+                return accept;
+            }
+            reject
+        }
+    }
+    FocusRing {
+        shown: focus.focus-visible;
+        radius: root.height / 2;
+    }
+}

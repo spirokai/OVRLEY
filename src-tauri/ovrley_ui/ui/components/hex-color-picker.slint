@@ -1,0 +1,362 @@
+import { Theme, WindowMetrics } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { FocusRing } from "focus-ring.slint";
+import { GroupPosition, GroupSurface } from "group-surface.slint";
+import { Input } from "input.slint";
+import { OverlayMotion } from "overlay-motion.slint";
+import { ColorPickerArea, ColorPickerFormatSelect, ColorPickerHueSlider, ColorPickerInput, ColorPickerSwatch } from "color-picker.slint";
+import { ColorFormat, ColorPickerLogic, Hsv, Placement, PlacementAlign, PlacementLogic, PlacementSide, Rgba } from "logic.slint";
+import { ComponentStrings } from "strings.slint";
+
+// hex-color-picker.jsx. Its value is normalized with `normalize-hex-color`.
+// Default trigger in React: a field-lift button, 2.25rem high, with a 1.25rem swatch and, with `show-value`,
+// the value in 0.815rem Fira Code, uppercase, tracking 0.18em, muted; hover
+// `surface-highlight-soft`. With `custom-trigger` the caller draws the trigger: the picker fills
+// its parent, which it anchors to, and the caller opens it with `open()` (the gradient stops).
+// Content: aligned to the start, 8px away, 21.25rem wide, `rounded-sm`, `border` at 80%, `card` at
+// 95%, 0.75rem padding, `shadow-2xl` in `background` at 40%. Top to bottom: the area, the hue
+// slider, the format select and input (the eyedropper is not ported, Q1), the presets, and the
+// slot (extra content).
+// Commit rules, exactly as today:
+// - while open, edits change a draft, which every picker change passes through
+//   `normalize-hex-color(value, draft)`; outside the hex format the picker reports `rgb(…)`-style
+//   strings, which keep the previous draft;
+// - dragging in the area commits at most once per frame and again on release. React's 0 ms
+//   debounce commits per pointer event, and browsers deliver one per frame; the OS delivers mouse
+//   moves to Slint at its own rate (up to 1000 Hz), so the port throttles to ~60 Hz instead;
+// - the hue slider commits on release or a keyboard commit; a preset commits at once, even when
+//   it equals the value; typing changes only the draft; closing commits the draft if it differs;
+// - `changed(hex)` otherwise fires only for a value that differs from the committed one.
+// It shows the draft while open and the committed value otherwise.
+export component HexColorPicker {
+    in property <string> value;
+    in property <bool> disabled;
+    in property <bool> show-value: true;
+    in property <bool> custom-trigger;
+    in property <[string]> preset-colors: ["#ffffff", "#afeeee", "#40e0d0", "#005b5b", "#c65102", "#000000"];
+    out property <bool> is-open: popup.is-open;
+    callback changed(hex: string);
+
+    property <string> normalized: ColorPickerLogic.normalize-hex-color(root.value, "#000000");
+    property <string> draft;
+    property <Rgba> color;
+    property <Hsv> hsv;
+    property <ColorFormat> format: ColorFormat.hex;
+    property <bool> area-dragging;
+    property <bool> commit-scheduled;
+    property <length> content-width: 21.25rem;
+    property <length> radius: Theme.radius-sm * 1rem;
+    property <bool> popup-open: popup.is-open;
+    // What the trigger shows: the draft while open, the committed value otherwise.
+    property <string> shown-value: popup.is-open ? root.draft : root.normalized;
+    // The hex field's text: the shown value (uppercase, as React's trigger shows it) until the user
+    // edits it, and again after each commit or revert.
+    property <string> hex-text: root.shown-value.to-uppercase();
+
+    // `setValueFromProps`: the store follows the draft, keeping its alpha.
+    function sync-store() {
+        root.color = ColorPickerLogic.hex-to-rgb(root.draft, root.color.a);
+        root.hsv = ColorPickerLogic.rgb-to-hsv(root.color);
+    }
+    function set-draft(next: string) {
+        if next != root.draft {
+            root.draft = next;
+            root.sync-store();
+        }
+    }
+    // The picker's `onValueChange`: the store reports a colour string in the current format.
+    function value-change(color: Rgba) {
+        root.set-draft(ColorPickerLogic.normalize-hex-color(ColorPickerLogic.color-to-string(color, root.format), root.draft));
+        if root.area-dragging {
+            root.commit-scheduled = true;
+        }
+    }
+    function set-hsv(next: Hsv) {
+        root.hsv = next;
+        root.value-change(ColorPickerLogic.hsv-to-rgb(next));
+    }
+    function set-color(next: Rgba) {
+        root.color = next;
+        root.value-change(next);
+    }
+    function commit-draft() {
+        root.commit-scheduled = false;
+        let next = ColorPickerLogic.normalize-hex-color(root.draft, root.normalized);
+        if next != root.normalized {
+            root.changed(next);
+        }
+    }
+    // Commits the hex field's text when it is a valid hex colour that differs from the value;
+    // otherwise the field shows the value again.
+    function commit-hex-text() {
+        let next = ColorPickerLogic.normalize-hex-color(root.hex-text, "");
+        if next != "" && next != root.normalized {
+            root.changed(next);
+        }
+        root.hex-text = (next != "" ? next : root.shown-value).to-uppercase();
+    }
+    public function close-picker() {
+        popup.close();
+    }
+    public function open() {
+        if root.disabled || popup.is-open {
+            return;
+        }
+        popup.show();
+    }
+
+    changed normalized => {
+        if !popup.is-open {
+            root.set-draft(root.normalized);
+        }
+    }
+    changed shown-value => {
+        root.hex-text = root.shown-value.to-uppercase();
+    }
+    changed popup-open => {
+        if !root.popup-open {
+            root.area-dragging = false;
+            root.commit-draft();
+            root.set-draft(root.normalized);
+        } else {
+            root.set-draft(root.normalized);
+            root.sync-store();
+        }
+    }
+
+    // Area drags commit at most once per frame (~16 ms), like the browser's one pointer event per
+    // frame that React's 0 ms debounce relied on.
+    Timer {
+        interval: 16ms;
+        running: root.commit-scheduled;
+        triggered => {
+            root.commit-draft();
+        }
+    }
+
+    min-height: root.custom-trigger ? 0px : 2.25rem;
+    max-height: root.custom-trigger ? 100000px : 2.25rem;
+    horizontal-stretch: root.custom-trigger ? 0 : 1;
+
+    // The default trigger (user's design, 2026-11-14): a group like the input + button one. The
+    // hex field on the left takes typed or pasted values and commits a valid one on Enter or blur
+    // (normalized; anything else reverts). The swatch button on the right is filled with the colour
+    // edge to edge and opens the picker; without the field it takes the picker's whole width.
+    if !root.custom-trigger: HorizontalLayout {
+        opacity: root.disabled ? 0.5 : 1;
+
+        if root.show-value: hex-field := Input {
+            horizontal-stretch: 1;
+            text <=> root.hex-text;
+            label: ComponentStrings.hex-color-value;
+            placeholder: "#000000";
+            group-position: GroupPosition.first;
+            disabled: root.disabled;
+            mono: true;
+            font-size: 0.815rem;
+            focus-changed(focused) => {
+                if focused {
+                    root.hex-text = root.shown-value;
+                } else {
+                    root.commit-hex-text();
+                }
+            }
+            accepted => {
+                self.blur();
+            }
+        }
+
+        swatch-button := Rectangle {
+            min-width: root.show-value ? 3.5rem : 2.25rem;
+            max-width: root.show-value ? 3.5rem : 100000px;
+            horizontal-stretch: root.show-value ? 0 : 1;
+            accessible-role: AccessibleRole.button;
+            accessible-label: ComponentStrings.current-color-val.replace-all("{{val}}", root.shown-value);
+            accessible-action-default => {
+                root.open();
+            }
+
+            Shadow {
+                size: ShadowSize.xs;
+                radius: root.radius;
+            }
+            GroupSurface {
+                group-position: root.show-value ? GroupPosition.last : GroupPosition.isolated;
+                radius: root.radius;
+                background: ColorPickerLogic.hex-to-color(root.shown-value);
+                border-width: 1px;
+                border-color: swatch-touch.has-hover ? Theme.accent-border : Theme.border.transparentize(0.3);
+                animate border-color { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+            }
+            swatch-touch := TouchArea {
+                enabled: !root.disabled;
+                mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                        swatch-focus.focus();
+                    }
+                }
+                clicked => {
+                    root.open();
+                }
+            }
+            swatch-focus := FocusScope {
+                out property <bool> focus-visible;
+                enabled: !root.disabled;
+                focus-on-click: false;
+                focus-gained(reason) => {
+                    self.focus-visible = reason == FocusReason.tab-navigation;
+                }
+                focus-lost => {
+                    self.focus-visible = false;
+                }
+                key-pressed(event) => {
+                    if event.text == Key.Return || event.text == " " {
+                        root.open();
+                        return accept;
+                    }
+                    reject
+                }
+            }
+            FocusRing {
+                shown: swatch-focus.focus-visible;
+                radius: root.radius;
+                group-position: root.show-value ? GroupPosition.last : GroupPosition.isolated;
+            }
+        }
+    }
+
+    popup := PopupWindow {
+        property <Placement> placed: PlacementLogic.place(
+            { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
+            root.content-width, content.preferred-height, WindowMetrics.width, WindowMetrics.height,
+            PlacementSide.bottom, PlacementAlign.start, 8px);
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        x: self.placed.x - root.absolute-position.x;
+        y: self.placed.y - root.absolute-position.y;
+        width: root.content-width;
+        height: content.preferred-height;
+
+        OverlayMotion {
+            side: popup.placed.side;
+            Shadow {
+                size: ShadowSize.xxl;
+                radius: root.radius;
+                has-color: true;
+                color: Theme.background.transparentize(0.6);
+            }
+            Rectangle {
+                border-radius: root.radius;
+                border-width: 1px;
+                border-color: Theme.border.transparentize(0.2);
+                background: Theme.card.transparentize(0.05);
+            }
+            content := VerticalLayout {
+                padding: 0.75rem;
+                spacing: 1rem;
+
+                ColorPickerArea {
+                    hsv: root.hsv;
+                    disabled: root.disabled;
+                    drag-started => {
+                        root.area-dragging = true;
+                    }
+                    drag-ended => {
+                        root.area-dragging = false;
+                        root.commit-draft();
+                    }
+                    hsv-changed(next) => {
+                        root.set-hsv(next);
+                        root.set-color(ColorPickerLogic.hsv-to-rgb(next));
+                    }
+                }
+                ColorPickerHueSlider {
+                    value: root.hsv.h;
+                    disabled: root.disabled;
+                    value-changed(h) => {
+                        let next = { h: h, s: root.hsv.s, v: root.hsv.v, a: root.hsv.a };
+                        root.set-hsv(next);
+                        root.set-color(ColorPickerLogic.hsv-to-rgb(next));
+                    }
+                    value-committed => {
+                        root.commit-draft();
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 0.5rem;
+                    alignment: space-between;
+                    ColorPickerFormatSelect {
+                        format: root.format;
+                        disabled: root.disabled;
+                        format-changed(next) => {
+                            root.format = next;
+                        }
+                    }
+                    ColorPickerInput {
+                        color: root.color;
+                        hsv: root.hsv;
+                        format: root.format;
+                        disabled: root.disabled;
+                        color-entered(next) => {
+                            root.set-color(next);
+                            root.set-hsv(ColorPickerLogic.rgb-to-hsv(next));
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 0.5rem;
+                    AppText {
+                        content: ComponentStrings.presets;
+                        uppercase: true;
+                        font-size: 0.667rem;
+                        font-weight: Theme.font-weight-bold;
+                        tracking: 0.24;
+                        color: Theme.muted-foreground;
+                    }
+                    // `grid grid-cols-6 gap-2`: each swatch at the start of an equal cell.
+                    HorizontalLayout {
+                        spacing: 0.5rem;
+                        for preset in root.preset-colors: Rectangle {
+                            horizontal-stretch: 1;
+                            height: 2.25rem;
+                            swatch := Rectangle {
+                                x: 0px;
+                                width: 2.25rem;
+                                height: 2.25rem;
+                                accessible-role: AccessibleRole.button;
+                                accessible-label: "Use color " + preset;
+                                accessible-action-default => {
+                                    swatch.choose();
+                                }
+                                function choose() {
+                                    let next = ColorPickerLogic.normalize-hex-color(preset, "#000000");
+                                    root.set-draft(next);
+                                    root.changed(next);
+                                }
+                                Shadow {
+                                    size: ShadowSize.sm;
+                                    radius: Theme.radius-xs * 1rem;
+                                }
+                                Rectangle {
+                                    border-radius: Theme.radius-xs * 1rem;
+                                    border-width: 1px;
+                                    border-color: preset-touch.has-hover ? Theme.accent-border : Theme.border.transparentize(0.3);
+                                    background: ColorPickerLogic.hex-to-color(ColorPickerLogic.normalize-hex-color(preset, "#000000"));
+                                }
+                                preset-touch := TouchArea {
+                                    mouse-cursor: MouseCursor.pointer;
+                                    clicked => {
+                                        swatch.choose();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                @children
+            }
+        }
+    }
+
+}

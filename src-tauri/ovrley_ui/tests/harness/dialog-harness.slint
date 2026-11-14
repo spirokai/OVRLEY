@@ -1,0 +1,30 @@
+import { FluidWindow } from "../../ui/theme/fluid-window.slint";
+import { Button } from "../../ui/components/button.slint";
+import { Dialog } from "../../ui/components/dialog.slint";
+
+// The Dialog test harness: a button behind the dialog and two buttons inside it.
+export component DialogHarness inherits FluidWindow {
+    width: 1100px;
+    height: 720px;
+    in-out property <bool> open;
+    out property <string> last-clicked;
+
+    VerticalLayout {
+        alignment: start;
+        padding: 20px;
+        Button {
+            text: "Behind";
+            clicked => { root.last-clicked = "behind"; }
+        }
+    }
+    Dialog {
+        open: root.open;
+        title: "Probe";
+        open-changed(o) => { root.open = o; }
+        HorizontalLayout {
+            spacing: 8px;
+            Button { text: "First"; clicked => { root.last-clicked = "first"; } }
+            Button { text: "Second"; clicked => { root.last-clicked = "second"; } }
+        }
+    }
+}

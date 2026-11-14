@@ -1,0 +1,22 @@
+import { Theme } from "../theme/theme.slint";
+
+// `.bg-overlay-grid-muted`: two 45° gradients that colour the four corner triangles of each
+// 2.37rem tile. Tiled, they form `grid-line`-at-20% diamonds with a 2.37rem diagonal centred on
+// the tile corners. This draws those diamonds.
+export component Checkerboard inherits Rectangle {
+    property <length> tile: Theme.checkerboard-tile * 1rem;
+    property <int> columns: ceil(self.width / self.tile) + 1;
+    property <int> rows: ceil(self.height / self.tile) + 1;
+    clip: true;
+
+    for index in root.columns * root.rows: Rectangle {
+        property <int> tile-column: mod(index, root.columns);
+        property <int> tile-row: floor(index / root.columns);
+        width: root.tile / sqrt(2);
+        height: self.width;
+        x: self.tile-column * root.tile - self.width / 2;
+        y: self.tile-row * root.tile - self.height / 2;
+        transform-rotation: 45deg;
+        background: Theme.checkerboard-color;
+    }
+}

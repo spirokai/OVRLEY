@@ -1,0 +1,105 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon } from "icons.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+
+export enum ToggleVariant { default, outline }
+export enum ToggleSize { default, sm, lg }
+
+// toggle.jsx. On: `accent` with `accent-foreground`. Hover: `muted` with muted text (outline:
+// `accent`). Nothing uses it today (Q4); it is ported because the parent plan lists it.
+export component Toggle {
+    in property <ToggleVariant> variant: ToggleVariant.default;
+    in property <ToggleSize> size: ToggleSize.default;
+    in property <bool> pressed;
+    in property <string> text;
+    // An `Icons` path; empty for none.
+    in property <string> icon;
+    in property <bool> disabled;
+    in property <bool> invalid;
+    callback pressed-changed(pressed: bool);
+
+    property <length> box-size: root.size == ToggleSize.sm ? 2rem : root.size == ToggleSize.lg ? 2.5rem : 2.25rem;
+    property <length> radius: Theme.radius-md * 1rem;
+    property <bool> outline: root.variant == ToggleVariant.outline;
+    property <color> text-color: root.pressed ? Theme.accent-foreground
+        : touch.has-hover ? (root.outline ? Theme.accent-foreground : Theme.muted-foreground) : Theme.foreground;
+
+    min-height: root.box-size;
+    min-width: root.box-size;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.button;
+    accessible-label: root.text;
+    accessible-checkable: true;
+    accessible-checked: root.pressed;
+    accessible-enabled: !root.disabled;
+    accessible-action-default => {
+        root.pressed-changed(!root.pressed);
+    }
+
+    if root.outline: Shadow {
+        size: ShadowSize.xs;
+        radius: root.radius;
+    }
+    Rectangle {
+        border-radius: root.radius;
+        background: root.pressed ? Theme.accent : touch.has-hover ? (root.outline ? Theme.accent : Theme.muted) : transparent;
+        border-width: root.outline ? 1px : 0px;
+        border-color: root.invalid ? Theme.destructive : focus.focus-visible ? Theme.ring : Theme.input;
+    }
+    HorizontalLayout {
+        padding-left: root.size == ToggleSize.sm ? 0.375rem : root.size == ToggleSize.lg ? 0.625rem : 0.5rem;
+        padding-right: self.padding-left;
+        spacing: 0.5rem;
+        alignment: center;
+        if root.icon != "": Icon {
+            glyph: root.icon;
+            color: root.text-color;
+        }
+        if root.text != "": AppText {
+            content: root.text;
+            font-size: Theme.text-sm * 1rem;
+            font-weight: Theme.font-weight-medium;
+            color: root.text-color;
+            line-height: Theme.text-sm-line-height;
+        }
+    }
+    touch := TouchArea {
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                focus.focus();
+            }
+        }
+        enabled: !root.disabled;
+        clicked => {
+            root.pressed-changed(!root.pressed);
+        }
+    }
+    // Pointer presses focus it through the touch area: a scope with `focus-on-click` would
+    // swallow the first press.
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        focus-on-click: false;
+        enabled: !root.disabled;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.pressed-changed(!root.pressed);
+                return accept;
+            }
+            reject
+        }
+    }
+    FocusRing {
+        shown: focus.focus-visible || root.invalid;
+        radius: root.radius;
+        ring-color: root.invalid ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+}

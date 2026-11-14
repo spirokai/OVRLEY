@@ -1,0 +1,68 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon } from "icons.slint";
+import { FocusRing } from "focus-ring.slint";
+
+export enum BadgeVariant { default, secondary, destructive, outline }
+
+// badge.jsx: fully rounded, bordered, 0.5rem × 0.125rem padding, `text-xs`, weight 500; icons are
+// 0.75rem with a 0.25rem gap. No badge is a link, so the link hover styles are not ported. The
+// colour, radius and padding properties are the call sites' overrides (D5).
+export component Badge {
+    in property <BadgeVariant> variant: BadgeVariant.default;
+    in property <string> text;
+    // An `Icons` path; empty for none.
+    in property <string> icon;
+    in property <bool> invalid;
+    in property <color> background: root.variant == BadgeVariant.default ? Theme.primary
+        : root.variant == BadgeVariant.secondary ? Theme.secondary
+        : root.variant == BadgeVariant.destructive ? Theme.destructive : transparent;
+    in property <color> text-color: root.variant == BadgeVariant.default ? Theme.primary-foreground
+        : root.variant == BadgeVariant.secondary ? Theme.secondary-foreground
+        : root.variant == BadgeVariant.destructive ? Theme.primary-foreground : Theme.foreground;
+    in property <color> border-color: root.invalid ? Theme.destructive : root.variant == BadgeVariant.outline ? Theme.border : transparent;
+    in property <length> radius: 9999px;
+    in property <length> padding-x: 0.5rem;
+    in property <length> padding-y: 0.125rem;
+    in property <length> font-size: Theme.text-xs * 1rem;
+    in property <int> font-weight: Theme.font-weight-medium;
+
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    Rectangle {
+        background: root.background;
+        border-width: 1px;
+        border-color: root.border-color;
+        border-radius: min(root.radius, self.height / 2);
+        clip: true;
+    }
+
+    HorizontalLayout {
+        padding-left: root.padding-x;
+        padding-right: root.padding-x;
+        padding-top: root.padding-y;
+        padding-bottom: root.padding-y;
+        spacing: 0.25rem;
+        alignment: center;
+        if root.icon != "": Icon {
+            glyph: root.icon;
+            size: 0.75rem;
+            color: root.text-color;
+        }
+        AppText {
+            content: root.text;
+            uppercase: true;
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            color: root.text-color;
+            line-height: Theme.text-xs-line-height;
+        }
+    }
+
+    FocusRing {
+        shown: root.invalid;
+        radius: min(root.radius, self.height / 2);
+        ring-color: Theme.ring-invalid-color;
+    }
+}

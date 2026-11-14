@@ -1,0 +1,194 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon } from "icons.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Choice, ChoiceListLogic } from "logic.slint";
+
+export enum TabsListVariant { default, main, toolbar }
+export enum TabsTriggerVariant { default, main, toolbar }
+
+// tabs.jsx `TabsList` with its `TabsTrigger`s, drawn from `items` (D4; `kind` is `item`). List and trigger variants are
+// set separately, as today. Left and Right move and activate (Radix's automatic activation),
+// skipping disabled triggers; Home and End go to the ends. `stretch` is the call sites'
+// `grid w-full grid-cols-N`; the other style properties are their overrides (D5).
+export component TabsList {
+    in property <[Choice]> items;
+    in property <string> value;
+    in property <TabsListVariant> variant: TabsListVariant.default;
+    in property <TabsTriggerVariant> trigger-variant: TabsTriggerVariant.default;
+    in property <bool> stretch;
+    in property <color> background: root.variant == TabsListVariant.default ? Theme.muted : transparent;
+    in property <length> list-padding: root.variant == TabsListVariant.default ? 0.25rem : root.variant == TabsListVariant.toolbar ? 0.125rem : 0px;
+    in property <length> trigger-font-size: root.trigger-variant == TabsTriggerVariant.toolbar ? 0.7rem : Theme.text-sm * 1rem;
+    in property <int> trigger-font-weight: Theme.font-weight-semibold;
+    in property <length> trigger-padding-x: root.trigger-variant == TabsTriggerVariant.toolbar ? 0.5rem : 0.75rem;
+    in property <length> trigger-padding-y: root.trigger-variant == TabsTriggerVariant.main ? 1rem : root.trigger-variant == TabsTriggerVariant.default ? 0.25rem : 0px;
+    callback value-changed(value: string);
+
+    property <int> active-index: ChoiceListLogic.index-of(root.items, root.value);
+    property <length> list-radius: root.variant == TabsListVariant.default ? Theme.radius-sm * 1rem
+        : root.variant == TabsListVariant.toolbar ? Theme.radius-xs * 1rem : 0px;
+
+    function step(from: int, direction: int) {
+        root.activate(ChoiceListLogic.next-enabled(root.items, from, direction, true));
+    }
+    function activate(index: int) {
+        if index >= 0 && root.items[index].value != root.value {
+            root.value-changed(root.items[index].value);
+        }
+    }
+
+    min-height: max(root.variant == TabsListVariant.default ? 2.25rem : 0px, list-layout.min-height);
+    preferred-height: max(self.min-height, list-layout.preferred-height);
+    max-height: self.preferred-height;
+    min-width: list-layout.min-width;
+    preferred-width: list-layout.preferred-width;
+    horizontal-stretch: root.stretch ? 1 : 0;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.tab-list;
+
+    Rectangle {
+        background: root.background;
+        border-radius: root.list-radius;
+        border-width: root.variant == TabsListVariant.toolbar ? 1px : 0px;
+        border-color: Theme.border.transparentize(0.5);
+    }
+    if root.variant == TabsListVariant.main: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        focus-on-click: false;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if root.items.length == 0 {
+                return reject;
+            }
+            if event.text == Key.RightArrow {
+                root.step(root.active-index + 1, 1);
+                return accept;
+            }
+            if event.text == Key.LeftArrow {
+                root.step(root.active-index - 1, -1);
+                return accept;
+            }
+            if event.text == Key.Home {
+                root.step(0, 1);
+                return accept;
+            }
+            if event.text == Key.End {
+                root.step(root.items.length - 1, -1);
+                return accept;
+            }
+            reject
+        }
+
+        list-layout := HorizontalLayout {
+            padding: root.list-padding;
+            spacing: root.variant == TabsListVariant.toolbar ? 0.125rem : 0px;
+            alignment: root.stretch ? LayoutAlignment.stretch : LayoutAlignment.center;
+
+            for item[index] in root.items: trigger := Rectangle {
+                property <bool> active: item.value == root.value;
+                property <bool> hovered: trigger-touch.has-hover;
+                property <bool> toolbar: root.trigger-variant == TabsTriggerVariant.toolbar;
+                property <length> radius: root.trigger-variant == TabsTriggerVariant.default ? Theme.radius-sm * 1rem : 0px;
+                property <color> text-color: self.active
+                    ? (self.toolbar ? Theme.surface : Theme.primary)
+                    : self.toolbar && self.hovered ? Theme.foreground : Theme.muted-foreground;
+
+                horizontal-stretch: root.stretch ? 1 : 0;
+                min-height: max(self.toolbar ? 1.25rem : 0px, trigger-layout.min-height);
+                min-width: trigger-layout.min-width;
+                preferred-width: trigger-layout.preferred-width;
+                opacity: item.disabled ? 0.5 : 1;
+                accessible-role: AccessibleRole.tab;
+                accessible-label: item.label;
+                accessible-item-selectable: true;
+                accessible-item-selected: self.active;
+                accessible-item-index: index;
+                accessible-item-count: root.items.length;
+                accessible-enabled: !item.disabled;
+                accessible-action-default => {
+                    root.activate(index);
+                }
+
+                Rectangle {
+                    border-radius: trigger.radius;
+                    background: trigger.active
+                        ? (trigger.toolbar ? Theme.foreground : root.trigger-variant == TabsTriggerVariant.default ? Theme.surface-accent-strong : transparent)
+                        : trigger.toolbar && trigger.hovered ? Theme.surface-elevated : transparent;
+                    border-width: 1px;
+                    border-color: transparent;
+                    animate background { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+                }
+                // The main variant's active underline: 0.296rem of `primary`, 0.148rem below.
+                if root.trigger-variant == TabsTriggerVariant.main && trigger.active: Rectangle {
+                    y: parent.height + 0.148rem - 0.296rem;
+                    height: 0.296rem;
+                    background: Theme.primary;
+                }
+                trigger-layout := HorizontalLayout {
+                    padding-left: root.trigger-padding-x;
+                    padding-right: root.trigger-padding-x;
+                    padding-top: root.trigger-padding-y;
+                    padding-bottom: root.trigger-padding-y;
+                    spacing: 0.5rem;
+                    alignment: center;
+                    if item.icon != "": Icon {
+                        glyph: item.icon;
+                        color: trigger.text-color;
+                    }
+                    AppText {
+                        content: item.label;
+                        uppercase: trigger.toolbar;
+                        font-size: root.trigger-font-size;
+                        font-weight: root.trigger-font-weight;
+                        color: trigger.text-color;
+                        line-height: Theme.text-sm-line-height;
+                        animate color { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+                    }
+                }
+                trigger-touch := TouchArea {
+                    enabled: !item.disabled;
+                    mouse-cursor: MouseCursor.pointer;
+                    pointer-event(event) => {
+                        // Radix activates on pointer down.
+                        if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                            focus.focus();
+                            root.activate(index);
+                        }
+                    }
+                }
+                FocusRing {
+                    shown: trigger.active && focus.focus-visible;
+                    ring-width: 2px;
+                    offset: 2px;
+                    radius: trigger.radius;
+                    ring-color: Theme.ring;
+                }
+            }
+        }
+    }
+}
+
+// tabs.jsx `TabsContent`: its slot, shown when `value` is `active-value`, 0.5rem below the list.
+export component TabsContent inherits VerticalLayout {
+    in property <string> value;
+    in property <string> active-value;
+    property <bool> active: root.value == root.active-value;
+
+    visible: root.active;
+    max-height: root.active ? 100000px : 0px;
+    padding-top: root.active ? 0.5rem : 0px;
+    accessible-role: AccessibleRole.tab-panel;
+    @children
+}

@@ -1,0 +1,56 @@
+import { Theme } from "../theme/theme.slint";
+
+// progress.jsx: a `primary`-at-20% track, 0.5rem high, fully rounded, with a `primary` indicator.
+// The value is clamped to 0–100; a non-finite value counts as 0. The glide is ported as it is:
+// each forward move eases (ease-out cubic) over the time since the previous value, clamped to
+// 16–800 ms; the bar snaps on a backward move, at 0, and at 100 or more. `track-color` is the
+// call sites' override (D5).
+export component Progress {
+    in property <float> value;
+    in property <color> track-color: Theme.primary.transparentize(0.8);
+
+    // `x * 0 == 0` is false for NaN and ±Infinity.
+    property <float> target: root.value > 0 && root.value * 0 == 0 ? min(root.value, 100) : 0;
+    property <float> shown-value: root.target;
+    property <bool> snapping: true;
+    property <duration> tween: 16ms;
+    property <duration> last-target-at;
+    property <bool> has-last-target;
+
+    changed target => {
+        if root.target <= root.shown-value || root.target >= 100 || root.target == 0 {
+            root.snapping = true;
+            root.tween = 16ms;
+        } else {
+            root.snapping = false;
+            root.tween = root.has-last-target ? clamp(animation-tick() - root.last-target-at, 16ms, 800ms) : 800ms;
+        }
+        root.last-target-at = animation-tick();
+        root.has-last-target = true;
+        root.shown-value = root.target;
+    }
+
+    height: 0.5rem;
+    accessible-role: AccessibleRole.progress-indicator;
+    accessible-value: round(root.target);
+    accessible-value-minimum: 0;
+    accessible-value-maximum: 100;
+
+    Rectangle {
+        border-radius: root.height / 2;
+        background: root.track-color;
+        clip: true;
+
+        Rectangle {
+            x: -(100 - root.shown-value) / 100 * parent.width;
+            width: parent.width;
+            background: Theme.primary;
+        }
+    }
+
+    animate shown-value {
+        duration: root.snapping ? 0ms : root.tween;
+        // easeOutCubic (1 - (1 - t)^3); Slint has no named cubic ease-out.
+        easing: cubic-bezier(0.33, 1, 0.68, 1);
+    }
+}

@@ -1,0 +1,55 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { Separator } from "separator.slint";
+
+// button-group.jsx. Children join through their own `group-position` (D4); the group lays them
+// out without gaps. Today's groups are input + button and button + button. `@children` cannot sit
+// in a conditional element, so the vertical orientation is its own component; its children set
+// `group-orientation: vertical`.
+export component ButtonGroup inherits HorizontalLayout {
+    alignment: start;
+    accessible-role: AccessibleRole.groupbox;
+}
+
+export component ButtonGroupVertical inherits VerticalLayout {
+    alignment: start;
+    accessible-role: AccessibleRole.groupbox;
+}
+
+// Static text in a group: muted background, border, 1rem side padding, `text-sm`, weight 500,
+// `shadow-xs`.
+export component ButtonGroupText {
+    in property <string> text;
+
+    Shadow {
+        size: ShadowSize.xs;
+        radius: Theme.radius-md * 1rem;
+    }
+    Rectangle {
+        background: Theme.muted;
+        border-width: 1px;
+        border-color: Theme.border;
+        border-radius: Theme.radius-md * 1rem;
+    }
+    HorizontalLayout {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        spacing: 0.5rem;
+        alignment: center;
+        AppText {
+            content: root.text;
+            uppercase: true;
+            font-size: Theme.text-sm * 1rem;
+            font-weight: Theme.font-weight-medium;
+            line-height: Theme.text-sm-line-height;
+        }
+        @children
+    }
+}
+
+// A separator in `input` that stretches across the group.
+export component ButtonGroupSeparator inherits Separator {
+    orientation: Orientation.vertical;
+    line-color: Theme.input;
+}

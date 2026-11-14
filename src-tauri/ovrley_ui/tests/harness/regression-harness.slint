@@ -1,0 +1,79 @@
+import { FluidWindow } from "../../ui/theme/fluid-window.slint";
+import { AppText } from "../../ui/components/app-text.slint";
+import { Button } from "../../ui/components/button.slint";
+import { BlurInput } from "../../ui/components/blur-input.slint";
+import { ScrollArea } from "../../ui/components/scroll-area.slint";
+import { SimpleTooltip } from "../../ui/components/simple-tooltip.slint";
+import { GradientPicker } from "../../ui/components/gradient-picker.slint";
+import { HexColorPicker } from "../../ui/components/hex-color-picker.slint";
+import { GradientStop } from "../../ui/components/logic.slint";
+
+// Harness for the review fixes: a tooltip beside another button, a number BlurInput, a gradient
+// picker that feeds its changes back like a real caller, and a scroll area with tall content.
+export component RegressionHarness inherits FluidWindow {
+    width: 1100px;
+    height: 720px;
+    in-out property <[GradientStop]> stops;
+    out property <int> other-clicks;
+    in-out property <string> number: "30";
+    in-out property <string> hex: "#40e0d0";
+    out property <int> hex-changes;
+    out property <length> scroll-y: area.content-y;
+
+    HorizontalLayout {
+        padding: 40px;
+        spacing: 40px;
+        VerticalLayout {
+            alignment: start;
+            spacing: 20px;
+            HorizontalLayout {
+                alignment: start;
+                spacing: 20px;
+                SimpleTooltip {
+                    content: "Tooltip text";
+                    Button { text: "Hover me"; }
+                }
+                Button {
+                    text: "Other";
+                    clicked => { root.other-clicks += 1; }
+                }
+            }
+            HorizontalLayout {
+                alignment: start;
+                spacing: 20px;
+                BlurInput {
+                    width: 200px;
+                    label: "Num";
+                    number: true;
+                    constraints: { has-min: true, min: 1, step: "1" };
+                    value: root.number;
+                    changed(v) => { root.number = v; }
+                }
+                Button {
+                    text: "Set 60";
+                    clicked => { root.number = "60"; }
+                }
+            }
+            HexColorPicker {
+                width: 300px;
+                value: root.hex;
+                changed(h) => {
+                    root.hex = h;
+                    root.hex-changes += 1;
+                }
+            }
+            GradientPicker {
+                width: 400px;
+                stops: root.stops;
+                changed(next) => { root.stops = next; }
+            }
+        }
+        area := ScrollArea {
+            width: 300px;
+            height: 300px;
+            accessible-role: groupbox;
+            accessible-label: "Scroll area";
+            for i in 40: AppText { content: "Row " + i; }
+        }
+    }
+}

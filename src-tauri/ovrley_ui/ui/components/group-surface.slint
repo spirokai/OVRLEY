@@ -1,0 +1,84 @@
+import { Theme } from "../theme/theme.slint";
+
+// Where a control sits in a ButtonGroup or input group (D4). Slint parents cannot style their
+// children, so the caller sets it: `first`, `middle` and `last` square the joined corners, and
+// every item after the first drops the border on its joined side.
+export enum GroupPosition { isolated, first, middle, last }
+
+// The corner radii of a control at a group position: joined corners are square. Shared by
+// `GroupSurface` and the control's `FocusRing`.
+export global GroupCorners {
+    pure public function joins-before(position: GroupPosition) -> bool {
+        position == GroupPosition.middle || position == GroupPosition.last
+    }
+    pure public function joins-after(position: GroupPosition) -> bool {
+        position == GroupPosition.first || position == GroupPosition.middle
+    }
+    pure public function top-left(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        self.joins-before(position) ? 0px : radius
+    }
+    pure public function top-right(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        (orientation == Orientation.horizontal ? self.joins-after(position) : self.joins-before(position)) ? 0px : radius
+    }
+    pure public function bottom-left(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        (orientation == Orientation.horizontal ? self.joins-before(position) : self.joins-after(position)) ? 0px : radius
+    }
+    pure public function bottom-right(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        self.joins-after(position) ? 0px : radius
+    }
+}
+
+// The background, border and field lift of a groupable control.
+export component GroupSurface {
+    width: 100%;
+    height: 100%;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <Orientation> group-orientation: Orientation.horizontal;
+    in property <length> radius;
+    in property <brush> background: transparent;
+    in property <length> border-width;
+    in property <brush> border-color: Theme.border;
+    // `.field-lift`: a faint `field-lift` wash over the field's own background.
+    in property <bool> field-lift;
+
+    property <bool> joins-before: GroupCorners.joins-before(root.group-position);
+    property <bool> horizontal: root.group-orientation == Orientation.horizontal;
+    property <length> top-left: GroupCorners.top-left(root.group-position, root.group-orientation, root.radius);
+    property <length> top-right: GroupCorners.top-right(root.group-position, root.group-orientation, root.radius);
+    property <length> bottom-left: GroupCorners.bottom-left(root.group-position, root.group-orientation, root.radius);
+    property <length> bottom-right: GroupCorners.bottom-right(root.group-position, root.group-orientation, root.radius);
+    // The joined border is drawn outside the clip, which hides it.
+    property <length> hidden-before: root.joins-before ? root.border-width : 0px;
+
+    Rectangle {
+        clip: true;
+        border-top-left-radius: root.top-left;
+        border-top-right-radius: root.top-right;
+        border-bottom-left-radius: root.bottom-left;
+        border-bottom-right-radius: root.bottom-right;
+
+        Rectangle {
+            x: root.horizontal ? -root.hidden-before : 0px;
+            y: root.horizontal ? 0px : -root.hidden-before;
+            width: root.width + (root.horizontal ? root.hidden-before : 0px);
+            height: root.height + (root.horizontal ? 0px : root.hidden-before);
+            background: root.background;
+            border-width: root.border-width;
+            border-color: root.border-color;
+            border-top-left-radius: root.top-left;
+            border-top-right-radius: root.top-right;
+            border-bottom-left-radius: root.bottom-left;
+            border-bottom-right-radius: root.bottom-right;
+
+            if root.field-lift: Rectangle {
+                background: Theme.field-lift;
+                border-top-left-radius: root.top-left;
+                border-top-right-radius: root.top-right;
+                border-bottom-left-radius: root.bottom-left;
+                border-bottom-right-radius: root.bottom-right;
+            }
+        }
+
+        @children
+    }
+}

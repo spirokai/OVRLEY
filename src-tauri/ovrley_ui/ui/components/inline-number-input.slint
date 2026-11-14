@@ -1,0 +1,77 @@
+import { Theme } from "../theme/theme.slint";
+import { Input, InputVariant } from "input.slint";
+import { InlineBlurKind, NumberConstraints, NumberInputLogic } from "logic.slint";
+
+// The port of `useInlineNumberInput`: an inline `Input` that keeps a draft while editing.
+// Focusing selects all; Escape restores the value and blurs; Enter blurs. On blur an unchanged
+// number does nothing (an untouched value may sit between steps after a canvas resize), a changed
+// valid number commits, and a changed invalid number keeps the draft and shows the invalid state
+// (without the browser's validation bubble, Q2). As in React, an empty field commits NaN. The
+// value shows as Slint's number-to-string, which matches JavaScript's `String(value)` for the
+// values the editor displays.
+export component InlineNumberInput {
+    in property <float> value;
+    in property <NumberConstraints> constraints: { step: "" };
+    in property <bool> disabled;
+    // `aria-label`: the field's accessible name.
+    in property <string> label;
+    callback committed(value: float);
+
+    property <string> text;
+    property <bool> invalid;
+
+    init => {
+        root.text = (root.value + "");
+    }
+    changed value => {
+        if !field.has-focus && !root.invalid {
+            root.text = (root.value + "");
+        }
+    }
+
+    min-height: field.min-height;
+    max-height: field.max-height;
+    forward-focus: field;
+
+    field := Input {
+        width: root.width;
+        height: root.height;
+        variant: InputVariant.inline;
+        number: true;
+        text <=> root.text;
+        disabled: root.disabled;
+        invalid: root.invalid;
+        label: root.label;
+
+        edited => {
+            root.invalid = false;
+        }
+        focus-changed(focused) => {
+            if focused {
+                self.select-all();
+                return;
+            }
+            let decision = NumberInputLogic.inline-blur(root.text, root.value, root.constraints);
+            if decision.kind == InlineBlurKind.invalid {
+                root.invalid = true;
+                return;
+            }
+            root.invalid = false;
+            if decision.kind == InlineBlurKind.commit {
+                root.committed(decision.value);
+            }
+            root.text = (root.value + "");
+        }
+        accepted => {
+            self.blur();
+        }
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.text = (root.value + "");
+                self.blur();
+                return accept;
+            }
+            reject
+        }
+    }
+}

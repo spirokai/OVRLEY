@@ -1,0 +1,210 @@
+// Logic globals (D2). Slint cannot call Rust directly, so components call these pure callbacks;
+// they are bound after the window is created, so components must not call them from `init`;
+// `install_component_logic` (ovrley_ui/src/logic) binds them to ovrley_app. In the LSP preview they
+// are unbound: components still render, and interactions that need Rust are tested in the showcase.
+
+// ── Colour ──────────────────────────────────────────────────────────────────────────────────────
+
+export struct Rgba {
+    r: float,
+    g: float,
+    b: float,
+    a: float,
+}
+
+export struct Hsv {
+    h: float,
+    s: float,
+    v: float,
+    a: float,
+}
+
+export struct Hsl {
+    h: float,
+    s: float,
+    l: float,
+}
+
+export enum ColorFormat { hex, rgb, hsl, hsb }
+
+// A colour string that may not parse.
+export struct ParsedColor {
+    valid: bool,
+    color: Rgba,
+}
+
+// A channel input's text that may not be an accepted value.
+export struct ParsedChannel {
+    valid: bool,
+    value: float,
+}
+
+export global ColorPickerLogic {
+    pure callback hex-to-rgb(hex: string, alpha: float) -> Rgba;
+    pure callback rgb-to-hex(color: Rgba) -> string;
+    pure callback rgb-to-hsv(color: Rgba) -> Hsv;
+    pure callback hsv-to-rgb(hsv: Hsv) -> Rgba;
+    pure callback rgb-to-hsl(color: Rgba) -> Hsl;
+    pure callback hsl-to-rgb(hsl: Hsl, alpha: float) -> Rgba;
+    pure callback color-to-string(color: Rgba, format: ColorFormat) -> string;
+    pure callback parse-color-string(value: string) -> ParsedColor;
+    pure callback parse-channel(text: string, max: float) -> ParsedChannel;
+    pure callback normalize-hex-color(value: string, fallback: string) -> string;
+    // A normalized `#rrggbb` string as a drawable colour.
+    pure callback hex-to-color(hex: string) -> color;
+}
+
+// ── Gradient ────────────────────────────────────────────────────────────────────────────────────
+
+export struct GradientStop {
+    offset: float,
+    color: string,
+}
+
+// One piece of the track fill: a two-colour gradient between two offsets.
+export struct GradientTrackSegment {
+    start: float,
+    end: float,
+    start-color: color,
+    end-color: color,
+}
+
+export enum GradientStopKeyResult { ignored, handled, apply }
+
+export struct GradientStopKeyOutcome {
+    result: GradientStopKeyResult,
+    stops: [GradientStop],
+}
+
+export global GradientPickerLogic {
+    pure callback track-segments(stops: [GradientStop]) -> [GradientTrackSegment];
+    pure callback can-add-stop(stop-count: int) -> bool;
+    pure callback can-remove-stop(stop-count: int) -> bool;
+    pure callback offset-at(x: length, track-width: length) -> float;
+    pure callback exceeds-drag-threshold(start-x: length, x: length) -> bool;
+    pure callback add-stop(stops: [GradientStop], offset: float) -> [GradientStop];
+    pure callback move-stop(stops: [GradientStop], index: int, offset: float) -> [GradientStop];
+    pure callback set-stop-color(stops: [GradientStop], index: int, color: string) -> [GradientStop];
+    pure callback remove-stop(stops: [GradientStop], index: int) -> [GradientStop];
+    pure callback stop-key(stops: [GradientStop], index: int, key: string, shift: bool) -> GradientStopKeyOutcome;
+}
+
+// ── Number input ────────────────────────────────────────────────────────────────────────────────
+
+// `min`, `max` and `step` of a number input, as the HTML attributes. `min` and `max` are optional
+// (`has-min`, `has-max`); `step` is the attribute text, where "" is the default step of 1.
+export struct NumberConstraints {
+    has-min: bool,
+    min: float,
+    has-max: bool,
+    max: float,
+    step: string,
+}
+
+export enum StepDirection { up, down }
+
+// `stepUp()`/`stepDown()`: `stepped` is false where the input cannot step (`step="any"`).
+export struct SteppedNumber {
+    stepped: bool,
+    text: string,
+}
+
+export enum InlineBlurKind { unchanged, commit, invalid }
+
+export struct InlineBlur {
+    kind: InlineBlurKind,
+    value: float,
+}
+
+export global NumberInputLogic {
+    pure callback is-number-input-text(text: string) -> bool;
+    pure callback step(text: string, constraints: NumberConstraints, direction: StepDirection) -> SteppedNumber;
+    pure callback inline-blur(text: string, value: float, constraints: NumberConstraints) -> InlineBlur;
+}
+
+// ── Placement ───────────────────────────────────────────────────────────────────────────────────
+
+export enum PlacementSide { top, right, bottom, left }
+export enum PlacementAlign { start, center, end }
+
+export struct PlacementRect {
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
+export struct Placement {
+    x: length,
+    y: length,
+    side: PlacementSide,
+    available-height: length,
+}
+
+export struct ItemAlignedPlacement {
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+    scroll-y: length,
+}
+
+export global PlacementLogic {
+    pure callback place(
+        anchor: PlacementRect,
+        content-width: length,
+        content-height: length,
+        window-width: length,
+        window-height: length,
+        side: PlacementSide,
+        align: PlacementAlign,
+        side-offset: length) -> Placement;
+    pure callback item-aligned(
+        trigger: PlacementRect,
+        content-width: length,
+        content-height: length,
+        window-width: length,
+        window-height: length,
+        item-top: length,
+        item-height: length) -> ItemAlignedPlacement;
+}
+
+// ── Choice lists ────────────────────────────────────────────────────────────────────────────────
+
+export enum ChoiceKind { item, label, separator }
+
+// One entry of a list of choices (D4): a tab trigger, a toggle-group item, or a select item,
+// group label or separator. `pressed` is a toggle-group item's state in multiple mode.
+export struct Choice {
+    kind: ChoiceKind,
+    value: string,
+    label: string,
+    // An `Icons` path; empty for none.
+    icon: string,
+    // The accessible name of an icon-only item; empty to use `label`.
+    accessible-label: string,
+    disabled: bool,
+    pressed: bool,
+}
+
+export struct ChoiceListMetrics {
+    content-height: length,
+    entry-top: length,
+}
+
+// Keyboard navigation over choices. Slint has no loops, so components ask for these. Indices are
+// -1 when nothing matches.
+export global ChoiceListLogic {
+    pure callback index-of(items: [Choice], value: string) -> int;
+    // The first enabled item from `from` (inclusive) stepping by `direction`; `wrap` continues
+    // past the ends.
+    pure callback next-enabled(items: [Choice], from: int, direction: int, wrap: bool) -> int;
+    // Radix Select's type-ahead from the `current` item.
+    pure callback typeahead(items: [Choice], current: int, search: string) -> int;
+    // The list's content height and where entry `index` starts: items and labels are `row-height`
+    // tall, separators `separator-height`, inside `padding` above and below.
+    pure callback list-metrics(items: [Choice], index: int, row-height: length, separator-height: length, padding: length) -> ChoiceListMetrics;
+    // FontSelectField's list: the recommended group, then a separator and the system group when
+    // there are system fonts, each under its label.
+    pure callback font-select-choices(recommended: [Choice], recommended-label: string, system: [Choice], system-label: string) -> [Choice];
+}

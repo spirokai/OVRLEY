@@ -1,0 +1,186 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon } from "icons.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { GroupPosition, GroupSurface } from "group-surface.slint";
+
+export enum ButtonVariant { default, destructive, outline, secondary, ghost, toolbar, link }
+export enum ButtonSize { default, sm, lg, icon, icon-sm, icon-lg, toolbar-icon }
+
+// button.jsx. Content is `text`, an optional `icon`, and a slot for other content (spinners,
+// custom layouts). Text is `text-sm`, weight 600, in `rounded-sm`, 0.5rem apart; it keeps its
+// case except in the toolbar variant. The colour, type, shadow and spacing properties default to
+// the variant's values and are the call sites' overrides (D5); width and height are Slint geometry.
+export component Button {
+    in property <ButtonVariant> variant: ButtonVariant.default;
+    in property <ButtonSize> size: ButtonSize.default;
+    in property <string> text;
+    // An `Icons` path; empty for none.
+    in property <string> icon;
+    in property <length> icon-size: 1rem;
+    in property <bool> disabled;
+    // `aria-pressed`, styled by the toolbar variant.
+    in property <bool> pressed;
+    in property <bool> invalid;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <Orientation> group-orientation: Orientation.horizontal;
+
+    in property <color> background: root.variant == ButtonVariant.default ? Theme.primary
+        : root.variant == ButtonVariant.destructive ? Theme.destructive
+        : root.variant == ButtonVariant.outline ? Theme.background
+        : root.variant == ButtonVariant.secondary ? Theme.secondary : transparent;
+    in property <color> hover-background: root.variant == ButtonVariant.default ? Theme.primary.transparentize(0.1)
+        : root.variant == ButtonVariant.destructive ? Theme.destructive.transparentize(0.1)
+        : root.variant == ButtonVariant.outline ? Theme.accent.transparentize(0.8)
+        : root.variant == ButtonVariant.secondary ? Theme.secondary.transparentize(0.2)
+        : root.variant == ButtonVariant.ghost || root.variant == ButtonVariant.toolbar ? Theme.surface-elevated : transparent;
+    in property <color> text-color: root.variant == ButtonVariant.default || root.variant == ButtonVariant.destructive ? Theme.primary-foreground
+        : root.variant == ButtonVariant.secondary ? Theme.secondary-foreground
+        : root.variant == ButtonVariant.toolbar ? Theme.muted-foreground
+        : root.variant == ButtonVariant.link ? Theme.primary : Theme.foreground;
+    in property <color> hover-text-color: root.variant == ButtonVariant.toolbar ? Theme.foreground : root.text-color;
+    in property <length> border-width: root.variant == ButtonVariant.outline ? 1px : 0px;
+    in property <color> border-color: root.variant == ButtonVariant.outline ? Theme.input : Theme.border;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    in property <int> font-weight: Theme.font-weight-semibold;
+    in property <bool> uppercase: root.variant == ButtonVariant.toolbar;
+    in property <ShadowSize> shadow: root.variant == ButtonVariant.outline ? ShadowSize.xs : ShadowSize.none;
+    in property <length> padding-x: root.size == ButtonSize.default ? (root.icon != "" ? 0.75rem : 1rem)
+        : root.size == ButtonSize.sm ? (root.icon != "" ? 0.625rem : 0.75rem)
+        : root.size == ButtonSize.lg ? (root.icon != "" ? 1rem : 1.5rem) : 0px;
+    in property <length> spacing: root.size == ButtonSize.sm ? 0.375rem : 0.5rem;
+    in property <LayoutAlignment> alignment: LayoutAlignment.center;
+    in property <length> radius: Theme.radius-sm * 1rem;
+
+    out property <bool> has-hover: touch.has-hover;
+    out property <bool> has-focus: focus.has-focus;
+    callback clicked;
+
+    property <length> box-size: root.size == ButtonSize.sm || root.size == ButtonSize.icon-sm ? 2rem
+        : root.size == ButtonSize.lg || root.size == ButtonSize.icon-lg ? 2.5rem
+        : root.size == ButtonSize.toolbar-icon ? 1.75rem : 2.25rem;
+    property <bool> square: root.size == ButtonSize.icon || root.size == ButtonSize.icon-sm || root.size == ButtonSize.icon-lg || root.size == ButtonSize.toolbar-icon;
+    // Disabled default and outline buttons keep their normal colours on hover; other variants
+    // still change, as `:hover` applies to disabled buttons in the browser.
+    property <bool> hover-styled: touch.has-hover && !(root.disabled && (root.variant == ButtonVariant.default || root.variant == ButtonVariant.outline));
+    property <bool> toolbar-pressed: root.variant == ButtonVariant.toolbar && root.pressed;
+    property <color> current-text: root.toolbar-pressed ? Theme.surface : root.hover-styled ? root.hover-text-color : root.text-color;
+
+    // `[&>*]:focus-visible:relative z-10`: a focused control's ring draws above its neighbours.
+    z: focus.focus-visible ? 1 : 0;
+    min-height: root.box-size;
+    preferred-height: root.box-size;
+    max-height: root.box-size;
+    min-width: root.square ? root.box-size : 0px;
+    preferred-width: root.square ? root.box-size : content.preferred-width;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.button;
+    accessible-label: root.text;
+    accessible-enabled: !root.disabled;
+    accessible-checkable: root.variant == ButtonVariant.toolbar;
+    accessible-checked: root.pressed;
+    accessible-action-default => {
+        if !root.disabled {
+            root.clicked();
+        }
+    }
+
+    Shadow {
+        size: root.shadow;
+        radius: root.radius;
+    }
+
+    GroupSurface {
+        group-position: root.group-position;
+        group-orientation: root.group-orientation;
+        radius: root.radius;
+        background: root.toolbar-pressed ? Theme.foreground : root.hover-styled ? root.hover-background : root.background;
+        border-width: root.border-width;
+        border-color: root.invalid ? Theme.destructive : focus.focus-visible ? Theme.ring : root.border-color;
+        animate background { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+    }
+
+    content := HorizontalLayout {
+        padding-left: root.padding-x;
+        padding-right: root.padding-x;
+        spacing: root.spacing;
+        alignment: root.alignment;
+        if root.icon != "": Icon {
+            glyph: root.icon;
+            size: root.icon-size;
+            color: root.current-text;
+        }
+        if root.text != "": label := AppText {
+            content: root.text;
+            uppercase: root.uppercase;
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            color: root.current-text;
+            line-height: Theme.text-sm-line-height;
+            animate color { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+
+            // `link` underlines on hover, 4px below the text. Slint text has no underline.
+            if root.variant == ButtonVariant.link && touch.has-hover: Rectangle {
+                y: parent.height / 2 + parent.font-size * 0.35 + 4px;
+                height: 1px;
+                background: root.current-text;
+            }
+        }
+        @children
+    }
+
+    touch := TouchArea {
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                focus.focus();
+            }
+        }
+        enabled: !root.disabled;
+        mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    // Pointer presses focus it through the touch area: a scope with `focus-on-click` would
+    // swallow the first press.
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        focus-on-click: false;
+        enabled: !root.disabled;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return {
+                root.clicked();
+                return accept;
+            }
+            if event.text == " " {
+                return accept;
+            }
+            reject
+        }
+        // Space activates on release, as in the browser.
+        key-released(event) => {
+            if event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+
+    FocusRing {
+        shown: focus.focus-visible || root.invalid;
+        radius: root.radius;
+        group-position: root.group-position;
+        group-orientation: root.group-orientation;
+        ring-color: root.invalid || (root.variant == ButtonVariant.destructive && focus.focus-visible) ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+}

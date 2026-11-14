@@ -1,0 +1,22 @@
+import { FluidWindow } from "../../ui/theme/fluid-window.slint";
+import { BlurInput } from "../../ui/components/blur-input.slint";
+
+// The BlurInput test harness: one field labelled "FPS" whose committed value the test sets.
+export component BlurInputHarness inherits FluidWindow {
+    width: 1100px;
+    height: 720px;
+    in-out property <string> value: "30";
+    in-out property <int> commit-count;
+
+    VerticalLayout {
+        alignment: start;
+        padding: 20px;
+        BlurInput {
+            label: "FPS";
+            value: root.value;
+            changed(v) => {
+                root.commit-count += 1;
+            }
+        }
+    }
+}

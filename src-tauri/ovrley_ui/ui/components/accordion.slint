@@ -1,0 +1,143 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon, Icons } from "icons.slint";
+import { FocusRing } from "focus-ring.slint";
+
+// accordion.jsx. The one caller uses single, collapsible mode driven by app state, so the caller
+// (Phase 3) applies that rule: it passes `open` to the trigger and the content, and handles
+// `toggled`. Slint parents cannot hand state to their children, hence `open` on both parts.
+
+// An item: its trigger and content, with a bottom border.
+export component AccordionItem inherits VerticalLayout {
+    @children
+    Rectangle {
+        height: 1px;
+        background: Theme.border;
+    }
+}
+
+// The trigger: 1rem vertical padding, `text-sm`, weight 500, underlined on hover; the slot holds
+// its content. The muted 1rem chevron rotates 180° over 200 ms and turns `primary` when open.
+// Enter and Space toggle it. The colour and padding properties are the call site's overrides (D5).
+export component AccordionTrigger {
+    in property <bool> open;
+    in property <string> text;
+    in property <color> background: Theme.background.transparentize(1);
+    in property <color> open-background: root.background;
+    in property <color> text-color: Theme.foreground;
+    in property <color> hover-text-color: root.text-color;
+    in property <color> open-text-color: root.text-color;
+    in property <bool> underline-on-hover: true;
+    in property <length> inset-left: 0px;
+    in property <length> inset-right: 0px;
+    in property <length> inset-y: 1rem;
+    out property <bool> has-hover: touch.has-hover;
+    callback toggled();
+
+    property <color> current-text: root.open ? root.open-text-color : touch.has-hover ? root.hover-text-color : root.text-color;
+
+    forward-focus: focus;
+    accessible-role: AccessibleRole.button;
+    accessible-label: root.text;
+    accessible-expandable: true;
+    accessible-expanded: root.open;
+    accessible-action-default => {
+        root.toggled();
+    }
+    accessible-action-expand => {
+        root.toggled();
+    }
+
+    Rectangle {
+        background: root.open ? root.open-background : root.background;
+    }
+    HorizontalLayout {
+        padding-left: root.inset-left;
+        padding-right: root.inset-right;
+        padding-top: root.inset-y;
+        padding-bottom: root.inset-y;
+        spacing: 0.5rem;
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            alignment: start;
+            if root.text != "": label := AppText {
+                content: root.text;
+                font-size: Theme.text-sm * 1rem;
+                font-weight: Theme.font-weight-medium;
+                color: root.current-text;
+                line-height: Theme.text-sm-line-height;
+                if root.underline-on-hover && touch.has-hover: Rectangle {
+                    y: parent.height / 2 + parent.font-size * 0.35 + 1px;
+                    height: 1px;
+                    background: root.current-text;
+                }
+            }
+            @children
+        }
+        Icon {
+            glyph: Icons.chevron-down;
+            size: 1rem;
+            color: root.open ? Theme.primary : Theme.muted-foreground;
+            transform-rotation: root.open ? 180deg : 0deg;
+            animate transform-rotation { duration: Theme.duration-200; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+        }
+    }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                focus.focus();
+            }
+        }
+        clicked => {
+            root.toggled();
+        }
+    }
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        focus-on-click: false;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.toggled();
+                return accept;
+            }
+            reject
+        }
+    }
+    FocusRing {
+        shown: focus.focus-visible;
+        ring-width: 2px;
+        ring-color: Theme.ring;
+    }
+}
+
+// The content: its height animates over 160 ms (Radix's accordion keyframes, `ease-out`) and is
+// clipped, with 1rem bottom padding. The colour and padding properties are the call site's
+// overrides (D5).
+export component AccordionContent inherits Rectangle {
+    in property <bool> open;
+    in property <length> inset-left: 0px;
+    in property <length> inset-right: 0px;
+    in property <length> inset-top: 0px;
+    in property <length> inset-bottom: 1rem;
+
+    height: root.open ? inner.preferred-height : 0px;
+    clip: true;
+    animate height { duration: Theme.duration-160; easing: ease-out; }
+
+    inner := VerticalLayout {
+        y: 0px;
+        height: self.preferred-height;
+        padding-left: root.inset-left;
+        padding-right: root.inset-right;
+        padding-top: root.inset-top;
+        padding-bottom: root.inset-bottom;
+        @children
+    }
+}

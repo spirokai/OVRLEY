@@ -1,0 +1,202 @@
+import { Theme } from "../theme/theme.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+
+// slider.jsx, with one thumb: every caller passes a one-element array (Q4).
+// A 0.375rem `primary`-at-20% track with a `primary` range; a 1rem round thumb with a `primary`
+// border, `highlight-foreground` fill, `shadow-sm`, and a 4px ring (`ring` at 50%) on hover and
+// focus. Vertical sliders (video sync) are at least 11rem tall. The slot draws inside the track
+// (`trackChildren`).
+//
+// Radix behaviour: pressing the track jumps there and starts a drag; values snap to the step;
+// arrows move one step, Shift+arrow, PageUp and PageDown ten, Home and End go to the ends.
+// `value-changed` fires when the value changes during a drag or key press; `value-committed`
+// fires on release and on each key press, when the value changed.
+export component Slider {
+    in property <float> value;
+    in property <float> minimum: 0;
+    in property <float> maximum: 100;
+    in property <float> step: 1;
+    in property <Orientation> orientation: Orientation.horizontal;
+    in property <bool> disabled;
+    // Style overrides (D5), used by the colour picker's hue slider.
+    in property <brush> track-background: Theme.primary.transparentize(0.8);
+    in property <brush> range-background: Theme.primary;
+    in property <length> track-thickness: 0.375rem;
+    in property <color> thumb-background: Theme.highlight-foreground;
+    in property <color> thumb-border-color: Theme.primary;
+    // The 4px ring on hover and focus; without it, focus shows a 1px ring.
+    in property <bool> thumb-ring: true;
+    callback value-changed(value: float);
+    callback value-committed(value: float);
+
+    property <bool> horizontal: root.orientation == Orientation.horizontal;
+    property <length> thumb-size: 1rem;
+    property <float> fraction: root.maximum > root.minimum ? clamp((root.value - root.minimum) / (root.maximum - root.minimum), 0, 1) : 0;
+    property <length> length: root.horizontal ? root.width : root.height;
+    // Radix keeps the thumb inside the slider: its centre moves from half a thumb in at the start
+    // to half a thumb in at the end.
+    property <length> thumb-center: root.fraction * root.length + root.thumb-size / 2 * (1 - 2 * root.fraction);
+    property <float> value-before-slide;
+
+    // Snaps to the step grid from `minimum`, clamps, and rounds to the step's precision.
+    pure function snap(raw: float) -> float {
+        clamp(round((raw - root.minimum) / root.step) * root.step + root.minimum, root.minimum, root.maximum)
+    }
+    function value-at(position: length) -> float {
+        let fraction = clamp(position / root.length, 0, 1);
+        root.snap(root.minimum + (root.horizontal ? fraction : 1 - fraction) * (root.maximum - root.minimum))
+    }
+    function update(next: float, commit: bool) {
+        if next != root.value {
+            root.value-changed(next);
+            if commit {
+                root.value-committed(next);
+            }
+        }
+    }
+
+    min-width: root.horizontal ? 0px : root.thumb-size;
+    min-height: root.horizontal ? root.thumb-size : 11rem;
+    horizontal-stretch: root.horizontal ? 1 : 0;
+    vertical-stretch: root.horizontal ? 0 : 1;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.slider;
+    accessible-value: root.value;
+    accessible-value-minimum: root.minimum;
+    accessible-value-maximum: root.maximum;
+    accessible-value-step: root.step;
+    accessible-orientation: root.orientation;
+    accessible-enabled: !root.disabled;
+    accessible-action-increment => {
+        root.update(root.snap(root.value + root.step), true);
+    }
+    accessible-action-decrement => {
+        root.update(root.snap(root.value - root.step), true);
+    }
+
+    track := Rectangle {
+        x: root.horizontal ? 0px : (root.width - root.track-thickness) / 2;
+        y: root.horizontal ? (root.height - root.track-thickness) / 2 : 0px;
+        width: root.horizontal ? root.width : root.track-thickness;
+        height: root.horizontal ? root.track-thickness : root.height;
+        border-radius: root.track-thickness / 2;
+        background: root.track-background;
+        clip: true;
+
+        Rectangle {
+            x: 0px;
+            y: root.horizontal ? 0px : parent.height * (1 - root.fraction);
+            width: root.horizontal ? parent.width * root.fraction : parent.width;
+            height: root.horizontal ? parent.height : parent.height * root.fraction;
+            background: root.range-background;
+        }
+        @children
+    }
+
+    touch := TouchArea {
+        enabled: !root.disabled;
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                root.value-before-slide = root.value;
+                focus.focus();
+                root.update(root.value-at(root.horizontal ? self.mouse-x : self.mouse-y), false);
+            }
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                if root.value != root.value-before-slide {
+                    root.value-committed(root.value);
+                }
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.update(root.value-at(root.horizontal ? self.mouse-x : self.mouse-y), false);
+            }
+        }
+    }
+
+    thumb := Rectangle {
+        width: root.thumb-size;
+        height: root.thumb-size;
+        x: root.horizontal ? root.thumb-center - self.width / 2 : (root.width - self.width) / 2;
+        y: root.horizontal ? (root.height - self.height) / 2 : root.length - root.thumb-center - self.height / 2;
+
+        Shadow {
+            size: ShadowSize.sm;
+            radius: parent.width / 2;
+        }
+        Rectangle {
+            border-radius: parent.width / 2;
+            border-width: 1px;
+            border-color: root.thumb-border-color;
+            background: root.thumb-background;
+        }
+        FocusRing {
+            shown: root.thumb-ring ? (thumb-touch.has-hover || focus.focus-visible) : focus.focus-visible;
+            ring-width: root.thumb-ring ? 4px : 1px;
+            radius: parent.width / 2;
+            ring-color: root.thumb-ring ? Theme.ring-color : Theme.ring;
+        }
+        thumb-touch := TouchArea {
+            enabled: !root.disabled;
+            mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+            pointer-event(event) => {
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                    root.value-before-slide = root.value;
+                    focus.focus();
+                }
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                    if root.value != root.value-before-slide {
+                        root.value-committed(root.value);
+                    }
+                }
+            }
+            moved => {
+                if self.pressed {
+                    root.update(root.value-at(root.horizontal ? self.absolute-position.x - root.absolute-position.x + self.mouse-x : self.absolute-position.y - root.absolute-position.y + self.mouse-y), false);
+                }
+            }
+        }
+    }
+
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        enabled: !root.disabled;
+        focus-on-click: false;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            let big = root.step * 10;
+            if event.text == Key.Home {
+                root.update(root.minimum, true);
+                return accept;
+            }
+            if event.text == Key.End {
+                root.update(root.maximum, true);
+                return accept;
+            }
+            if event.text == Key.PageUp {
+                root.update(root.snap(root.value + big), true);
+                return accept;
+            }
+            if event.text == Key.PageDown {
+                root.update(root.snap(root.value - big), true);
+                return accept;
+            }
+            if event.text == Key.RightArrow || event.text == Key.UpArrow {
+                root.update(root.snap(root.value + (event.modifiers.shift ? big : root.step)), true);
+                return accept;
+            }
+            if event.text == Key.LeftArrow || event.text == Key.DownArrow {
+                root.update(root.snap(root.value - (event.modifiers.shift ? big : root.step)), true);
+                return accept;
+            }
+            reject
+        }
+    }
+}

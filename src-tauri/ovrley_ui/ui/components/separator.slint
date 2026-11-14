@@ -1,0 +1,30 @@
+import { Theme } from "../theme/theme.slint";
+
+// separator.jsx: 1px of `border` at 50% opacity, full width (horizontal) or height (vertical).
+// `line-color` is the `bg-*` override (`ButtonGroupSeparator` uses `input`). Given more room
+// across its line, it centres the line, so it sits level with text in a row. Slint has no
+// separator role, so the separator is never exposed to accessibility, decorative or not.
+export component Separator {
+    in property <Orientation> orientation: Orientation.horizontal;
+    in property <bool> decorative: true;
+    in property <color> line-color: Theme.border;
+
+    property <bool> horizontal: root.orientation == Orientation.horizontal;
+    min-height: root.horizontal ? 1px : 0px;
+    preferred-height: root.horizontal ? 1px : 0px;
+    min-width: root.horizontal ? 0px : 1px;
+    preferred-width: root.horizontal ? 0px : 1px;
+    max-height: root.horizontal ? 100000px : 100000px;
+    horizontal-stretch: root.horizontal ? 1 : 0;
+    vertical-stretch: root.horizontal ? 0 : 1;
+    accessible-role: AccessibleRole.none;
+
+    Rectangle {
+        x: root.horizontal ? 0px : (root.width - 1px) / 2;
+        y: root.horizontal ? (root.height - 1px) / 2 : 0px;
+        width: root.horizontal ? root.width : 1px;
+        height: root.horizontal ? 1px : root.height;
+        background: root.line-color;
+        opacity: 0.5;
+    }
+}

@@ -1,0 +1,263 @@
+import { Theme } from "../theme/theme.slint";
+import { Icons } from "icons.slint";
+import { Label } from "label.slint";
+import { Button, ButtonSize, ButtonVariant } from "button.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { SimpleTooltip } from "simple-tooltip.slint";
+import { HexColorPicker } from "hex-color-picker.slint";
+import { ColorPickerLogic, GradientPickerLogic, GradientStop, GradientStopKeyResult } from "logic.slint";
+import { ComponentStrings } from "strings.slint";
+
+// gradient-picker.jsx with `useGradientPicker`; the rules are in ovrley_app
+// (`hooks/gradient_picker.rs`, `lib/gradient_stops.rs`).
+// - Label: 0.667rem, muted, uppercase, bold (default `components.gradient`).
+// - Track: 0.625rem high, `rounded-xs`, `border` at 70%, `shadow-xs`, inset 0.5rem on every side,
+//   its hit area extended 0.5rem above and below; the copy cursor and the hint tooltip while a stop
+//   can be added. Slint gradients have a fixed stop count, so the fill is one two-colour segment
+//   per pair of neighbouring stops, with solid ends.
+// - Stops: 0.875rem, a 2px white border, two shadows, grab and grabbing cursors, 125% while their
+//   picker is open, centred on their offset, labelled `gradientStopLabel`.
+// - Pressing the track (not a stop) adds a stop there in the sampled colour, up to 5. Pressing a
+//   stop drags it once the pointer moves 3px, reporting at most one change per frame; releasing
+//   commits if it moved and suppresses the click. A click opens the stop's picker, with a Remove
+//   button (disabled at 2 stops). Delete and Backspace remove; ← and → move by 0.01 (Shift 0.1).
+//   Recolouring commits. Discrete edits fire `changed` and `committed` together.
+// - React keys stop nodes by the stop count so an open picker never jumps to another stop. Here the
+//   nodes repeat over `node-count`: every edit hands over a new stops model, and repeating over the
+//   model (or over a binding to its length) rebuilds the nodes, closing an open picker, on each
+//   change. `node-count` is set, not bound, and a set notifies only when the number changes, so the
+//   nodes are rebuilt only when stops are added or removed.
+export component GradientPicker inherits VerticalLayout {
+    in property <[GradientStop]> stops;
+    in property <string> label: ComponentStrings.gradient;
+    // Receives the next stops; at most once per frame while dragging.
+    callback changed(stops: [GradientStop]);
+    // An interaction ended; `changed` may act as a live preview until then.
+    callback committed();
+
+    property <bool> can-add: GradientPickerLogic.can-add-stop(root.stops.length);
+    property <bool> can-remove: GradientPickerLogic.can-remove-stop(root.stops.length);
+    property <length> node-size: 0.875rem;
+    // The drag in progress: the stop, where it started, whether it passed the threshold, and the
+    // offset waiting for the next frame.
+    property <int> drag-index: -1;
+    property <length> drag-start-x;
+    property <bool> drag-moved;
+    property <bool> drag-pending;
+    property <float> drag-offset;
+    property <bool> suppress-click;
+    property <int> node-count;
+
+    init => {
+        root.node-count = root.stops.length;
+    }
+    changed stops => {
+        root.node-count = root.stops.length;
+    }
+
+    function apply(next: [GradientStop]) {
+        root.changed(next);
+        root.committed();
+    }
+    function flush-drag() {
+        if root.drag-pending && root.drag-index >= 0 {
+            root.drag-pending = false;
+            root.changed(GradientPickerLogic.move-stop(root.stops, root.drag-index, root.drag-offset));
+        }
+    }
+
+    spacing: 0.75rem;
+
+    Label {
+        text: root.label;
+        font-size: 0.667rem;
+        font-weight: Theme.font-weight-bold;
+        color: Theme.muted-foreground;
+    }
+
+    // The 0.5rem inset keeps the stops at 0% and 100% (half a node wide) inside the field.
+    VerticalLayout {
+        padding: 0.5rem;
+
+        track-tip := SimpleTooltip {
+            content: root.can-add ? ComponentStrings.gradient-add-stop-hint : "";
+            height: 0.625rem;
+            mouse-cursor: root.can-add ? MouseCursor.copy : MouseCursor.default;
+
+            track := Rectangle {
+                height: 0.625rem;
+                accessible-role: AccessibleRole.groupbox;
+                accessible-label: ComponentStrings.gradient-stops;
+
+                // The extended hit area: 0.5rem above and below the track.
+                TouchArea {
+                    y: -0.5rem;
+                    height: parent.height + 1rem;
+                    mouse-cursor: root.can-add ? MouseCursor.copy : MouseCursor.default;
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down && event.button == PointerEventButton.left && root.can-add {
+                            root.apply(GradientPickerLogic.add-stop(root.stops, GradientPickerLogic.offset-at(self.mouse-x, track.width)));
+                        }
+                    }
+                }
+                Shadow {
+                    size: ShadowSize.xs;
+                    radius: Theme.radius-xs * 1rem;
+                }
+                Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    clip: true;
+                    for segment in GradientPickerLogic.track-segments(root.stops): Rectangle {
+                        x: segment.start * parent.width;
+                        width: (segment.end - segment.start) * parent.width;
+                        background: @linear-gradient(90deg, segment.start-color 0%, segment.end-color 100%);
+                    }
+                }
+                Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 1px;
+                    border-color: Theme.border.transparentize(0.3);
+                }
+
+                for index in root.node-count: node := Rectangle {
+                    property <GradientStop> stop: root.stops[index];
+                    width: root.node-size;
+                    height: root.node-size;
+                    x: node.stop.offset * parent.width - self.width / 2;
+                    y: (parent.height - self.height) / 2;
+                    transform-scale-x: picker.is-open ? 125% : 100%;
+                    transform-scale-y: self.transform-scale-x;
+                    forward-focus: node-focus;
+                    accessible-role: AccessibleRole.button;
+                    accessible-label: ComponentStrings.gradient-stop-label.replace-all("{{percent}}", round(node.stop.offset * 100));
+                    accessible-action-default => {
+                        picker.open();
+                    }
+                    // `0 0 0 1px rgb(0 0 0/.5), 0 1px 3px rgb(0 0 0/.4)`.
+                    Rectangle {
+                        x: -1px;
+                        y: -1px;
+                        width: parent.width + 2px;
+                        height: parent.height + 2px;
+                        border-radius: self.width / 2;
+                        background: #00000080;
+                        drop-shadow-offset-y: 1px;
+                        drop-shadow-blur: 3px;
+                        drop-shadow-color: #00000066;
+                    }
+                    Rectangle {
+                        border-radius: self.width / 2;
+                        border-width: 2px;
+                        border-color: #ffffff;
+                        background: ColorPickerLogic.hex-to-color(node.stop.color);
+                    }
+                    node-touch := TouchArea {
+                        mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                        pointer-event(event) => {
+                            if event.button != PointerEventButton.left {
+                                return;
+                            }
+                            if event.kind == PointerEventKind.down {
+                                node-focus.focus();
+                                root.drag-index = index;
+                                root.drag-start-x = self.absolute-position.x + self.mouse-x;
+                                root.drag-moved = false;
+                                root.drag-pending = false;
+                            } else if event.kind == PointerEventKind.up {
+                                root.flush-drag();
+                                let moved = root.drag-moved;
+                                root.suppress-click = moved;
+                                root.drag-index = -1;
+                                if moved {
+                                    root.committed();
+                                }
+                            }
+                        }
+                        moved => {
+                            if root.drag-index != index {
+                                return;
+                            }
+                            let x = self.absolute-position.x + self.mouse-x;
+                            if !root.drag-moved && !GradientPickerLogic.exceeds-drag-threshold(root.drag-start-x, x) {
+                                return;
+                            }
+                            root.drag-moved = true;
+                            root.drag-offset = GradientPickerLogic.offset-at(x - track.absolute-position.x, track.width);
+                            root.drag-pending = true;
+                        }
+                        clicked => {
+                            if root.suppress-click {
+                                root.suppress-click = false;
+                                return;
+                            }
+                            picker.open();
+                        }
+                    }
+                    node-focus := FocusScope {
+                        out property <bool> focus-visible;
+                        focus-on-click: false;
+                        focus-gained(reason) => {
+                            self.focus-visible = reason == FocusReason.tab-navigation;
+                        }
+                        focus-lost => {
+                            self.focus-visible = false;
+                        }
+                        key-pressed(event) => {
+                            let outcome = GradientPickerLogic.stop-key(root.stops, index, event.text, event.modifiers.shift);
+                            if outcome.result == GradientStopKeyResult.ignored {
+                                return reject;
+                            }
+                            if outcome.result == GradientStopKeyResult.apply {
+                                root.apply(outcome.stops);
+                            }
+                            accept
+                        }
+                    }
+                    FocusRing {
+                        shown: node-focus.focus-visible;
+                        ring-width: 2px;
+                        radius: parent.width / 2;
+                        ring-color: Theme.ring;
+                    }
+                    picker := HexColorPicker {
+                        custom-trigger: true;
+                        value: node.stop.color;
+                        changed(color) => {
+                            root.apply(GradientPickerLogic.set-stop-color(root.stops, index, color));
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            Button {
+                                variant: ButtonVariant.outline;
+                                size: ButtonSize.icon;
+                                icon: Icons.trash-2;
+                                accessible-label: ComponentStrings.gradient-remove-stop;
+                                disabled: !root.can-remove;
+                                background: Theme.surface;
+                                border-color: Theme.border.transparentize(0.3);
+                                text-color: Theme.muted-foreground;
+                                hover-background: Theme.surface-elevated;
+                                hover-text-color: Theme.foreground;
+                                clicked => {
+                                    if root.can-remove {
+                                        root.apply(GradientPickerLogic.remove-stop(root.stops, index));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // One move per frame while dragging.
+    Timer {
+        interval: 16ms;
+        running: root.drag-pending;
+        triggered => {
+            root.flush-drag();
+        }
+    }
+}

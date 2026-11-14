@@ -1,0 +1,393 @@
+import { Theme, WindowMetrics } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Icon, Icons } from "icons.slint";
+import { FocusRing } from "focus-ring.slint";
+import { Shadow, ShadowSize } from "shadow.slint";
+import { GroupPosition, GroupSurface } from "group-surface.slint";
+import { OverlayMotion } from "overlay-motion.slint";
+import { Choice, ChoiceKind, ChoiceListLogic, ChoiceListMetrics, ItemAlignedPlacement, Placement, PlacementAlign, PlacementLogic, PlacementSide } from "logic.slint";
+
+export enum SelectSize { default, sm }
+export enum SelectPosition { item-aligned, popper }
+
+// select.jsx: `Select` with its trigger, value and content. The options are a model (D4):
+// `item`s, group `label`s and `separator`s (`SelectGroup` is the run of items after a label).
+//
+// Trigger: 2.25rem high (sm 2rem), field lift, 0.75rem × 0.5rem padding, `text-sm`, `shadow-xs`,
+// `rounded-sm`, a 1rem chevron at 50%, hover `surface-highlight-soft`, a 0.222rem focus ring,
+// muted placeholder; it shows the selected item's text, elided, in its own case (it is a button).
+// List: `popover` fill, bordered, `rounded-sm`, `shadow-md`, at least 8rem and at least the
+// trigger wide, capped at the available height, 0.25rem padding, scroll buttons that scroll while
+// hovered, and the overlay animation. Position `item-aligned` puts the selected item over the
+// trigger; `popper` opens below, 0.25rem away. Items: 0.375rem vertical, 2rem right and 0.5rem
+// left padding, `text-xs`, uppercase (inherited in React), `rounded-xs`; highlighted
+// (hover or keyboard) in `accent` with `accent-foreground`; the selected item shows a 1rem check;
+// disabled items are 50%. Labels: 0.5rem × 0.375rem, `text-xs`, `primary`. Separators: 1px of
+// `border` reaching 0.25rem past each side, 0.25rem margins.
+// Keyboard (Radix): the trigger opens on click, Enter, Space, ↑ and ↓; in the list ↑ and ↓ move,
+// Home and End jump, typing selects by label prefix, Enter and Space choose, Escape and Tab close;
+// focus returns to the trigger. The trigger style properties are the call sites' overrides (D5).
+// The list is not measured to fit its longest label; it is as wide as the trigger, at least 8rem.
+export component Select {
+    in property <[Choice]> items;
+    in property <string> value;
+    in property <string> placeholder;
+    in property <bool> disabled;
+    in property <bool> invalid;
+    in property <SelectSize> size: SelectSize.default;
+    in property <SelectPosition> position: SelectPosition.item-aligned;
+    in property <PlacementAlign> align: PlacementAlign.center;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    in property <bool> mono;
+    in property <bool> uppercase;
+    in property <color> background: transparent;
+    in property <length> border-width: 0px;
+    in property <color> border-color: Theme.border;
+    in property <ShadowSize> shadow: ShadowSize.xs;
+    in property <length> padding-x: 0.75rem;
+    callback value-changed(value: string);
+
+    property <int> selected-index: ChoiceListLogic.index-of(root.items, root.value);
+    property <length> box: root.size == SelectSize.sm ? 2rem : 2.25rem;
+    property <length> radius: Theme.radius-sm * 1rem;
+    property <length> row-height: 1.75rem;
+    property <length> separator-height: 0.5rem + 1px;
+    property <length> list-padding: 0.25rem;
+    property <length> scroll-button-height: 1.5rem;
+    property <int> highlighted: -1;
+    property <string> search;
+    property <length> list-width: max(8rem, root.width);
+    property <ChoiceListMetrics> metrics: ChoiceListLogic.list-metrics(root.items, max(root.selected-index, 0), root.row-height, root.separator-height, root.list-padding);
+    property <ItemAlignedPlacement> aligned: PlacementLogic.item-aligned(
+        { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
+        root.list-width, root.metrics.content-height, WindowMetrics.width, WindowMetrics.height,
+        root.selected-index >= 0 ? root.metrics.entry-top : 0px, root.row-height);
+    property <Placement> popper: PlacementLogic.place(
+        { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
+        root.list-width, root.metrics.content-height, WindowMetrics.width, WindowMetrics.height,
+        PlacementSide.bottom, root.align, 0.25rem);
+    property <bool> item-aligned: root.position == SelectPosition.item-aligned;
+    property <length> list-height: root.item-aligned ? root.aligned.height : min(root.metrics.content-height, root.popper.available-height);
+    property <bool> popup-open: popup.is-open;
+
+    changed popup-open => {
+        if !root.popup-open {
+            root.search = "";
+            trigger-focus.focus();
+        }
+    }
+
+    public function open() {
+        if root.disabled || popup.is-open {
+            return;
+        }
+        root.highlighted = root.selected-index >= 0 ? root.selected-index : ChoiceListLogic.next-enabled(root.items, 0, 1, false);
+        popup.show();
+    }
+    function choose(index: int) {
+        if index >= 0 && root.items[index].value != root.value {
+            root.value-changed(root.items[index].value);
+        }
+        popup.close();
+    }
+    function entry-top(index: int) -> length {
+        ChoiceListLogic.list-metrics(root.items, index, root.row-height, root.separator-height, root.list-padding).entry-top
+    }
+
+    // `[&>*]:focus-visible:relative z-10`: a focused control's ring draws above its neighbours.
+    z: trigger-focus.focus-visible ? 1 : 0;
+    min-height: root.box;
+    preferred-height: root.box;
+    max-height: root.box;
+    min-width: 0px;
+    preferred-width: trigger-layout.preferred-width;
+    horizontal-stretch: 1;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: trigger-focus;
+    accessible-role: AccessibleRole.combobox;
+    accessible-value: root.selected-index >= 0 ? root.items[root.selected-index].label : "";
+    accessible-placeholder-text: root.placeholder;
+    accessible-enabled: !root.disabled;
+    accessible-expandable: true;
+    accessible-expanded: popup.is-open;
+    accessible-action-default => {
+        root.open();
+    }
+    accessible-action-expand => {
+        root.open();
+    }
+
+    Shadow {
+        size: root.shadow;
+        radius: root.radius;
+    }
+    GroupSurface {
+        group-position: root.group-position;
+        radius: root.radius;
+        background: trigger-touch.has-hover ? Theme.surface-highlight-soft : root.background;
+        border-width: root.border-width;
+        border-color: root.invalid ? Theme.destructive : root.border-color;
+        field-lift: true;
+    }
+    trigger-layout := HorizontalLayout {
+        padding-left: root.padding-x;
+        padding-right: root.padding-x;
+        spacing: 0.5rem;
+        AppText {
+            horizontal-stretch: 1;
+            content: root.selected-index >= 0 ? root.items[root.selected-index].label : root.placeholder;
+            color: root.selected-index >= 0 ? Theme.foreground : Theme.muted-foreground;
+            mono: root.mono;
+            uppercase: root.uppercase;
+            font-size: root.font-size;
+            line-height: Theme.text-sm-line-height;
+            max-lines: 1;
+            overflow: elide;
+        }
+        Icon {
+            glyph: Icons.chevron-down;
+            size: 1rem;
+            color: Theme.muted-foreground;
+            opacity: 0.5;
+        }
+    }
+    trigger-touch := TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+        pointer-event(event) => {
+            // Radix opens on pointer down.
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                trigger-focus.focus();
+                root.open();
+            }
+        }
+    }
+    trigger-focus := FocusScope {
+        out property <bool> focus-visible;
+        enabled: !root.disabled;
+        focus-on-click: false;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " || event.text == Key.UpArrow || event.text == Key.DownArrow {
+                root.open();
+                return accept;
+            }
+            reject
+        }
+    }
+    FocusRing {
+        shown: trigger-focus.focus-visible || root.invalid;
+        radius: root.radius;
+        group-position: root.group-position;
+        ring-color: root.invalid ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+
+    popup := PopupWindow {
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        x: (root.item-aligned ? root.aligned.x : root.popper.x) - root.absolute-position.x;
+        y: (root.item-aligned ? root.aligned.y : root.popper.y) - root.absolute-position.y;
+        width: root.item-aligned ? root.aligned.width : root.list-width;
+        height: root.list-height;
+
+        OverlayMotion {
+            side: root.item-aligned ? PlacementSide.bottom : root.popper.side;
+            Shadow {
+                size: ShadowSize.md;
+                radius: root.radius;
+            }
+            Rectangle {
+                border-radius: root.radius;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: Theme.popover;
+                clip: true;
+
+                list-focus := FocusScope {
+                    function move-to(index: int) {
+                        if index < 0 {
+                            return;
+                        }
+                        root.highlighted = index;
+                        let top = root.entry-top(index);
+                        if top < -flick.content-y {
+                            flick.content-y = -top;
+                        } else if top + root.row-height > -flick.content-y + flick.height {
+                            flick.content-y = -(top + root.row-height - flick.height);
+                        }
+                    }
+                    init => {
+                        self.focus();
+                        flick.content-y = root.item-aligned ? -root.aligned.scroll-y
+                            : -max(0px, min(root.metrics.content-height - root.list-height, root.metrics.entry-top + root.row-height - root.list-height));
+                    }
+                    key-pressed(event) => {
+                        if event.text == Key.DownArrow {
+                            self.move-to(ChoiceListLogic.next-enabled(root.items, root.highlighted + 1, 1, false));
+                            return accept;
+                        }
+                        if event.text == Key.UpArrow {
+                            self.move-to(ChoiceListLogic.next-enabled(root.items, root.highlighted - 1, -1, false));
+                            return accept;
+                        }
+                        if event.text == Key.Home {
+                            self.move-to(ChoiceListLogic.next-enabled(root.items, 0, 1, false));
+                            return accept;
+                        }
+                        if event.text == Key.End {
+                            self.move-to(ChoiceListLogic.next-enabled(root.items, root.items.length - 1, -1, false));
+                            return accept;
+                        }
+                        if event.text == Key.Return || (event.text == " " && root.search == "") {
+                            root.choose(root.highlighted);
+                            return accept;
+                        }
+                        if event.text == Key.Tab || event.text == Key.Backtab {
+                            popup.close();
+                            return accept;
+                        }
+                        if event.text == Key.Escape {
+                            return reject;
+                        }
+                        // Type-ahead: printable characters typed within a second form one search.
+                        if event.text.character-count == 1 && !event.modifiers.control && !event.modifiers.meta && event.text >= " " {
+                            root.search += event.text;
+                            typeahead-reset.restart();
+                            self.move-to(ChoiceListLogic.typeahead(root.items, root.highlighted, root.search));
+                            return accept;
+                        }
+                        reject
+                    }
+
+                    // Wheel and keyboard only, as in the webview (no drag-scrolling with the mouse).
+                    flick := Flickable {
+                        interactive: false;
+                        content-width: self.width;
+                        VerticalLayout {
+                            padding: root.list-padding;
+                            for item[index] in root.items: row := Rectangle {
+                                property <bool> selectable: item.kind == ChoiceKind.item && !item.disabled;
+                                property <bool> highlighted: root.highlighted == index && self.selectable;
+                                height: item.kind == ChoiceKind.separator ? root.separator-height : root.row-height;
+                                accessible-role: AccessibleRole.list-item;
+                                accessible-label: item.label;
+                                accessible-item-selectable: item.kind == ChoiceKind.item;
+                                accessible-item-selected: index == root.selected-index;
+                                accessible-enabled: !item.disabled;
+                                accessible-action-default => {
+                                    if row.selectable {
+                                        root.choose(index);
+                                    }
+                                }
+
+                                if item.kind == ChoiceKind.separator: Rectangle {
+                                    x: -root.list-padding;
+                                    y: 0.25rem;
+                                    width: parent.width + 2 * root.list-padding;
+                                    height: 1px;
+                                    background: Theme.border;
+                                }
+                                if item.kind == ChoiceKind.label: AppText {
+                                    x: 0.5rem;
+                                    width: parent.width - 1rem;
+                                    content: item.label;
+                                    uppercase: true;
+                                    font-size: Theme.text-xs * 1rem;
+                                    line-height: Theme.text-xs-line-height;
+                                    color: Theme.primary;
+                                    max-lines: 1;
+                                    overflow: elide;
+                                }
+                                if item.kind == ChoiceKind.item: Rectangle {
+                                    border-radius: Theme.radius-xs * 1rem;
+                                    background: row.highlighted ? Theme.accent : transparent;
+                                    opacity: item.disabled ? 0.5 : 1;
+
+                                    AppText {
+                                        x: 0.5rem;
+                                        width: parent.width - 2.5rem;
+                                        content: item.label;
+                                        uppercase: true;
+                                        font-size: Theme.text-xs * 1rem;
+                                        line-height: Theme.text-xs-line-height;
+                                        color: row.highlighted ? Theme.accent-foreground : Theme.popover-foreground;
+                                        max-lines: 1;
+                                        overflow: elide;
+                                    }
+                                    if index == root.selected-index: Icon {
+                                        x: parent.width - 0.5rem - 0.875rem + (0.875rem - self.width) / 2;
+                                        glyph: Icons.check;
+                                        size: 1rem;
+                                        color: Theme.muted-foreground;
+                                    }
+                                    TouchArea {
+                                        enabled: row.selectable;
+                                        mouse-cursor: MouseCursor.pointer;
+                                        changed has-hover => {
+                                            if self.has-hover {
+                                                root.highlighted = index;
+                                            }
+                                        }
+                                        clicked => {
+                                            root.choose(index);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Scroll buttons: shown while the list can scroll that way; hovering scrolls.
+                    if flick.content-y < 0px: Rectangle {
+                        y: 0px;
+                        height: root.scroll-button-height;
+                        background: Theme.popover;
+                        Icon {
+                            glyph: Icons.chevron-up;
+                            size: 1rem;
+                        }
+                        up-touch := TouchArea { }
+                        Timer {
+                            interval: 50ms;
+                            running: up-touch.has-hover;
+                            triggered => {
+                                flick.content-y = min(0px, flick.content-y + root.row-height);
+                            }
+                        }
+                    }
+                    if -flick.content-y < flick.content-height - flick.height - 0.5px: Rectangle {
+                        y: parent.height - self.height;
+                        height: root.scroll-button-height;
+                        background: Theme.popover;
+                        Icon {
+                            glyph: Icons.chevron-down;
+                            size: 1rem;
+                        }
+                        down-touch := TouchArea { }
+                        Timer {
+                            interval: 50ms;
+                            running: down-touch.has-hover;
+                            triggered => {
+                                flick.content-y = max(flick.height - flick.content-height, flick.content-y - root.row-height);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    typeahead-reset := Timer {
+        interval: 1s;
+        running: false;
+        triggered => {
+            root.search = "";
+            self.running = false;
+        }
+    }
+}

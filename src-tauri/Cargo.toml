@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets"]
+members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets", "ovrley_ui", "ovrley_app"]
 
 [package]
 name = "app"
