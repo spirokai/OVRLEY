@@ -81,7 +81,7 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 ## Dependencies
 
 - **Node.js 24 and pnpm 10.25.0**: one workspace and root lockfile. Frontend tooling uses **Vite+** (`vp`) for development, builds, linting, formatting, and Vitest tests.
-- **Rust via rustup**: native toolchain listed in [`.tool-versions`](.tool-versions), plus **Rust 1.98.1** with the `wasm32-unknown-emscripten` target for browser preview bindings.
+- **Rust via rustup**: rustup installs the toolchain pinned in [`rust-toolchain.toml`](rust-toolchain.toml) for both the native app and the browser preview bindings; the WASM build adds its targets.
 - **Tauri v2 platform prerequisites**: native compiler and webview development tools (MSVC Build Tools and WebView2 on Windows, Xcode Command Line Tools on macOS, system development packages on Linux).
 - **Emscripten 6.0.9** installed and activated through emsdk, plus **Python 3.10+** and **Git**.
 - **FFmpeg 8.1+ full build**: downloaded automatically into `vendor/ffmpeg` during installation.

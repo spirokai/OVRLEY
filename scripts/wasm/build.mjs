@@ -8,7 +8,8 @@ export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const crateDir = join(root, 'src-tauri', 'wasm-bindings')
 export const target = 'wasm32-unknown-emscripten'
 export const revision = 'b7f043e0b1e2a850e702245de811f01df1f6b0ff'
-export const rustVersion = '1.98.1'
+/** The repo's single Rust toolchain, which the stored Skia archive must have been built with. */
+export const rustVersion = readFileSync(join(root, 'rust-toolchain.toml'), 'utf8').match(/^channel = "(.+)"$/m)[1]
 export const emscriptenVersion = '6.0.9'
 export const vendorDir = join(root, 'vendor', 'skia-wasm')
 export const archivePathFor = (sha256) => {
@@ -64,6 +65,7 @@ export function toolchainEnvironment() {
   ])
     delete env[name]
   execFileSync('rustup', ['run', rustVersion, 'rustc', '--version'], { env, stdio: 'pipe' })
+  execFileSync('rustup', ['target', 'add', '--toolchain', rustVersion, target], { env, stdio: 'inherit' })
   return { env, emscripten, emcc, emxx, emar }
 }
 

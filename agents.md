@@ -74,7 +74,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 ## Rust backend
 
-- Rust 1.84.0 (`.tool-versions`). `edition = "2021"`.
+- Rust toolchain pinned in `rust-toolchain.toml`. `edition = "2021"`.
 - `ovrley_core` crate has Skia (`skia-safe 0.75`), serde, chrono.
 - Tauri crate (`src-tauri/`) depends on `ovrley_core` as a workspace member.
 - On Windows: links `msvcprt` via `build.rs`.

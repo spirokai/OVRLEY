@@ -134,7 +134,7 @@ jobs:
             zip
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: rustup toolchain install
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
