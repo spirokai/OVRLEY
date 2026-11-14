@@ -51,7 +51,7 @@ function OverlayEditorContent(props) {
     moveableProps,
     widgetBadges,
   } = editor
-  const { displayScale, viewportRef, scrollViewportRef, handleWheel } = viewport
+  const { displayScale, viewportRef, scrollViewportRef } = viewport
   return (
     <div ref={viewportRef} className="relative flex h-full flex-1 overflow-hidden">
       <div data-testid="canvas-status-badges" className="pointer-events-none absolute right-8 top-4 z-50 flex items-center gap-2">
@@ -84,7 +84,7 @@ function OverlayEditorContent(props) {
           undoRedoControls={undoRedoControls}
         />
       </div>
-      <div ref={scrollViewportRef} data-overlay-viewport className="absolute left-0 right-0 top-12 bottom-0 overflow-auto" onWheel={handleWheel}>
+      <div ref={scrollViewportRef} data-overlay-viewport className="absolute left-0 right-0 top-12 bottom-0 overflow-auto">
         <div
           ref={setStageElement}
           data-testid="overlay-editor-stage"
