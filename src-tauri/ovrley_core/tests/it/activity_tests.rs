@@ -177,6 +177,37 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
 }
 
 #[test]
+fn merges_raw_samples_that_share_an_instant() {
+    // FIT writers may split one instant across records: GPS in one, heart rate in the next.
+    let raw_activity = serde_json::json!({
+        "file_name": "split-records.fit",
+        "file_format": "fit",
+        "raw_samples": [
+            { "timestamp": "2026-01-01T00:00:00.000Z", "elapsed_seconds": 0.0, "latitude": 50.0, "longitude": 14.0, "heartrate": 120.0 },
+            { "timestamp": "2026-01-01T00:00:00.000Z", "elapsed_seconds": 0.0, "heartrate": 121.0 },
+            { "timestamp": "2026-01-01T00:00:01.000Z", "elapsed_seconds": 1.0, "latitude": 50.0, "longitude": 14.0001 },
+            { "timestamp": "2026-01-01T00:00:01.000Z", "elapsed_seconds": 1.0, "heartrate": 125.0 }
+        ],
+        "options": {
+            "skip_idle_gap_fill": false,
+            "smoothing": {}
+        }
+    });
+
+    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
+    assert_eq!(
+        activity.course,
+        vec![(Some(50.0), Some(14.0)), (Some(50.0), Some(14.0001))]
+    );
+    assert_eq!(activity.heartrate, vec![Some(121.0), Some(125.0)]);
+    assert_eq!(activity.metadata["original_sample_count"], 4);
+}
+
+#[test]
 fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty() {
     // A stepped 8 m/s climb over 4 s: distance and altitude advance every other 0.25 s sample.
     let raw_samples: Vec<_> = (0..17)
