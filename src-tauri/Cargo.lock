@@ -117,6 +117,7 @@ dependencies = [
  "chrono",
  "http",
  "http-cache-semantics",
+ "libc",
  "log",
  "objc2-app-kit",
  "open",
@@ -135,6 +136,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tiny_http",
  "uuid",
+ "webkit2gtk",
  "windows 0.61.3",
  "zip 2.4.2",
 ]

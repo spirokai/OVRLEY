@@ -44,6 +44,11 @@ reqwest = { version = "0.12.28", default-features = false, features = ["blocking
 http = "1.4"
 http-cache-semantics = "=2.1.0"
 
+# The main window turns off a WebKitGTK feature through an API newer than the bindings, looked up at runtime.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0.2"
+libc = "0.2"
+
 # DXGI tells whether a hardware GPU exists before WebView2 starts.
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.61", features = ["Win32_Graphics_Dxgi"] }
