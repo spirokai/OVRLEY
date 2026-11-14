@@ -37,6 +37,8 @@ mod video_server_tests;
 #[cfg(test)]
 mod map_tile_service_tests;
 
+#[cfg(target_os = "linux")]
+mod appimage_integration;
 mod distribution;
 mod file_ops;
 #[cfg(not(target_os = "macos"))]
@@ -149,6 +151,8 @@ pub fn run() {
         .setup(|app| {
             app.manage(distribution::detect()?);
             app.manage(raster_resources::RasterResources::default());
+            #[cfg(target_os = "linux")]
+            appimage_integration::register(app);
 
             #[cfg(debug_assertions)]
             {
