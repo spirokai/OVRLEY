@@ -4,6 +4,7 @@ use ovrley_widgets::{
     error::{WidgetError, WidgetResult},
     preview::PreviewSession,
     preview_widget::{PreviewWidget, WidgetRequest},
+    render::preview::PreviewRasterScale,
     widgets::map::preview::PreviewMap,
 };
 use std::sync::{Once, OnceLock};
@@ -116,6 +117,15 @@ pub unsafe extern "C" fn ovrley_preview_disabled_laps(
     let result = bytes(ptr, len)
         .and_then(|b| serde_json::from_slice(b).map_err(|e| WidgetError::Config(e.to_string())))
         .and_then(|disabled| session.preview.select_laps(disabled));
+    session.status(result)
+}
+
+/// The editor's display density; widgets re-rasterize when it changes.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_raster_scale(session: *mut Session, scale: f32) -> u32 {
+    let session = &mut *session;
+    let result =
+        PreviewRasterScale::new(scale).and_then(|scale| session.preview.set_raster_scale(scale));
     session.status(result)
 }
 

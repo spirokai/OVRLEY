@@ -172,10 +172,11 @@ export async function suggestRenderOutputPath(outputKind, rememberedDirectory) {
  * @param {string} activityId Native snapshot identity.
  * @param {object[]} widgets Effective map widgets. None just stops the last download.
  * @param {object} scene Effective scene.
+ * @param {number} rasterScale Preview session density; it sets the maps' pixel ratio and so their tile zoom.
  * @returns {Promise<void>} Settles when this download ends, rejecting if a tile failed.
  */
-export function prepareMapTiles(activityId, widgets, scene) {
-  return invokeCommand('backend_map_prepare', { activityId, widgets, scene })
+export function prepareMapTiles(activityId, widgets, scene, rasterScale) {
+  return invokeCommand('backend_map_prepare', { activityId, widgets, scene, rasterScale })
 }
 
 /** @param {string} activityId Native snapshot identity. @returns {Promise<ArrayBuffer>} Original-density activity bytes. */

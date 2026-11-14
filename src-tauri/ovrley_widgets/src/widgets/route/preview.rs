@@ -41,9 +41,13 @@ pub struct PreviewRoute {
 }
 
 impl PreviewRoute {
-    pub fn new(widget: CoursePlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn new(
+        widget: CoursePlotConfig,
+        scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
         let config = validate_route_plot(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Self::from_validated(config, validate_scene_presentation(scene)?, &host)
     }
 
@@ -76,10 +80,11 @@ impl PreviewRoute {
         &mut self,
         widget: CoursePlotConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         transient: bool,
     ) -> WidgetResult<()> {
         let config = validate_route_plot(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let window = host.plot_window(config.show_full_activity);
         let preview_duration = host.placeholder_duration()?;
         let preview_raster_scale = host.raster_scale;

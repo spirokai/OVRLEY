@@ -37,10 +37,11 @@ impl PreviewAltitudeTape {
     pub fn new(
         widget: ValueConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         let widget = validate_altitude_tape(widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Self::from_validated(&widget, &validate_scene_presentation(scene)?, &host, fonts)
     }
 

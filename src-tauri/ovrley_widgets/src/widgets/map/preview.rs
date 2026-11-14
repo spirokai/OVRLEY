@@ -189,11 +189,12 @@ impl PreviewMap {
     pub fn new(
         widget: MapConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         styles: Option<&MapStyleCatalog>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         let config = validate_map_widget(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Self::with_content(
             resolve_style(styles, &config)?,
             config,
@@ -270,12 +271,13 @@ impl PreviewMap {
         &mut self,
         widget: MapConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         styles: Option<&MapStyleCatalog>,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
         let config = validate_map_widget(&widget, 0)?;
         let style = resolve_style(styles, &config)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let window = host.plot_window(config.show_full_activity);
         let preview_duration = host.placeholder_duration()?;
         let raster_scale = host.raster_scale;

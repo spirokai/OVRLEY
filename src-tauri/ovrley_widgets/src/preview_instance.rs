@@ -2,7 +2,7 @@
 use crate::{
     error::{WidgetError, WidgetResult},
     preview_widget::{PreviewWidget, WidgetRequest},
-    render::{image::ImageSource, text::FontResolver},
+    render::{image::ImageSource, preview::PreviewRasterScale, text::FontResolver},
     widgets::value::preview::{TileBounds, WidgetGeometry},
 };
 use ovrley_map::MapStyleCatalog;
@@ -157,7 +157,9 @@ struct PlacementGeometry {
 
 pub struct PreviewInstance {
     pub widget: PreviewWidget,
-    config: WidgetRequest,
+    /// The last applied request, so a new raster scale rebuilds without the host resending it.
+    request: WidgetRequest,
+    raster_scale: PreviewRasterScale,
     origin: [f64; 2],
     position: [f64; 2],
     placed_geometry: Option<Vec<u8>>,
@@ -169,16 +171,16 @@ pub struct PreviewInstance {
 impl PreviewInstance {
     pub fn new(
         request: WidgetRequest,
+        raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         let (position, _) = request.placement()?;
-        let mut config = request.clone();
-        config.pixel_config();
         let mut instance = Self {
-            widget: PreviewWidget::new(request, fonts, images, map_styles)?,
-            config,
+            widget: PreviewWidget::new(request.clone(), raster_scale, fonts, images, map_styles)?,
+            request,
+            raster_scale,
             origin: position,
             position,
             placed_geometry: None,
@@ -190,9 +192,27 @@ impl PreviewInstance {
         Ok(instance)
     }
 
+    /// Re-rasterizes at a new display density from the last applied request.
+    pub fn set_raster_scale(
+        &mut self,
+        raster_scale: PreviewRasterScale,
+        fonts: &dyn FontResolver,
+        images: &(impl ImageSource + ?Sized),
+        map_styles: Option<&MapStyleCatalog>,
+    ) -> WidgetResult<()> {
+        self.update(
+            self.request.clone(),
+            raster_scale,
+            fonts,
+            images,
+            map_styles,
+        )
+    }
+
     pub fn update(
         &mut self,
         request: WidgetRequest,
+        raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_styles: Option<&MapStyleCatalog>,
@@ -200,10 +220,15 @@ impl PreviewInstance {
         let (position, transient) = request.placement()?;
         let mut config = request.clone();
         config.pixel_config();
+        let mut applied = self.request.clone();
+        applied.pixel_config();
         let delta = [position[0] - self.origin[0], position[1] - self.origin[1]];
         // A live drag may resample cached pixels at a fractional position. Once
         // committed, rebuild at that position to match native export exactly.
-        if config == self.config && (transient || delta.iter().all(|value| value.fract() == 0.0)) {
+        if config == applied
+            && raster_scale == self.raster_scale
+            && (transient || delta.iter().all(|value| value.fract() == 0.0))
+        {
             // Pixel-changing requests use the family's validation below. Only
             // placement-only input bypasses it and validates its new x/y here.
             if position.iter().any(|value| !(*value as f32).is_finite()) {
@@ -216,8 +241,10 @@ impl PreviewInstance {
                 self.place_geometry()?;
                 self.revision = self.revision.wrapping_add(1);
             }
+            self.request = request;
             return Ok(());
         }
+        let applied = request.clone();
         match (&mut self.widget, request) {
             (
                 PreviewWidget::DivingProfile(profile),
@@ -226,7 +253,7 @@ impl PreviewInstance {
                     scene,
                     transient,
                 },
-            ) => profile.update(widget, scene, transient)?,
+            ) => profile.update(widget, scene, raster_scale, transient)?,
             (
                 PreviewWidget::Elevation(elevation),
                 WidgetRequest::Elevation {
@@ -234,7 +261,7 @@ impl PreviewInstance {
                     scene,
                     transient,
                 },
-            ) => elevation.update(widget, scene, transient)?,
+            ) => elevation.update(widget, scene, raster_scale, transient)?,
             (
                 PreviewWidget::Route(route),
                 WidgetRequest::Route {
@@ -242,19 +269,20 @@ impl PreviewInstance {
                     scene,
                     transient,
                 },
-            ) => route.update(widget, scene, transient)?,
+            ) => route.update(widget, scene, raster_scale, transient)?,
             (PreviewWidget::Map(map), WidgetRequest::Map { widget, scene, .. }) => {
-                map.update(widget, scene, map_styles, fonts)?
+                map.update(widget, scene, raster_scale, map_styles, fonts)?
             }
             (PreviewWidget::Raster(raster), WidgetRequest::Raster { widget, scene, .. }) => {
-                raster.update(widget, scene, images)?
+                raster.update(widget, scene, raster_scale, images)?
             }
             (_, request) => {
-                self.widget = PreviewWidget::new(request, fonts, images, map_styles)?;
+                self.widget = PreviewWidget::new(request, raster_scale, fonts, images, map_styles)?;
                 self.rendered_revision = None;
             }
         }
-        self.config = config;
+        self.request = applied;
+        self.raster_scale = raster_scale;
         self.origin = position;
         self.position = position;
         self.placed_geometry = None;

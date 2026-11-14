@@ -143,7 +143,6 @@ export default function useOverlayEditorState({
     setGroupGestureType: selection.setGroupGestureType,
     setGroupDragSelectionIds: selection.setGroupDragSelectionIds,
   })
-  const previewRasterScale = Math.min(1, viewport.displayScale * window.devicePixelRatio)
   const scene = useMemo(
     () =>
       buildWasmScene({
@@ -152,10 +151,11 @@ export default function useOverlayEditorState({
         exportRange: previewExportRange,
         activity: parsedActivity,
         fallbackDurationSeconds,
-        previewRasterScale,
       }),
-    [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds, previewRasterScale],
+    [globalDefaults, sceneSize, previewExportRange, parsedActivity, fallbackDurationSeconds],
   )
+  // Widgets rasterize at the device density the zoomed scene is shown at, never above native export resolution.
+  const rasterScale = Math.min(1, viewport.displayScale * window.devicePixelRatio)
   const markControls = resolveVideoSyncMarkControls(videoSyncMarkControls, videoSyncPreviewSecond, videoSyncMode)
   if (videoSyncMode && markControls === null) throw new Error('Video sync editor requires mark controls')
   useEffect(
@@ -175,6 +175,7 @@ export default function useOverlayEditorState({
     viewport,
     viewportContentSize,
     scene,
+    rasterScale,
     gridRef,
     backgroundImageSrc: importedBackgroundImagePath === null ? null : convertFileSrc(importedBackgroundImagePath),
     gridStyle: { transform: `scale(${1 / viewport.displayScale})`, transformOrigin: 'top left' },

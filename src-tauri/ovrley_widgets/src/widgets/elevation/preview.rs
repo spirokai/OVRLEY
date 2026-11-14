@@ -55,8 +55,12 @@ impl PreviewElevation {
         ))
     }
 
-    pub fn new(widget: ElevationPlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
-        let host = WidgetHost::from_scene(&scene)?;
+    pub fn new(
+        widget: ElevationPlotConfig,
+        scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let scene = validate_scene_presentation(scene)?;
         let config = validate_elevation_plot(&widget, 0, &scene)?;
         Self::from_validated(config, scene, &host)
@@ -91,9 +95,10 @@ impl PreviewElevation {
         &mut self,
         widget: ElevationPlotConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         transient: bool,
     ) -> WidgetResult<()> {
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let (window, preview_duration) = Self::timing(widget.show_full_activity, &host)?;
         let preview_raster_scale = host.raster_scale;
         let scene = validate_scene_presentation(scene)?;
@@ -120,7 +125,10 @@ impl PreviewElevation {
         }
         if let Some(layout) = self.layout.as_mut() {
             // The cached remaining raster sits on the position's sub-pixel grid, so a move rebuilds.
-            if layout.config != config || layout.scene != scene {
+            if layout.config != config
+                || layout.scene != scene
+                || self.preview_raster_scale != preview_raster_scale
+            {
                 self.layout = None;
             }
         }
