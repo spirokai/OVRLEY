@@ -67,3 +67,4 @@ tmp/
 .claude/settings.local.json
 .agents/plans/
 .vite-hooks/
+CLAUDE.md
