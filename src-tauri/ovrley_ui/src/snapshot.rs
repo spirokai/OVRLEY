@@ -10,14 +10,15 @@ use slint::ComponentHandle;
 use std::path::PathBuf;
 use std::time::Duration;
 
-/// One state of the tour: its name and the action that sets it up.
-type Step = (&'static str, fn(&mut Store, &mut Services));
+/// One state of the tour: its name and the action that sets it up. A `None` action toggles native
+/// full screen instead (macOS: the header's inset follows AppKit's notifications).
+type Step = (&'static str, Option<fn(&mut Store, &mut Services)>);
 
 fn tour() -> Vec<Step> {
     use ovrley_app::features::app_shell::SettingsSection;
     use ovrley_app::i18n::{change_language_preference, Locale};
     use ovrley_app::store::slices::layout::LeftDrawerTool;
-    vec![
+    let steps: Vec<(&'static str, fn(&mut Store, &mut Services))> = vec![
         ("shell", |store, _| {
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
@@ -43,7 +44,11 @@ fn tour() -> Vec<Step> {
             store.layout.dismiss_left_drawer_overlay();
             change_language_preference(store, services, Locale::En);
         }),
-    ]
+    ];
+    let mut tour: Vec<Step> = steps.into_iter().map(|(name, action)| (name, Some(action))).collect();
+    tour.push(("fullscreen", None));
+    tour.push(("fullscreen-left", None));
+    tour
 }
 
 /// Starts the tour when `OVRLEY_SNAPSHOT` is set.
@@ -67,9 +72,21 @@ fn take(window: slint::Weak<AppWindow>, dispatcher: Dispatcher, dir: PathBuf, st
         slint::quit_event_loop().expect("quit");
         return;
     };
-    dispatcher.dispatch(action);
+    let settle = match action {
+        Some(action) => {
+            dispatcher.dispatch(action);
+            800
+        }
+        None => {
+            let app = window.upgrade().expect("the window is open");
+            let fullscreen = !app.window().is_fullscreen();
+            log::debug!("snapshot: set_fullscreen({fullscreen})");
+            app.window().set_fullscreen(fullscreen);
+            2000
+        }
+    };
     // Let animations and the layout settle before the capture.
-    slint::Timer::single_shot(Duration::from_millis(800), move || {
+    slint::Timer::single_shot(Duration::from_millis(settle), move || {
         let app = window.upgrade().expect("the window is open");
         let pixels = app.window().take_snapshot().expect("snapshot");
         let path = dir.join(format!("shell-{index}-{name}.png"));

@@ -81,26 +81,26 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
         slint::CloseRequestResponse::KeepWindowShown
     });
 
-    // Leaving fullscreen resizes the window, and AppKit puts the traffic lights back in the corner on
-    // every resize, so both are re-read here.
-    let resized = dispatcher.handle();
+    // AppKit puts the traffic lights back in the corner on every resize.
+    #[cfg(target_os = "macos")]
     window.window().on_winit_window_event(move |slint_window, event| {
         if let winit::event::WindowEvent::Resized(_) = event {
-            let fullscreen = slint_window
-                .with_winit_window(|winit_window| {
-                    #[cfg(target_os = "macos")]
-                    platform::macos::apply_traffic_light_inset(winit_window);
-                    winit_window.fullscreen().is_some()
-                })
-                .unwrap_or(false);
-            resized.dispatch(move |store, _| store.traffic_light_inset.set_fullscreen(fullscreen));
+            slint_window.with_winit_window(platform::macos::apply_traffic_light_inset);
         }
         EventResult::Propagate
     });
 
     // `useAppBootstrap`'s shell part runs on the first event-loop turn.
     let startup = dispatcher.handle();
-    slint::Timer::single_shot(std::time::Duration::ZERO, move || startup.dispatch(|store, _| store.bootstrap.set_startup_ready()));
+    let shown = window.as_weak();
+    slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+        #[cfg(target_os = "macos")]
+        if let Some(window) = shown.upgrade() {
+            observe_fullscreen(&window, startup.clone());
+        }
+        let _ = &shown;
+        startup.dispatch(|store, _| store.bootstrap.set_startup_ready());
+    });
 
     // Live preview (D17): Slint gives no reload notification, so the projections run on a short
     // timer. A reload resets the globals to their defaults; the projections compare with the
@@ -126,4 +126,33 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
 /// build that lost its catalogs.
 fn select_language(locale: Locale) {
     slint::select_bundled_translation(locale.code()).unwrap_or_else(|error| panic!("the {} translation is not bundled: {error:?}", locale.code()));
+}
+
+/// `useTrafficLightInset` on macOS: the header gives up its inset as the window starts entering
+/// full screen (the traffic lights go away) and takes it back as it starts leaving. Installed once
+/// the winit window exists, which is after the first event-loop turn.
+#[cfg(target_os = "macos")]
+fn observe_fullscreen(window: &AppWindow, dispatch: ovrley_app::store::DispatchHandle) {
+    use platform::macos::FullscreenTransition;
+    let window = window.as_weak();
+    let spawned = slint::spawn_local(async move {
+        let Some(app) = window.upgrade() else { return };
+        let winit_window = match app.window().winit_window().await {
+            Ok(winit_window) => winit_window,
+            Err(error) => {
+                log::warn!("no winit window for the full-screen observer: {error}");
+                return;
+            }
+        };
+        platform::macos::apply_traffic_light_inset(&winit_window);
+        log::debug!("full-screen observer installed");
+        platform::macos::observe_fullscreen(&winit_window, move |transition| {
+            log::debug!("full-screen transition: {transition:?}");
+            let fullscreen = matches!(transition, FullscreenTransition::WillEnter | FullscreenTransition::DidEnter);
+            dispatch.dispatch(move |store, _| store.traffic_light_inset.set_fullscreen(fullscreen));
+        });
+    });
+    if let Err(error) = spawned {
+        log::warn!("could not install the full-screen observer: {error}");
+    }
 }
