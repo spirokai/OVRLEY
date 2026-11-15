@@ -11,4 +11,6 @@ use crate::features::toolbar;
 pub(super) fn run(store: &mut Store, services: &mut Services) {
     // 1. `useDrawerPreference`'s second effect: persist `{pinned, activeTool}` when it changed.
     toolbar::persist_drawer_preference(store, services);
+    // The plan's language step is not needed: `change_language_preference` validates, applies and
+    // persists `lng` itself, as React's does, and every path (Settings, MCP) goes through it.
 }

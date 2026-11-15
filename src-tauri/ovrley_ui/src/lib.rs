@@ -3,6 +3,7 @@
 
 slint::include_modules!();
 
+pub mod i18n_strings;
 pub mod logic;
 
 pub use logic::install_component_logic;

@@ -5,6 +5,7 @@
 
 pub mod features;
 pub mod hooks;
+pub mod i18n;
 pub mod js;
 // `src/lib.rs` is the crate root, so the `lib` module's directory is named explicitly.
 #[path = "lib/mod.rs"]

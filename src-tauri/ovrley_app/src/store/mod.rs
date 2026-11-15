@@ -14,6 +14,7 @@ pub mod services;
 pub mod slices;
 
 use crate::features::toolbar::DrawerPreferenceState;
+use crate::i18n::I18nState;
 use crate::lib::preferences_store::PreferencesStore;
 use services::{ServiceParts, Services};
 use slices::layout::LayoutSlice;
@@ -27,15 +28,17 @@ use std::rc::{Rc, Weak};
 pub struct Store {
     pub layout: LayoutSlice,
     pub media: MediaSlice,
+    pub i18n: I18nState,
     /// `useDrawerPreference`'s last observed preference.
     pub drawer_preference: DrawerPreferenceState,
 }
 
 impl Store {
     /// Reads the preferences the shell needs before its first frame, as `main.jsx` and the startup
-    /// hooks do: the drawer preference (normalized, Q5).
+    /// hooks do: the language (`lng`, strict) and the drawer preference (normalized, Q5).
     pub fn hydrate(preferences: &PreferencesStore) -> Result<Self, String> {
         let mut store = Self::default();
+        crate::i18n::hydrate_language_preference(&mut store, preferences)?;
         crate::features::toolbar::hydrate_drawer_preference(&mut store, preferences);
         Ok(store)
     }

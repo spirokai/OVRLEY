@@ -5340,6 +5340,7 @@ dependencies = [
  "image",
  "ovrley_app",
  "regex",
+ "serde_json",
  "skia-safe",
  "slint",
  "slint-build",
