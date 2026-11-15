@@ -7,7 +7,6 @@ import { Shadow, ShadowSize } from "shadow.slint";
 import { SimpleTooltip } from "simple-tooltip.slint";
 import { HexColorPicker } from "hex-color-picker.slint";
 import { ColorPickerLogic, GradientPickerLogic, GradientStop, GradientStopKeyResult } from "logic.slint";
-import { ComponentStrings } from "../i18n/strings.slint";
 
 // gradient-picker.jsx with `useGradientPicker`; the rules are in ovrley_app
 // (`hooks/gradient_picker.rs`, `lib/gradient_stops.rs`).
@@ -30,7 +29,7 @@ import { ComponentStrings } from "../i18n/strings.slint";
 //   nodes are rebuilt only when stops are added or removed.
 export component GradientPicker inherits VerticalLayout {
     in property <[GradientStop]> stops;
-    in property <string> label: ComponentStrings.gradient;
+    in property <string> label: @tr("components.gradient" => "Gradient");
     // Receives the next stops; at most once per frame while dragging.
     callback changed(stops: [GradientStop]);
     // An interaction ended; `changed` may act as a live preview until then.
@@ -81,14 +80,14 @@ export component GradientPicker inherits VerticalLayout {
         padding: 0.5rem;
 
         track-tip := SimpleTooltip {
-            content: root.can-add ? ComponentStrings.gradient-add-stop-hint : "";
+            content: root.can-add ? @tr("components.gradientAddStopHint" => "Click to add a color stop") : "";
             height: 0.625rem;
             mouse-cursor: root.can-add ? MouseCursor.copy : MouseCursor.default;
 
             track := Rectangle {
                 height: 0.625rem;
                 accessible-role: AccessibleRole.groupbox;
-                accessible-label: ComponentStrings.gradient-stops;
+                accessible-label: @tr("components.gradientStops" => "Gradient stops");
 
                 // The extended hit area: 0.5rem above and below the track.
                 TouchArea {
@@ -130,7 +129,7 @@ export component GradientPicker inherits VerticalLayout {
                     transform-scale-y: self.transform-scale-x;
                     forward-focus: node-focus;
                     accessible-role: AccessibleRole.button;
-                    accessible-label: ComponentStrings.gradient-stop-label.replace-all("{{percent}}", round(node.stop.offset * 100));
+                    accessible-label: @tr("components.gradientStopLabel" => "Color stop at {0}%", round(node.stop.offset * 100));
                     accessible-action-default => {
                         picker.open();
                     }
@@ -232,7 +231,7 @@ export component GradientPicker inherits VerticalLayout {
                                 variant: ButtonVariant.outline;
                                 size: ButtonSize.icon;
                                 icon: Icons.trash-2;
-                                accessible-label: ComponentStrings.gradient-remove-stop;
+                                accessible-label: @tr("components.gradientRemoveStop" => "Remove stop");
                                 disabled: !root.can-remove;
                                 background: Theme.surface;
                                 border-color: Theme.border.transparentize(0.3);

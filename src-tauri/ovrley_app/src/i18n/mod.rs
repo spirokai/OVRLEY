@@ -4,10 +4,12 @@
 //! The 15 locale files are embedded from `app/src/i18n/locales/`, where the React app keeps them.
 //! i18next's behaviour is kept: English is the fallback language, a key missing from a locale shows
 //! the English text, a key missing from every locale shows its code default, and `{{name}}`
-//! placeholders are filled without escaping. Keys are looked up through the generated constants in
-//! [`keys`], so a key that does not exist fails to compile.
+//! placeholders are filled without escaping.
+//!
+//! This catalog serves the strings Rust code chooses at runtime (errors, projected labels). The
+//! `.slint` files translate their own strings with `@tr`, from gettext catalogs that `ovrley_ui`'s
+//! build converts from the same JSON files.
 
-pub mod keys;
 pub mod locales;
 
 pub use locales::{Locale, DEFAULT_LOCALE, LOCALES};
@@ -66,14 +68,13 @@ impl Catalog {
     /// default.
     ///
     /// # Panics
-    /// For a key that is in no catalog and has no code default, which the generated constants make
+    /// For a key that is in no catalog, which the tests rule out for every key Rust code uses
     /// impossible.
     pub fn t(&self, locale: Locale, key: &str) -> &str {
         self.tables[locale.index()]
             .get(key)
             .or_else(|| self.tables[DEFAULT_LOCALE.index()].get(key))
             .map(String::as_str)
-            .or_else(|| keys::CODE_DEFAULTS.iter().find(|(default_key, _)| *default_key == key).map(|(_, text)| *text))
             .unwrap_or_else(|| panic!("translation key {key} has no text"))
     }
 
@@ -128,6 +129,30 @@ pub fn translate_options<T: Copy>(options: &[OptionDefinition<T>], locale: Local
         .collect()
 }
 
+/// `[project_error:<tag>]` → its message key.
+const PROJECT_ERROR_KEYS: [(&str, &str); 4] = [
+    ("archive_size", "projects.archiveTooLarge"),
+    ("invalid_archive", "projects.invalidArchive"),
+    ("raster_unavailable", "projects.rasterUnavailable"),
+    ("save_failed", "projects.saveFailed"),
+];
+
+/// `[raster_error:<tag>:<id>]` → its message key.
+const RASTER_ERROR_KEYS: [(&str, &str); 12] = [
+    ("invalid_config", "raster.errors.invalidConfig"),
+    ("no_image", "raster.errors.noImage"),
+    ("missing_resource", "raster.errors.renderUnavailable"),
+    ("relative_path", "raster.errors.relativePath"),
+    ("missing", "raster.errors.missing"),
+    ("unreadable", "raster.errors.unreadable"),
+    ("unsupported_type", "raster.errors.unsupportedType"),
+    ("encoded_size", "raster.errors.encodedSize"),
+    ("resolution", "raster.errors.resolution"),
+    ("decode", "raster.errors.decode"),
+    ("missing_asset", "raster.errors.missingAsset"),
+    ("corrupt_asset", "raster.errors.corruptAsset"),
+];
+
 /// `translateBackendError`: formats tagged backend errors (`[project_error:…]`,
 /// `[raster_error:…:…]`) for display, and leaves any other message unchanged.
 pub fn translate_backend_error(message: &str, locale: Locale) -> String {
@@ -137,13 +162,7 @@ pub fn translate_backend_error(message: &str, locale: Locale) -> String {
 
     let project = PROJECT.get_or_init(|| Regex::new(r"\[project_error:([a-z_]+)\]").expect("valid regex"));
     if let Some(code) = project.captures(message).map(|captures| captures.get(1).expect("one group").as_str()) {
-        let key = match code {
-            "archive_size" => Some(keys::PROJECTS_ARCHIVE_TOO_LARGE),
-            "invalid_archive" => Some(keys::PROJECTS_INVALID_ARCHIVE),
-            "raster_unavailable" => Some(keys::PROJECTS_RASTER_UNAVAILABLE),
-            "save_failed" => Some(keys::PROJECTS_SAVE_FAILED),
-            _ => None,
-        };
+        let key = PROJECT_ERROR_KEYS.iter().find(|(tag, _)| *tag == code).map(|(_, key)| *key);
         if let Some(key) = key {
             return catalog.t(locale, key).to_string();
         }
@@ -154,23 +173,12 @@ pub fn translate_backend_error(message: &str, locale: Locale) -> String {
         return message.to_string();
     };
     let id = captures.get(2).expect("two groups").as_str();
-    let key = match captures.get(1).expect("two groups").as_str() {
-        "invalid_config" => keys::RASTER_ERRORS_INVALID_CONFIG,
-        "no_image" => keys::RASTER_ERRORS_NO_IMAGE,
-        "missing_resource" => keys::RASTER_ERRORS_RENDER_UNAVAILABLE,
-        "relative_path" => keys::RASTER_ERRORS_RELATIVE_PATH,
-        "missing" => keys::RASTER_ERRORS_MISSING,
-        "unreadable" => keys::RASTER_ERRORS_UNREADABLE,
-        "unsupported_type" => keys::RASTER_ERRORS_UNSUPPORTED_TYPE,
-        "encoded_size" => keys::RASTER_ERRORS_ENCODED_SIZE,
-        "resolution" => keys::RASTER_ERRORS_RESOLUTION,
-        "decode" => keys::RASTER_ERRORS_DECODE,
-        "missing_asset" => keys::RASTER_ERRORS_MISSING_ASSET,
-        "corrupt_asset" => keys::RASTER_ERRORS_CORRUPT_ASSET,
-        _ => return message.to_string(),
+    let tag = captures.get(1).expect("two groups").as_str();
+    let Some(key) = RASTER_ERROR_KEYS.iter().find(|(candidate, _)| *candidate == tag).map(|(_, key)| *key) else {
+        return message.to_string();
     };
     let translated = catalog.t_with(locale, key, &[("id", id)]);
-    if key == keys::RASTER_ERRORS_NO_IMAGE || key == keys::RASTER_ERRORS_RENDER_UNAVAILABLE || id == "configuration" {
+    if tag == "no_image" || tag == "missing_resource" || id == "configuration" {
         translated
     } else {
         format!("{id}: {translated}")
@@ -214,12 +222,12 @@ mod tests {
     #[test]
     fn every_locale_file_parses_and_english_is_complete() {
         let catalog = catalog();
-        assert_eq!(catalog.t(Locale::De, keys::APP_SHELL_CLOSE), catalog.tables[Locale::De.index()]["app-shell.close"]);
-        assert_eq!(catalog.t(Locale::En, keys::TOOLBAR_PIN_DRAWER), catalog.tables[0]["toolbar.pinDrawer"]);
+        assert_eq!(catalog.t(Locale::De, "app-shell.close"), catalog.tables[Locale::De.index()]["app-shell.close"]);
+        assert_eq!(catalog.t(Locale::En, "toolbar.pinDrawer"), catalog.tables[0]["toolbar.pinDrawer"]);
     }
 
     #[test]
-    fn falls_back_to_english_then_to_the_code_default() {
+    fn falls_back_to_english() {
         let catalog = catalog();
         let missing_in_german = catalog.tables[0]
             .keys()
@@ -228,7 +236,13 @@ mod tests {
         if let Some(key) = missing_in_german.as_deref() {
             assert_eq!(catalog.t(Locale::De, key), catalog.t(Locale::En, key));
         }
-        assert_eq!(catalog.t(Locale::Ja, keys::COMPONENTS_GRADIENT), "Gradient");
+    }
+
+    #[test]
+    fn every_backend_error_key_has_english_text() {
+        for (_, key) in PROJECT_ERROR_KEYS.iter().chain(RASTER_ERROR_KEYS.iter()) {
+            assert!(catalog().tables[DEFAULT_LOCALE.index()].contains_key(*key), "{key}");
+        }
     }
 
     #[test]
@@ -242,19 +256,19 @@ mod tests {
         let catalog = catalog();
         assert_eq!(
             translate_backend_error("boom [project_error:save_failed]", Locale::En),
-            catalog.t(Locale::En, keys::PROJECTS_SAVE_FAILED)
+            catalog.t(Locale::En, "projects.saveFailed")
         );
         assert_eq!(
             translate_backend_error("x [raster_error:missing:logo]", Locale::En),
-            format!("logo: {}", catalog.t_with(Locale::En, keys::RASTER_ERRORS_MISSING, &[("id", "logo")]))
+            format!("logo: {}", catalog.t_with(Locale::En, "raster.errors.missing", &[("id", "logo")]))
         );
         assert_eq!(
             translate_backend_error("x [raster_error:no_image:logo]", Locale::En),
-            catalog.t_with(Locale::En, keys::RASTER_ERRORS_NO_IMAGE, &[("id", "logo")])
+            catalog.t_with(Locale::En, "raster.errors.noImage", &[("id", "logo")])
         );
         assert_eq!(
             translate_backend_error("x [raster_error:missing:configuration]", Locale::En),
-            catalog.t_with(Locale::En, keys::RASTER_ERRORS_MISSING, &[("id", "configuration")])
+            catalog.t_with(Locale::En, "raster.errors.missing", &[("id", "configuration")])
         );
     }
 

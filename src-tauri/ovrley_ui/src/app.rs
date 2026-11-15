@@ -3,9 +3,9 @@
 
 use crate::platform::gpu::GpuDevice;
 use crate::platform::{self, NativeDialogs, SlintUiPost, SlintWindowControl, SystemClipboard};
-use crate::{features, i18n_strings, AppWindow};
+use crate::{features, AppWindow};
 use ovrley_app::features::app_shell;
-use ovrley_app::i18n::{self, Locale};
+use ovrley_app::i18n::Locale;
 use ovrley_app::lib::preferences_store::PreferencesStore;
 use ovrley_app::store::services::ServiceParts;
 use ovrley_app::store::{Dispatcher, Store};
@@ -15,8 +15,8 @@ use std::cell::Cell;
 use std::rc::Rc;
 use std::sync::Arc;
 
-/// Runs every feature's projection after each dispatch. Re-applies the whole catalog to the string
-/// globals when the language changed.
+/// Runs every feature's projection after each dispatch, and switches Slint's bundled translation
+/// when the language changed (every `@tr` then re-evaluates).
 struct Projections {
     window: slint::Weak<AppWindow>,
     language: Cell<Locale>,
@@ -26,7 +26,7 @@ impl Projections {
     fn run(&self, store: &Store) {
         let Some(window) = self.window.upgrade() else { return };
         if self.language.replace(store.i18n.language) != store.i18n.language {
-            i18n_strings::apply_locale(&window, i18n::catalog(), store.i18n.language);
+            select_language(store.i18n.language);
         }
         features::app_shell::project(&window, store);
     }
@@ -38,7 +38,7 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
     crate::install_component_logic(&window);
     let language = store.i18n.language;
-    i18n_strings::apply_locale(&window, i18n::catalog(), language);
+    select_language(language);
 
     let dispatcher = Dispatcher::new(
         store,
@@ -88,19 +88,12 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
 
     // Live preview (D17): Slint gives no reload notification, so the projections run on a short
     // timer. A reload resets the globals to their defaults; the projections compare with the
-    // current values and restore the store's state, and the catalog is written again.
+    // current values and restore the store's state.
     #[cfg(feature = "live-preview")]
     let _live_preview = {
         let timer = slint::Timer::default();
         let dispatcher = dispatcher.clone();
-        let window = window.as_weak();
-        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
-            if let Some(window) = window.upgrade() {
-                let language = dispatcher.with_store(|store| store.i18n.language);
-                i18n_strings::apply_locale(&window, i18n::catalog(), language);
-            }
-            dispatcher.reproject();
-        });
+        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || dispatcher.reproject());
         timer
     };
 
@@ -111,4 +104,10 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
     dispatcher.flush_preferences();
     result
+}
+
+/// Every locale is bundled at build time, and English is the untranslated text, so a failure is a
+/// build that lost its catalogs.
+fn select_language(locale: Locale) {
+    slint::select_bundled_translation(locale.code()).unwrap_or_else(|error| panic!("the {} translation is not bundled: {error:?}", locale.code()));
 }

@@ -7,7 +7,6 @@ import { Input } from "input.slint";
 import { Select } from "select.slint";
 import { GroupPosition } from "group-surface.slint";
 import { Choice, ColorFormat, ColorPickerLogic, Hsv, Rgba } from "logic.slint";
-import { ComponentStrings } from "../i18n/strings.slint";
 
 // color-picker.jsx: the parts `HexColorPicker` uses (Q4 drops inline mode, the alpha slider and
 // inputs, the form fields, `readOnly` and RTL). Slint has no context, so the parts take the
@@ -124,7 +123,7 @@ export component ColorPickerSwatch {
     in property <bool> disabled;
 
     accessible-role: AccessibleRole.image;
-    accessible-label: ComponentStrings.current-color-val.replace-all("{{val}}", ColorPickerLogic.color-to-string(root.color, root.format));
+    accessible-label: @tr("components.currentColorVal" => "Current color: {0}", ColorPickerLogic.color-to-string(root.color, root.format));
     opacity: root.disabled ? 0.5 : 1;
 
     Shadow {
@@ -233,7 +232,7 @@ export component ColorPickerInput {
     if root.format == ColorFormat.hex: Input {
         width: 9.75rem;
         text <=> root.hex-text;
-        label: ComponentStrings.hex-color-value;
+        label: @tr("components.hexColorValue" => "Hex color value");
         placeholder: "#000000";
         disabled: root.disabled;
         background: Theme.surface;
@@ -260,7 +259,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: root.color.r;
             max: 255;
-            label: ComponentStrings.red-color-component-0255;
+            label: @tr("components.redColorComponent0255" => "Red color component (0-255)");
             group-position: GroupPosition.first;
             disabled: root.disabled;
             value-entered(v) => { root.color-entered({ r: v, g: root.color.g, b: root.color.b, a: root.color.a }); }
@@ -268,7 +267,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: root.color.g;
             max: 255;
-            label: ComponentStrings.green-color-component-0255;
+            label: @tr("components.greenColorComponent0255" => "Green color component (0-255)");
             group-position: GroupPosition.middle;
             disabled: root.disabled;
             value-entered(v) => { root.color-entered({ r: root.color.r, g: v, b: root.color.b, a: root.color.a }); }
@@ -276,7 +275,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: root.color.b;
             max: 255;
-            label: ComponentStrings.blue-color-component-0255;
+            label: @tr("components.blueColorComponent0255" => "Blue color component (0-255)");
             group-position: GroupPosition.last;
             disabled: root.disabled;
             value-entered(v) => { root.color-entered({ r: root.color.r, g: root.color.g, b: v, a: root.color.a }); }
@@ -287,7 +286,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: ColorPickerLogic.rgb-to-hsl(root.color).h;
             max: 360;
-            label: ComponentStrings.hue-degree-0360;
+            label: @tr("components.hueDegree0360" => "Hue degree (0-360)");
             group-position: GroupPosition.first;
             disabled: root.disabled;
             value-entered(v) => {
@@ -298,7 +297,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: ColorPickerLogic.rgb-to-hsl(root.color).s;
             max: 100;
-            label: ComponentStrings.saturation-percentage-0100;
+            label: @tr("components.saturationPercentage0100" => "Saturation percentage (0-100)");
             group-position: GroupPosition.middle;
             disabled: root.disabled;
             value-entered(v) => {
@@ -309,7 +308,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: ColorPickerLogic.rgb-to-hsl(root.color).l;
             max: 100;
-            label: ComponentStrings.lightness-percentage-0100;
+            label: @tr("components.lightnessPercentage0100" => "Lightness percentage (0-100)");
             group-position: GroupPosition.last;
             disabled: root.disabled;
             value-entered(v) => {
@@ -323,7 +322,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: root.hsv.h;
             max: 360;
-            label: ComponentStrings.hue-degree-0360;
+            label: @tr("components.hueDegree0360" => "Hue degree (0-360)");
             group-position: GroupPosition.first;
             disabled: root.disabled;
             value-entered(v) => { root.color-entered(ColorPickerLogic.hsv-to-rgb({ h: v, s: root.hsv.s, v: root.hsv.v, a: root.hsv.a })); }
@@ -331,7 +330,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: root.hsv.s;
             max: 100;
-            label: ComponentStrings.saturation-percentage-0100;
+            label: @tr("components.saturationPercentage0100" => "Saturation percentage (0-100)");
             group-position: GroupPosition.middle;
             disabled: root.disabled;
             value-entered(v) => { root.color-entered(ColorPickerLogic.hsv-to-rgb({ h: root.hsv.h, s: v, v: root.hsv.v, a: root.hsv.a })); }
@@ -339,7 +338,7 @@ export component ColorPickerInput {
         ChannelInput {
             value: root.hsv.v;
             max: 100;
-            label: ComponentStrings.brightness-percentage-0100;
+            label: @tr("components.brightnessPercentage0100" => "Brightness percentage (0-100)");
             group-position: GroupPosition.last;
             disabled: root.disabled;
             value-entered(v) => { root.color-entered(ColorPickerLogic.hsv-to-rgb({ h: root.hsv.h, s: root.hsv.s, v: v, a: root.hsv.a })); }

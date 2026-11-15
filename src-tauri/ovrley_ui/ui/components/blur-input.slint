@@ -2,7 +2,6 @@ import { Theme } from "../theme/theme.slint";
 import { Icon, Icons } from "icons.slint";
 import { Input, InputVariant } from "input.slint";
 import { NumberConstraints, NumberInputLogic, StepDirection } from "logic.slint";
-import { ComponentStrings } from "../i18n/strings.slint";
 
 // One of the number mode's step buttons: it does not take focus from the field.
 component StepButton inherits Rectangle {
@@ -139,7 +138,7 @@ export component BlurInput {
                 vertical-stretch: 1;
                 glyph: Icons.chevron-up;
                 disabled: root.disabled;
-                accessible-label: ComponentStrings.increase-value;
+                accessible-label: @tr("components.increaseValue" => "Increase value");
                 clicked => {
                     root.step(StepDirection.up);
                 }
@@ -152,7 +151,7 @@ export component BlurInput {
                 vertical-stretch: 1;
                 glyph: Icons.chevron-down;
                 disabled: root.disabled;
-                accessible-label: ComponentStrings.decrease-value;
+                accessible-label: @tr("components.decreaseValue" => "Decrease value");
                 clicked => {
                     root.step(StepDirection.down);
                 }

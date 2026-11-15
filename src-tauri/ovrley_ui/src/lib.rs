@@ -6,7 +6,6 @@ slint::include_modules!();
 pub mod app;
 pub mod features;
 pub mod hooks;
-pub mod i18n_strings;
 pub mod logic;
 pub mod platform;
 #[cfg(debug_assertions)]

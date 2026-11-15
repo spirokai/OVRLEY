@@ -7,7 +7,6 @@ import { Input } from "input.slint";
 import { OverlayMotion } from "overlay-motion.slint";
 import { ColorPickerArea, ColorPickerFormatSelect, ColorPickerHueSlider, ColorPickerInput, ColorPickerSwatch } from "color-picker.slint";
 import { ColorFormat, ColorPickerLogic, Hsv, Placement, PlacementAlign, PlacementLogic, PlacementSide, Rgba } from "logic.slint";
-import { ComponentStrings } from "../i18n/strings.slint";
 
 // hex-color-picker.jsx. Its value is normalized with `normalize-hex-color`.
 // Default trigger in React: a field-lift button, 2.25rem high, with a 1.25rem swatch and, with `show-value`,
@@ -149,7 +148,7 @@ export component HexColorPicker {
         if root.show-value: hex-field := Input {
             horizontal-stretch: 1;
             text <=> root.hex-text;
-            label: ComponentStrings.hex-color-value;
+            label: @tr("components.hexColorValue" => "Hex color value");
             placeholder: "#000000";
             group-position: GroupPosition.first;
             disabled: root.disabled;
@@ -172,7 +171,7 @@ export component HexColorPicker {
             max-width: root.show-value ? 3.5rem : 100000px;
             horizontal-stretch: root.show-value ? 0 : 1;
             accessible-role: AccessibleRole.button;
-            accessible-label: ComponentStrings.current-color-val.replace-all("{{val}}", root.shown-value);
+            accessible-label: @tr("components.currentColorVal" => "Current color: {0}", root.shown-value);
             accessible-action-default => {
                 root.open();
             }
@@ -307,7 +306,7 @@ export component HexColorPicker {
                 VerticalLayout {
                     spacing: 0.5rem;
                     AppText {
-                        content: ComponentStrings.presets;
+                        content: @tr("components.presets" => "Presets");
                         uppercase: true;
                         font-size: 0.667rem;
                         font-weight: Theme.font-weight-bold;
