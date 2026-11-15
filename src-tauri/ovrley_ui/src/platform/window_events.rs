@@ -112,6 +112,10 @@ impl CustomApplicationHandler for AppEvents {
             WindowEvent::HoveredFileCancelled => set_hovering(false),
             WindowEvent::DroppedFile(path) => self.pending_drop.push(path.clone()),
             WindowEvent::CursorMoved { position, .. } => self.cursor = Some(*position),
+            // Losing the window's focus cancels a running transform, as React's window blur does.
+            WindowEvent::Focused(false) => super::dispatch_ui(|store, _| {
+                ovrley_app::features::overlay_editor::interaction::cancel_gesture(store);
+            }),
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button: MouseButton::Left,

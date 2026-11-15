@@ -3,7 +3,120 @@ import { AppText } from "../../components/app-text.slint";
 import { Checkerboard } from "../../components/checkerboard.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { UndoRedo } from "../undo-redo/index.slint";
-import { BackgroundMode, OverlayEditor, WidgetView } from "index.slint";
+import { BackgroundMode, OverlayEditor, WidgetView, HandleView, GuideLabelView, BadgeView } from "index.slint";
+
+// The selection layer over the stage (D12, D13): outlines in accent at one device pixel, square
+// accent handles rotated with their widget, the white rotation knob with its line, the guides
+// (scene lines 1 px, widget lines 2 px, connectors in ice; Slint has no dashes, so connectors are
+// solid), their distance labels in bold `#f55`, the marquee and the badges.
+component SelectionLayer inherits Rectangle {
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.guides-normal;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.guide-scale;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.guides-bold;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.guide-scale * 2;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.guides-dashed;
+        stroke: Theme.theme-color-ice;
+        stroke-width: OverlayEditor.guide-scale;
+        fill: transparent;
+    }
+    for label in OverlayEditor.guide-labels: AppText {
+        x: label.vertical ? label.x + 2px + 3 * OverlayEditor.guide-scale : label.x - self.preferred-width / 2;
+        y: label.vertical ? label.y - self.preferred-height / 2 : label.y - self.preferred-height - 2px - 3 * OverlayEditor.guide-scale;
+        content: label.text;
+        font-size: 1.037rem * OverlayEditor.guide-scale / 1px;
+        font-weight: Theme.font-weight-bold;
+        color: #ff5555;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.selection-commands;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.border-width;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.knob-line-commands;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.guide-scale;
+        fill: transparent;
+    }
+    for handle in OverlayEditor.handles: Rectangle {
+        property <length> size: handle.knob ? OverlayEditor.knob-size : OverlayEditor.handle-size;
+        x: handle.x - self.size / 2;
+        y: handle.y - self.size / 2;
+        width: self.size;
+        height: self.size;
+        transform-rotation: handle.rotation;
+        border-radius: handle.knob ? self.size / 2 : 0px;
+        background: handle.knob ? #ffffff : Theme.theme-color-accent;
+        border-width: handle.knob ? 0.148rem * OverlayEditor.guide-scale / 1px : 0px;
+        border-color: Theme.theme-color-accent;
+    }
+    if OverlayEditor.marquee-shown: Rectangle {
+        x: OverlayEditor.marquee-x;
+        y: OverlayEditor.marquee-y;
+        width: OverlayEditor.marquee-width;
+        height: OverlayEditor.marquee-height;
+        border-width: 1px;
+        border-color: Theme.primary.transparentize(0.3);
+        background: Theme.primary.transparentize(0.9);
+    }
+    // Badges: 1.25rem high, `rounded-xs`, `border` at 70%, `card` at 90%, `px-2`, 0.815rem
+    // semibold muted, `shadow-sm`, rotated about their top-left corner.
+    for badge in OverlayEditor.badges: Rectangle {
+        x: badge.x;
+        y: badge.y;
+        width: badge-text.preferred-width + 1rem;
+        height: 1.25rem;
+        transform-origin: { x: 0px, y: 0px };
+        transform-rotation: badge.rotation;
+        Shadow {
+            size: ShadowSize.sm;
+            radius: Theme.radius-xs * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.radius-xs * 1rem;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            background: Theme.card.transparentize(0.1);
+        }
+        badge-text := AppText {
+            content: badge.label;
+            font-size: 0.815rem;
+            font-weight: Theme.font-weight-semibold;
+            color: Theme.muted-foreground;
+            line-height: Theme.leading-none;
+        }
+    }
+}
 import { EditorToolbar } from "editor-toolbar.slint";
 
 // `OverlayCanvas`: the scene rectangle in the background colour, `rounded-sm`, a `border` at
@@ -75,7 +188,7 @@ export component OverlayEditorView inherits Rectangle {
     property <length> stage-padding: 1rem;
 
     function report() {
-        OverlayEditor.viewport-changed(root.width, root.height, root.width, root.height - root.toolbar-row, root.stage-padding);
+        OverlayEditor.viewport-changed(root.width, root.height, root.width, root.height - root.toolbar-row, root.stage-padding, 1rem);
     }
     init => {
         root.report();
@@ -86,6 +199,11 @@ export component OverlayEditorView inherits Rectangle {
     changed height => {
         root.report();
     }
+    // The root font follows the window width (`FluidWindow`), and the handles follow the rem.
+    property <length> rem: 1rem;
+    changed rem => {
+        root.report();
+    }
 
     clip: true;
     scroll-area := Rectangle {
@@ -93,6 +211,21 @@ export component OverlayEditorView inherits Rectangle {
         height: root.height - root.toolbar-row;
         clip: true;
         TouchArea {
+            mouse-cursor: OverlayEditor.over-widget ? MouseCursor.move : MouseCursor.default;
+            pointer-event(event) => {
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                    OverlayEditor.pointer-down(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                    OverlayEditor.pointer-up(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                } else if event.kind == PointerEventKind.move {
+                    OverlayEditor.pointer-move(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                }
+            }
+            changed has-hover => {
+                if !self.has-hover && !self.pressed {
+                    OverlayEditor.pointer-leave();
+                }
+            }
             scroll-event(event) => {
                 OverlayEditor.wheel(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y,
                     event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
@@ -116,6 +249,10 @@ export component OverlayEditorView inherits Rectangle {
                 display-scale: OverlayEditor.display-scale;
                 widgets: OverlayEditor.widgets;
                 error: OverlayEditor.error;
+            }
+            SelectionLayer {
+                width: parent.width;
+                height: parent.height;
             }
         }
     }

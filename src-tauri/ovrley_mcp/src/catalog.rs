@@ -7,7 +7,8 @@
 
 use ovrley_app::features::{app_shell, template_manager};
 use ovrley_app::i18n::{change_language_preference, Locale};
-use ovrley_app::store::agent::{describe_activity, describe_template, AgentReply, AgentResult};
+use ovrley_app::features::overlay_editor::interaction::{resize_widget, rotate_widget, ResizeTarget};
+use ovrley_app::store::agent::{describe_activity, describe_template, describe_widget, describe_widgets, AgentReply, AgentResult};
 use ovrley_app::store::services::Services;
 use ovrley_app::store::slices::layout::LeftDrawerTool;
 use ovrley_app::store::slices::template::TemplateKind;
@@ -116,6 +117,53 @@ pub struct TemplateLoadArguments {
     pub template_id: String,
 }
 
+/// The widget to read or delete.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WidgetArguments {
+    /// A widget id from `ovrley_summary`'s widgets.
+    pub widget_id: String,
+}
+
+/// Where to move a widget.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WidgetMoveArguments {
+    /// A widget id from `ovrley_summary`'s widgets.
+    pub widget_id: String,
+    /// The widget's x in scene pixels, as the Position section shows it.
+    pub x: f64,
+    /// The widget's y in scene pixels.
+    pub y: f64,
+}
+
+/// How to resize a widget: `width` and `height`, or `factor`.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WidgetResizeArguments {
+    /// A widget id from `ovrley_summary`'s widgets.
+    pub widget_id: String,
+    /// The content width in scene pixels; with `height`.
+    #[serde(default)]
+    pub width: Option<f64>,
+    /// The content height in scene pixels; with `width`.
+    #[serde(default)]
+    pub height: Option<f64>,
+    /// A scale factor of the current size, instead of `width` and `height`.
+    #[serde(default)]
+    pub factor: Option<f64>,
+}
+
+/// The rotation to set.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WidgetRotateArguments {
+    /// A course or image widget's id.
+    pub widget_id: String,
+    /// The rotation in degrees; it is rounded to a whole degree.
+    pub rotation: f64,
+}
+
 /// A tool's input schema: draft 2020-12, with every reference inlined, because not every client
 /// follows `$ref`.
 pub fn input_schema<T: JsonSchema>() -> Value {
@@ -170,6 +218,44 @@ pub fn tools() -> Vec<ToolDefinition> {
             title: "Dismiss the drawer",
             description: "Hides the drawer while it is a temporary overlay. A pinned drawer stays.",
             input_schema: input_schema::<NoArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "widget_get",
+            title: "Read a widget",
+            description: "Describes one widget: its saved data, its content rectangle on the canvas in scene pixels, and the fields its \
+                          type takes.",
+            input_schema: input_schema::<WidgetArguments>(),
+            read_only: true,
+        },
+        ToolDefinition {
+            name: "widget_move",
+            title: "Move a widget",
+            description: "Moves a widget to an absolute position in scene pixels, as the Position section does. One undo step.",
+            input_schema: input_schema::<WidgetMoveArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "widget_resize",
+            title: "Resize a widget",
+            description: "Resizes a widget as dragging its bottom-right handle does, keeping its top-left corner: give width and height in \
+                          scene pixels, or a factor. Widgets that keep their proportions use the width. One undo step.",
+            input_schema: input_schema::<WidgetResizeArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "widget_rotate",
+            title: "Rotate a widget",
+            description: "Rotates a course or image widget about its centre, as its rotation handle does. Other widgets do not rotate and \
+                          the call fails. One undo step.",
+            input_schema: input_schema::<WidgetRotateArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "widget_delete",
+            title: "Delete a widget",
+            description: "Deletes a widget, as the Delete key and the sidebar's delete button do. One undo step.",
+            input_schema: input_schema::<WidgetArguments>(),
             read_only: false,
         },
         ToolDefinition {
@@ -266,7 +352,7 @@ fn summary(store: &Store) -> Value {
         "template": describe_template(store),
         "activity": describe_activity(store),
         "video": null,
-        "widgets": [],
+        "widgets": describe_widgets(store),
         "history": { "canUndo": store.history.can_undo(), "canRedo": store.history.can_redo() },
     })
 }
@@ -339,6 +425,47 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             "template_list" => {
                 arguments::<NoArguments>(arguments_value)?;
                 now(template_list(store))
+            }
+            "widget_get" => {
+                let arguments: WidgetArguments = arguments(arguments_value)?;
+                now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+            }
+            "widget_move" => {
+                let arguments: WidgetMoveArguments = arguments(arguments_value)?;
+                if !arguments.x.is_finite() || !arguments.y.is_finite() {
+                    return Err(ToolOutcome::InvalidParams("x and y must be finite numbers".into()));
+                }
+                let mut patch = serde_json::Map::new();
+                patch.insert("x".into(), ovrley_widgets::model::document::number(arguments.x));
+                patch.insert("y".into(), ovrley_widgets::model::document::number(arguments.y));
+                store.editor.config.widget(&arguments.widget_id).map_err(ToolOutcome::Failed)?;
+                store.editor.edit_config(|config| config.update_widgets(&[(arguments.widget_id.clone(), patch)])).map_err(ToolOutcome::Failed)?;
+                now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+            }
+            "widget_resize" => {
+                let arguments: WidgetResizeArguments = arguments(arguments_value)?;
+                let target = match (arguments.width, arguments.height, arguments.factor) {
+                    (Some(width), Some(height), None) => ResizeTarget::Size { width, height },
+                    (None, None, Some(factor)) => ResizeTarget::Factor(factor),
+                    _ => return Err(ToolOutcome::InvalidParams("Give width and height, or factor.".into())),
+                };
+                resize_widget(store, &arguments.widget_id, target).map_err(ToolOutcome::Failed)?;
+                now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+            }
+            "widget_rotate" => {
+                let arguments: WidgetRotateArguments = arguments(arguments_value)?;
+                if !arguments.rotation.is_finite() {
+                    return Err(ToolOutcome::InvalidParams("rotation must be a finite number".into()));
+                }
+                rotate_widget(store, &arguments.widget_id, arguments.rotation).map_err(ToolOutcome::Failed)?;
+                now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+            }
+            "widget_delete" => {
+                let arguments: WidgetArguments = arguments(arguments_value)?;
+                store.editor.config.widget(&arguments.widget_id).map_err(ToolOutcome::Failed)?;
+                let ids = vec![arguments.widget_id];
+                store.editor.edit_config(|config| config.delete_widgets(&ids));
+                now(json!({ "widgets": describe_widgets(store) }))
             }
             "activity_import" => {
                 let path = absolute(arguments::<PathArguments>(arguments_value)?.path)?;
@@ -478,6 +605,24 @@ mod tests {
     }
 
     #[test]
+    fn widget_tools_move_rotate_and_delete_as_one_undo_step_each() {
+        let (dispatcher, _) = dispatcher(true);
+        dispatcher.dispatch(|store, _| {
+            store.history.set_mode(ovrley_app::features::undo_redo::HistoryMode::Reset);
+            store.editor.set_config(ovrley_widgets::model::document::OverlayConfig::from_value(&json!({"scene": {"width": 1920, "height": 1080}, "labels": [{"id": "a", "text": "A", "x": 1, "y": 2}]})).unwrap());
+        });
+        let ToolOutcome::Ok(moved) = run(&dispatcher, "widget_move", json!({"widgetId": "a", "x": 40, "y": 50})) else { panic!() };
+        assert_eq!((moved["data"]["x"].clone(), moved["data"]["y"].clone()), (json!(40), json!(50)));
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 1);
+        assert!(matches!(run(&dispatcher, "widget_rotate", json!({"widgetId": "a", "rotation": 10})), ToolOutcome::Failed(_)), "labels do not rotate (or have not rendered)");
+        assert!(matches!(run(&dispatcher, "widget_move", json!({"widgetId": "nope", "x": 0, "y": 0})), ToolOutcome::Failed(_)));
+        assert!(matches!(run(&dispatcher, "widget_resize", json!({"widgetId": "a", "width": 10})), ToolOutcome::InvalidParams(_)));
+        let ToolOutcome::Ok(left) = run(&dispatcher, "widget_delete", json!({"widgetId": "a"})) else { panic!() };
+        assert_eq!(left["widgets"], json!([]));
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2);
+    }
+
+    #[test]
     fn template_new_waits_for_the_user_and_is_cancelled_with_the_dialog() {
         let (dispatcher, _) = dispatcher(true);
         dispatcher.dispatch(|store, _| store.editor.set_config(ovrley_widgets::model::document::OverlayConfig::from_value(&json!({"labels": [{"id": "a"}]})).unwrap()));
@@ -498,7 +643,7 @@ mod tests {
         let ToolOutcome::Ok(summary) = run(&dispatcher, "ovrley_summary", Value::Null) else { panic!("summary failed") };
         assert_eq!(summary["language"], "en");
         assert_eq!(summary["drawer"], json!({"visible": false, "pinned": false, "activeTool": "widgets"}));
-        assert_eq!(summary["widgets"], json!([]));
+        assert!(summary["widgets"].is_array());
         assert!(summary["project"].is_null());
         assert!(summary["activity"].is_null());
         assert_eq!(summary["template"]["saveStatus"], "Draft");

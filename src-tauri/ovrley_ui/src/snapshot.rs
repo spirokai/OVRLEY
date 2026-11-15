@@ -30,6 +30,13 @@ fn tour() -> Vec<Step> {
             let ride = ovrley_services::runtime_paths::source_repo_root().join("src-tauri/ovrley_core/tests/fixtures/activity/test-ride.fit");
             ovrley_app::features::app_shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);
         }),
+        ("widget-selected", |store, _| {
+            store.layout.set_left_drawer_pinned(false);
+            store.layout.dismiss_left_drawer_overlay();
+            let ids = store.editor.config.widget_ids();
+            let last = ids.last().cloned();
+            store.editor.set_widget_selection(&ids[ids.len().saturating_sub(2)..], last.as_deref());
+        }),
         ("template-confirm", |store, services| {
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();

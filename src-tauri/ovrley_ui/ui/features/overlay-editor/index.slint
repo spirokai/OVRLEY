@@ -12,6 +12,30 @@ export struct WidgetView {
     height: length,
 }
 
+// A transform handle in stage pixels: a resize square, rotated with its widget, or the knob.
+export struct HandleView {
+    x: length,
+    y: length,
+    rotation: angle,
+    knob: bool,
+}
+
+// A guide's distance label in stage pixels.
+export struct GuideLabelView {
+    x: length,
+    y: length,
+    text: string,
+    vertical: bool,
+}
+
+// A widget's type badge in stage pixels.
+export struct BadgeView {
+    x: length,
+    y: length,
+    rotation: angle,
+    label: string,
+}
+
 // The overlay-editor feature's global (D5), written by `src/features/overlay_editor.rs`.
 export global OverlayEditor {
     // The stage (the scroll area's content) and the scene inside it, in logical pixels.
@@ -42,11 +66,38 @@ export global OverlayEditor {
     // A resource or render failure.
     in property <string> error;
 
+    // The selection (D12, D13), in stage pixels: outlines as path commands, the handles, the
+    // rotation line, the guides by style, their labels, the marquee and the badges.
+    in property <string> selection-commands;
+    in property <length> border-width: 1px;
+    in property <[HandleView]> handles;
+    in property <string> knob-line-commands;
+    in property <length> handle-size;
+    in property <length> knob-size;
+    in property <length> guide-scale: 1px;
+    in property <string> guides-normal;
+    in property <string> guides-bold;
+    in property <string> guides-dashed;
+    in property <[GuideLabelView]> guide-labels;
+    in property <bool> marquee-shown;
+    in property <length> marquee-x;
+    in property <length> marquee-y;
+    in property <length> marquee-width;
+    in property <length> marquee-height;
+    in property <[BadgeView]> badges;
+    // The pointer is over a widget (the move cursor).
+    in property <bool> over-widget;
+
     // The editor area, the scroll area below the toolbar row, and the stage's padding.
-    callback viewport-changed(editor-width: length, editor-height: length, scroll-width: length, scroll-height: length, padding: length);
+    callback viewport-changed(editor-width: length, editor-height: length, scroll-width: length, scroll-height: length, padding: length, rem: length);
     // A wheel over the stage: deltas in logical pixels as Slint reports them, the cursor in
     // scroll-area coordinates, and the modifiers.
     callback wheel(delta-x: length, delta-y: length, x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    // The pointer over the stage, in scroll-area coordinates, with its modifiers.
+    callback pointer-down(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback pointer-move(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback pointer-up(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback pointer-leave();
     callback zoom-in();
     callback zoom-out();
     callback reset-zoom();

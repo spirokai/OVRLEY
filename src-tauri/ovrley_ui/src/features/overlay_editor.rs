@@ -3,7 +3,9 @@
 
 use crate::hooks::app_store_selectors::set_if_changed;
 use crate::platform::key_input::{key_input, SlintModifiers};
-use crate::{AppWindow, BackgroundMode, OverlayEditor, WidgetView};
+use crate::{AppWindow, BackgroundMode, BadgeView, GuideLabelView, HandleView, OverlayEditor, WidgetView};
+use ovrley_app::features::overlay_editor::geometry::GuideStyle;
+use ovrley_app::features::overlay_editor::interaction::{self, Handle, PointerModifiers};
 use ovrley_app::features::app_shell::EditorBackgroundMode;
 use ovrley_app::features::overlay_editor::{self as editor, viewport::ViewportMetrics, WheelInput};
 use ovrley_app::features::widget_preview::{preview_frame, widget_layer};
@@ -99,6 +101,7 @@ impl Projection {
         set_if_changed(global.get_error(), SharedString::from(error), |value| global.set_error(value));
 
         self.project_widgets(&global, store, display);
+        project_selection(&global, store);
         self.schedule_frame(store);
     }
 
@@ -140,11 +143,107 @@ impl Projection {
     }
 }
 
+fn replace_model<T: Clone + PartialEq + 'static>(current: ModelRc<T>, next: Vec<T>, set: impl FnOnce(ModelRc<T>)) {
+    let same = current.row_count() == next.len() && current.iter().zip(&next).all(|(left, right)| left == *right);
+    if !same {
+        set(ModelRc::new(VecModel::from(next)));
+    }
+}
+
+fn path(segments: impl IntoIterator<Item = ((f64, f64), (f64, f64))>) -> String {
+    segments.into_iter().map(|(from, to)| format!("M {} {} L {} {} ", from.0, from.1, to.0, to.1)).collect::<String>().trim_end().to_string()
+}
+
+/// The selection layer (D12, D13): outlines, handles, the knob line, guides, labels, the marquee
+/// and the badges, in stage pixels.
+fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
+    let metrics = &store.overlay_editor.viewport.metrics;
+    let handle_scale = editor::viewport::handle_scale(metrics);
+    let moveable = 0.75 * handle_scale;
+    let outlines: String = interaction::selection_outlines(store)
+        .iter()
+        .map(|corners| format!("M {} {} L {} {} L {} {} L {} {} Z ", corners[0].0, corners[0].1, corners[1].0, corners[1].1, corners[2].0, corners[2].1, corners[3].0, corners[3].1))
+        .collect();
+    set_if_changed(global.get_selection_commands(), SharedString::from(outlines.trim_end()), |value| global.set_selection_commands(value));
+    let device_pixel = (1.0 / metrics.scale_factor.max(1.0)) as f32;
+    set_if_changed(global.get_border_width(), device_pixel, |value| global.set_border_width(value));
+    set_if_changed(global.get_guide_scale(), moveable as f32, |value| global.set_guide_scale(value));
+    let rem = metrics.rem as f32;
+    set_if_changed(global.get_handle_size(), 0.741 * rem * moveable as f32, |value| global.set_handle_size(value));
+    set_if_changed(global.get_knob_size(), 1.037 * rem * moveable as f32, |value| global.set_knob_size(value));
+
+    let handles = interaction::handles(store);
+    let rotation = interaction::selection_rotation(store);
+    let mut knob_line = String::new();
+    let views: Vec<HandleView> = handles
+        .iter()
+        .map(|(point, handle)| {
+            let stage = interaction::scene_to_stage(store, *point);
+            if *handle == Handle::Rotate {
+                if let Some(top) = interaction::selection_top_middle(store) {
+                    let top = interaction::scene_to_stage(store, top);
+                    knob_line = path([(top, stage)]);
+                }
+            }
+            HandleView { x: stage.0 as f32, y: stage.1 as f32, rotation: rotation as f32, knob: *handle == Handle::Rotate }
+        })
+        .collect();
+    replace_model(global.get_handles(), views, |model| global.set_handles(model));
+    set_if_changed(global.get_knob_line_commands(), SharedString::from(knob_line), |value| global.set_knob_line_commands(value));
+
+    let guides = interaction::current_guides(store);
+    let by_style = |style: GuideStyle| path(guides.iter().filter(|guide| guide.style == style).map(|guide| (interaction::scene_to_stage(store, guide.from), interaction::scene_to_stage(store, guide.to))));
+    set_if_changed(global.get_guides_normal(), SharedString::from(by_style(GuideStyle::Normal)), |value| global.set_guides_normal(value));
+    set_if_changed(global.get_guides_bold(), SharedString::from(by_style(GuideStyle::Bold)), |value| global.set_guides_bold(value));
+    set_if_changed(global.get_guides_dashed(), SharedString::from(by_style(GuideStyle::Dashed)), |value| global.set_guides_dashed(value));
+    let labels: Vec<GuideLabelView> = guides
+        .iter()
+        .filter_map(|guide| {
+            let text = guide.label.clone()?;
+            let middle = interaction::scene_to_stage(store, ((guide.from.0 + guide.to.0) / 2.0, (guide.from.1 + guide.to.1) / 2.0));
+            Some(GuideLabelView { x: middle.0 as f32, y: middle.1 as f32, text: text.into(), vertical: guide.from.0 == guide.to.0 })
+        })
+        .collect();
+    replace_model(global.get_guide_labels(), labels, |model| global.set_guide_labels(model));
+
+    let marquee = interaction::marquee_rect(store);
+    set_if_changed(global.get_marquee_shown(), marquee.is_some(), |value| global.set_marquee_shown(value));
+    if let Some(rect) = marquee {
+        global.set_marquee_x(rect.left as f32);
+        global.set_marquee_y(rect.top as f32);
+        global.set_marquee_width(rect.width as f32);
+        global.set_marquee_height(rect.height as f32);
+    }
+    let badges: Vec<BadgeView> = interaction::badges(store)
+        .into_iter()
+        .map(|badge| BadgeView {
+            x: badge.left as f32,
+            y: badge.top as f32,
+            rotation: badge.rotation as f32,
+            label: ovrley_app::lib::widget::widget_type_name(&badge.kind, store.i18n.language).into(),
+        })
+        .collect();
+    replace_model(global.get_badges(), badges, |model| global.set_badges(model));
+    set_if_changed(global.get_over_widget(), store.overlay_editor.hovered_widget_id.is_some(), |value| global.set_over_widget(value));
+}
+
+fn modifiers(alt: bool, control: bool, shift: bool, meta: bool) -> PointerModifiers {
+    // The browser's `ctrlKey` and `metaKey`, as the key adapter maps them per platform.
+    let input = key_input("", SlintModifiers { alt, control, shift, meta }, false, cfg!(target_os = "macos"));
+    PointerModifiers { shift: input.shift, ctrl: input.ctrl, meta: input.meta, alt: input.alt }
+}
+
+/// Scroll-area coordinates to stage coordinates.
+fn stage_point(store: &Store, x: f32, y: f32) -> (f64, f64) {
+    let viewport = &store.overlay_editor.viewport;
+    (f64::from(x) + viewport.scroll_x, f64::from(y) + viewport.scroll_y)
+}
+
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let global = window.global::<OverlayEditor>();
     let dispatch = dispatcher.handle();
     let weak = window.as_weak();
-    global.on_viewport_changed(move |editor_width, editor_height, scroll_width, scroll_height, padding| {
+    global.on_viewport_changed(move |editor_width, editor_height, scroll_width, scroll_height, padding, rem| {
         let scale_factor = weak.upgrade().map_or(1.0, |window| f64::from(window.window().scale_factor()));
         let metrics = ViewportMetrics {
             editor_width: f64::from(editor_width),
@@ -153,6 +252,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             scroll_height: f64::from(scroll_height),
             padding: f64::from(padding),
             scale_factor,
+            rem: f64::from(rem),
         };
         dispatch.dispatch(move |store, _| {
             if store.overlay_editor.viewport.metrics != metrics {
@@ -172,6 +272,32 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         };
         dispatch.dispatch(move |store, _| editor::handle_wheel(store, &input, wheel));
     });
+    let dispatch = dispatcher.handle();
+    global.on_pointer_down(move |x, y, alt, control, shift, meta| {
+        let modifiers = modifiers(alt, control, shift, meta);
+        dispatch.dispatch(move |store, _| {
+            let point = stage_point(store, x, y);
+            interaction::pointer_down(store, point, modifiers);
+        });
+    });
+    let dispatch = dispatcher.handle();
+    global.on_pointer_move(move |x, y, alt, control, shift, meta| {
+        let modifiers = modifiers(alt, control, shift, meta);
+        dispatch.dispatch(move |store, _| {
+            let point = stage_point(store, x, y);
+            interaction::pointer_move(store, point, modifiers);
+        });
+    });
+    let dispatch = dispatcher.handle();
+    global.on_pointer_up(move |x, y, alt, control, shift, meta| {
+        let modifiers = modifiers(alt, control, shift, meta);
+        dispatch.dispatch(move |store, _| {
+            let point = stage_point(store, x, y);
+            interaction::pointer_up(store, point, modifiers);
+        });
+    });
+    let dispatch = dispatcher.handle();
+    global.on_pointer_leave(move || dispatch.dispatch(interaction::pointer_leave_action));
     let dispatch = dispatcher.handle();
     global.on_zoom_in(move || dispatch.dispatch(|store, _| editor::set_zoom(store, step_zoom(store, true), None)));
     let dispatch = dispatcher.handle();

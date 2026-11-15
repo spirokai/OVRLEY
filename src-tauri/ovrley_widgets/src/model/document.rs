@@ -217,8 +217,9 @@ impl OverlayConfig {
         for (widget_id, patch) in updates {
             let (collection, index) = next.find_widget(widget_id)?;
             let widgets = next.collection_mut(collection);
-            let mut merged =
-                merge_widget_data(Some(&widgets[index]), &normalize_color_fields(patch));
+            let mut patch = normalize_color_fields(patch);
+            canonical_numbers(&mut patch);
+            let mut merged = merge_widget_data(Some(&widgets[index]), &patch);
             merged.insert("id".into(), Value::String(widget_id.clone()));
             widgets[index] = merged;
         }
@@ -340,6 +341,24 @@ pub fn number(value: f64) -> Value {
     } else {
         Value::from(value)
     }
+}
+
+/// Whole floating-point numbers as integers, recursively: JavaScript has one number type, so a
+/// patch from a Rust struct (`100.0`) must equal the document's `100`.
+pub fn canonical_numbers(map: &mut Map<String, Value>) {
+    fn visit(value: &mut Value) {
+        match value {
+            Value::Number(current) if current.is_f64() => {
+                if let Some(float) = current.as_f64() {
+                    *value = number(float);
+                }
+            }
+            Value::Object(map) => map.values_mut().for_each(visit),
+            Value::Array(items) => items.iter_mut().for_each(visit),
+            _ => {}
+        }
+    }
+    map.values_mut().for_each(visit);
 }
 
 /// `Math.round`: halves round towards positive infinity.
@@ -1205,6 +1224,14 @@ mod tests {
         );
         assert_eq!(normalize_hex_color("#A0B1C2FF", "#000000"), "#a0b1c2");
         assert!(is_color_field_key("color_primary") && !is_color_field_key("colorful"));
+    }
+
+    #[test]
+    fn edits_store_whole_numbers_as_integers() {
+        let mut document = config(json!({"labels": [{"id": "a", "x": 1}]}));
+        document.update_widgets(&[("a".into(), map(json!({"x": 100.0, "nested": {"y": 2.5, "z": 3.0}})))]).unwrap();
+        assert_eq!(document.labels[0]["x"], json!(100));
+        assert_eq!(document.labels[0]["nested"], json!({"y": 2.5, "z": 3}));
     }
 
     #[test]

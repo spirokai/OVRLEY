@@ -646,6 +646,13 @@ pub fn load_template_document(file: &Value) -> CoreResult<TemplateDocument> {
         &document,
         migrated["settings"]["globalDefaults"].as_object(),
     )?;
+    // The editor sizes its canvas from these; React would show an empty canvas without them.
+    for key in ["width", "height"] {
+        let size = state.config.scene.get(key).and_then(Value::as_f64);
+        if !size.is_some_and(|size| size.is_finite() && size > 0.0) {
+            return Err(invalid(format!("Template scene {key} must be a positive number.")));
+        }
+    }
     Ok(TemplateDocument {
         config: state.config,
         global_defaults: state.global_defaults,
@@ -695,7 +702,10 @@ mod tests {
         normalize_template_config(&document(value), &Map::new())
     }
 
-    fn file(config: Value, globals: Value) -> Value {
+    fn file(mut config: Value, globals: Value) -> Value {
+        if let Some(object) = config.as_object_mut() {
+            object.entry("scene").or_insert(json!({"width": 1920, "height": 1080}));
+        }
         json!({"format": TEMPLATE_FILE_FORMAT, "version": TEMPLATE_FILE_VERSION, "config": config, "settings": {"globalDefaults": globals}})
     }
 
@@ -925,7 +935,7 @@ mod tests {
 
     #[test]
     fn version_2_gains_an_empty_raster_collection_and_version_3_must_have_one() {
-        let loaded = load_template_document(&json!({"format": TEMPLATE_FILE_FORMAT, "version": 2, "config": {"scene": {}}, "settings": {"globalDefaults": {}}})).unwrap();
+        let loaded = load_template_document(&json!({"format": TEMPLATE_FILE_FORMAT, "version": 2, "config": {"scene": {"width": 1920, "height": 1080}}, "settings": {"globalDefaults": {}}})).unwrap();
         assert!(loaded.config.rasters.is_empty());
         let error = load_error(
             json!({"format": TEMPLATE_FILE_FORMAT, "version": 2, "config": {"rasters": []}, "settings": {"globalDefaults": {}}}),
@@ -1078,6 +1088,12 @@ mod tests {
             !state.config.values[1].contains_key("display_unit"),
             "a non-string unit is not persisted"
         );
+    }
+
+    #[test]
+    fn a_scene_without_a_size_fails() {
+        let error = load_error(file(json!({"scene": {"width": 1920}, "rasters": []}), json!({})));
+        assert!(error.contains("Template scene height must be a positive number."), "{error}");
     }
 
     #[test]

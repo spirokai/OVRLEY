@@ -10,11 +10,10 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 ovrley_app = { path = "../ovrley_app", features = ["schema"] }
+ovrley_widgets = { path = "../ovrley_widgets" }
 interprocess = "2"
 log = "0.4"
 schemars = "1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-[dev-dependencies]
-ovrley_widgets = { path = "../ovrley_widgets" }

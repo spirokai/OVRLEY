@@ -141,12 +141,12 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let keys = dispatcher.clone();
     shell.on_app_key(move |text, alt, control, shift, meta, repeat| {
         let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, repeat, cfg!(target_os = "macos"));
-        keys.dispatch_with_result(move |store, services| app_shell::handle_app_key(store, services, &input)).unwrap_or(false)
+        keys.dispatch_with_result(move |store, services| app_shell::handle_window_key(store, services, &input)).unwrap_or(false)
     });
     let keys = dispatcher.clone();
     shell.on_capture_key(move |text, alt, control, shift, meta, repeat| {
         let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, repeat, cfg!(target_os = "macos"));
-        keys.dispatch_with_result(move |store, _| ovrley_app::features::toolbar::handle_drawer_capture_key(store, &input)).unwrap_or(false)
+        keys.dispatch_with_result(move |store, _| app_shell::handle_window_capture_key(store, &input)).unwrap_or(false)
     });
 
     let dispatch = dispatcher.handle();

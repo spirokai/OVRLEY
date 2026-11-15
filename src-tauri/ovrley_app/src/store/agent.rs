@@ -87,6 +87,43 @@ pub fn describe_template(store: &Store) -> Value {
     })
 }
 
+/// The document's widgets, as agents read them: id, type, name, position and whether selected.
+pub fn describe_widgets(store: &Store) -> Value {
+    let widgets: Vec<Value> = crate::lib::widget::build_config_widgets(&store.editor.config)
+        .into_iter()
+        .map(|widget| {
+            json!({
+                "id": widget.id,
+                "type": widget.kind,
+                "name": crate::lib::widget::group_widgets_for_sidebar(std::slice::from_ref(&widget), crate::i18n::Locale::En)[0].name,
+                "x": widget.data.get("x"),
+                "y": widget.data.get("y"),
+                "selected": store.editor.selected_widget_ids.contains(&widget.id),
+            })
+        })
+        .collect();
+    Value::Array(widgets)
+}
+
+/// One widget for `widget_get`: its durable data, its presented content rectangle, and the fields
+/// its type takes (the catalog's config keys).
+pub fn describe_widget(store: &Store, widget_id: &str) -> Result<Value, String> {
+    let data = store.editor.config.widget(widget_id)?;
+    let (collection, _) = store.editor.config.find_widget(widget_id)?;
+    let kind = collection.widget_type(data)?;
+    let definition = ovrley_widgets::model::catalog::catalog().require_widget(&kind)?;
+    let content = crate::features::overlay_editor::interaction::content_rect(store, widget_id)
+        .map(|rect| json!({"left": rect.left, "top": rect.top, "width": rect.width, "height": rect.height}));
+    Ok(json!({
+        "id": widget_id,
+        "type": kind,
+        "data": data,
+        "content": content,
+        "fields": definition.config_keys,
+        "displayTypes": definition.display_types,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

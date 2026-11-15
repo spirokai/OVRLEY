@@ -130,6 +130,18 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
     }
 }
 
+/// A key no focused control used, through the window's scopes in turn: app, history, editor.
+pub fn handle_window_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
+    handle_app_key(store, services, input)
+        || crate::features::overlay_editor::keyboard::handle_history_key(store, input)
+        || crate::features::overlay_editor::keyboard::handle_editor_key(store, input)
+}
+
+/// The capture phase (D14): the drawer's Escape rule, then an active gesture's cancel.
+pub fn handle_window_capture_key(store: &mut Store, input: &KeyInput) -> bool {
+    crate::features::toolbar::handle_drawer_capture_key(store, input) || crate::features::overlay_editor::keyboard::handle_capture_key(store, input)
+}
+
 /// What a dropped file is, by extension, using the lists the file dialogs use.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DropKind {

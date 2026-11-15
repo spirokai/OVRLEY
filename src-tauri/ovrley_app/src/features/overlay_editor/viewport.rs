@@ -29,6 +29,8 @@ pub struct ViewportMetrics {
     pub padding: f64,
     /// Device pixels per logical pixel (`devicePixelRatio`).
     pub scale_factor: f64,
+    /// The root font size in logical pixels, which the handle sizes follow.
+    pub rem: f64,
 }
 
 /// The scroll offsets and the measurements they are clamped to.
@@ -184,6 +186,7 @@ mod tests {
             scroll_height: 624.0,
             padding: 16.0,
             scale_factor: 2.0,
+            rem: 16.0,
         }
     }
 

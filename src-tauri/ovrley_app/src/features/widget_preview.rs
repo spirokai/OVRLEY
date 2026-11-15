@@ -339,6 +339,28 @@ impl PreviewHost {
         self.session.widgets[&handle].pixels()
     }
 
+    /// `PreviewSession::resize_widget` for one widget: the Rust resize policy turns a size or factor
+    /// and a fixed anchor into the widget's data patch. Profiles and maps measure their prepared
+    /// vectors, so their request names their handle.
+    pub fn resize_widget(&mut self, widget_id: &str, mut request: Map<String, Value>) -> Result<Map<String, Value>, String> {
+        let kind = request.get("type").and_then(Value::as_str).unwrap_or_default().to_string();
+        if matches!(kind.as_str(), "course" | "elevation" | "diving_profile" | "map") {
+            let handle = self.instances.get(widget_id).map(|instance| instance.handle).ok_or_else(|| format!("{widget_id} has not rendered yet"))?;
+            request.insert("handle".into(), Value::from(handle));
+        }
+        let request = serde_json::from_value(Value::Object(request)).map_err(|error| error.to_string())?;
+        let update = self.session.resize_widget(request).map_err(|error| error.to_string())?;
+        match serde_json::to_value(update).map_err(|error| error.to_string())? {
+            Value::Object(patch) => Ok(patch),
+            other => Err(format!("a resize answered {other}")),
+        }
+    }
+
+    /// The scene of a widget's last request, which a resize starts from.
+    pub fn request_scene(&self, widget_id: &str) -> Option<&Value> {
+        self.instances.get(widget_id).map(|instance| &instance.request["scene"])
+    }
+
     /// The editor never grid-fits text, so resizing scales it continuously.
     fn new_session(&mut self) {
         self.session = PreviewSession::default();

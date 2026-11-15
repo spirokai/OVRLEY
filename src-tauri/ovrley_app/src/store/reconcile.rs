@@ -13,6 +13,7 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     toolbar::persist_drawer_preference(store, services);
     // 2. `useWidgetDraftState`'s reset: a new document clears the drafts, and a new document or
     //    selection ends the gesture's patches (D7).
+    overlay_editor::interaction::reconcile_gesture(store);
     overlay_editor::drafts::reconcile_widget_drafts(store);
     // 3. The durable template state behind the save status, cached by pointers.
     crate::features::template_manager::reconcile_durable_state(store);

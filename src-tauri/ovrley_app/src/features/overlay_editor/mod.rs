@@ -3,12 +3,18 @@
 //! keyboard scope (D14).
 
 pub mod drafts;
+pub mod geometry;
+pub mod interaction;
+pub mod keyboard;
 pub mod viewport;
 
 use crate::lib::keyboard_shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
 use crate::store::Store;
 use serde_json::Value;
 use viewport::{next_wheel_zoom, EditorViewport, StageLayout, ViewportMetrics};
+
+/// A widget's data with its collection, as the editor's clipboard holds it.
+pub type PreviewWidgetData = (ovrley_widgets::model::document::Collection, ovrley_widgets::model::document::WidgetData);
 
 /// `CANVAS_BACKGROUND_COLORS`, for the modes Phase 3 has.
 pub fn canvas_background_color(mode: crate::features::app_shell::EditorBackgroundMode) -> &'static str {
@@ -54,14 +60,22 @@ pub fn grid_commands(scene: (f64, f64), display_scale: f64) -> String {
 #[derive(Debug, Default)]
 pub struct OverlayEditorState {
     pub viewport: EditorViewport,
+    /// What the pointer is doing: nothing, a marquee or a transform.
+    pub pointer: interaction::PointerState,
+    /// The widget under the pointer.
+    pub hovered_widget_id: Option<String>,
+    /// `clipboardRef`: copied widgets with their collections, local to the editor.
+    pub clipboard: Vec<PreviewWidgetData>,
 }
 
 impl OverlayEditorState {
     /// Whether the preview may reuse a widget's cached pixels at a fractional position: it is
-    /// being dragged, or a profile is being resized (`interaction.isDragging`, `isResizing`). The
-    /// transform arrives later in Phase 3.
-    pub fn is_transient(&self, _widget_id: &str, _kind: &str) -> bool {
-        false
+    /// being dragged, or a profile is being resized (`interaction.isDragging`, `isResizing`).
+    pub fn is_transient(&self, widget_id: &str, kind: &str) -> bool {
+        match &self.pointer {
+            interaction::PointerState::Gesture(gesture) => gesture.is_transient(widget_id, kind),
+            _ => false,
+        }
     }
 }
 
@@ -155,6 +169,7 @@ mod tests {
                 scroll_height: 1104.0,
                 padding: 16.0,
                 scale_factor: 2.0,
+                rem: 16.0,
             },
         );
         store
