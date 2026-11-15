@@ -82,6 +82,13 @@ opt-level = 3
 [profile.dev.package.ovrley_widgets]
 opt-level = 3
 
+# wgpu-core's debug lock tracing keeps a thread-local; the native app's shared device is dropped
+# from Slint's own thread-local at exit, after that one is gone, and the process aborts on quit.
+[profile.dev.package.wgpu-core]
+debug-assertions = false
+
 # Dependency debug symbols dominate target/debug (~14 GB) and are not needed to debug this app.
+# Dependencies are optimised so Skia, wgpu and Slint stay fast while our crates rebuild quickly.
 [profile.dev.package."*"]
 debug = false
+opt-level = 2

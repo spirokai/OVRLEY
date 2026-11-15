@@ -11,9 +11,24 @@ license = "GPL-3.0-or-later"
 [features]
 # Exports the component showcase and the test harness windows.
 dev-windows = []
+# Dev only (`pnpm dev:native:live`, with SLINT_LIVE_PREVIEW=1): saving a .slint file reloads the
+# UI inside the running app. Never in release builds.
+live-preview = ["slint/live-preview"]
+
+[[bin]]
+# Packaging renames it in Phase 9.
+name = "ovrley"
+path = "src/main.rs"
 
 [dependencies]
 ovrley_app = { path = "../ovrley_app" }
+ovrley_services = { path = "../ovrley_services" }
+arboard = { version = "3.7", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png"] }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
+log = "0.4"
+pollster = "0.4"
+rfd = "0.16"
 slint = { version = "=1.18.1", default-features = false, features = [
   "std",
   "compat-1-2",
@@ -21,11 +36,24 @@ slint = { version = "=1.18.1", default-features = false, features = [
   "renderer-skia",
   "accessibility",
   "unstable-wgpu-30",
+  "unstable-winit-030",
+  "raw-window-handle-06",
 ] }
 
 # Not used directly. Slint's Skia renderer depends on it; `no-compile` makes a missing
 # prebuilt binary fail the build instead of compiling Skia, also when this crate builds alone.
 skia-safe = { version = "=0.153.3", features = ["binary-cache", "no-compile"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "objc2-core-foundation",
+  "NSResponder",
+  "NSView",
+  "NSWindow",
+  "NSButton",
+  "NSControl",
+] }
 
 [build-dependencies]
 slint-build = "=1.18.1"
@@ -33,7 +61,6 @@ slint-build = "=1.18.1"
 [dev-dependencies]
 i-slint-backend-testing = "=1.18.1"
 iconify = "=0.3.1"
-image = { version = "0.25", default-features = false, features = ["png"] }
 regex = "1"
 serde_json = "1.0"
 

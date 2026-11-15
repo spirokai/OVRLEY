@@ -13,6 +13,7 @@ mod reconcile;
 pub mod services;
 pub mod slices;
 
+use crate::features::app_shell::{AppBootstrapState, TrafficLightInsetState, WindowCloseGuardState};
 use crate::features::toolbar::DrawerPreferenceState;
 use crate::i18n::I18nState;
 use crate::lib::preferences_store::PreferencesStore;
@@ -31,6 +32,9 @@ pub struct Store {
     pub i18n: I18nState,
     /// `useDrawerPreference`'s last observed preference.
     pub drawer_preference: DrawerPreferenceState,
+    pub bootstrap: AppBootstrapState,
+    pub close_guard: WindowCloseGuardState,
+    pub traffic_light_inset: TrafficLightInsetState,
 }
 
 impl Store {
@@ -80,6 +84,13 @@ impl DispatchHandle {
     pub fn dispatch(&self, action: impl FnOnce(&mut Store, &mut Services) + 'static) {
         if let Some(shared) = self.0.upgrade() {
             Dispatcher(shared).dispatch(action);
+        }
+    }
+
+    /// Writes pending preferences out, if the dispatcher still exists.
+    pub fn flush_preferences(&self) {
+        if let Some(shared) = self.0.upgrade() {
+            Dispatcher(shared).flush_preferences();
         }
     }
 }

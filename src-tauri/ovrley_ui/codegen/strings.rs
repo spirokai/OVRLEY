@@ -144,6 +144,9 @@ fn keys_by_namespace(english_json: &str) -> BTreeMap<String, Vec<Key>> {
         serde_json::from_str(english_json).expect("en-translation.json is valid JSON");
     let mut entries = Vec::new();
     flatten("", &catalog, &mut entries);
+    // Sorted, so the output does not depend on whether a build enables serde_json's
+    // `preserve_order` (feature unification decides that, not this crate).
+    entries.sort();
     for (key, default) in CODE_DEFAULTS {
         assert!(
             !entries.iter().any(|(existing, _)| existing == key),

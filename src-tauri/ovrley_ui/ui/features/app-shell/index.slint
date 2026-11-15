@@ -1,0 +1,10 @@
+// The app-shell feature's global (D5): the properties its projection writes and the callbacks
+// `src/features/app_shell.rs` binds to dispatches. Only the shell's composition components read it.
+export global AppShell {
+    // `useAppBootstrap`: the startup screen shows until the drawer is hydrated and startup work ran.
+    in property <bool> show-startup-screen: true;
+    // A startup failure once the window exists (a malformed `lng`), shown as a full-window page.
+    in property <string> startup-error;
+    // `useTrafficLightInset`: macOS, and the window is not fullscreen.
+    in property <bool> traffic-light-inset;
+}
