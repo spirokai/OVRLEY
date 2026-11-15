@@ -25,6 +25,7 @@
     "processingYourActivity": "Activiteit verwerken..."
   },
   "app-shell": {
+    "dropFilesToImport": "Zet bestanden neer om te importeren",
     "backendOffline": "Backend offline",
     "blackBackground": "Zwarte achtergrond",
     "checkeredBackground": "Geruite achtergrond",

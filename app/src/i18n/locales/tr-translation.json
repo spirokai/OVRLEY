@@ -25,6 +25,7 @@
     "processingYourActivity": "Etkinliğiniz işleniyor..."
   },
   "app-shell": {
+    "dropFilesToImport": "İçe aktarmak için dosyaları bırakın",
     "backendOffline": "Arka uç çevrim dışı",
     "blackBackground": "Siyah arka plan",
     "checkeredBackground": "Damalı arka plan",

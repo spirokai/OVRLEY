@@ -25,6 +25,7 @@
     "processingYourActivity": "Przetwarzanie aktywności..."
   },
   "app-shell": {
+    "dropFilesToImport": "Upuść pliki, aby je zaimportować",
     "backendOffline": "Backend niedostępny",
     "blackBackground": "Czarne tło",
     "checkeredBackground": "Tło w szachownicę",

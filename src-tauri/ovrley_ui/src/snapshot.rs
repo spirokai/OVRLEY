@@ -12,13 +12,14 @@ use std::time::Duration;
 
 /// One state of the tour: its name and the action that sets it up. A `None` action toggles native
 /// full screen instead (macOS: the header's inset follows AppKit's notifications).
-type Step = (&'static str, Option<fn(&mut Store, &mut Services)>);
+type Step = (&'static str, Option<StepAction>);
+type StepAction = fn(&mut Store, &mut Services);
 
 fn tour() -> Vec<Step> {
     use ovrley_app::features::app_shell::SettingsSection;
     use ovrley_app::i18n::{change_language_preference, Locale};
     use ovrley_app::store::slices::layout::LeftDrawerTool;
-    let steps: Vec<(&'static str, fn(&mut Store, &mut Services))> = vec![
+    let steps: Vec<(&'static str, StepAction)> = vec![
         ("shell", |store, _| {
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();

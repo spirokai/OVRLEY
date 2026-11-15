@@ -1,3 +1,4 @@
+import { FocusedField } from "focused-field.slint";
 import { Theme } from "../theme/theme.slint";
 import { AppText } from "app-text.slint";
 import { FocusRing } from "focus-ring.slint";
@@ -50,6 +51,14 @@ export component Input {
     }
     public function select-all() {
         field.select-all();
+    }
+
+    // D19: a press away from the focused field blurs it.
+    property <int> blur-serial: FocusedField.blur-serial;
+    changed blur-serial => {
+        if field.has-focus {
+            field.clear-focus();
+        }
     }
 
     property <bool> inline: root.variant == InputVariant.inline;
@@ -129,6 +138,14 @@ export component Input {
             changed has-focus => {
                 if self.has-focus {
                     root.accepted-text = self.text;
+                    // D19: report where the focused field is.
+                    FocusedField.x = root.absolute-position.x;
+                    FocusedField.y = root.absolute-position.y;
+                    FocusedField.width = root.width;
+                    FocusedField.height = root.height;
+                    FocusedField.active = true;
+                } else {
+                    FocusedField.active = false;
                 }
                 root.focus-changed(self.has-focus);
             }

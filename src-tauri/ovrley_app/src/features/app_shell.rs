@@ -1,5 +1,6 @@
 //! The app-shell feature's hooks: `useAppBootstrap` (its shell part), `useEditorShellState` (its
-//! shell fields), `useWindowCloseGuard` and `useTrafficLightInset`; and `getKeyboardShortcutGroups`.
+//! shell fields), `useWindowCloseGuard` and `useTrafficLightInset`; `getKeyboardShortcutGroups`;
+//! and the window-wide file drop (plan D10).
 //!
 //! React keeps each in a hook's state; here each is a struct in the [`Store`], named after its
 //! hook, and its actions are methods on it (plan D1, D2).
@@ -97,6 +98,124 @@ pub fn handle_app_key(store: &mut Store, input: &KeyInput) -> bool {
             true
         }
         _ => false,
+    }
+}
+
+/// What a dropped file is, by extension, using the lists the file dialogs use.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DropKind {
+    // In import order: a template first, then the activity, then the video.
+    Template,
+    Activity,
+    Video,
+    Project,
+}
+
+impl DropKind {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Template => "template",
+            Self::Activity => "activity",
+            Self::Video => "video",
+            Self::Project => "project",
+        }
+    }
+}
+
+const ACTIVITY_EXTENSIONS: [&str; 10] = ["gpx", "fit", "tcx", "srt", "igc", "csv", "vbo", "uddf", "ssrf", "xml"];
+const VIDEO_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
+/// Background images, in debug builds only, as the video import accepts them today.
+const DEBUG_IMAGE_EXTENSIONS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
+
+/// A dropped path, as the platform layer saw it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DroppedPath {
+    pub path: std::path::PathBuf,
+    pub is_dir: bool,
+}
+
+/// One import a drop runs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DropImport {
+    pub kind: DropKind,
+    pub path: std::path::PathBuf,
+}
+
+fn classify(dropped: &DroppedPath, debug: bool) -> Option<DropKind> {
+    if dropped.is_dir {
+        return None;
+    }
+    // Case-insensitive, as `caseInsensitiveFilters` makes the file dialogs.
+    let extension = dropped.path.extension()?.to_str()?.to_ascii_lowercase();
+    let extension = extension.as_str();
+    if ACTIVITY_EXTENSIONS.contains(&extension) {
+        Some(DropKind::Activity)
+    } else if VIDEO_EXTENSIONS.contains(&extension) || (debug && DEBUG_IMAGE_EXTENSIONS.contains(&extension)) {
+        Some(DropKind::Video)
+    } else if extension == "oly" {
+        Some(DropKind::Project)
+    } else if extension == "json" {
+        Some(DropKind::Template)
+    } else {
+        None
+    }
+}
+
+/// `route_dropped_files` (Q1): the imports one drop runs, in order, or the one error it shows.
+/// At most one file of each kind; a project must be alone, because opening it replaces everything;
+/// a directory or any other file imports nothing. The wording is English, like today's drop errors.
+pub fn route_dropped_files(paths: &[DroppedPath], debug: bool) -> Result<Vec<DropImport>, String> {
+    let mut imports: Vec<DropImport> = Vec::with_capacity(paths.len());
+    for dropped in paths {
+        let name = dropped.path.file_name().map_or_else(|| dropped.path.display().to_string(), |name| name.to_string_lossy().into_owned());
+        let kind = classify(dropped, debug).ok_or_else(|| format!("Drop failed: {name} cannot be imported."))?;
+        if imports.iter().any(|import| import.kind == kind) {
+            return Err(format!("Drop failed: Drop at most one {} file.", kind.name()));
+        }
+        imports.push(DropImport {
+            kind,
+            path: dropped.path.clone(),
+        });
+    }
+    if imports.len() > 1 && imports.iter().any(|import| import.kind == DropKind::Project) {
+        return Err("Drop failed: Drop a project file on its own.".into());
+    }
+    imports.sort_by_key(|import| import.kind);
+    Ok(imports)
+}
+
+/// The window-wide file drag (D10): a file hovers the window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct WindowFileDropState {
+    pub hovering: bool,
+}
+
+/// Drops are ignored, and the overlay does not show, while a modal dialog is open or the startup
+/// screen shows.
+pub fn accepts_file_drops(store: &Store) -> bool {
+    !store.editor_shell.settings_open && !AppBootstrapState::shows_startup_screen(store)
+}
+
+pub fn set_file_drag_hovering(store: &mut Store, hovering: bool) {
+    store.file_drop.hovering = hovering && accepts_file_drops(store);
+}
+
+/// One drop, however many files. No importer exists in Phase 2, so each kind reports that it
+/// cannot be opened yet; each feature replaces its kind's arm when it lands (activity and template
+/// in Phase 3, video and project in Phase 6).
+pub fn drop_files(store: &mut Store, paths: &[DroppedPath]) {
+    store.file_drop.hovering = false;
+    if !accepts_file_drops(store) {
+        return;
+    }
+    match route_dropped_files(paths, cfg!(debug_assertions)) {
+        Err(message) => store.media.set_error_message(message),
+        Ok(imports) => {
+            if let Some(import) = imports.first() {
+                let kind = import.kind.name();
+                store.media.set_error_message(format!("Drop failed: {kind} files cannot be opened yet."));
+            }
+        }
     }
 }
 
@@ -416,5 +535,81 @@ mod tests {
         // "allows modified shell commands in inputs").
         let mut store = Store::default();
         assert!(handle_app_key(&mut store, &alt("w")));
+    }
+
+    fn dropped(paths: &[&str]) -> Vec<DroppedPath> {
+        paths
+            .iter()
+            .map(|path| DroppedPath {
+                path: (*path).into(),
+                is_dir: path.ends_with('/'),
+            })
+            .collect()
+    }
+
+    fn kinds(paths: &[&str], debug: bool) -> Result<Vec<DropKind>, String> {
+        route_dropped_files(&dropped(paths), debug).map(|imports| imports.into_iter().map(|import| import.kind).collect())
+    }
+
+    #[test]
+    fn classifies_every_extension_in_both_cases() {
+        for extension in ACTIVITY_EXTENSIONS {
+            assert_eq!(kinds(&[&format!("/a/ride.{extension}")], false), Ok(vec![DropKind::Activity]));
+            assert_eq!(kinds(&[&format!("/a/ride.{}", extension.to_uppercase())], false), Ok(vec![DropKind::Activity]));
+        }
+        for extension in VIDEO_EXTENSIONS {
+            assert_eq!(kinds(&[&format!("/a/CLIP.{}", extension.to_uppercase())], false), Ok(vec![DropKind::Video]));
+        }
+        assert_eq!(kinds(&["/a/Race.OLY"], false), Ok(vec![DropKind::Project]));
+        assert_eq!(kinds(&["/a/theme.Json"], false), Ok(vec![DropKind::Template]));
+    }
+
+    #[test]
+    fn mixed_drops_run_template_then_activity_then_video() {
+        assert_eq!(
+            kinds(&["/a/clip.mp4", "/a/ride.fit", "/a/look.json"], false),
+            Ok(vec![DropKind::Template, DropKind::Activity, DropKind::Video])
+        );
+    }
+
+    #[test]
+    fn two_files_of_one_kind_import_nothing() {
+        assert_eq!(kinds(&["/a/one.fit", "/a/two.gpx"], false), Err("Drop failed: Drop at most one activity file.".into()));
+    }
+
+    #[test]
+    fn a_project_must_be_alone() {
+        assert_eq!(kinds(&["/a/race.oly", "/a/ride.fit"], false), Err("Drop failed: Drop a project file on its own.".into()));
+    }
+
+    #[test]
+    fn directories_and_other_files_are_unsupported() {
+        assert_eq!(kinds(&["/a/folder.fit/"], false), Err("Drop failed: folder.fit cannot be imported.".into()));
+        assert_eq!(kinds(&["/a/ride.fit", "/a/notes.txt"], false), Err("Drop failed: notes.txt cannot be imported.".into()));
+        assert_eq!(kinds(&["/a/README"], false), Err("Drop failed: README cannot be imported.".into()));
+    }
+
+    #[test]
+    fn images_are_backgrounds_in_debug_builds_only() {
+        assert_eq!(kinds(&["/a/bg.PNG"], true), Ok(vec![DropKind::Video]));
+        assert!(kinds(&["/a/bg.png"], false).is_err());
+    }
+
+    #[test]
+    fn drops_are_ignored_behind_a_dialog_and_the_startup_screen() {
+        let mut store = Store::default();
+        set_file_drag_hovering(&mut store, true);
+        assert!(!store.file_drop.hovering, "the startup screen shows");
+        store.bootstrap.set_startup_ready();
+        store.layout.initialize_left_drawer(Default::default());
+        set_file_drag_hovering(&mut store, true);
+        assert!(store.file_drop.hovering);
+        store.editor_shell.open_settings();
+        drop_files(&mut store, &dropped(&["/a/notes.txt"]));
+        assert_eq!(store.media.error_message, None);
+        assert!(!store.file_drop.hovering);
+        store.editor_shell.close_settings();
+        drop_files(&mut store, &dropped(&["/a/ride.fit"]));
+        assert_eq!(store.media.error_message.as_deref(), Some("Drop failed: activity files cannot be opened yet."));
     }
 }

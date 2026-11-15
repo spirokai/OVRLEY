@@ -25,6 +25,7 @@
     "processingYourActivity": "Bearbetar aktiviteten..."
   },
   "app-shell": {
+    "dropFilesToImport": "Släpp filer för att importera",
     "backendOffline": "Backend otillgänglig",
     "blackBackground": "Svart bakgrund",
     "checkeredBackground": "Schackrutig bakgrund",

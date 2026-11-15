@@ -1,12 +1,17 @@
 import { FluidWindow } from "../../ui/theme/fluid-window.slint";
 import { BlurInput } from "../../ui/components/blur-input.slint";
+import { Button } from "../../ui/components/button.slint";
 
-// The BlurInput test harness: one field labelled "FPS" whose committed value the test sets.
+// The BlurInput test harness: a field labelled "FPS" whose committed value the test sets, and for
+// the press-away blur (D19) a second field and a button.
 export component BlurInputHarness inherits FluidWindow {
     width: 1100px;
     height: 720px;
     in-out property <string> value: "30";
     in-out property <int> commit-count;
+    in-out property <string> second-value: "8";
+    in-out property <int> second-commit-count;
+    out property <bool> button-focused: probe.has-focus;
 
     VerticalLayout {
         alignment: start;
@@ -16,6 +21,19 @@ export component BlurInputHarness inherits FluidWindow {
             value: root.value;
             changed(v) => {
                 root.commit-count += 1;
+            }
+        }
+        BlurInput {
+            label: "Bitrate";
+            value: root.second-value;
+            changed(v) => {
+                root.second-commit-count += 1;
+            }
+        }
+        HorizontalLayout {
+            alignment: start;
+            probe := Button {
+                text: "Probe";
             }
         }
     }

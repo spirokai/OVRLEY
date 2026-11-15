@@ -110,6 +110,8 @@ export component Icon {
     in property <string> glyph;
     in property <length> size: 1rem;
     in property <color> color: Theme.foreground;
+    // lucide's stroke width on the 24 grid.
+    in property <float> stroke: 2;
     width: root.size;
     min-height: root.size;
     preferred-height: root.size;
@@ -125,7 +127,7 @@ export component Icon {
         commands: root.glyph;
         fill: transparent;
         stroke: root.color;
-        stroke-width: root.size * 2 / 24;
+        stroke-width: root.size * root.stroke / 24;
         stroke-line-cap: round;
         stroke-line-join: round;
     }

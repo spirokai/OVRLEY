@@ -25,6 +25,7 @@
     "processingYourActivity": "正在处理活动..."
   },
   "app-shell": {
+    "dropFilesToImport": "拖放文件以导入",
     "backendOffline": "后端不可用",
     "blackBackground": "黑色背景",
     "checkeredBackground": "棋盘格背景",

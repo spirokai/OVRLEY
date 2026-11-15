@@ -25,6 +25,7 @@
     "processingYourActivity": "Обработка активности..."
   },
   "app-shell": {
+    "dropFilesToImport": "Перетащите файлы для импорта",
     "backendOffline": "Бэкенд недоступен",
     "blackBackground": "Чёрный фон",
     "checkeredBackground": "Шахматный фон",

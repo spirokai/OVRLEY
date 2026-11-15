@@ -25,6 +25,7 @@
     "processingYourActivity": "Zpracování aktivity..."
   },
   "app-shell": {
+    "dropFilesToImport": "Přetáhněte soubory k importu",
     "backendOffline": "Backend není dostupný",
     "blackBackground": "Černé pozadí",
     "checkeredBackground": "Šachovnicové pozadí",

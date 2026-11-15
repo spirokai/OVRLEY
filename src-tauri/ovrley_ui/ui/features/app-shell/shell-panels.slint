@@ -1,6 +1,6 @@
 import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
-import { Icons } from "../../components/icons.slint";
+import { Icon, Icons } from "../../components/icons.slint";
 import { TabsList, TabsContent, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
 
@@ -111,6 +111,48 @@ export component StartupError inherits Rectangle {
             wrap: word-wrap;
             accessible-role: AccessibleRole.text;
             accessible-live-region: assertive;
+        }
+    }
+}
+
+// The window-wide drop overlay (D10, Q2): `FileDropZone`'s hover state scaled to the window. A
+// `surface-overlay` scrim at 70%, then a zone inset 1rem with a `primary` border on
+// `surface-accent-soft` at 30%, the file icon and the label. It takes no input: the drop arrives
+// through winit, not through Slint. Slint has no dashed borders, so the border is solid (review).
+export component FileDropOverlay inherits Rectangle {
+    in property <bool> shown;
+    opacity: root.shown ? 1 : 0;
+    visible: self.opacity > 0;
+    animate opacity { duration: Theme.duration-150; easing: ease-out; }
+    background: Theme.surface-overlay.transparentize(0.3);
+
+    Rectangle {
+        x: 1rem;
+        y: 1rem;
+        width: parent.width - 2rem;
+        height: parent.height - 2rem;
+        border-radius: Theme.radius-xs * 1rem;
+        border-width: 1px;
+        border-color: Theme.primary;
+        background: Theme.surface-accent-soft.transparentize(0.7);
+        VerticalLayout {
+            alignment: center;
+            spacing: 0.5rem;
+            HorizontalLayout {
+                alignment: center;
+                Icon {
+                    glyph: Icons.file-up;
+                    size: 2.5rem;
+                    stroke: 1.5;
+                    color: Theme.primary;
+                }
+            }
+            AppText {
+                content: @tr("app-shell.dropFilesToImport" => "Drop files to import");
+                horizontal-alignment: center;
+                font-size: Theme.text-sm * 1rem;
+                font-weight: Theme.font-weight-extrabold;
+            }
         }
     }
 }

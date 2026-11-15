@@ -5598,6 +5598,7 @@ dependencies = [
  "i-slint-backend-testing",
  "iconify",
  "image",
+ "libc",
  "log",
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
@@ -5611,6 +5612,8 @@ dependencies = [
  "skia-safe",
  "slint",
  "slint-build",
+ "wayland-backend",
+ "wayland-client",
 ]
 
 [[package]]

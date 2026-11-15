@@ -25,6 +25,7 @@
     "processingYourActivity": "활동 처리 중..."
   },
   "app-shell": {
+    "dropFilesToImport": "가져올 파일을 놓으세요",
     "backendOffline": "백엔드 오프라인",
     "blackBackground": "검은색 배경",
     "checkeredBackground": "체크무늬 배경",

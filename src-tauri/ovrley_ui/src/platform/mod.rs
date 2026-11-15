@@ -3,6 +3,9 @@
 
 pub mod gpu;
 pub mod key_input;
+#[cfg(target_os = "linux")]
+pub mod wayland_drop;
+pub mod window_events;
 #[cfg(target_os = "macos")]
 pub mod macos;
 
@@ -11,7 +14,6 @@ use gpu::{GpuChoice, GpuDevice};
 use ovrley_app::store::services::{Clipboard, DialogReply, Dialogs, FileDialogRequest, UiPost, WindowControl};
 use ovrley_app::store::{DispatchHandle, SendAction};
 use slint::winit_030::winit;
-use slint::winit_030 as winit_handler;
 use slint::ComponentHandle;
 use std::cell::RefCell;
 
@@ -25,7 +27,7 @@ pub fn select_backend() -> Result<Option<GpuDevice>, String> {
     let selector = slint::BackendSelector::new()
         .backend_name("winit".into())
         .with_winit_window_attributes_hook(window_attributes)
-        .with_winit_custom_application_handler(AppEvents);
+        .with_winit_custom_application_handler(window_events::AppEvents::default());
     let (selector, shared) = match gpu {
         GpuChoice::Shared(device) => {
             let selector = selector.require_wgpu_30(slint::wgpu_30::WGPUConfiguration::Manual {
@@ -100,32 +102,27 @@ fn window_icon() -> Option<winit::window::Icon> {
         .ok()
 }
 
-/// The raw winit events the app needs before Slint routes them. Installed at backend selection,
-/// before the dispatcher exists, so it reaches the app through [`UI_DISPATCH`]. Step 8 adds the
-/// file drops and the press-away blur here.
-struct AppEvents;
-
-impl winit_handler::CustomApplicationHandler for AppEvents {
-    /// On macOS, ⌘Q ends the loop inside the system's terminate, and `window.run()` may never
-    /// return; the preferences are flushed here, while everything is still alive.
-    fn exiting(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) -> winit_handler::EventResult {
-        UI_DISPATCH.with(|slot| {
-            if let Some(dispatch) = slot.borrow().as_ref() {
-                dispatch.flush_preferences();
-            }
-        });
-        winit_handler::EventResult::Propagate
-    }
-}
-
 thread_local! {
     /// The dispatcher's handle on the UI thread, for actions posted from other threads.
-    static UI_DISPATCH: RefCell<Option<DispatchHandle>> = const { RefCell::new(None) };
+    pub(crate) static UI_DISPATCH: RefCell<Option<DispatchHandle>> = const { RefCell::new(None) };
+    /// The app window, for the raw-event handler, which exists before the window does.
+    pub(crate) static APP_WINDOW: RefCell<Option<slint::Weak<AppWindow>>> = const { RefCell::new(None) };
 }
 
-/// Makes posted actions reach `dispatch`. Called once the dispatcher exists.
-pub fn install_ui_dispatch(dispatch: DispatchHandle) {
+/// Makes posted actions and raw window events reach `dispatch` and `window`. Called once both
+/// exist; a drop or a press cannot happen before the window is up.
+pub fn install_ui_dispatch(dispatch: DispatchHandle, window: slint::Weak<AppWindow>) {
     UI_DISPATCH.with(|slot| *slot.borrow_mut() = Some(dispatch));
+    APP_WINDOW.with(|slot| *slot.borrow_mut() = Some(window));
+}
+
+/// Dispatches into the app from code that runs outside Slint's callbacks (raw window events).
+pub(crate) fn dispatch_ui(action: impl FnOnce(&mut ovrley_app::store::Store, &mut ovrley_app::store::services::Services) + 'static) {
+    UI_DISPATCH.with(|slot| {
+        if let Some(dispatch) = slot.borrow().as_ref() {
+            dispatch.dispatch(action);
+        }
+    });
 }
 
 /// Delivers actions to the UI thread through Slint's event loop.

@@ -2,7 +2,8 @@ import { FluidWindow } from "../theme/fluid-window.slint";
 import { Theme } from "../theme/theme.slint";
 import { AppShell } from "../features/app-shell/index.slint";
 import { AppHeader } from "../features/app-shell/app-header.slint";
-import { ControlPanel, LoadingOverlay, StartupError } from "../features/app-shell/shell-panels.slint";
+import { ControlPanel, FileDropOverlay, LoadingOverlay, StartupError } from "../features/app-shell/shell-panels.slint";
+import { FocusedField } from "../components/focused-field.slint";
 import { SettingsDialog } from "../features/app-shell/dialogs.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
@@ -84,6 +85,13 @@ export component AppWindow inherits FluidWindow {
     }
     }
 
+    // D19: after a press away from a text field, the window's root scope takes the focus, so keys
+    // keep reaching the shortcuts.
+    property <int> blur-serial: FocusedField.blur-serial;
+    changed blur-serial => {
+        keys.focus();
+    }
+
     changed show-settings => {
         if !self.show-settings {
             keys.focus();
@@ -114,6 +122,10 @@ export component AppWindow inherits FluidWindow {
         LoadingOverlay {
             label: @tr("app.ovrleyIsStarting" => "OVRLEY is starting...");
         }
+    }
+
+    FileDropOverlay {
+        shown: AppShell.file-drag-hovering;
     }
 
     if AppShell.startup-error != "": StartupError {

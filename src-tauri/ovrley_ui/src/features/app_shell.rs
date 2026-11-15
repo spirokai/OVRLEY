@@ -96,6 +96,8 @@ pub fn project(window: &AppWindow, store: &Store, language_changed: bool) {
         shell.set_traffic_light_inset(value)
     });
 
+    set_if_changed(shell.get_file_drag_hovering(), store.file_drop.hovering, |value| shell.set_file_drag_hovering(value));
+
     let editor_shell = &store.editor_shell;
     set_if_changed(shell.get_settings_open(), editor_shell.settings_open, |value| shell.set_settings_open(value));
     set_if_changed(shell.get_settings_section(), to_slint_section(editor_shell.settings_section), |value| {

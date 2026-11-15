@@ -72,7 +72,7 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
             window: Box::new(SlintWindowControl { window: window.as_weak() }),
         },
     );
-    platform::install_ui_dispatch(dispatcher.handle());
+    platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());
 
     // The close guard decides; the window stays until it does.
     let close = dispatcher.handle();
@@ -94,11 +94,9 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
     let startup = dispatcher.handle();
     let shown = window.as_weak();
     slint::Timer::single_shot(std::time::Duration::ZERO, move || {
-        #[cfg(target_os = "macos")]
         if let Some(window) = shown.upgrade() {
-            observe_fullscreen(&window, startup.clone());
+            when_winit_window_exists(&window, startup.clone());
         }
-        let _ = &shown;
         startup.dispatch(|store, _| store.bootstrap.set_startup_ready());
     });
 
@@ -128,31 +126,36 @@ fn select_language(locale: Locale) {
     slint::select_bundled_translation(locale.code()).unwrap_or_else(|error| panic!("the {} translation is not bundled: {error:?}", locale.code()));
 }
 
-/// `useTrafficLightInset` on macOS: the header gives up its inset as the window starts entering
-/// full screen (the traffic lights go away) and takes it back as it starts leaving. Installed once
-/// the winit window exists, which is after the first event-loop turn.
-#[cfg(target_os = "macos")]
-fn observe_fullscreen(window: &AppWindow, dispatch: ovrley_app::store::DispatchHandle) {
-    use platform::macos::FullscreenTransition;
+/// Platform work that needs the winit window, which exists only after the first event-loop turn:
+/// on macOS the traffic lights and `useTrafficLightInset`, which follows AppKit's full-screen
+/// transitions (the header gives up its inset as the window starts entering full screen and takes
+/// it back as it starts leaving); on Linux the Wayland drop listener.
+fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::DispatchHandle) {
     let window = window.as_weak();
     let spawned = slint::spawn_local(async move {
         let Some(app) = window.upgrade() else { return };
         let winit_window = match app.window().winit_window().await {
             Ok(winit_window) => winit_window,
             Err(error) => {
-                log::warn!("no winit window for the full-screen observer: {error}");
+                log::warn!("no winit window for the platform integration: {error}");
                 return;
             }
         };
-        platform::macos::apply_traffic_light_inset(&winit_window);
-        log::debug!("full-screen observer installed");
-        platform::macos::observe_fullscreen(&winit_window, move |transition| {
-            log::debug!("full-screen transition: {transition:?}");
-            let fullscreen = matches!(transition, FullscreenTransition::WillEnter | FullscreenTransition::DidEnter);
-            dispatch.dispatch(move |store, _| store.traffic_light_inset.set_fullscreen(fullscreen));
-        });
+        #[cfg(target_os = "macos")]
+        {
+            use platform::macos::FullscreenTransition;
+            platform::macos::apply_traffic_light_inset(&winit_window);
+            platform::macos::observe_fullscreen(&winit_window, move |transition| {
+                let fullscreen = matches!(transition, FullscreenTransition::WillEnter | FullscreenTransition::DidEnter);
+                dispatch.dispatch(move |store, _| store.traffic_light_inset.set_fullscreen(fullscreen));
+            });
+        }
+        #[cfg(target_os = "linux")]
+        platform::window_events::start_wayland_drop(&winit_window);
+        #[cfg(not(target_os = "macos"))]
+        drop(dispatch);
     });
     if let Err(error) = spawned {
-        log::warn!("could not install the full-screen observer: {error}");
+        log::warn!("could not start the platform integration: {error}");
     }
 }

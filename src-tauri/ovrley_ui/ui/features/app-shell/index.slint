@@ -28,6 +28,8 @@ export global AppShell {
     in property <string> startup-error;
     // `useTrafficLightInset`: macOS, and the window is not fullscreen.
     in property <bool> traffic-light-inset;
+    // A file hovers the window and drops are accepted (D10).
+    in property <bool> file-drag-hovering;
     // `v<VITE_OVRLEY_VERSION>`, read at compile time.
     in property <string> version;
 

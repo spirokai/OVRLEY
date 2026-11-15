@@ -25,6 +25,7 @@
     "processingYourActivity": "Processando sua atividade..."
   },
   "app-shell": {
+    "dropFilesToImport": "Solte arquivos para importar",
     "backendOffline": "Backend offline",
     "blackBackground": "Fundo preto",
     "checkeredBackground": "Fundo quadriculado",

@@ -25,6 +25,7 @@
     "processingYourActivity": "アクティビティを処理しています..."
   },
   "app-shell": {
+    "dropFilesToImport": "ファイルをドロップしてインポート",
     "backendOffline": "バックエンドがオフラインです",
     "blackBackground": "黒い背景",
     "checkeredBackground": "市松模様の背景",
