@@ -123,21 +123,43 @@ pub fn agent_bridge_hooks() -> ovrley_mcp::link::BridgeHooks {
     use std::sync::Arc;
     ovrley_mcp::link::BridgeHooks {
         call: Arc::new(|tool: String, arguments: serde_json::Value| {
-            let (reply, outcome) = std::sync::mpsc::channel();
+            use std::sync::mpsc;
+            enum Message {
+                Outcome(ToolOutcome),
+                Deferred,
+            }
+            let (sender, receiver) = mpsc::channel::<Message>();
+            let reply_sender = sender.clone();
+            let reply: catalog::Reply = Box::new(move |outcome| {
+                // The connection may be gone (the agent quit while it waited); nobody reads then.
+                let _ = reply_sender.send(Message::Outcome(outcome));
+            });
             let posted = slint::invoke_from_event_loop(move || {
-                let result = UI_DISPATCH.with(|slot| {
+                let answer = UI_DISPATCH.with(|slot| {
                     slot.borrow()
                         .as_ref()
-                        .and_then(|dispatch| dispatch.dispatch_with_result(move |store, services| catalog::call(&tool, arguments, store, services)))
+                        .and_then(|dispatch| dispatch.dispatch_with_result(move |store, services| catalog::call(&tool, arguments, store, services, reply)))
                 });
-                let _ = reply.send(result.unwrap_or_else(|| ToolOutcome::Failed("OVRLEY is busy. Try again.".into())));
+                let message = match answer {
+                    Some(catalog::Answer::Now(outcome)) => Message::Outcome(outcome),
+                    Some(catalog::Answer::Later) => Message::Deferred,
+                    None => Message::Outcome(ToolOutcome::Failed("OVRLEY is busy. Try again.".into())),
+                };
+                let _ = sender.send(message);
             });
             if posted.is_err() {
                 return ToolOutcome::Failed("OVRLEY is closing.".into());
             }
-            outcome
-                .recv_timeout(ovrley_mcp::link::CALL_TIMEOUT)
-                .unwrap_or_else(|_| ToolOutcome::Failed("OVRLEY did not answer in time. The change may still be applied.".into()))
+            match receiver.recv_timeout(ovrley_mcp::link::CALL_TIMEOUT) {
+                Ok(Message::Outcome(outcome)) => outcome,
+                // D15: a call that waits for a worker or the user has no timeout. It ends with the
+                // reply; a reply dropped unanswered answers that the call was cancelled.
+                Ok(Message::Deferred) => match receiver.recv() {
+                    Ok(Message::Outcome(outcome)) => outcome,
+                    Ok(Message::Deferred) | Err(_) => ToolOutcome::Failed(ovrley_app::store::agent::CANCELLED.into()),
+                },
+                Err(_) => ToolOutcome::Failed("OVRLEY did not answer in time. The change may still be applied.".into()),
+            }
         }),
         session: Arc::new(|open: bool| {
             let posted = slint::invoke_from_event_loop(move || {

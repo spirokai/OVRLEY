@@ -4,7 +4,8 @@ import { AppShell } from "../features/app-shell/index.slint";
 import { AppHeader } from "../features/app-shell/app-header.slint";
 import { ControlPanel, FileDropOverlay, LoadingOverlay, StartupError } from "../features/app-shell/shell-panels.slint";
 import { FocusedField } from "../components/focused-field.slint";
-import { SettingsDialog } from "../features/app-shell/dialogs.slint";
+import { SettingsDialog, UnsavedChangesDialog } from "../features/app-shell/dialogs.slint";
+import { TemplateManager, UnsavedAnswer } from "../features/template-manager/index.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 
@@ -43,6 +44,26 @@ export component AppWindow inherits FluidWindow {
             traffic-light-inset: AppShell.traffic-light-inset;
             version: AppShell.version;
             agent-connected: AppShell.agent-connected;
+            template-choices: TemplateManager.choices;
+            selected-template: TemplateManager.selected;
+            template-file-name: TemplateManager.file-name;
+            can-save-template: TemplateManager.can-save;
+            template-selector-open-serial: TemplateManager.selector-open-serial;
+            import-activity => {
+                AppShell.import-activity();
+            }
+            select-template(id) => {
+                TemplateManager.select-template(id);
+            }
+            new-template => {
+                TemplateManager.new-template();
+            }
+            import-template => {
+                TemplateManager.import-template();
+            }
+            save-template => {
+                TemplateManager.save-template();
+            }
             minimize-window => {
                 AppShell.minimize-window();
             }
@@ -72,10 +93,12 @@ export component AppWindow inherits FluidWindow {
                 AppShell.open-settings();
             }
 
-            // The workspace: the editor and the player arrive in Phases 3 and 4.
+            // The workspace: the editor (later in Phase 3) and the player (Phase 4). The loading
+            // overlay covers it while an import or a template load runs.
             Rectangle {
                 horizontal-stretch: 1;
                 background: Theme.surface-darken;
+                if AppShell.processing: LoadingOverlay { }
             }
             Rectangle {
                 width: root.control-panel-width;
@@ -99,6 +122,32 @@ export component AppWindow inherits FluidWindow {
         }
     }
     property <bool> show-settings: AppShell.settings-open;
+
+    changed show-template-confirm => {
+        if !self.show-template-confirm {
+            keys.focus();
+        }
+    }
+    property <bool> show-template-confirm: TemplateManager.confirm-open;
+
+    // `newTemplateConfirmDialog`.
+    UnsavedChangesDialog {
+        open: TemplateManager.confirm-open;
+        title: @tr("template-manager.createNewTemplate" => "Create New Template");
+        description: @tr("template-manager.unsavedChanges" => "Your template has unsaved changes. Save them or discard them.");
+        cancel-label: @tr("template-manager.cancel" => "Cancel");
+        save-label: @tr("template-manager.save" => "Save");
+        discard-label: @tr("template-manager.newTemplate" => "New Template");
+        cancel => {
+            TemplateManager.answer-confirm(UnsavedAnswer.cancel);
+        }
+        save => {
+            TemplateManager.answer-confirm(UnsavedAnswer.save);
+        }
+        discard => {
+            TemplateManager.answer-confirm(UnsavedAnswer.discard);
+        }
+    }
 
     SettingsDialog {
         open: AppShell.settings-open;

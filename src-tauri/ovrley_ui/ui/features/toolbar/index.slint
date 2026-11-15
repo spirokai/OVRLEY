@@ -1,13 +1,41 @@
 // The drawer's tools, in the rail's order.
 export enum DrawerTool { projects, activity, video, video-sync, widgets }
 
+// One metadata row of the activity drawer's details.
+export struct ActivityRowView {
+    label: string,
+    value: string,
+}
+
+// One detected lap.
+export struct ActivityLapView {
+    id: int,
+    number: string,
+    duration: string,
+    start: string,
+    enabled: bool,
+}
+
 // The toolbar feature's global (D5), written by `src/features/toolbar.rs`.
 export global Toolbar {
     in property <DrawerTool> active-tool: DrawerTool.widgets;
     in property <bool> visible;
     in property <bool> pinned;
 
+    // The activity drawer (`buildActivityDrawerViewModel`, `buildLapRows`).
+    in property <bool> has-activity;
+    in property <string> activity-file-name;
+    in property <bool> can-delete-activity;
+    in property <string> activity-format;
+    in property <[ActivityRowView]> activity-metadata;
+    in property <[string]> activity-extracted;
+    in property <[string]> activity-derived;
+    in property <[ActivityLapView]> activity-laps;
+
     callback select-tool(DrawerTool);
     callback set-pinned(bool);
     callback dismiss-overlay();
+    callback load-activity();
+    callback delete-activity();
+    callback set-lap-enabled(int, bool);
 }

@@ -194,11 +194,17 @@ mod tests {
     impl ToolCaller for InProcess {
         fn call(&mut self, tool: &str, arguments: Value) -> ToolOutcome {
             let tool = tool.to_string();
-            self.dispatcher
+            // These tests call tools that answer in their dispatch.
+            let answer = self
+                .dispatcher
                 .dispatch_with_result(move |store, services| {
-                    catalog::call(&tool, arguments, store, services)
+                    catalog::call(&tool, arguments, store, services, Box::new(|_| panic!("answered later")))
                 })
-                .unwrap()
+                .unwrap();
+            match answer {
+                catalog::Answer::Now(outcome) => outcome,
+                catalog::Answer::Later => panic!("the protocol tests call tools that answer at once"),
+            }
         }
     }
 
@@ -244,16 +250,9 @@ mod tests {
             .iter()
             .map(|tool| tool["name"].as_str().unwrap())
             .collect();
-        assert_eq!(
-            names,
-            [
-                "ovrley_summary",
-                "language_set",
-                "drawer_select_tool",
-                "drawer_set_pinned",
-                "drawer_dismiss"
-            ]
-        );
+        let expected: Vec<&str> = catalog::tools().iter().map(|tool| tool.name).collect();
+        assert_eq!(names, expected);
+        assert!(names.starts_with(&["ovrley_summary", "language_set", "drawer_select_tool", "drawer_set_pinned", "drawer_dismiss"]));
         assert!(!answer.to_string().contains("$ref"));
         assert_eq!(answer["id"], "a");
     }

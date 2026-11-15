@@ -46,6 +46,10 @@ export component Select {
     in property <color> border-color: Theme.border;
     in property <ShadowSize> shadow: ShadowSize.xs;
     in property <length> padding-x: 0.75rem;
+    // An `Icons` path shown before the value (TemplateSection's Sparkles); empty for none.
+    in property <string> leading-icon;
+    in property <length> leading-icon-size: 0.75rem;
+    in property <color> leading-icon-color: Theme.primary;
     callback value-changed(value: string);
 
     property <int> selected-index: ChoiceListLogic.index-of(root.items, root.value);
@@ -134,6 +138,11 @@ export component Select {
         padding-left: root.padding-x;
         padding-right: root.padding-x;
         spacing: 0.5rem;
+        if root.leading-icon != "": Icon {
+            glyph: root.leading-icon;
+            size: root.leading-icon-size;
+            color: root.leading-icon-color;
+        }
         AppText {
             horizontal-stretch: 1;
             content: root.selected-index >= 0 ? root.items[root.selected-index].label : root.placeholder;

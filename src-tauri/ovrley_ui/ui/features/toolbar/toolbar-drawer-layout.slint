@@ -4,7 +4,8 @@ import { Icons } from "../../components/icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
-import { DrawerTool } from "index.slint";
+import { DrawerTool, Toolbar } from "index.slint";
+import { ActivityDrawer } from "activity-drawer.slint";
 
 // The rail's tools: label and icon per `DrawerTool`.
 component RailButton {
@@ -203,8 +204,28 @@ export component ToolbarDrawerLayout {
                     }
                 }
             }
-            // The drawer contents arrive with their features (Phases 3, 5, 6, 8).
-            Rectangle {
+            // The activity drawer (Phase 3); the others arrive with their features (Phases 5, 6, 8).
+            if root.active-tool == DrawerTool.activity: ActivityDrawer {
+                vertical-stretch: 1;
+                has-activity: Toolbar.has-activity;
+                file-name: Toolbar.activity-file-name;
+                can-delete: Toolbar.can-delete-activity;
+                format-label: Toolbar.activity-format;
+                metadata: Toolbar.activity-metadata;
+                extracted: Toolbar.activity-extracted;
+                derived: Toolbar.activity-derived;
+                laps: Toolbar.activity-laps;
+                load-activity => {
+                    Toolbar.load-activity();
+                }
+                delete-activity => {
+                    Toolbar.delete-activity();
+                }
+                lap-enabled-changed(id, enabled) => {
+                    Toolbar.set-lap-enabled(id, enabled);
+                }
+            }
+            if root.active-tool != DrawerTool.activity: Rectangle {
                 vertical-stretch: 1;
             }
         }

@@ -88,6 +88,7 @@ pub fn project(window: &AppWindow, store: &Store, language_changed: bool) {
     set_if_changed(shell.get_allow_agent_edits(), store.agent_session.allow_agent_edits, |value| shell.set_allow_agent_edits(value));
     set_if_changed(shell.get_agent_connected(), store.agent_session.shows_indicator(), |value| shell.set_agent_connected(value));
     set_if_changed(shell.get_file_drag_hovering(), store.file_drop.hovering, |value| shell.set_file_drag_hovering(value));
+    set_if_changed(shell.get_processing(), store.media.is_processing, |value| shell.set_processing(value));
 
     let editor_shell = &store.editor_shell;
     set_if_changed(shell.get_settings_open(), editor_shell.settings_open, |value| shell.set_settings_open(value));
@@ -140,13 +141,16 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let keys = dispatcher.clone();
     shell.on_app_key(move |text, alt, control, shift, meta, repeat| {
         let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, repeat, cfg!(target_os = "macos"));
-        keys.dispatch_with_result(move |store, _| app_shell::handle_app_key(store, &input)).unwrap_or(false)
+        keys.dispatch_with_result(move |store, services| app_shell::handle_app_key(store, services, &input)).unwrap_or(false)
     });
     let keys = dispatcher.clone();
     shell.on_capture_key(move |text, alt, control, shift, meta, repeat| {
         let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, repeat, cfg!(target_os = "macos"));
         keys.dispatch_with_result(move |store, _| ovrley_app::features::toolbar::handle_drawer_capture_key(store, &input)).unwrap_or(false)
     });
+
+    let dispatch = dispatcher.handle();
+    shell.on_import_activity(move || dispatch.dispatch(app_shell::open_activity_dialog));
 
     let alert = window.global::<AlertLayer>();
     let dispatch = dispatcher.handle();

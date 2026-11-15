@@ -9,6 +9,7 @@ use crate::i18n::{catalog, Locale};
 use crate::lib::keyboard_shortcuts::{manifest, match_keyboard_shortcut, Binding, KeyInput, Modifier, Scope};
 use crate::store::slices::layout::LeftDrawerTool;
 use crate::lib::utils::IS_MACOS;
+use crate::features::template_manager;
 use crate::features::undo_redo::HistoryMode;
 use crate::lib::file_dialog::{open_single_path, DialogOptions};
 use crate::store::agent::AgentReply;
@@ -82,9 +83,9 @@ impl TrafficLightInsetState {
 /// - Open overlays block app shortcuts (`hasOpenOverlay`): the settings dialog, and the unpinned
 ///   drawer's backdrop, except `drawer.toggle` while the drawer is that overlay. Keys do not reach
 ///   the window while a select, popover or dialog popup has focus, so those block by themselves.
-/// - Phase 2 runs only `drawer.toggle`. Every other app command is matched but not consumed until
-///   its feature arrives, so it does not swallow the key.
-pub fn handle_app_key(store: &mut Store, input: &KeyInput) -> bool {
+/// - Commands whose features have not arrived (projects, video, render, output, sync) are matched
+///   but not consumed, so they do not swallow the key.
+pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
     if input.repeat {
         return false;
     }
@@ -100,6 +101,29 @@ pub fn handle_app_key(store: &mut Store, input: &KeyInput) -> bool {
     match command {
         "drawer.toggle" => {
             store.layout.select_left_drawer_tool(LeftDrawerTool::Widgets);
+            true
+        }
+        "template.new" => {
+            template_manager::create_new_template_request(store, services, None);
+            true
+        }
+        "template.import" => {
+            template_manager::open_import_template_dialog(store, services);
+            true
+        }
+        "template.save" => {
+            if !template_manager::save_status(store).shows() {
+                return false;
+            }
+            template_manager::open_save_template_dialog(store, services, Box::new(|_, _, _| {}));
+            true
+        }
+        "template.select" => {
+            store.template_manager.request_selector_open();
+            true
+        }
+        "activity.import" => {
+            open_activity_dialog(store, services);
             true
         }
         _ => false,
@@ -770,47 +794,85 @@ mod tests {
         input
     }
 
+    /// Runs `keys` through `handle_app_key` in one dispatch and returns what each answered.
+    fn press(store: Store, keys: Vec<KeyInput>) -> (Vec<bool>, Dispatcher, crate::store::services::fakes::Fakes) {
+        let (parts, fakes) = fake_services(json!({}));
+        let dispatcher = Dispatcher::new(store, parts);
+        let answers = dispatcher.dispatch_with_result(move |store, services| keys.iter().map(|key| handle_app_key(store, services, key)).collect()).unwrap();
+        (answers, dispatcher, fakes)
+    }
+
+    fn modified(key: &str, ctrl: bool, shift: bool) -> KeyInput {
+        let mut input = KeyInput::new(key);
+        input.ctrl = ctrl && !IS_MACOS;
+        input.meta = ctrl && IS_MACOS;
+        input.shift = shift;
+        input
+    }
+
     #[test]
     fn alt_w_toggles_the_widgets_drawer() {
-        let mut store = Store::default();
-        assert!(handle_app_key(&mut store, &alt("w")));
-        assert!(store.layout.left_drawer_visible);
-        assert_eq!(store.layout.active_left_drawer_tool, LeftDrawerTool::Widgets);
-        assert!(handle_app_key(&mut store, &alt("w")), "allowed while the drawer is the overlay");
-        assert!(!store.layout.left_drawer_visible);
+        let (answers, dispatcher, _) = press(Store::default(), vec![alt("w")]);
+        assert_eq!(answers, [true]);
+        dispatcher.with_store(|store| {
+            assert!(store.layout.left_drawer_visible);
+            assert_eq!(store.layout.active_left_drawer_tool, LeftDrawerTool::Widgets);
+        });
+        let (answers, dispatcher, _) = press(Store::default(), vec![alt("w"), alt("w")]);
+        assert_eq!(answers, [true, true], "allowed while the drawer is the overlay");
+        assert!(!dispatcher.with_store(|store| store.layout.left_drawer_visible));
     }
 
     #[test]
     fn a_repeated_key_never_runs_a_command() {
-        let mut store = Store::default();
         let mut repeated = alt("w");
         repeated.repeat = true;
-        assert!(!handle_app_key(&mut store, &repeated));
-        assert!(!store.layout.left_drawer_visible);
+        let (answers, dispatcher, _) = press(Store::default(), vec![repeated]);
+        assert_eq!(answers, [false]);
+        assert!(!dispatcher.with_store(|store| store.layout.left_drawer_visible));
     }
 
     #[test]
     fn the_settings_dialog_blocks_app_shortcuts() {
         let mut store = Store::default();
         store.editor_shell.open_settings();
-        assert!(!handle_app_key(&mut store, &alt("w")));
-        assert!(!store.layout.left_drawer_visible);
+        let (answers, _, _) = press(store, vec![alt("w")]);
+        assert_eq!(answers, [false]);
     }
 
     #[test]
     fn commands_of_later_phases_are_matched_but_not_consumed() {
+        let (answers, _, _) = press(Store::default(), vec![modified("s", true, false), modified("i", true, false)]);
+        assert_eq!(answers, [false, false]);
+    }
+
+    #[test]
+    fn template_and_activity_commands_run() {
+        let (answers, dispatcher, fakes) = press(Store::default(), vec![modified("k", true, false), modified("t", true, false), modified("l", true, true)]);
+        assert_eq!(answers, [true, true, true]);
+        assert_eq!(fakes.dialogs.requests().len(), 2, "the activity and template dialogs opened");
+        assert_eq!(dispatcher.with_store(|store| store.template_manager.selector_open_serial), 1);
+    }
+
+    #[test]
+    fn template_save_runs_only_while_the_status_shows() {
         let mut store = Store::default();
-        let mut save = KeyInput::new("s");
-        save.ctrl = true;
-        assert!(!handle_app_key(&mut store, &save));
+        store.template.last_saved_template_state = Some(ovrley_core::normalize::template::create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults)).unwrap());
+        crate::features::template_manager::reconcile_durable_state(&mut store);
+        let (answers, _, fakes) = press(store, vec![modified("p", true, true)]);
+        assert_eq!(answers, [false], "a saved template has nothing to save");
+        assert!(fakes.dialogs.requests().is_empty());
+        let (answers, _, fakes) = press(Store::default(), vec![modified("p", true, true)]);
+        assert_eq!(answers, [true], "a draft saves");
+        assert_eq!(fakes.dialogs.requests().len(), 1);
     }
 
     #[test]
     fn modified_shell_commands_still_run_when_a_field_had_focus() {
         // A focused text field rejects Alt+W, so the window's handler receives it (React's
         // "allows modified shell commands in inputs").
-        let mut store = Store::default();
-        assert!(handle_app_key(&mut store, &alt("w")));
+        let (answers, _, _) = press(Store::default(), vec![alt("w")]);
+        assert_eq!(answers, [true]);
     }
 
     fn dropped(paths: &[&str]) -> Vec<DroppedPath> {

@@ -3,6 +3,9 @@ import { AppText } from "../../components/app-text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
 import { Badge, BadgeVariant } from "../../components/badge.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { Choice } from "../../components/logic.slint";
+import { FileMenu } from "file-menu.slint";
+import { TemplateSection } from "template-section.slint";
 
 // One window button: 2.5rem wide, full height, muted; on hover `surface-elevated` and
 // `foreground`, or `destructive` with white text for close.
@@ -89,16 +92,26 @@ export component WindowControls {
 
 // `AppHeader`: `card` with a bottom border; 0.75rem top and bottom padding, 0.25rem right, and
 // 1.5rem left, or 7rem while the macOS traffic lights overlay it. Three columns 1.5rem apart:
-// the logo and version (`ActivitySection`; the File menu arrives in Phase 3), the template column
-// (Phase 3, empty), and the right column with the window controls. Empty header space drags the
-// window; presses on controls stay with the controls.
+// `ActivitySection` (logo, version, divider, File menu), `TemplateSection`, and the right column
+// with the window controls. Empty header space drags the window; presses on controls stay with the
+// controls.
 export component AppHeader inherits Rectangle {
     in property <bool> traffic-light-inset;
     in property <string> version;
     in property <bool> agent-connected;
+    in property <[Choice]> template-choices;
+    in property <string> selected-template;
+    in property <string> template-file-name;
+    in property <bool> can-save-template;
+    in property <int> template-selector-open-serial;
     callback minimize-window();
     callback toggle-maximize-window();
     callback close-window();
+    callback import-activity();
+    callback select-template(string);
+    callback new-template();
+    callback import-template();
+    callback save-template();
 
     background: Theme.card;
     Rectangle {
@@ -115,8 +128,11 @@ export component AppHeader inherits Rectangle {
             padding-left: root.traffic-light-inset ? 7rem : 1.5rem;
             spacing: 1.5rem;
 
-            // ActivitySection's left part: logo, divider, version.
+            // ActivitySection: logo, divider, version, then a divider and the File menu, 1.5rem apart.
             HorizontalLayout {
+              horizontal-stretch: 0;
+              spacing: 1.5rem;
+              HorizontalLayout {
                 spacing: 0.5rem;
                 alignment: start;
                 HorizontalLayout {
@@ -151,9 +167,42 @@ export component AppHeader inherits Rectangle {
                     }
                 }
             }
-            // The template column (Phase 3).
-            Rectangle {
+              VerticalLayout {
+                  alignment: center;
+                  Rectangle {
+                      width: 1px;
+                      height: 2rem;
+                      background: Theme.border.transparentize(0.4);
+                  }
+              }
+              VerticalLayout {
+                  alignment: center;
+                  FileMenu {
+                      import-activity => {
+                          root.import-activity();
+                      }
+                  }
+              }
+            }
+            TemplateSection {
                 horizontal-stretch: 1;
+                choices: root.template-choices;
+                selected: root.selected-template;
+                file-name: root.template-file-name;
+                can-save: root.can-save-template;
+                selector-open-serial: root.template-selector-open-serial;
+                select-template(id) => {
+                    root.select-template(id);
+                }
+                new-template => {
+                    root.new-template();
+                }
+                import-template => {
+                    root.import-template();
+                }
+                save-template => {
+                    root.save-template();
+                }
             }
             HorizontalLayout {
                 alignment: end;

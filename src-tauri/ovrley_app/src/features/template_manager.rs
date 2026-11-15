@@ -73,8 +73,8 @@ struct DurableCache {
 
 #[derive(Default)]
 pub struct TemplateManagerState {
-    /// `templateSelectorOpen`.
-    pub selector_open: bool,
+    /// Increments when `template.select` asks the select to open; the select owns its open state.
+    pub selector_open_serial: i32,
     /// Callers waiting for the running template list fetch; concurrent fetches share it.
     fetch_waiters: Option<Vec<Box<dyn FnOnce(&mut Store, &mut Services)>>>,
     /// Continuations of running workers, by job.
@@ -87,7 +87,7 @@ impl std::fmt::Debug for TemplateManagerState {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("TemplateManagerState")
-            .field("selector_open", &self.selector_open)
+            .field("selector_open_serial", &self.selector_open_serial)
             .field("fetching", &self.fetch_waiters.is_some())
             .field("jobs", &self.continuations.len())
             .finish()
@@ -95,6 +95,11 @@ impl std::fmt::Debug for TemplateManagerState {
 }
 
 impl TemplateManagerState {
+    /// `openTemplateSelector`.
+    pub fn request_selector_open(&mut self) {
+        self.selector_open_serial = self.selector_open_serial.wrapping_add(1);
+    }
+
     fn park(&mut self, on_done: OnDone) -> u64 {
         self.next_job += 1;
         self.continuations.insert(self.next_job, on_done);
@@ -140,14 +145,25 @@ pub fn reconcile_durable_state(store: &mut Store) {
     };
 }
 
-/// `useTemplateSaveStatus`: Draft until saved, then Saved or Modified. A document that does not
-/// normalize (a defect, logged by the reconcile step) counts as modified.
+/// `useTemplateSaveStatus`: Draft until saved, then Saved or Modified. It reads the cached durable
+/// state when that matches the document on screen, and computes it otherwise (inside an action,
+/// before the reconcile step refreshed the cache). A document that does not normalize (a defect,
+/// logged) counts as modified.
 pub fn save_status(store: &Store) -> SaveStatus {
-    let Some(saved) = &store.template.last_saved_template_state else {
-        return SaveStatus::Draft;
+    let Some(saved) = &store.template.last_saved_template_state else { return SaveStatus::Draft };
+    let cache = &store.template_manager.durable;
+    let fresh = cache.config.as_ref().is_some_and(|config| Rc::ptr_eq(config, &store.editor.config))
+        && cache.global_defaults.as_ref().is_some_and(|globals| Rc::ptr_eq(globals, &store.template.global_defaults));
+    let computed;
+    let current = match (&cache.state, fresh) {
+        (Some(state), true) => state.as_ref().ok(),
+        _ => {
+            computed = create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults)).ok();
+            computed.as_ref()
+        }
     };
-    match store.template_manager.current_durable_state() {
-        Some(Ok(current)) if current == saved => SaveStatus::Saved,
+    match current {
+        Some(current) if current == saved => SaveStatus::Saved,
         _ => SaveStatus::Modified,
     }
 }

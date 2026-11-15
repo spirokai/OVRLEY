@@ -1,0 +1,336 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Badge, BadgeVariant } from "../../components/badge.slint";
+import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
+import { Switch } from "../../components/switch.slint";
+import { ScrollArea } from "../../components/scroll-area.slint";
+import { ActivityRowView, ActivityLapView } from "index.slint";
+
+// A table or grid cell's text with `px-2`.
+component Cell inherits HorizontalLayout {
+    in property <string> content;
+    in property <int> weight: Theme.font-weight-medium;
+    in property <length> size: Theme.text-xs * 1rem;
+    in property <color> color: Theme.foreground.transparentize(0.1);
+    // Header cells keep their whole label, as the table's header does.
+    in property <bool> elide: true;
+
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    AppText {
+        content: root.content;
+        font-size: root.size;
+        font-weight: root.weight;
+        color: root.color;
+        horizontal-alignment: left;
+        vertical-alignment: center;
+        overflow: root.elide ? TextOverflow.elide : TextOverflow.clip;
+        max-lines: 1;
+    }
+}
+
+// `FileDropZone`: at least 6rem high, 1rem below the button, `rounded-xs`, a 1px `border` at 80%
+// on `surface`, a 1.25rem FileUp, the bold label and the format list. Slint has no dashed borders,
+// so the border is solid (as the window's drop overlay). Native drops land on the whole window
+// (Phase 2 D10), whose overlay covers the drawer while a file hovers, so the zone shows no hover
+// state of its own.
+component FileDropZone inherits Rectangle {
+    in property <string> label;
+    in property <string> sublabel;
+
+    min-height: 6rem;
+    vertical-stretch: 0;
+    border-radius: Theme.radius-xs * 1rem;
+    border-width: 1px;
+    border-color: Theme.border.transparentize(0.2);
+    background: Theme.surface;
+    VerticalLayout {
+        alignment: center;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        HorizontalLayout {
+            alignment: center;
+            padding-bottom: 0.5rem;
+            Icon {
+                glyph: Icons.file-up;
+                size: 1.25rem;
+                color: Theme.muted-foreground;
+            }
+        }
+        AppText {
+            content: root.label;
+            horizontal-alignment: center;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-extrabold;
+        }
+        Rectangle {
+            height: 0.25rem;
+        }
+        AppText {
+            content: root.sublabel;
+            horizontal-alignment: center;
+            font-size: 0.75rem;
+            color: Theme.muted-foreground;
+        }
+    }
+}
+
+// `MetricGrid`: two columns 0.375rem apart of outline badges without border, `text-[0.7rem]`
+// medium; an empty list shows its label.
+component MetricGrid inherits VerticalLayout {
+    in property <[string]> metrics;
+    in property <string> empty-label;
+
+    spacing: 0.375rem;
+    if root.metrics.length == 0: Cell {
+        content: root.empty-label;
+        size: 0.7rem;
+        weight: Theme.font-weight-normal;
+        color: Theme.muted-foreground.transparentize(0.1);
+    }
+    for row in Math.ceil(root.metrics.length / 2): HorizontalLayout {
+        spacing: 0.375rem;
+        for column in 2: Cell {
+            // Equal columns, as `grid-cols-2`.
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            min-width: 0px;
+            content: row * 2 + column < root.metrics.length ? root.metrics[row * 2 + column] : "";
+            size: 0.7rem;
+        }
+    }
+}
+
+// `ActivityLapTable`: lap, duration, start and a switch, `text-xs`; a hidden lap's row is muted.
+component ActivityLapTable inherits VerticalLayout {
+    in property <[ActivityLapView]> laps;
+    callback lap-enabled-changed(id: int, enabled: bool);
+
+    spacing: 0.25rem;
+    HorizontalLayout {
+        padding-bottom: 0.125rem;
+        Cell {
+            width: 2.5rem;
+            content: @tr("toolbar.lapNumber" => "Lap");
+            elide: false;
+            weight: Theme.font-weight-bold;
+            color: Theme.muted-foreground;
+        }
+        Cell {
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            content: @tr("toolbar.lapDuration" => "Duration");
+            weight: Theme.font-weight-bold;
+            color: Theme.muted-foreground;
+        }
+        Cell {
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            content: @tr("toolbar.lapStart" => "Start");
+            weight: Theme.font-weight-bold;
+            color: Theme.muted-foreground;
+        }
+        Rectangle {
+            width: 3rem;
+        }
+    }
+    for lap in root.laps: HorizontalLayout {
+        property <color> text-color: lap.enabled ? Theme.foreground.transparentize(0.1) : Theme.muted-foreground.transparentize(0.3);
+        Cell {
+            width: 2.5rem;
+            content: lap.number;
+            color: parent.text-color;
+        }
+        Cell {
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            content: lap.duration;
+            color: parent.text-color;
+        }
+        Cell {
+            horizontal-stretch: 1;
+            preferred-width: 0px;
+            content: lap.start;
+            color: parent.text-color;
+        }
+        HorizontalLayout {
+            width: 3rem;
+            alignment: end;
+            padding-right: 0.5rem;
+            Switch {
+                checked: lap.enabled;
+                accessible-label: @tr("toolbar.showLap" => "Show lap {0}", lap.number);
+                checked-changed(checked) => {
+                    root.lap-enabled-changed(lap.id, checked);
+                }
+            }
+        }
+    }
+}
+
+// `ActivityDrawerContent`: the load button and drop zone, then, with an activity, its file name
+// and delete button, Details (format badge and metadata rows), Extracted, Calculated and the
+// detected laps.
+export component ActivityDrawer inherits ScrollArea {
+    in property <bool> has-activity;
+    in property <string> file-name;
+    in property <bool> can-delete;
+    in property <string> format-label;
+    in property <[ActivityRowView]> metadata;
+    in property <[string]> extracted;
+    in property <[string]> derived;
+    in property <[ActivityLapView]> laps;
+    callback load-activity();
+    callback delete-activity();
+    callback lap-enabled-changed(id: int, enabled: bool);
+
+    thin: true;
+    VerticalLayout {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-bottom: 1rem;
+        Button {
+            height: 2.25rem;
+            icon: Icons.activity;
+            icon-size: 1rem;
+            text: @tr("toolbar.loadActivity" => "Load activity");
+            clicked => {
+                root.load-activity();
+            }
+        }
+        Rectangle {
+            height: 1rem;
+        }
+        FileDropZone {
+            label: @tr("toolbar.dropActivityFile" => "Drop activity file");
+            sublabel: "GPX, FIT, TCX, SRT, IGC, CSV, VBO";
+        }
+        if root.has-activity: VerticalLayout {
+            padding-top: 2.5rem;
+            Rectangle {
+                height: 1px;
+                background: Theme.border.transparentize(0.2);
+            }
+            VerticalLayout {
+                padding-top: 0.5rem;
+                spacing: 2rem;
+                VerticalLayout {
+                    spacing: 1rem;
+                    HorizontalLayout {
+                        padding-top: 1rem;
+                        padding-bottom: 0.5rem;
+                        padding-left: 0.25rem;
+                        AppText {
+                            horizontal-stretch: 1;
+                            content: root.file-name;
+                            horizontal-alignment: left;
+                            font-size: Theme.text-sm * 1rem;
+                            font-weight: Theme.font-weight-extrabold;
+                            overflow: elide;
+                            max-lines: 1;
+                            vertical-alignment: center;
+                        }
+                        if root.can-delete: Button {
+                            variant: ButtonVariant.ghost;
+                            size: ButtonSize.icon;
+                            width: 1.75rem;
+                            height: 1.75rem;
+                            icon: Icons.trash-2;
+                            icon-size: 0.875rem;
+                            text-color: Theme.muted-foreground;
+                            hover-background: Theme.surface-accent-soft;
+                            hover-text-color: Theme.primary;
+                            accessible-label: @tr("toolbar.deleteActivity" => "Delete activity");
+                            clicked => {
+                                root.delete-activity();
+                            }
+                        }
+                    }
+                    SectionHeading {
+                        icon: Icons.route;
+                        title: @tr("toolbar.details" => "Details");
+                        variant: SectionHeadingVariant.drawer;
+                        HorizontalLayout {
+                            padding-right: 0.25rem;
+                            Badge {
+                                variant: BadgeVariant.outline;
+                                radius: 0px;
+                                text: root.format-label;
+                                font-size: 0.75rem;
+                                font-weight: Theme.font-weight-extrabold;
+                                text-color: Theme.primary;
+                                border-color: Theme.primary;
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        padding-left: 0.5rem;
+                        padding-right: 0.5rem;
+                        spacing: 0.375rem;
+                        for row in root.metadata: HorizontalLayout {
+                            spacing: 1.125rem;
+                            AppText {
+                                // Equal columns, as `grid-cols-2`.
+                                width: (parent.width - parent.spacing) / 2;
+                                content: row.label;
+                                horizontal-alignment: left;
+                                font-size: Theme.text-xs * 1rem;
+                                font-weight: Theme.font-weight-bold;
+                                color: Theme.muted-foreground;
+                            }
+                            AppText {
+                                width: (parent.width - parent.spacing) / 2;
+                                content: row.value;
+                                horizontal-alignment: left;
+                                font-size: Theme.text-xs * 1rem;
+                                font-weight: Theme.font-weight-medium;
+                                color: Theme.foreground.transparentize(0.1);
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 1rem;
+                    SectionHeading {
+                        icon: Icons.database;
+                        title: @tr("toolbar.extracted" => "Extracted");
+                        variant: SectionHeadingVariant.drawer;
+                    }
+                    MetricGrid {
+                        metrics: root.extracted;
+                        empty-label: @tr("toolbar.noDataExtracted" => "No data were extracted");
+                    }
+                }
+                VerticalLayout {
+                    spacing: 1rem;
+                    SectionHeading {
+                        icon: Icons.sparkles;
+                        title: @tr("toolbar.calculated" => "Calculated");
+                        variant: SectionHeadingVariant.drawer;
+                    }
+                    MetricGrid {
+                        metrics: root.derived;
+                        empty-label: @tr("toolbar.noDataCalculated" => "No data were calculated");
+                    }
+                }
+                if root.laps.length > 0: VerticalLayout {
+                    spacing: 1rem;
+                    SectionHeading {
+                        icon: Icons.flag;
+                        title: @tr("toolbar.detectedLaps" => "Detected laps");
+                        variant: SectionHeadingVariant.drawer;
+                    }
+                    ActivityLapTable {
+                        laps: root.laps;
+                        lap-enabled-changed(id, enabled) => {
+                            root.lap-enabled-changed(id, enabled);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

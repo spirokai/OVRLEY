@@ -5880,6 +5880,7 @@ dependencies = [
  "interprocess",
  "log",
  "ovrley_app",
+ "ovrley_widgets",
  "schemars 1.2.0",
  "serde",
  "serde_json",

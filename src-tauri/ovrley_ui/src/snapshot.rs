@@ -26,7 +26,18 @@ fn tour() -> Vec<Step> {
         }),
         ("drawer-overlay", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Activity)),
         ("drawer-pinned", |store, _| store.layout.set_left_drawer_pinned(true)),
-        ("settings-general", |store, _| {
+        ("activity-imported", |store, services| {
+            let ride = ovrley_services::runtime_paths::source_repo_root().join("src-tauri/ovrley_core/tests/fixtures/activity/test-ride.fit");
+            ovrley_app::features::app_shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);
+        }),
+        ("template-confirm", |store, services| {
+            store.layout.set_left_drawer_pinned(false);
+            store.layout.dismiss_left_drawer_overlay();
+            store.template.set_last_saved_template_state(None);
+            ovrley_app::features::template_manager::create_new_template_request(store, services, None);
+        }),
+        ("settings-general", |store, services| {
+            ovrley_app::features::template_manager::answer_unsaved_confirm(store, services, ovrley_app::features::app_shell::UnsavedAnswer::Cancel);
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
             store.editor_shell.set_settings_section(SettingsSection::Settings);

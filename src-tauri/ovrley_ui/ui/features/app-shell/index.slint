@@ -30,6 +30,8 @@ export global AppShell {
     in property <bool> traffic-light-inset;
     // A file hovers the window and drops are accepted (D10).
     in property <bool> file-drag-hovering;
+    // `isProcessing`: an import or a template load runs; the workspace shows the loading overlay.
+    in property <bool> processing;
     // `v<VITE_OVRLEY_VERSION>`, read at compile time.
     in property <string> version;
 
@@ -49,6 +51,8 @@ export global AppShell {
     callback select-settings-section(SettingsSection);
     callback change-language(string);
     callback set-allow-agent-edits(bool);
+    // The File menu's "Import Activity".
+    callback import-activity();
 
     // Keys no focused control used (`key-pressed`) and the capture phase (`capture-key-pressed`),
     // as the window's root focus scope receives them. They answer whether the key was consumed.

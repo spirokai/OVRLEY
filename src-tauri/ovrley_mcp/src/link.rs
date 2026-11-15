@@ -11,7 +11,9 @@
 //!   arguments; the reply carries the id and the outcome.
 //! - **Sessions:** each connection is one agent session, for the header's indicator. A call is
 //!   handed to the window's UI thread through the hooks; the connection's thread waits for the
-//!   reply, up to [`CALL_TIMEOUT`].
+//!   reply, up to [`CALL_TIMEOUT`] for the dispatch, and without a limit once the call says it
+//!   answers later (a worker's result or the user's answer, Phase 3 D15). If the agent quits while
+//!   a call waits, the reply finds the connection closed and the session ends.
 
 use crate::catalog::ToolOutcome;
 use interprocess::local_socket::prelude::*;
@@ -23,7 +25,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
-/// How long a call waits for the window to answer.
+/// How long a call waits for its dispatch to answer or to say that it answers later.
 pub const CALL_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// What an agent sees when no window serves.
@@ -162,7 +164,7 @@ impl LinkClient {
 /// How the window's bridge reaches the app. Both run on connection threads; the implementations
 /// hand the work to the UI thread.
 pub struct BridgeHooks {
-    /// Runs a tool on the UI thread and returns its outcome (waiting up to [`CALL_TIMEOUT`]).
+    /// Runs a tool on the UI thread and returns its outcome (see the module docs for the waits).
     pub call: Arc<dyn Fn(String, Value) -> ToolOutcome + Send + Sync>,
     /// An agent session opened (`true`) or closed (`false`).
     pub session: Arc<dyn Fn(bool) + Send + Sync>,

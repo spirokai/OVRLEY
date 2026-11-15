@@ -33,6 +33,7 @@ impl Projections {
         }
         features::app_shell::project(&window, store, language_changed);
         features::toolbar::project(&window, store);
+        features::template_manager::project(&window, store);
     }
 }
 
@@ -53,6 +54,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::app_shell::initialize(window);
     features::app_shell::bind(window, &dispatcher);
     features::toolbar::bind(window, &dispatcher);
+    features::template_manager::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher
@@ -108,7 +110,12 @@ pub fn run(store: Store, paths: ovrley_core::paths::AppPaths, preferences: Prefe
         if let Some(window) = shown.upgrade() {
             when_winit_window_exists(&window, startup.clone());
         }
-        startup.dispatch(|store, _| store.bootstrap.set_startup_ready());
+        // `useAppBootstrap`: the template list and the last template; the startup screen shows
+        // until the restore has finished.
+        startup.dispatch(|store, services| {
+            ovrley_app::features::template_manager::fetch_templates(store, services, None);
+            ovrley_app::features::template_manager::restore_last_loaded_template(store, services, Box::new(|store, _| store.bootstrap.set_startup_ready()));
+        });
     });
 
     // Live preview (D17): Slint gives no reload notification, so the projections run on a short
