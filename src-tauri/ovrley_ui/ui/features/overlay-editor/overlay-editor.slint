@@ -3,7 +3,7 @@ import { AppText } from "../../components/app-text.slint";
 import { Checkerboard } from "../../components/checkerboard.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { UndoRedo } from "../undo-redo/index.slint";
-import { BackgroundMode, OverlayEditor, WidgetView, HandleView, GuideLabelView, BadgeView } from "index.slint";
+import { BackgroundMode, EditorCursor, OverlayEditor, WidgetView, HandleView, GuideLabelView, BadgeView } from "index.slint";
 
 // The selection layer over the stage (D12, D13): outlines in accent at one device pixel, square
 // accent handles rotated with their widget, the white rotation knob with its line, the guides
@@ -211,7 +211,13 @@ export component OverlayEditorView inherits Rectangle {
         height: root.height - root.toolbar-row;
         clip: true;
         TouchArea {
-            mouse-cursor: OverlayEditor.over-widget ? MouseCursor.move : MouseCursor.default;
+            mouse-cursor: OverlayEditor.cursor == EditorCursor.move ? MouseCursor.move
+                : OverlayEditor.cursor == EditorCursor.resize-ns ? MouseCursor.ns-resize
+                : OverlayEditor.cursor == EditorCursor.resize-ew ? MouseCursor.ew-resize
+                : OverlayEditor.cursor == EditorCursor.resize-nwse ? MouseCursor.nwse-resize
+                : OverlayEditor.cursor == EditorCursor.resize-nesw ? MouseCursor.nesw-resize
+                : OverlayEditor.cursor == EditorCursor.rotate ? MouseCursor.alias
+                : MouseCursor.default;
             pointer-event(event) => {
                 if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
                     OverlayEditor.pointer-down(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);

@@ -1,3 +1,7 @@
+// The pointer's cursor over the stage: move over a widget, resize cursors (turned with the
+// widget) over handles, and the knob's rotate cursor.
+export enum EditorCursor { default, move, resize-ns, resize-ew, resize-nwse, resize-nesw, rotate }
+
 // The canvas background behind the scene. Image and video arrive with Phase 6.
 export enum BackgroundMode { checker, black, white }
 
@@ -85,8 +89,7 @@ export global OverlayEditor {
     in property <length> marquee-width;
     in property <length> marquee-height;
     in property <[BadgeView]> badges;
-    // The pointer is over a widget (the move cursor).
-    in property <bool> over-widget;
+    in property <EditorCursor> cursor;
 
     // The editor area, the scroll area below the toolbar row, and the stage's padding.
     callback viewport-changed(editor-width: length, editor-height: length, scroll-width: length, scroll-height: length, padding: length, rem: length);

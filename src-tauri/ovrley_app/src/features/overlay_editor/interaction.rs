@@ -332,6 +332,60 @@ fn commit_selection(store: &mut Store, ids: &[String], preferred: Option<&str>) 
     store.editor.set_widget_selection(&ids, primary.as_deref());
 }
 
+/// The selection handle under a scene point.
+fn handle_at(store: &Store, scene_point: (f64, f64)) -> Option<Handle> {
+    let radius = handle_radius(store);
+    handles(store).into_iter().find(|(position, _)| (position.0 - scene_point.0).hypot(position.1 - scene_point.1) <= radius).map(|(_, handle)| handle)
+}
+
+/// The pointer's cursor over the stage.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EditorCursor {
+    Default,
+    Move,
+    /// A resize along `ns`, `ew`, `nwse` or `nesw`.
+    ResizeNs,
+    ResizeEw,
+    ResizeNwse,
+    ResizeNesw,
+    /// The rotation knob (Moveable's `alias`).
+    Rotate,
+}
+
+/// A resize cursor for a handle direction on a box rotated by `rotation` degrees: the direction's
+/// angle, turned with the box, to the nearest of the four resize cursors (Moveable rotates its
+/// cursors with the widget).
+fn resize_cursor(direction: (f64, f64), rotation: f64) -> EditorCursor {
+    let angle = direction.1.atan2(direction.0).to_degrees() + rotation;
+    let step = (((angle % 180.0) + 180.0) % 180.0 / 45.0).round() as i32 % 4;
+    match step {
+        0 => EditorCursor::ResizeEw,
+        1 => EditorCursor::ResizeNwse,
+        2 => EditorCursor::ResizeNs,
+        _ => EditorCursor::ResizeNesw,
+    }
+}
+
+/// What the cursor shows: a running gesture keeps its own; otherwise the handle, then the widget,
+/// under the pointer.
+pub fn cursor(store: &Store) -> EditorCursor {
+    let handle = match &store.overlay_editor.pointer {
+        PointerState::Gesture(gesture) => match gesture.kind {
+            GestureKind::Drag => return EditorCursor::Move,
+            GestureKind::Rotate => Some(Handle::Rotate),
+            GestureKind::Resize { direction } => Some(Handle::Resize { direction }),
+        },
+        PointerState::Marquee(_) => return EditorCursor::Default,
+        PointerState::Idle => store.overlay_editor.hovered_handle,
+    };
+    match handle {
+        Some(Handle::Rotate) => EditorCursor::Rotate,
+        Some(Handle::Resize { direction }) => resize_cursor(direction, selection_rotation(store)),
+        None if store.overlay_editor.hovered_widget_id.is_some() => EditorCursor::Move,
+        None => EditorCursor::Default,
+    }
+}
+
 /// A press on the stage at `point` (stage pixels).
 pub fn pointer_down(store: &mut Store, point: (f64, f64), modifiers: PointerModifiers) {
     cancel_gesture(store);
@@ -848,6 +902,7 @@ pub fn pointer_move(store: &mut Store, point: (f64, f64), modifiers: PointerModi
             store.overlay_editor.pointer = PointerState::Marquee(marquee);
         }
         PointerState::Idle => {
+            store.overlay_editor.hovered_handle = handle_at(store, scene_point);
             store.overlay_editor.hovered_widget_id = hit_widget(store, scene_point);
         }
     }
@@ -901,6 +956,7 @@ pub fn pointer_up(store: &mut Store, point: (f64, f64), modifiers: PointerModifi
 /// The pointer left the canvas: hover ends.
 pub fn pointer_leave(store: &mut Store) {
     store.overlay_editor.hovered_widget_id = None;
+    store.overlay_editor.hovered_handle = None;
 }
 
 /// [`pointer_leave`] as an action.
@@ -1293,6 +1349,30 @@ mod tests {
             assert!(variant["width"].as_f64().unwrap() > 200.0, "{widget:?}");
             assert_eq!(widget["x"], json!(100));
         });
+    }
+
+    #[test]
+    fn resize_cursors_turn_with_the_box() {
+        assert_eq!(resize_cursor((1.0, 0.0), 0.0), EditorCursor::ResizeEw);
+        assert_eq!(resize_cursor((0.0, -1.0), 0.0), EditorCursor::ResizeNs);
+        assert_eq!(resize_cursor((1.0, 1.0), 0.0), EditorCursor::ResizeNwse);
+        assert_eq!(resize_cursor((1.0, -1.0), 0.0), EditorCursor::ResizeNesw);
+        assert_eq!(resize_cursor((1.0, 0.0), 90.0), EditorCursor::ResizeNs);
+        assert_eq!(resize_cursor((1.0, 1.0), 90.0), EditorCursor::ResizeNesw);
+    }
+
+    #[test]
+    fn hovering_a_handle_shows_its_cursor() {
+        let (dispatcher, _) = editor(vec![backdrop("a", 100.0, 100.0)]);
+        press(&dispatcher, (110.0, 110.0), PointerModifiers::default());
+        release(&dispatcher, (110.0, 110.0));
+        let corner = dispatcher.with_store(|store| handles(store).into_iter().find(|(_, handle)| *handle == Handle::Resize { direction: (1.0, 1.0) }).unwrap().0);
+        drag_to(&dispatcher, corner, PointerModifiers::default());
+        assert_eq!(dispatcher.with_store(cursor), EditorCursor::ResizeNwse);
+        drag_to(&dispatcher, (110.0, 110.0), PointerModifiers::default());
+        assert_eq!(dispatcher.with_store(cursor), EditorCursor::Move);
+        drag_to(&dispatcher, (900.0, 450.0), PointerModifiers::default());
+        assert_eq!(dispatcher.with_store(cursor), EditorCursor::Default);
     }
 
     #[test]

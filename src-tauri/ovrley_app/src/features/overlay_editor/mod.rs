@@ -64,6 +64,8 @@ pub struct OverlayEditorState {
     pub pointer: interaction::PointerState,
     /// The widget under the pointer.
     pub hovered_widget_id: Option<String>,
+    /// The selection handle under the pointer.
+    pub hovered_handle: Option<interaction::Handle>,
     /// `clipboardRef`: copied widgets with their collections, local to the editor.
     pub clipboard: Vec<PreviewWidgetData>,
 }

@@ -3,7 +3,7 @@
 
 use crate::hooks::app_store_selectors::set_if_changed;
 use crate::platform::key_input::{key_input, SlintModifiers};
-use crate::{AppWindow, BackgroundMode, BadgeView, GuideLabelView, HandleView, OverlayEditor, WidgetView};
+use crate::{AppWindow, BackgroundMode, BadgeView, EditorCursor, GuideLabelView, HandleView, OverlayEditor, WidgetView};
 use ovrley_app::features::overlay_editor::geometry::GuideStyle;
 use ovrley_app::features::overlay_editor::interaction::{self, Handle, PointerModifiers};
 use ovrley_app::features::app_shell::EditorBackgroundMode;
@@ -224,7 +224,16 @@ fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
         })
         .collect();
     replace_model(global.get_badges(), badges, |model| global.set_badges(model));
-    set_if_changed(global.get_over_widget(), store.overlay_editor.hovered_widget_id.is_some(), |value| global.set_over_widget(value));
+    let cursor = match interaction::cursor(store) {
+        interaction::EditorCursor::Default => EditorCursor::Default,
+        interaction::EditorCursor::Move => EditorCursor::Move,
+        interaction::EditorCursor::ResizeNs => EditorCursor::ResizeNs,
+        interaction::EditorCursor::ResizeEw => EditorCursor::ResizeEw,
+        interaction::EditorCursor::ResizeNwse => EditorCursor::ResizeNwse,
+        interaction::EditorCursor::ResizeNesw => EditorCursor::ResizeNesw,
+        interaction::EditorCursor::Rotate => EditorCursor::Rotate,
+    };
+    set_if_changed(global.get_cursor(), cursor, |value| global.set_cursor(value));
 }
 
 fn modifiers(alt: bool, control: bool, shift: bool, meta: bool) -> PointerModifiers {
