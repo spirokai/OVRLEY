@@ -1,6 +1,6 @@
 import { Theme } from "../../theme/theme.slint";
 import { Icons } from "../../components/icons.slint";
-import { Button, ButtonVariant } from "../../components/button.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
 import { Popover } from "../../components/popover.slint";
 import { PlacementAlign } from "../../components/logic.slint";
 
@@ -32,7 +32,8 @@ component MenuItem inherits HorizontalLayout {
     }
 }
 
-// `ActivitySection`'s File menu: the `h-9` File button and a popover 13.75rem wide with `p-1`,
+// `ActivitySection`'s File menu: the File button, 2rem high like the template select's trigger (the
+// user's choice; React's is `h-9`), and a popover 13.75rem wide with `p-1`,
 // 6px below, aligned at the start. Phase 3 has "Import Activity"; the project and video items
 // arrive in Phase 6.
 export component FileMenu {
@@ -41,11 +42,12 @@ export component FileMenu {
     property <bool> open;
 
     trigger := Button {
-        height: 2.25rem;
+        size: ButtonSize.sm;
+        height: 2rem;
         icon: Icons.menu;
-        icon-size: 1rem;
+        icon-size: 0.875rem;
         text: @tr("app-shell.file" => "File");
-        spacing: 0.75rem;
+        spacing: 0.5rem;
         accessible-label: @tr("app-shell.fileMenu" => "File menu");
         clicked => {
             root.open = !root.open;
