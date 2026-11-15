@@ -2,12 +2,16 @@ import "../../assets/fonts/Figtree-variable.ttf";
 import "../../assets/fonts/FiraCode-variable.ttf";
 import { Theme, WindowMetrics } from "theme.slint";
 import { TooltipLayerView } from "../components/tooltip-layer.slint";
+import { AlertLayerView } from "../components/alert-layer.slint";
 
 // The one place that holds the scaling formula: the React root's
 // `font-size: clamp(9px, 0.584vw + 5.5px, 14.6px)`. Every rem in the UI follows it. It also hosts
 // the window's tooltip layer, above the content.
 export component FluidWindow inherits Window {
-    default-font-size: max(9px, min(14.6px, self.width * 0.00584 + 5.5px));
+    // From `WindowMetrics.width`, which the `changed width` handler below keeps current, not from
+    // `self.width`: rem widths in the content feed the window's minimum size, so a binding on the
+    // window's own width would be a binding loop.
+    default-font-size: max(9px, min(14.6px, WindowMetrics.width * 0.00584 + 5.5px));
     default-font-family: Theme.font-sans;
     default-font-weight: Theme.font-weight-normal;
     background: Theme.background;
@@ -25,4 +29,6 @@ export component FluidWindow inherits Window {
 
     @children
     TooltipLayerView { }
+    // Last, so the error alert stays above everything in the main tree (D12).
+    AlertLayerView { }
 }

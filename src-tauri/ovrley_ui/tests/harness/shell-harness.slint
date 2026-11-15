@@ -1,0 +1,57 @@
+import { FluidWindow } from "../../ui/theme/fluid-window.slint";
+import { Button } from "../../ui/components/button.slint";
+import { ToolbarDrawerLayout } from "../../ui/features/toolbar/toolbar-drawer-layout.slint";
+import { DrawerTool } from "../../ui/features/toolbar/index.slint";
+import { WindowControls } from "../../ui/features/app-shell/app-header.slint";
+
+// The shell harness: the drawer layout with a workspace that records presses and a control panel
+// with a button, and the window controls. The drawer state lives here, as the store would hold it.
+export component ShellHarness inherits FluidWindow {
+    width: 1100px;
+    height: 720px;
+    in-out property <bool> drawer-visible;
+    in-out property <bool> pinned;
+    out property <int> workspace-presses;
+    out property <int> control-panel-clicks;
+    out property <string> window-call;
+
+    VerticalLayout {
+        WindowControls {
+            minimize => { root.window-call = "minimize"; }
+            toggle-maximize => { root.window-call = "maximize"; }
+            close => { root.window-call = "close"; }
+        }
+        ToolbarDrawerLayout {
+            vertical-stretch: 1;
+            active-tool: DrawerTool.widgets;
+            drawer-visible: root.drawer-visible;
+            pinned: root.pinned;
+            trailing-width: 300px;
+            select-tool(tool) => { root.drawer-visible = !root.drawer-visible; }
+            set-pinned(pinned) => { root.pinned = pinned; root.drawer-visible = true; }
+            dismiss-overlay => { if !root.pinned { root.drawer-visible = false; } }
+
+            Rectangle {
+                horizontal-stretch: 1;
+                accessible-role: AccessibleRole.button;
+                accessible-label: "Workspace";
+                TouchArea {
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down { root.workspace-presses += 1; }
+                    }
+                }
+            }
+            Rectangle {
+                width: 300px;
+                VerticalLayout {
+                    alignment: center;
+                    Button {
+                        text: "Control panel button";
+                        accessible-label: "Control panel button";
+                        clicked => { root.control-panel-clicks += 1; }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -13,7 +13,7 @@ mod reconcile;
 pub mod services;
 pub mod slices;
 
-use crate::features::app_shell::{AppBootstrapState, TrafficLightInsetState, WindowCloseGuardState};
+use crate::features::app_shell::{AppBootstrapState, EditorShellState, TrafficLightInsetState, WindowCloseGuardState};
 use crate::features::toolbar::DrawerPreferenceState;
 use crate::i18n::I18nState;
 use crate::lib::preferences_store::PreferencesStore;
@@ -33,6 +33,7 @@ pub struct Store {
     /// `useDrawerPreference`'s last observed preference.
     pub drawer_preference: DrawerPreferenceState,
     pub bootstrap: AppBootstrapState,
+    pub editor_shell: EditorShellState,
     pub close_guard: WindowCloseGuardState,
     pub traffic_light_inset: TrafficLightInsetState,
 }

@@ -6,6 +6,7 @@ pub mod color_picker;
 pub mod color_utils;
 pub mod file_dialog;
 pub mod gradient_stops;
+pub mod keyboard_shortcuts;
 pub mod number_input;
 pub mod placement;
 pub mod preferences_store;

@@ -27,6 +27,7 @@ arboard = { version = "3.7", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png"] }
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 log = "0.4"
+serde_json = "1.0"
 pollster = "0.4"
 rfd = "0.16"
 slint = { version = "=1.18.1", default-features = false, features = [
@@ -79,6 +80,10 @@ required-features = ["dev-windows"]
 
 [[test]]
 name = "dialog"
+required-features = ["dev-windows"]
+
+[[test]]
+name = "shell"
 required-features = ["dev-windows"]
 
 [[test]]

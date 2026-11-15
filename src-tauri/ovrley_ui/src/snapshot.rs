@@ -14,7 +14,36 @@ use std::time::Duration;
 type Step = (&'static str, fn(&mut Store, &mut Services));
 
 fn tour() -> Vec<Step> {
-    vec![("startup", |_, _| {})]
+    use ovrley_app::features::app_shell::SettingsSection;
+    use ovrley_app::i18n::{change_language_preference, Locale};
+    use ovrley_app::store::slices::layout::LeftDrawerTool;
+    vec![
+        ("shell", |store, _| {
+            store.layout.set_left_drawer_pinned(false);
+            store.layout.dismiss_left_drawer_overlay();
+        }),
+        ("drawer-overlay", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Activity)),
+        ("drawer-pinned", |store, _| store.layout.set_left_drawer_pinned(true)),
+        ("settings-general", |store, _| {
+            store.layout.set_left_drawer_pinned(false);
+            store.layout.dismiss_left_drawer_overlay();
+            store.editor_shell.set_settings_section(SettingsSection::Settings);
+            store.editor_shell.open_settings();
+        }),
+        ("settings-shortcuts", |store, _| store.editor_shell.set_settings_section(SettingsSection::Shortcuts)),
+        ("error-over-dialog", |store, _| store.media.set_error_message("Project save failed [project_error:save_failed]".into())),
+        ("german", |store, services| {
+            store.editor_shell.close_settings();
+            store.media.set_error_message("ffmpeg exited with status 1:\nInvalid argument".into());
+            store.layout.select_left_drawer_tool(LeftDrawerTool::Widgets);
+            change_language_preference(store, services, Locale::De);
+        }),
+        ("english-again", |store, services| {
+            store.media.clear_error();
+            store.layout.dismiss_left_drawer_overlay();
+            change_language_preference(store, services, Locale::En);
+        }),
+    ]
 }
 
 /// Starts the tour when `OVRLEY_SNAPSHOT` is set.

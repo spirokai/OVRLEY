@@ -27,7 +27,7 @@ fn start() -> Result<(), String> {
     let distribution = ovrley_services::distribution::detect()?;
     log::info!("{distribution:?} distribution; settings in {}", roots.app_data_dir.display());
 
-    let preferences = PreferencesStore::open(&roots.app_data_dir)?;
+    let preferences = open_preferences(&roots.app_data_dir)?;
     let store = Store::hydrate(&preferences).unwrap_or_else(|error| {
         log::error!("startup failed: {error}");
         let mut store = Store::default();
@@ -37,6 +37,17 @@ fn start() -> Result<(), String> {
 
     let gpu = ovrley_ui::platform::select_backend()?;
     ovrley_ui::app::run(store, preferences, gpu)
+}
+
+/// The settings file. The debug snapshot tour (`OVRLEY_SNAPSHOT`) changes the language and the
+/// drawer, so it reads the file but never writes it: it is shared with the React app.
+fn open_preferences(app_data_dir: &std::path::Path) -> Result<PreferencesStore, String> {
+    if cfg!(debug_assertions) && std::env::var_os("OVRLEY_SNAPSHOT").is_some() {
+        let path = app_data_dir.join(ovrley_app::lib::preferences_store::PREFERENCES_FILE_NAME);
+        let values = ovrley_app::lib::preferences_store::read_preferences_file(&path)?;
+        return Ok(PreferencesStore::with_sink(values, Box::new(ovrley_app::lib::preferences_store::MemorySink::default())));
+    }
+    PreferencesStore::open(app_data_dir)
 }
 
 /// The installed build's resources: `Contents/Resources` in a macOS bundle, the executable's

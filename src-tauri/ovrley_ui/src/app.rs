@@ -20,15 +20,19 @@ use std::sync::Arc;
 struct Projections {
     window: slint::Weak<AppWindow>,
     language: Cell<Locale>,
+    /// The first run writes what depends on the language even though it has not changed.
+    first: Cell<bool>,
 }
 
 impl Projections {
     fn run(&self, store: &Store) {
         let Some(window) = self.window.upgrade() else { return };
-        if self.language.replace(store.i18n.language) != store.i18n.language {
+        let language_changed = self.language.replace(store.i18n.language) != store.i18n.language || self.first.replace(false);
+        if language_changed {
             select_language(store.i18n.language);
         }
-        features::app_shell::project(&window, store);
+        features::app_shell::project(&window, store, language_changed);
+        features::toolbar::project(&window, store);
     }
 }
 
@@ -54,7 +58,11 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
     let projections = Projections {
         window: window.as_weak(),
         language: Cell::new(language),
+        first: Cell::new(true),
     };
+    features::app_shell::initialize(&window);
+    features::app_shell::bind(&window, &dispatcher);
+    features::toolbar::bind(&window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
 

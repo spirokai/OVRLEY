@@ -1,0 +1,388 @@
+import { Theme, WindowMetrics } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Dialog, DialogTitle, DialogDescription } from "../../components/dialog.slint";
+import { Shadow, ShadowSize } from "../../components/shadow.slint";
+import { Select } from "../../components/select.slint";
+import { ScrollArea } from "../../components/scroll-area.slint";
+import { Kbd } from "../../components/kbd.slint";
+import { Choice, PlacementAlign } from "../../components/logic.slint";
+import { SettingsSection, ShortcutGroupView } from "index.slint";
+
+// A dialog panel: `rounded-sm`, `accent-border` at 80%, `card`, `shadow-2xl`.
+component DialogPanel inherits Rectangle {
+    Shadow {
+        size: ShadowSize.xxl;
+        radius: Theme.radius-sm * 1rem;
+    }
+    Rectangle {
+        background: Theme.card;
+        border-width: 1px;
+        border-color: Theme.accent-border.transparentize(0.2);
+        border-radius: Theme.radius-sm * 1rem;
+    }
+    @children
+}
+
+// `UnsavedChangesDialog`: at most 28rem wide, 1.5rem padding. Escape or the scrim answers cancel.
+// Cancel and Save are outline buttons on `surface`; Discard is the default button.
+export component UnsavedChangesDialog {
+    in property <bool> open;
+    in property <string> title;
+    in property <string> description;
+    in property <string> discard-label;
+    in property <string> cancel-label: "Cancel";
+    in property <string> save-label: "Save";
+    callback cancel();
+    callback save();
+    callback discard();
+
+    Dialog {
+        open: root.open;
+        title: root.title;
+        description: root.description;
+        open-changed(open) => {
+            if !open {
+                root.cancel();
+            }
+        }
+        DialogPanel {
+            max-width: 28rem;
+            preferred-width: 28rem;
+            VerticalLayout {
+                padding: 1.5rem;
+                spacing: 0px;
+                HorizontalLayout {
+                    spacing: 1rem;
+                    alignment: start;
+                    Icon {
+                        glyph: Icons.file-plus-2;
+                        size: 1rem;
+                        color: Theme.primary;
+                    }
+                    DialogTitle {
+                        content: root.title;
+                        font-size: Theme.text-sm * 1rem;
+                        font-weight: Theme.font-weight-semibold;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 0.5rem;
+                    padding-bottom: 0.5rem;
+                    DialogDescription {
+                        content: root.description;
+                        font-size: Theme.text-xs * 1rem;
+                        line-height: 1.25 / 0.75;
+                        color: Theme.muted-foreground;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 1.5rem;
+                    spacing: 0.75rem;
+                    alignment: end;
+                    Button {
+                        variant: ButtonVariant.outline;
+                        text: root.cancel-label;
+                        background: Theme.surface;
+                        hover-background: Theme.surface-elevated;
+                        border-color: Theme.border.transparentize(0.3);
+                        text-color: Theme.foreground;
+                        clicked => {
+                            root.cancel();
+                        }
+                    }
+                    Button {
+                        variant: ButtonVariant.outline;
+                        text: root.save-label;
+                        background: Theme.surface;
+                        hover-background: Theme.surface-elevated;
+                        border-color: Theme.border.transparentize(0.3);
+                        text-color: Theme.foreground;
+                        clicked => {
+                            root.save();
+                        }
+                    }
+                    Button {
+                        text: root.discard-label;
+                        clicked => {
+                            root.discard();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A labelled row of the General panel: the label on the left, the control on the right.
+component SettingsRow inherits HorizontalLayout {
+    in property <string> label;
+    spacing: 1.5rem;
+    AppText {
+        content: root.label;
+        font-size: Theme.text-sm * 1rem;
+        horizontal-stretch: 1;
+    }
+    @children
+}
+
+// `GeneralSettingsPanel` (D15): the language select. Units arrive in Phase 3, the map tile cache
+// in Phase 5.
+component GeneralSettingsPanel {
+    in property <string> language;
+    in property <[Choice]> languages;
+    callback change-language(string);
+
+    ScrollArea {
+        width: 100%;
+        height: 100%;
+        thin: true;
+        VerticalLayout {
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+            spacing: 1rem;
+            alignment: start;
+            SettingsRow {
+                label: @tr("app-shell.language" => "Language");
+                Select {
+                    width: 11rem;
+                    height: 2rem;
+                    items: root.languages;
+                    value: root.language;
+                    align: PlacementAlign.end;
+                    background: Theme.surface;
+                    font-size: Theme.text-xs * 1rem;
+                    accessible-label: @tr("app-shell.language" => "Language");
+                    value-changed(value) => {
+                        root.change-language(value);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// `KeyboardShortcutsPanel`: an intro paragraph, then under a top border the groups, 2rem apart,
+// each row on a two-column grid (16rem and the rest, 2rem apart).
+component KeyboardShortcutsPanel {
+    in property <[ShortcutGroupView]> groups;
+
+    VerticalLayout {
+        HorizontalLayout {
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+            padding-top: 1rem;
+            padding-bottom: 0.75rem;
+            AppText {
+                content: @tr("app-shell.keyboardShortcutsDescription" => "You can use the following keyboard shortcuts to improve your workflow:");
+                font-size: 0.9rem;
+                font-weight: 300;
+                wrap: word-wrap;
+            }
+        }
+        Rectangle {
+            height: 1px;
+            background: Theme.border.transparentize(0.4);
+        }
+        ScrollArea {
+            thin: true;
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding-left: 1.5rem;
+                padding-right: 1.5rem;
+                padding-top: 1rem;
+                padding-bottom: 1rem;
+                spacing: 2rem;
+                for group in root.groups: VerticalLayout {
+                    spacing: 0.75rem;
+                    AppText {
+                        content: group.name;
+                        uppercase: true;
+                        font-size: 1rem;
+                        font-weight: Theme.font-weight-extrabold;
+                        color: Theme.primary;
+                    }
+                    VerticalLayout {
+                        spacing: 0.5rem;
+                        for row in group.rows: HorizontalLayout {
+                            spacing: 2rem;
+                            HorizontalLayout {
+                                width: 16rem;
+                                spacing: 0.75rem;
+                                alignment: start;
+                                for option in row.options: HorizontalLayout {
+                                    spacing: 0.25rem;
+                                    for modifier[index] in option.modifiers: HorizontalLayout {
+                                        spacing: 0.25rem;
+                                        Kbd {
+                                            text: modifier;
+                                        }
+                                        if index < option.modifiers.length - 1: AppText {
+                                            content: "+";
+                                            font-size: 0.9rem;
+                                            color: Theme.muted-foreground;
+                                        }
+                                    }
+                                    if option.modifiers.length > 0 && option.keys.length > 0: AppText {
+                                        content: "+";
+                                        font-size: 0.9rem;
+                                        color: Theme.muted-foreground;
+                                    }
+                                    for key in option.keys: Kbd {
+                                        text: key;
+                                    }
+                                }
+                            }
+                            AppText {
+                                content: row.description;
+                                font-size: Theme.text-xs * 1rem;
+                                horizontal-stretch: 1;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// A section button of the settings navigation: 2.25rem high, the selected one in the `default`
+// variant and marked as the current page; the others ghost and muted, `foreground` on hover.
+component SectionButton {
+    in property <string> label;
+    in property <string> glyph;
+    in property <bool> selected;
+    callback clicked();
+    min-height: 2.25rem;
+    Button {
+        width: root.width;
+        variant: root.selected ? ButtonVariant.default : ButtonVariant.ghost;
+        height: 2.25rem;
+        text: root.label;
+        icon: root.glyph;
+        icon-size: 1rem;
+        alignment: LayoutAlignment.start;
+        spacing: 0.75rem;
+        padding-x: 0.75rem;
+        text-color: root.selected ? Theme.primary-foreground : Theme.muted-foreground;
+        hover-text-color: root.selected ? Theme.primary-foreground : Theme.foreground;
+        pressed: root.selected;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// `SettingsDialog`: 70% of the window height (at most 42.5rem) and at most 56rem wide; a 12rem
+// section navigation, a close button, and the section's title row above its panel.
+export component SettingsDialog {
+    in property <bool> open;
+    in property <SettingsSection> section;
+    in property <string> language;
+    in property <[Choice]> languages;
+    in property <[ShortcutGroupView]> shortcut-groups;
+    callback close();
+    callback select-section(SettingsSection);
+    callback change-language(string);
+
+    property <string> section-title: root.section == SettingsSection.settings ? @tr("app-shell.settings" => "Settings") : @tr("app-shell.shortcuts" => "Shortcuts");
+
+    Dialog {
+        open: root.open;
+        title: root.section-title;
+        open-changed(open) => {
+            if !open {
+                root.close();
+            }
+        }
+        DialogPanel {
+            preferred-width: min(56rem, WindowMetrics.width - 2rem);
+            max-width: 56rem;
+            height: min(42.5rem, WindowMetrics.height * 0.7);
+            HorizontalLayout {
+                VerticalLayout {
+                    width: 12rem;
+                    padding: 0.75rem;
+                    spacing: 0.25rem;
+                    alignment: start;
+                    accessible-role: AccessibleRole.list;
+                    accessible-label: @tr("app-shell.settings" => "Settings");
+                    SectionButton {
+                        label: @tr("app-shell.settings" => "Settings");
+                        glyph: Icons.settings;
+                        selected: root.section == SettingsSection.settings;
+                        clicked => {
+                            root.select-section(SettingsSection.settings);
+                        }
+                    }
+                    SectionButton {
+                        label: @tr("app-shell.shortcuts" => "Shortcuts");
+                        glyph: Icons.keyboard;
+                        selected: root.section == SettingsSection.shortcuts;
+                        clicked => {
+                            root.select-section(SettingsSection.shortcuts);
+                        }
+                    }
+                }
+                Rectangle {
+                    width: 1px;
+                    background: Theme.border.transparentize(0.4);
+                }
+                VerticalLayout {
+                    padding-top: 1.5rem;
+                    spacing: 0.5rem;
+                    horizontal-stretch: 1;
+                    HorizontalLayout {
+                        padding-left: 1.5rem;
+                        padding-right: 4rem;
+                        spacing: 0.75rem;
+                        Icon {
+                            glyph: root.section == SettingsSection.settings ? Icons.settings : Icons.keyboard;
+                            size: 1rem;
+                            color: Theme.primary;
+                        }
+                        DialogTitle {
+                            content: root.section-title;
+                            font-size: Theme.text-sm * 1rem;
+                            font-weight: Theme.font-weight-semibold;
+                            overflow: elide;
+                            horizontal-stretch: 1;
+                        }
+                    }
+                    if root.section == SettingsSection.settings: GeneralSettingsPanel {
+                        vertical-stretch: 1;
+                        language: root.language;
+                        languages: root.languages;
+                        change-language(value) => {
+                            root.change-language(value);
+                        }
+                    }
+                    if root.section == SettingsSection.shortcuts: KeyboardShortcutsPanel {
+                        vertical-stretch: 1;
+                        groups: root.shortcut-groups;
+                    }
+                }
+            }
+            Button {
+                x: parent.width - self.width - 1rem;
+                y: 1rem;
+                variant: ButtonVariant.ghost;
+                size: ButtonSize.icon-sm;
+                width: 2rem;
+                height: 2rem;
+                icon: Icons.x;
+                icon-size: 1rem;
+                text-color: Theme.muted-foreground;
+                hover-text-color: Theme.foreground;
+                accessible-label: @tr("app-shell.close" => "Close");
+                clicked => {
+                    root.close();
+                }
+            }
+        }
+    }
+}

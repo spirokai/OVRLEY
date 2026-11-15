@@ -1,0 +1,172 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+
+// One window button: 2.5rem wide, full height, muted; on hover `surface-elevated` and
+// `foreground`, or `destructive` with white text for close.
+component WindowButton inherits Rectangle {
+    in property <string> glyph;
+    in property <length> glyph-size: 1rem;
+    in property <bool> destructive;
+    in property <string> label;
+    callback clicked();
+
+    width: 2.5rem;
+    background: touch.has-hover ? (root.destructive ? Theme.destructive : Theme.surface-elevated) : transparent;
+    animate background { duration: Theme.duration-150; }
+    accessible-role: AccessibleRole.button;
+    accessible-label: root.label;
+    accessible-action-default => {
+        root.clicked();
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+    Icon {
+        glyph: root.glyph;
+        size: root.glyph-size;
+        color: touch.has-hover ? (root.destructive ? #ffffff : Theme.foreground) : Theme.muted-foreground;
+    }
+}
+
+component WindowButtonSeparator inherits Rectangle {
+    width: 1px;
+    VerticalLayout {
+        alignment: center;
+        Rectangle {
+            height: 1.5rem;
+            background: Theme.border.transparentize(0.5);
+        }
+    }
+}
+
+// `WindowControls` on Windows and Linux: minimise, maximise and close in a 2.25rem row. On macOS
+// the native traffic lights are used and only a 0.025rem spacer remains. "Minimize" and "Maximize"
+// are hard-coded English, as today.
+export component WindowControls {
+    callback minimize();
+    callback toggle-maximize();
+    callback close();
+
+    if Platform.os == OperatingSystemType.macos: Rectangle {
+        width: 0.025rem;
+    }
+    if Platform.os != OperatingSystemType.macos: HorizontalLayout {
+        padding-left: 0.5rem;
+        height: 2.25rem;
+        WindowButton {
+            glyph: Icons.minus;
+            label: "Minimize";
+            clicked => {
+                root.minimize();
+            }
+        }
+        WindowButtonSeparator { }
+        WindowButton {
+            glyph: Icons.square;
+            glyph-size: 0.875rem;
+            label: "Maximize";
+            clicked => {
+                root.toggle-maximize();
+            }
+        }
+        WindowButtonSeparator { }
+        WindowButton {
+            glyph: Icons.x;
+            destructive: true;
+            label: @tr("app-shell.close" => "Close");
+            clicked => {
+                root.close();
+            }
+        }
+    }
+}
+
+// `AppHeader`: `card` with a bottom border; 0.75rem top and bottom padding, 0.25rem right, and
+// 1.5rem left, or 7rem while the macOS traffic lights overlay it. Three columns 1.5rem apart:
+// the logo and version (`ActivitySection`; the File menu arrives in Phase 3), the template column
+// (Phase 3, empty), and the right column with the window controls. Empty header space drags the
+// window; presses on controls stay with the controls.
+export component AppHeader inherits Rectangle {
+    in property <bool> traffic-light-inset;
+    in property <string> version;
+    callback minimize-window();
+    callback toggle-maximize-window();
+    callback close-window();
+
+    background: Theme.card;
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    WindowMoveArea {
+        HorizontalLayout {
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+            padding-right: 0.25rem;
+            padding-left: root.traffic-light-inset ? 7rem : 1.5rem;
+            spacing: 1.5rem;
+
+            // ActivitySection's left part: logo, divider, version.
+            HorizontalLayout {
+                spacing: 0.5rem;
+                alignment: start;
+                HorizontalLayout {
+                    padding-right: 0.75rem;
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../../../../app/public/logo.svg");
+                            height: 1.25rem;
+                            accessible-role: AccessibleRole.image;
+                            accessible-label: "OVRLEY";
+                        }
+                    }
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 1px;
+                        height: 2rem;
+                        background: Theme.border.transparentize(0.4);
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 0.25rem;
+                    padding-left: 0.75rem;
+                    AppText {
+                        content: root.version;
+                        font-size: 0.8rem;
+                        font-weight: Theme.font-weight-semibold;
+                        color: Theme.muted-foreground.transparentize(0.3);
+                        line-height: Theme.leading-none;
+                    }
+                }
+            }
+            // The template column (Phase 3).
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+            HorizontalLayout {
+                alignment: end;
+                spacing: 0.75rem;
+                WindowControls {
+                    minimize => {
+                        root.minimize-window();
+                    }
+                    toggle-maximize => {
+                        root.toggle-maximize-window();
+                    }
+                    close => {
+                        root.close-window();
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,13 @@
+// The drawer's tools, in the rail's order.
+export enum DrawerTool { projects, activity, video, video-sync, widgets }
+
+// The toolbar feature's global (D5), written by `src/features/toolbar.rs`.
+export global Toolbar {
+    in property <DrawerTool> active-tool: DrawerTool.widgets;
+    in property <bool> visible;
+    in property <bool> pinned;
+
+    callback select-tool(DrawerTool);
+    callback set-pinned(bool);
+    callback dismiss-overlay();
+}

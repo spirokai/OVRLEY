@@ -1,32 +1,98 @@
 import { FluidWindow } from "../theme/fluid-window.slint";
 import { Theme } from "../theme/theme.slint";
 import { AppShell } from "../features/app-shell/index.slint";
+import { AppHeader } from "../features/app-shell/app-header.slint";
+import { ControlPanel, LoadingOverlay, StartupError } from "../features/app-shell/shell-panels.slint";
+import { SettingsDialog } from "../features/app-shell/dialogs.slint";
+import { Toolbar } from "../features/toolbar/index.slint";
+import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 
-// `main.jsx`'s failure page: the whole window, `p-8`, destructive text, announced as an alert.
-component StartupError inherits Rectangle {
-    in property <string> message;
-    background: Theme.background;
-    VerticalLayout {
-        padding: 2rem;
-        Text {
-            text: root.message;
-            color: Theme.destructive;
-            wrap: word-wrap;
-            accessible-role: text;
-            accessible-label: root.message;
-        }
-    }
-}
-
-// The composition root that `App.jsx` is (D5). Window chrome per platform (D9): on macOS the native
-// title bar stays, transparent, over the header; elsewhere the window has no frame, draws its own
-// controls, and resizes from Slint's own border.
+// The composition root that `App.jsx` is (D5): the header, then the drawer layout with the
+// workspace and the control panel, then the dialogs. Window chrome per platform (D9): on macOS the
+// native title bar stays, transparent, over the header; elsewhere the window has no frame, draws
+// its own controls, and resizes from Slint's own border.
 export component AppWindow inherits FluidWindow {
     title: "OVRLEY";
     min-width: 1100px;
     min-height: 720px;
+    // The Tauri window's size; it opens maximised.
+    preferred-width: 1920px;
+    preferred-height: 1080px;
     no-frame: Platform.os != OperatingSystemType.macos;
     resize-border-width: Platform.os == OperatingSystemType.macos ? 0px : 6px;
+
+    property <length> control-panel-width: 26.5rem;
+
+    VerticalLayout {
+        AppHeader {
+            traffic-light-inset: AppShell.traffic-light-inset;
+            version: AppShell.version;
+            minimize-window => {
+                AppShell.minimize-window();
+            }
+            toggle-maximize-window => {
+                AppShell.toggle-maximize-window();
+            }
+            close-window => {
+                AppShell.close-window();
+            }
+        }
+        ToolbarDrawerLayout {
+            vertical-stretch: 1;
+            active-tool: Toolbar.active-tool;
+            drawer-visible: Toolbar.visible;
+            pinned: Toolbar.pinned;
+            trailing-width: root.control-panel-width;
+            select-tool(tool) => {
+                Toolbar.select-tool(tool);
+            }
+            set-pinned(pinned) => {
+                Toolbar.set-pinned(pinned);
+            }
+            dismiss-overlay => {
+                Toolbar.dismiss-overlay();
+            }
+            open-settings => {
+                AppShell.open-settings();
+            }
+
+            // The workspace: the editor and the player arrive in Phases 3 and 4.
+            Rectangle {
+                horizontal-stretch: 1;
+                background: Theme.surface-darken;
+            }
+            Rectangle {
+                width: root.control-panel-width;
+                background: Theme.card.transparentize(0.4);
+                ControlPanel { }
+            }
+        }
+    }
+
+    SettingsDialog {
+        open: AppShell.settings-open;
+        section: AppShell.settings-section;
+        language: AppShell.language;
+        languages: AppShell.languages;
+        shortcut-groups: AppShell.shortcut-groups;
+        close => {
+            AppShell.close-settings();
+        }
+        select-section(section) => {
+            AppShell.select-settings-section(section);
+        }
+        change-language(code) => {
+            AppShell.change-language(code);
+        }
+    }
+
+    // `!toolbarDrawer.initialized || !startupReady`: the startup screen.
+    if AppShell.show-startup-screen && AppShell.startup-error == "": Rectangle {
+        background: Theme.background;
+        LoadingOverlay {
+            label: @tr("app.ovrleyIsStarting" => "OVRLEY is starting...");
+        }
+    }
 
     if AppShell.startup-error != "": StartupError {
         message: AppShell.startup-error;

@@ -1,5 +1,6 @@
 import { Theme, WindowMetrics } from "../theme/theme.slint";
 import { AppText } from "app-text.slint";
+import { AlertLayerView } from "alert-layer.slint";
 
 // dialog.jsx: modal over the whole window. The scrim is `surface-overlay` at the caller's opacity
 // (today 70% or 82%); the 12px backdrop blur is not available in Slint 1.18 (Q3). The slot is
@@ -74,6 +75,8 @@ export component Dialog {
                 }
             }
         }
+        // The error alert stays visible and clickable above an open dialog (D12).
+        AlertLayerView { }
     }
 }
 

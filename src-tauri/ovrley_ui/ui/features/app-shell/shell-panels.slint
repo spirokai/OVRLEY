@@ -1,0 +1,116 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icons } from "../../components/icons.slint";
+import { TabsList, TabsContent, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import { ScrollArea } from "../../components/scroll-area.slint";
+
+// `ControlPanel`: two equal tabs, Settings and Widgets, over a scrolling area that keeps a stable
+// gutter. The tab is local state, uncontrolled as today. A 1px left divider is drawn above the
+// content. The tab contents arrive in Phase 3.
+export component ControlPanel inherits Rectangle {
+    property <string> tab: "settings";
+    background: Theme.card;
+
+    VerticalLayout {
+        TabsList {
+            variant: TabsListVariant.main;
+            trigger-variant: TabsTriggerVariant.main;
+            stretch: true;
+            items: [
+                { value: "settings", label: @tr("app-shell.settings" => "Settings"), icon: Icons.settings-2 },
+                { value: "widgets", label: @tr("app-shell.widgets" => "Widgets"), icon: Icons.activity },
+            ];
+            value: root.tab;
+            value-changed(value) => {
+                root.tab = value;
+            }
+        }
+        ScrollArea {
+            vertical-stretch: 1;
+            TabsContent {
+                value: "settings";
+                active-value: root.tab;
+            }
+            TabsContent {
+                value: "widgets";
+                active-value: root.tab;
+            }
+        }
+    }
+    Rectangle {
+        x: 0px;
+        width: 1px;
+        background: Theme.border;
+    }
+}
+
+// The 2rem spinner: a circle at 25% opacity and a quarter arc at 75%, turning once a second.
+component Spinner {
+    in property <length> size: 2rem;
+    in property <color> color: Theme.muted-foreground;
+    width: root.size;
+    height: root.size;
+    Rectangle {
+        transform-rotation: mod(animation-tick(), 1s) / 1s * 360deg;
+        Path {
+            width: root.size;
+            height: root.size;
+            viewbox-width: 24;
+            viewbox-height: 24;
+            commands: "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0";
+            fill: transparent;
+            stroke: root.color.transparentize(0.75);
+            stroke-width: root.size * 4 / 24;
+        }
+        Path {
+            width: root.size;
+            height: root.size;
+            viewbox-width: 24;
+            viewbox-height: 24;
+            commands: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z";
+            fill: root.color.transparentize(0.25);
+        }
+    }
+}
+
+// `LoadingOverlay`: fills its parent with `surface-overlay` at 95%; a spinner above a `text-sm`,
+// muted label, 0.5rem apart.
+export component LoadingOverlay inherits Rectangle {
+    in property <string> label: @tr("app-shell.loadingEditorData" => "Loading editor data...");
+    background: Theme.surface-overlay.transparentize(0.05);
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.label;
+    // The overlay takes the pointer, as the React overlay covers what is under it.
+    TouchArea { }
+    VerticalLayout {
+        alignment: center;
+        spacing: 0.5rem;
+        HorizontalLayout {
+            alignment: center;
+            Spinner { }
+        }
+        AppText {
+            content: root.label;
+            horizontal-alignment: center;
+            font-size: Theme.text-sm * 1rem;
+            color: Theme.muted-foreground;
+        }
+    }
+}
+
+// `main.jsx`'s failure page: the whole window, `p-8`, destructive text, announced as an alert.
+export component StartupError inherits Rectangle {
+    in property <string> message;
+    background: Theme.background;
+    VerticalLayout {
+        padding: 2rem;
+        alignment: start;
+        AppText {
+            content: root.message;
+            color: Theme.destructive;
+            wrap: word-wrap;
+            accessible-role: AccessibleRole.text;
+            accessible-live-region: assertive;
+        }
+    }
+}

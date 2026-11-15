@@ -33,6 +33,8 @@ import { FontSelectField } from "../components/font-select-field.slint";
 import { HexColorPicker } from "../components/hex-color-picker.slint";
 import { GradientPicker } from "../components/gradient-picker.slint";
 import { GradientStop } from "../components/logic.slint";
+import { UnsavedChangesDialog } from "../features/app-shell/dialogs.slint";
+import { LoadingOverlay } from "../features/app-shell/shell-panels.slint";
 import { PlacementSide, PlacementAlign } from "../components/logic.slint";
 
 // One section of the showcase: a heading and its demos.
@@ -95,6 +97,8 @@ export component ShowcaseWindow inherits FluidWindow {
     property <float> inline-value: 12.5;
     in-out property <bool> popover-open;
     in-out property <bool> dialog-open;
+    in-out property <bool> unsaved-open;
+    in-out property <string> unsaved-answer;
     // For the snapshot mode.
     public function open-select() {
         demo-select.open();
@@ -611,6 +615,34 @@ export component ShowcaseWindow inherits FluidWindow {
                             open: root.open-item == index;
                             AppText { content: title + " settings would go here."; color: Theme.muted-foreground; }
                         }
+                    }
+                }
+            }
+
+            // Phase 2 shell pieces with no caller yet.
+            Section {
+                title: "Shell";
+                Row {
+                    caption: "Unsaved changes dialog";
+                    Button { text: "Open"; clicked => { root.unsaved-open = true; } }
+                    AppText { content: root.unsaved-answer == "" ? "" : "Answer: " + root.unsaved-answer; color: Theme.muted-foreground; }
+                    UnsavedChangesDialog {
+                        open: root.unsaved-open;
+                        title: "Start a new template?";
+                        description: "Your template has unsaved changes. Save them first, discard them, or keep editing.";
+                        discard-label: "Discard";
+                        cancel => { root.unsaved-open = false; root.unsaved-answer = "cancel"; }
+                        save => { root.unsaved-open = false; root.unsaved-answer = "save"; }
+                        discard => { root.unsaved-open = false; root.unsaved-answer = "discard"; }
+                    }
+                }
+                Row {
+                    caption: "Loading overlay";
+                    Rectangle {
+                        width: 24rem;
+                        height: 10rem;
+                        background: Theme.surface-darken;
+                        LoadingOverlay { }
                     }
                 }
             }

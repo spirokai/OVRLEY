@@ -1,3 +1,24 @@
+import { Choice } from "../../components/logic.slint";
+
+// The settings dialog's sections, in the navigation's order.
+export enum SettingsSection { settings, shortcuts }
+
+// One way to press a shortcut: modifier labels joined by "+", then the alternative keys.
+export struct ShortcutOptionView {
+    modifiers: [string],
+    keys: [string],
+}
+
+export struct ShortcutRowView {
+    description: string,
+    options: [ShortcutOptionView],
+}
+
+export struct ShortcutGroupView {
+    name: string,
+    rows: [ShortcutRowView],
+}
+
 // The app-shell feature's global (D5): the properties its projection writes and the callbacks
 // `src/features/app_shell.rs` binds to dispatches. Only the shell's composition components read it.
 export global AppShell {
@@ -7,4 +28,23 @@ export global AppShell {
     in property <string> startup-error;
     // `useTrafficLightInset`: macOS, and the window is not fullscreen.
     in property <bool> traffic-light-inset;
+    // `v<VITE_OVRLEY_VERSION>`, read at compile time.
+    in property <string> version;
+
+    in property <bool> settings-open;
+    in property <SettingsSection> settings-section;
+    // The resolved language's code, and the 15 locales with their native labels.
+    in property <string> language;
+    in property <[Choice]> languages;
+    in property <[ShortcutGroupView]> shortcut-groups;
+
+    callback open-settings();
+    callback close-settings();
+    callback select-settings-section(SettingsSection);
+    callback change-language(string);
+
+    // The window buttons: minimise and maximise change no app state; close goes through the guard.
+    callback minimize-window();
+    callback toggle-maximize-window();
+    callback close-window();
 }
