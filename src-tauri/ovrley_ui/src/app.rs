@@ -38,13 +38,31 @@ impl Projections {
 
 /// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
 /// the compositor (Phase 6).
-pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) -> Result<(), String> {
-    let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
-    crate::install_component_logic(&window);
+/// Wires `window` to a dispatcher over `store` and `services`: the component logic, the language,
+/// the features' callbacks and projections, and a first projection. The app and the window tests
+/// both start here; the tests pass fake services.
+pub fn compose(window: &AppWindow, store: Store, services: ServiceParts) -> Dispatcher {
+    crate::install_component_logic(window);
     let language = store.i18n.language;
     select_language(language);
+    let dispatcher = Dispatcher::new(store, services);
+    let projections = Projections {
+        window: window.as_weak(),
+        language: Cell::new(language),
+        first: Cell::new(true),
+    };
+    features::app_shell::initialize(window);
+    features::app_shell::bind(window, &dispatcher);
+    features::toolbar::bind(window, &dispatcher);
+    dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
+    dispatcher.reproject();
+    dispatcher
+}
 
-    let dispatcher = Dispatcher::new(
+pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) -> Result<(), String> {
+    let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
+    let dispatcher = compose(
+        &window,
         store,
         ServiceParts {
             preferences,
@@ -55,16 +73,6 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
         },
     );
     platform::install_ui_dispatch(dispatcher.handle());
-    let projections = Projections {
-        window: window.as_weak(),
-        language: Cell::new(language),
-        first: Cell::new(true),
-    };
-    features::app_shell::initialize(&window);
-    features::app_shell::bind(&window, &dispatcher);
-    features::toolbar::bind(&window, &dispatcher);
-    dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
-    dispatcher.reproject();
 
     // The close guard decides; the window stays until it does.
     let close = dispatcher.handle();

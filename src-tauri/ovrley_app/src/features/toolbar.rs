@@ -1,6 +1,7 @@
 //! The toolbar feature's hooks: `useDrawerPreference` (hydrating and persisting the shared drawer
-//! preference).
+//! preference) and `useToolbarDrawer`'s Escape rule.
 
+use crate::lib::keyboard_shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
 use crate::lib::preferences_store::PreferencesStore;
 use crate::store::services::Services;
 use crate::store::slices::layout::DrawerPreference;
@@ -51,6 +52,19 @@ pub fn persist_drawer_preference(store: &mut Store, services: &mut Services) {
         DRAWER_PREFERENCE_KEY,
         serde_json::to_value(preference).expect("a drawer preference serializes"),
     );
+}
+
+/// `useToolbarDrawer`'s capture-phase Escape rule (`drawer.close`): Escape dismisses an unpinned
+/// drawer. Returns whether the key is consumed. A pinned drawer leaves Escape alone: in Slint an
+/// open select or popover takes its own Escape before the window sees it, which is what React's
+/// `hasOpenPopup` check achieves.
+pub fn handle_drawer_capture_key(store: &mut Store, input: &KeyInput) -> bool {
+    let is_close = match_keyboard_shortcut(input, Scope::Drawer).is_some_and(|found| found.command.id == "drawer.close");
+    if !is_close || !store.layout.is_unpinned_overlay() {
+        return false;
+    }
+    store.layout.dismiss_left_drawer_overlay();
+    true
 }
 
 #[cfg(test)]
@@ -127,5 +141,31 @@ mod tests {
                 json!({"pinned": false, "activeTool": "widgets"})
             ]
         );
+    }
+
+    #[test]
+    fn escape_dismisses_only_an_unpinned_drawer() {
+        let mut store = Store::default();
+        let escape = KeyInput::new("escape");
+        assert!(!handle_drawer_capture_key(&mut store, &escape), "a hidden drawer leaves Escape alone");
+
+        store.layout.select_left_drawer_tool(LeftDrawerTool::Activity);
+        assert!(handle_drawer_capture_key(&mut store, &escape));
+        assert!(!store.layout.left_drawer_visible);
+
+        store.layout.set_left_drawer_pinned(true);
+        assert!(!handle_drawer_capture_key(&mut store, &escape), "a pinned drawer leaves Escape to the focused popup");
+        assert!(store.layout.left_drawer_visible);
+    }
+
+    #[test]
+    fn other_keys_do_not_close_the_drawer() {
+        let mut store = Store::default();
+        store.layout.select_left_drawer_tool(LeftDrawerTool::Activity);
+        let mut shifted = KeyInput::new("escape");
+        shifted.shift = true;
+        assert!(!handle_drawer_capture_key(&mut store, &shifted));
+        assert!(!handle_drawer_capture_key(&mut store, &KeyInput::new("x")));
+        assert!(store.layout.left_drawer_visible);
     }
 }

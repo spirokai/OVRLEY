@@ -5,7 +5,8 @@
 //! hook, and its actions are methods on it (plan D1, D2).
 
 use crate::i18n::{catalog, Locale};
-use crate::lib::keyboard_shortcuts::{manifest, Binding, Modifier};
+use crate::lib::keyboard_shortcuts::{manifest, match_keyboard_shortcut, Binding, KeyInput, Modifier, Scope};
+use crate::store::slices::layout::LeftDrawerTool;
 use crate::lib::utils::IS_MACOS;
 use crate::store::services::Services;
 use crate::store::Store;
@@ -65,6 +66,37 @@ impl TrafficLightInsetState {
 
     pub fn has_inset(self) -> bool {
         IS_MACOS && !self.fullscreen
+    }
+}
+
+/// `useAppShellKeyboard`: app-scope shortcuts that no focused control used. Returns whether the
+/// key is consumed.
+///
+/// - A repeated key never runs a command.
+/// - Open overlays block app shortcuts (`hasOpenOverlay`): the settings dialog, and the unpinned
+///   drawer's backdrop, except `drawer.toggle` while the drawer is that overlay. Keys do not reach
+///   the window while a select, popover or dialog popup has focus, so those block by themselves.
+/// - Phase 2 runs only `drawer.toggle`. Every other app command is matched but not consumed until
+///   its feature arrives, so it does not swallow the key.
+pub fn handle_app_key(store: &mut Store, input: &KeyInput) -> bool {
+    if input.repeat {
+        return false;
+    }
+    let Some(found) = match_keyboard_shortcut(input, Scope::App) else {
+        return false;
+    };
+    let drawer_overlay = store.layout.is_unpinned_overlay();
+    let overlay_open = store.editor_shell.settings_open || drawer_overlay;
+    let command = found.command.id.as_str();
+    if overlay_open && !(command == "drawer.toggle" && drawer_overlay && !store.editor_shell.settings_open) {
+        return false;
+    }
+    match command {
+        "drawer.toggle" => {
+            store.layout.select_left_drawer_tool(LeftDrawerTool::Widgets);
+            true
+        }
+        _ => false,
     }
 }
 
@@ -335,5 +367,54 @@ mod tests {
         state.close_settings();
         assert!(!state.settings_open);
         assert_eq!(state.settings_section, SettingsSection::Shortcuts, "the section survives closing");
+    }
+
+    fn alt(key: &str) -> KeyInput {
+        let mut input = KeyInput::new(key);
+        input.alt = true;
+        input
+    }
+
+    #[test]
+    fn alt_w_toggles_the_widgets_drawer() {
+        let mut store = Store::default();
+        assert!(handle_app_key(&mut store, &alt("w")));
+        assert!(store.layout.left_drawer_visible);
+        assert_eq!(store.layout.active_left_drawer_tool, LeftDrawerTool::Widgets);
+        assert!(handle_app_key(&mut store, &alt("w")), "allowed while the drawer is the overlay");
+        assert!(!store.layout.left_drawer_visible);
+    }
+
+    #[test]
+    fn a_repeated_key_never_runs_a_command() {
+        let mut store = Store::default();
+        let mut repeated = alt("w");
+        repeated.repeat = true;
+        assert!(!handle_app_key(&mut store, &repeated));
+        assert!(!store.layout.left_drawer_visible);
+    }
+
+    #[test]
+    fn the_settings_dialog_blocks_app_shortcuts() {
+        let mut store = Store::default();
+        store.editor_shell.open_settings();
+        assert!(!handle_app_key(&mut store, &alt("w")));
+        assert!(!store.layout.left_drawer_visible);
+    }
+
+    #[test]
+    fn commands_of_later_phases_are_matched_but_not_consumed() {
+        let mut store = Store::default();
+        let mut save = KeyInput::new("s");
+        save.ctrl = true;
+        assert!(!handle_app_key(&mut store, &save));
+    }
+
+    #[test]
+    fn modified_shell_commands_still_run_when_a_field_had_focus() {
+        // A focused text field rejects Alt+W, so the window's handler receives it (React's
+        // "allows modified shell commands in inputs").
+        let mut store = Store::default();
+        assert!(handle_app_key(&mut store, &alt("w")));
     }
 }

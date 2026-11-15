@@ -2,6 +2,7 @@
 //! traits (plan D3), implemented with Slint, winit, `rfd` and `arboard`.
 
 pub mod gpu;
+pub mod key_input;
 #[cfg(target_os = "macos")]
 pub mod macos;
 

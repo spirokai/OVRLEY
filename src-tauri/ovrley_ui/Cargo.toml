@@ -83,6 +83,10 @@ name = "dialog"
 required-features = ["dev-windows"]
 
 [[test]]
+name = "app_window"
+required-features = ["dev-windows"]
+
+[[test]]
 name = "shell"
 required-features = ["dev-windows"]
 

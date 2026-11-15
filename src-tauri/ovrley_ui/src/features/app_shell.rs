@@ -2,6 +2,7 @@
 //! callbacks.
 
 use crate::hooks::app_store_selectors::set_if_changed;
+use crate::platform::key_input::{key_input, SlintModifiers};
 use crate::platform::SlintWindowControl;
 use crate::{AlertLayer, AppShell, AppWindow, Choice, ChoiceKind, SettingsSection, ShortcutGroupView, ShortcutOptionView, ShortcutRowView};
 use ovrley_app::features::app_shell::{self, keyboard_shortcut_groups, AppBootstrapState, ShortcutGroup};
@@ -139,6 +140,17 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     shell.on_toggle_maximize_window(move || window_control.toggle_maximize());
     let dispatch = dispatcher.handle();
     shell.on_close_window(move || dispatch.dispatch(app_shell::request_close));
+
+    let keys = dispatcher.clone();
+    shell.on_app_key(move |text, alt, control, shift, meta, repeat| {
+        let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, repeat, cfg!(target_os = "macos"));
+        keys.dispatch_with_result(move |store, _| app_shell::handle_app_key(store, &input)).unwrap_or(false)
+    });
+    let keys = dispatcher.clone();
+    shell.on_capture_key(move |text, alt, control, shift, meta, repeat| {
+        let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, repeat, cfg!(target_os = "macos"));
+        keys.dispatch_with_result(move |store, _| ovrley_app::features::toolbar::handle_drawer_capture_key(store, &input)).unwrap_or(false)
+    });
 
     let alert = window.global::<AlertLayer>();
     let dispatch = dispatcher.handle();

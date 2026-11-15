@@ -43,6 +43,11 @@ export global AppShell {
     callback select-settings-section(SettingsSection);
     callback change-language(string);
 
+    // Keys no focused control used (`key-pressed`) and the capture phase (`capture-key-pressed`),
+    // as the window's root focus scope receives them. They answer whether the key was consumed.
+    callback app-key(text: string, alt: bool, control: bool, shift: bool, meta: bool, repeat: bool) -> bool;
+    callback capture-key(text: string, alt: bool, control: bool, shift: bool, meta: bool, repeat: bool) -> bool;
+
     // The window buttons: minimise and maximise change no app state; close goes through the guard.
     callback minimize-window();
     callback toggle-maximize-window();

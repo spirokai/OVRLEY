@@ -23,6 +23,20 @@ export component AppWindow inherits FluidWindow {
 
     property <length> control-panel-width: 26.5rem;
 
+    // The root focus scope (D7). Slint delivers a key to the focused element and bubbles what it
+    // rejects to its parents, so `key-pressed` sees only keys no control used. A click on empty space
+    // focuses it, as the browser focuses the page. It takes the focus back when a dialog closes.
+    keys := FocusScope {
+        init => {
+            self.focus();
+        }
+        capture-key-pressed(event) => {
+            AppShell.capture-key(event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta, event.repeat) ? accept : reject
+        }
+        key-pressed(event) => {
+            AppShell.app-key(event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta, event.repeat) ? accept : reject
+        }
+
     VerticalLayout {
         AppHeader {
             traffic-light-inset: AppShell.traffic-light-inset;
@@ -68,6 +82,14 @@ export component AppWindow inherits FluidWindow {
             }
         }
     }
+    }
+
+    changed show-settings => {
+        if !self.show-settings {
+            keys.focus();
+        }
+    }
+    property <bool> show-settings: AppShell.settings-open;
 
     SettingsDialog {
         open: AppShell.settings-open;
