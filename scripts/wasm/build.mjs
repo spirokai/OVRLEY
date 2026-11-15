@@ -87,8 +87,9 @@ function buildWasm() {
   if (checksum !== manifest.sha256) throw new Error('Stored Skia archive checksum mismatch.')
   const { env } = toolchainEnvironment()
   // rust-skia strips file:// itself; it does not URL-decode paths or Windows drives.
+  // A crates.io skia-bindings build downloads by the revision in its crate metadata; forcing the
+  // download would make it ask git for the revision instead, which fails outside a checkout.
   env.SKIA_BINARIES_URL = `file://${archivePath.replaceAll('\\', '/')}`
-  env.FORCE_SKIA_BINARIES_DOWNLOAD = '1'
   cargoBuild(env, ['--features', 'skia-safe/no-compile'])
   buildMapBindings()
 }
