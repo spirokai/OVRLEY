@@ -94,6 +94,10 @@ impl Workers {
 
 /// Everything an action may use besides the store.
 pub struct Services {
+    /// The runtime paths `ovrley_core` reads templates, fonts and tools from.
+    pub paths: Arc<ovrley_core::paths::AppPaths>,
+    /// The session's selected raster images, shared with render jobs.
+    pub rasters: ovrley_services::raster_resources::RasterResources,
     pub preferences: PreferencesStore,
     pub dialogs: Box<dyn Dialogs>,
     pub workers: Workers,
@@ -106,6 +110,7 @@ pub struct Services {
 
 /// The parts of [`Services`] a host provides; the dispatcher adds its own handle.
 pub struct ServiceParts {
+    pub paths: Arc<ovrley_core::paths::AppPaths>,
     pub preferences: PreferencesStore,
     pub dialogs: Box<dyn Dialogs>,
     pub ui_post: Arc<dyn UiPost>,
@@ -116,6 +121,8 @@ pub struct ServiceParts {
 impl ServiceParts {
     pub(super) fn into_services(self, dispatch: DispatchHandle) -> Services {
         Services {
+            paths: self.paths,
+            rasters: ovrley_services::raster_resources::RasterResources::default(),
             preferences: self.preferences,
             dialogs: self.dialogs,
             workers: Workers::new(self.ui_post.clone()),
@@ -227,6 +234,12 @@ pub mod fakes {
         pub window: FakeWindow,
     }
 
+    /// The checkout's runtime paths: its bundled templates, fonts and tools.
+    pub fn repository_paths() -> ovrley_core::paths::AppPaths {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        ovrley_core::paths::AppPaths::from_repo_root(root.canonicalize().expect("the checkout exists"))
+    }
+
     /// Fake services over the given preferences object.
     pub fn fake_services(preferences: Value) -> (ServiceParts, Fakes) {
         let (preferences, sink) = PreferencesStore::in_memory(preferences);
@@ -238,6 +251,7 @@ pub mod fakes {
             window: FakeWindow::default(),
         };
         let parts = ServiceParts {
+            paths: Arc::new(repository_paths()),
             preferences,
             dialogs: Box::new(fakes.dialogs.clone()),
             ui_post: Arc::new(fakes.ui_post.clone()),

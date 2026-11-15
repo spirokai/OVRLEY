@@ -14,6 +14,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     // 2. `useWidgetDraftState`'s reset: a new document clears the drafts, and a new document or
     //    selection ends the gesture's patches (D7).
     overlay_editor::drafts::reconcile_widget_drafts(store);
+    // 3. The durable template state behind the save status, cached by pointers.
+    crate::features::template_manager::reconcile_durable_state(store);
     // The plan's language step is not needed: `change_language_preference` validates, applies and
     // persists `lng` itself, as React's does, and every path (Settings, MCP) goes through it.
 }

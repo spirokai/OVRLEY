@@ -4,7 +4,9 @@
 //! for a worker or for the user), the action keeps an [`AgentReply`] and answers later, on the UI
 //! thread. Dropping a reply unanswered answers that the call was cancelled.
 
-use serde_json::Value;
+use super::slices::media::ActivitySource;
+use super::Store;
+use serde_json::{json, Value};
 
 /// A tool's result: its value, or the error the agent reads.
 pub type AgentResult = Result<Value, String>;
@@ -13,10 +15,10 @@ pub type AgentResult = Result<Value, String>;
 pub const CANCELLED: &str = "The request was cancelled before OVRLEY could answer.";
 
 /// Answers one tool call, once.
-pub struct AgentReply(Option<Box<dyn FnOnce(AgentResult)>>);
+pub struct AgentReply(Option<Box<dyn FnOnce(AgentResult) + Send>>);
 
 impl AgentReply {
-    pub fn new(reply: impl FnOnce(AgentResult) + 'static) -> Self {
+    pub fn new(reply: impl FnOnce(AgentResult) + Send + 'static) -> Self {
         Self(Some(Box::new(reply)))
     }
 
@@ -41,19 +43,62 @@ impl std::fmt::Debug for AgentReply {
     }
 }
 
+/// The open activity, as agents read it: its file, format, duration and laps; `null` without one.
+pub fn describe_activity(store: &Store) -> Value {
+    let Some(summary) = &store.media.activity_summary else { return Value::Null };
+    let file = match &store.media.activity_source {
+        Some(ActivitySource::File { path }) => Value::String(path.clone()),
+        None => Value::Null,
+    };
+    let laps: Vec<Value> = summary
+        .laps
+        .iter()
+        .map(|lap| {
+            json!({
+                "id": lap.id,
+                "startSeconds": lap.start_seconds,
+                "durationSeconds": lap.duration_seconds,
+                "enabled": !store.media.disabled_laps.contains(&lap.id),
+            })
+        })
+        .collect();
+    json!({
+        "file": file,
+        "fileName": summary.file_name,
+        "format": summary.file_format,
+        "durationSeconds": summary.duration_seconds,
+        "laps": laps,
+        "disabledLaps": store.media.disabled_laps,
+    })
+}
+
+/// The loaded template, as agents read it: its source, its name and its save status.
+pub fn describe_template(store: &Store) -> Value {
+    use super::slices::template::TemplateSource;
+    let (source, name) = match &store.template.loaded_template_source {
+        Some(TemplateSource::Bundled { template_id }) => (json!({"kind": "bundled", "templateId": template_id}), Some(template_id.clone())),
+        Some(TemplateSource::File { path }) => (json!({"kind": "file", "path": path}), Some(crate::features::template_manager::filename_from_path(Some(path)))),
+        None => (Value::Null, None),
+    };
+    json!({
+        "source": source,
+        "name": name,
+        "saveStatus": crate::features::template_manager::save_status(store).name(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
+    use std::sync::{Arc, Mutex};
 
     #[test]
     fn a_reply_answers_once_and_a_dropped_reply_cancels() {
-        let seen = Rc::new(RefCell::new(Vec::new()));
+        let seen = Arc::new(Mutex::new(Vec::new()));
         let log = seen.clone();
-        AgentReply::new(move |result| log.borrow_mut().push(result)).send(Ok(Value::Bool(true)));
+        AgentReply::new(move |result| log.lock().unwrap().push(result)).send(Ok(Value::Bool(true)));
         let log = seen.clone();
-        drop(AgentReply::new(move |result| log.borrow_mut().push(result)));
-        assert_eq!(*seen.borrow(), [Ok(Value::Bool(true)), Err(CANCELLED.to_string())]);
+        drop(AgentReply::new(move |result| log.lock().unwrap().push(result)));
+        assert_eq!(*seen.lock().unwrap(), [Ok(Value::Bool(true)), Err(CANCELLED.to_string())]);
     }
 }

@@ -24,6 +24,7 @@ path = "src/main.rs"
 ovrley_app = { path = "../ovrley_app" }
 ovrley_services = { path = "../ovrley_services" }
 ovrley_widgets = { path = "../ovrley_widgets" }
+ovrley_core = { path = "../ovrley_core" }
 ovrley_mcp = { path = "../ovrley_mcp" }
 arboard = { version = "3.7", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png"] }

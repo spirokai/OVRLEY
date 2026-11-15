@@ -194,6 +194,11 @@ impl MediaSlice {
         self.activity_summary = None;
     }
 
+    /// Whether the imported activity has no preview copy (none imported, or an empty one).
+    pub fn preview_bytes_empty(&self) -> bool {
+        self.parsed_activity.as_ref().is_none_or(|imported| imported.preview_bytes.is_empty())
+    }
+
     /// `clearActivitySummary`: clears the activity file, keeping its source.
     pub fn clear_activity_summary(&mut self) {
         self.clear_activity_file(false);

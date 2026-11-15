@@ -45,6 +45,11 @@ pub struct Store {
     pub unsaved_confirm: UnsavedChangesConfirmState,
     /// `useWidgetDraftState` (D7).
     pub drafts: WidgetDraftState,
+    /// The theme colours widget fallbacks use; `ovrley_ui` reads them from the Slint theme before
+    /// the first dispatch.
+    pub theme: Option<crate::lib::template::ThemeColors>,
+    /// `useTemplateManagement`'s state and the cached durable state.
+    pub template_manager: crate::features::template_manager::TemplateManagerState,
     pub i18n: I18nState,
     /// `useDrawerPreference`'s last observed preference.
     pub drawer_preference: DrawerPreferenceState,

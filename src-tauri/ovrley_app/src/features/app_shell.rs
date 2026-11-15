@@ -9,8 +9,13 @@ use crate::i18n::{catalog, Locale};
 use crate::lib::keyboard_shortcuts::{manifest, match_keyboard_shortcut, Binding, KeyInput, Modifier, Scope};
 use crate::store::slices::layout::LeftDrawerTool;
 use crate::lib::utils::IS_MACOS;
-use crate::store::services::Services;
+use crate::features::undo_redo::HistoryMode;
+use crate::lib::file_dialog::{open_single_path, DialogOptions};
+use crate::store::agent::AgentReply;
+use crate::store::services::{DialogFilter, Services};
+use crate::store::slices::media::{ActivitySource, ImportedActivity, ParsedActivitySource};
 use crate::store::Store;
+use ovrley_widgets::model::document::{course_widget_dimensions, number};
 
 /// `useAppBootstrap`'s shell part. Phase 3 adds template fetching and restoring, Phase 7 codec
 /// detection.
@@ -200,23 +205,134 @@ pub fn set_file_drag_hovering(store: &mut Store, hovering: bool) {
     store.file_drop.hovering = hovering && accepts_file_drops(store);
 }
 
-/// One drop, however many files. No importer exists in Phase 2, so each kind reports that it
-/// cannot be opened yet; each feature replaces its kind's arm when it lands (activity and template
-/// in Phase 3, video and project in Phase 6).
-pub fn drop_files(store: &mut Store, paths: &[DroppedPath]) {
+/// One drop, however many files: each kind's import runs in order (a template, then the activity).
+/// The video and project arms arrive with Phase 6; until then those kinds report that they cannot
+/// be opened yet.
+pub fn drop_files(store: &mut Store, services: &mut Services, paths: &[DroppedPath]) {
     store.file_drop.hovering = false;
     if !accepts_file_drops(store) {
         return;
     }
-    match route_dropped_files(paths, cfg!(debug_assertions)) {
-        Err(message) => store.media.set_error_message(message),
-        Ok(imports) => {
-            if let Some(import) = imports.first() {
-                let kind = import.kind.name();
-                store.media.set_error_message(format!("Drop failed: {kind} files cannot be opened yet."));
+    let imports = match route_dropped_files(paths, cfg!(debug_assertions)) {
+        Err(message) => return store.media.set_error_message(message),
+        Ok(imports) => imports,
+    };
+    for import in imports {
+        let path = import.path.to_string_lossy().into_owned();
+        match import.kind {
+            DropKind::Activity => import_activity(store, services, path, None),
+            DropKind::Template => crate::features::template_manager::import_template(store, services, path, None),
+            kind => store.media.set_error_message(format!("Drop failed: {} files cannot be opened yet.", kind.name())),
+        }
+    }
+}
+
+/// The activity file dialog's filter.
+pub fn activity_dialog_filter() -> DialogFilter {
+    DialogFilter::new("Activity", &ACTIVITY_EXTENSIONS)
+}
+
+/// The directory the activity dialog remembers.
+pub const LAST_ACTIVITY_IMPORT_DIR_KEY: &str = "last-activity-import-dir";
+
+/// `handleActivityFileOpen`: the dialog, then the import of the chosen file (D5). A cancelled
+/// dialog imports nothing.
+pub fn open_activity_dialog(store: &mut Store, services: &mut Services) {
+    let opened = open_single_path(
+        services,
+        &[activity_dialog_filter()],
+        DialogOptions {
+            default_path: None,
+            last_directory_key: Some(LAST_ACTIVITY_IMPORT_DIR_KEY),
+        },
+        Box::new(|store, services, selected| {
+            if let Some(path) = selected {
+                import_activity(store, services, path, None);
+            }
+        }),
+    );
+    if let Err(error) = opened {
+        store.media.set_error_message(format!("Activity selection failed: {error}"));
+    }
+}
+
+/// `useActivityImport`'s import: the worker parses the file through `ovrley_core`'s one import
+/// entry and serializes the preview's copy (D4); its result activates without a history entry.
+/// An agent's call answers with the activity, or the error.
+pub fn import_activity(store: &mut Store, services: &mut Services, path: String, reply: Option<AgentReply>) {
+    store.media.set_processing(true);
+    let paths = std::sync::Arc::clone(&services.paths);
+    services.workers.spawn("activity-import", move || {
+        let result = ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string()).and_then(|response| {
+            let preview_bytes = serde_json::to_vec(&response.parsed_activity).map_err(|error| error.to_string())?;
+            Ok(ImportedActivity {
+                activity: std::sync::Arc::new(response.parsed_activity),
+                preview_bytes: std::sync::Arc::new(preview_bytes),
+            })
+        });
+        Box::new(move |store: &mut Store, _: &mut Services| finish_activity_import(store, path, result, reply))
+    });
+}
+
+fn finish_activity_import(store: &mut Store, path: String, result: Result<ImportedActivity, String>, reply: Option<AgentReply>) {
+    store.history.set_mode(HistoryMode::Skip);
+    let answer = match result {
+        Ok(imported) => {
+            store.media.clear_activity_summary();
+            activate_parsed_activity(store, ActivitySource::File { path }, imported);
+            Ok(crate::store::agent::describe_activity(store))
+        }
+        Err(error) => {
+            store.media.set_error_message(format!("Activity selection failed: {error}"));
+            Err(error)
+        }
+    };
+    store.media.set_processing(false);
+    if let Some(reply) = reply {
+        reply.send(answer);
+    }
+}
+
+/// `activateParsedActivity`: the activity, its whole-second duration as the timeline (an oddity
+/// kept: the video telemetry path does not floor), and course widgets sized to the route.
+pub fn activate_parsed_activity(store: &mut Store, source: ActivitySource, imported: ImportedActivity) {
+    let activity = std::sync::Arc::clone(&imported.activity);
+    store.media.set_activity_source(Some(source));
+    store.media.activate_activity_file(imported);
+    let duration = activity.metadata.get("duration_seconds").and_then(serde_json::Value::as_f64).unwrap_or_default();
+    if !(duration.is_finite() && duration > 0.0) {
+        return;
+    }
+    let whole = duration.floor();
+    let editor = &mut store.editor;
+    editor.set_fallback_duration_seconds(whole);
+    editor.set_start_second(0.0);
+    editor.set_end_second(whole);
+    editor.set_selected_second(0.0);
+    crate::store::sync::sync_scene_timing_to_config(editor, Some(0.0), Some(whole));
+    let sizing = ovrley_widgets::model::catalog::catalog()
+        .require_widget("course")
+        .expect("the catalog defines course")
+        .course_sizing
+        .expect("course declares its sizing");
+    if editor.config.plots.iter().any(|plot| plot.get("value").and_then(serde_json::Value::as_str) == Some("course")) {
+        if let Some((width, height)) = course_widget_dimensions(&activity.sample_course_points, sizing.max_dimension, sizing.min_dimension) {
+            let config = std::rc::Rc::make_mut(&mut editor.config);
+            for plot in config.plots.iter_mut().filter(|plot| plot.get("value").and_then(serde_json::Value::as_str) == Some("course")) {
+                plot.insert("width".into(), number(width));
+                plot.insert("height".into(), number(height));
             }
         }
     }
+}
+
+/// The activity drawer's delete: only an activity file can be deleted.
+pub fn delete_activity(store: &mut Store) -> Result<(), String> {
+    if store.media.parsed_activity_source != Some(ParsedActivitySource::ActivityFile) {
+        return Err("No activity file is loaded.".into());
+    }
+    store.media.clear_activity_file(true);
+    Ok(())
 }
 
 /// The preference that lets an agent drive the window over MCP (D13); off when absent.
@@ -280,15 +396,27 @@ pub enum KeyboardWorkspace {
     Player,
 }
 
-/// `useEditorShellState`'s shell fields. Phase 3 adds zoom, background, grid and snap. In memory
-/// only, as in React.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The canvas background behind the scene. Image and video arrive with Phase 6.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum EditorBackgroundMode {
+    #[default]
+    Checker,
+    Black,
+    White,
+}
+
+/// `useEditorShellState`: editor presentation state, in memory only, with today's launch defaults.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EditorShellState {
     pub settings_open: bool,
     pub settings_section: SettingsSection,
     pub active_keyboard_workspace: KeyboardWorkspace,
     /// `import.meta.env.DEV`.
     pub debug_mode_enabled: bool,
+    pub editor_zoom_level: f64,
+    pub editor_background_mode: EditorBackgroundMode,
+    pub editor_grid_visible: bool,
+    pub editor_snap_to_grid: bool,
 }
 
 impl Default for EditorShellState {
@@ -298,11 +426,53 @@ impl Default for EditorShellState {
             settings_section: SettingsSection::default(),
             active_keyboard_workspace: KeyboardWorkspace::default(),
             debug_mode_enabled: cfg!(debug_assertions),
+            editor_zoom_level: 1.0,
+            editor_background_mode: EditorBackgroundMode::default(),
+            editor_grid_visible: false,
+            editor_snap_to_grid: false,
         }
     }
 }
 
+/// The zoom range and step (`clamp(Number((zoom ± 0.05).toFixed(2)), 0.35, 4)`).
+pub const MIN_EDITOR_ZOOM: f64 = 0.35;
+pub const MAX_EDITOR_ZOOM: f64 = 4.0;
+const ZOOM_STEP: f64 = 0.05;
+
+fn round_to_hundredths(value: f64) -> f64 {
+    (value * 100.0).round() / 100.0
+}
+
 impl EditorShellState {
+    pub fn decrease_zoom(&mut self) {
+        self.editor_zoom_level = crate::lib::utils::clamp(round_to_hundredths(self.editor_zoom_level - ZOOM_STEP), MIN_EDITOR_ZOOM, MAX_EDITOR_ZOOM);
+    }
+
+    pub fn increase_zoom(&mut self) {
+        self.editor_zoom_level = crate::lib::utils::clamp(round_to_hundredths(self.editor_zoom_level + ZOOM_STEP), MIN_EDITOR_ZOOM, MAX_EDITOR_ZOOM);
+    }
+
+    pub fn reset_editor_zoom(&mut self) {
+        self.editor_zoom_level = 1.0;
+    }
+
+    /// `setEditorZoomLevel`, which the wheel zoom uses; it clamps like the steps.
+    pub fn set_editor_zoom_level(&mut self, zoom: f64) {
+        self.editor_zoom_level = crate::lib::utils::clamp(zoom, MIN_EDITOR_ZOOM, MAX_EDITOR_ZOOM);
+    }
+
+    pub fn set_editor_background_mode(&mut self, mode: EditorBackgroundMode) {
+        self.editor_background_mode = mode;
+    }
+
+    pub fn set_editor_grid_visible(&mut self, visible: bool) {
+        self.editor_grid_visible = visible;
+    }
+
+    pub fn set_editor_snap_to_grid(&mut self, snap: bool) {
+        self.editor_snap_to_grid = snap;
+    }
+
     pub fn open_settings(&mut self) {
         self.settings_open = true;
     }
@@ -562,6 +732,25 @@ mod tests {
     }
 
     #[test]
+    fn zoom_steps_round_and_clamp() {
+        let mut state = EditorShellState::default();
+        state.increase_zoom();
+        assert_eq!(state.editor_zoom_level, 1.05);
+        for _ in 0..100 {
+            state.decrease_zoom();
+        }
+        assert_eq!(state.editor_zoom_level, MIN_EDITOR_ZOOM);
+        for _ in 0..100 {
+            state.increase_zoom();
+        }
+        assert_eq!(state.editor_zoom_level, MAX_EDITOR_ZOOM);
+        state.reset_editor_zoom();
+        assert_eq!(state.editor_zoom_level, 1.0);
+        assert_eq!(state.editor_background_mode, EditorBackgroundMode::Checker);
+        assert!(!state.editor_grid_visible && !state.editor_snap_to_grid);
+    }
+
+    #[test]
     fn editor_shell_state_defaults_and_settings_actions() {
         let mut state = EditorShellState::default();
         assert!(!state.settings_open);
@@ -684,20 +873,95 @@ mod tests {
 
     #[test]
     fn drops_are_ignored_behind_a_dialog_and_the_startup_screen() {
+        let (parts, _) = fake_services(json!({}));
+        let dispatcher = Dispatcher::new(Store::default(), parts);
+        dispatcher.dispatch(|store, services| {
+            set_file_drag_hovering(store, true);
+            assert!(!store.file_drop.hovering, "the startup screen shows");
+            store.bootstrap.set_startup_ready();
+            store.layout.initialize_left_drawer(Default::default());
+            set_file_drag_hovering(store, true);
+            assert!(store.file_drop.hovering);
+            store.editor_shell.open_settings();
+            drop_files(store, services, &dropped(&["/a/notes.txt"]));
+            assert_eq!(store.media.error_message, None);
+            assert!(!store.file_drop.hovering);
+            store.editor_shell.close_settings();
+            drop_files(store, services, &dropped(&["/a/clip.mp4"]));
+            assert_eq!(store.media.error_message.as_deref(), Some("Drop failed: video files cannot be opened yet."));
+        });
+    }
+
+    fn settle(dispatcher: &Dispatcher, fakes: &crate::store::services::fakes::Fakes, done: impl Fn(&Store) -> bool) {
+        for _ in 0..400 {
+            fakes.ui_post.drain(dispatcher);
+            if dispatcher.with_store(&done) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        panic!("timed out");
+    }
+
+    fn fixture(name: &str) -> String {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ovrley_core/tests/fixtures/activity").join(name).to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn an_activity_import_activates_without_a_history_entry() {
+        let (parts, fakes) = fake_services(json!({}));
+        let dispatcher = Dispatcher::new(Store::default(), parts);
+        dispatcher.dispatch(|store, _| {
+            store.editor.set_config(ovrley_widgets::model::document::OverlayConfig::from_value(&json!({"plots": [{"id": "c", "value": "course", "width": 1, "height": 1}]})).unwrap());
+        });
+        let path = fixture("test-ride.fit");
+        let replies = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log = std::sync::Arc::clone(&replies);
+        let target = path.clone();
+        dispatcher.dispatch(move |store, services| import_activity(store, services, target, Some(AgentReply::new(move |result| log.lock().unwrap().push(result)))));
+        assert!(dispatcher.with_store(|store| store.media.is_processing));
+        settle(&dispatcher, &fakes, |store| !store.media.is_processing);
+        dispatcher.with_store(|store| {
+            assert_eq!(store.media.activity_source, Some(ActivitySource::File { path: path.clone() }));
+            let duration = store.media.parsed_activity.as_ref().unwrap().activity.metadata["duration_seconds"].as_f64().unwrap();
+            assert_eq!(store.editor.end_second, duration.floor());
+            assert_eq!(store.editor.fallback_duration_seconds, duration.floor());
+            assert_eq!(store.editor.config.scene["end"], json!(duration.floor() as i64));
+            assert_ne!(store.editor.config.plots[0]["width"], json!(1), "course widgets are sized to the route");
+            assert_eq!(store.history.past.len(), 1, "only the config edit before the import is recorded");
+            assert!(!store.media.preview_bytes_empty());
+        });
+        let replies = replies.lock().unwrap();
+        assert_eq!(replies[0].as_ref().unwrap()["file"], json!(path));
+    }
+
+    #[test]
+    fn a_failed_import_shows_the_selection_error() {
+        let (parts, fakes) = fake_services(json!({}));
+        let dispatcher = Dispatcher::new(Store::default(), parts);
+        dispatcher.dispatch(|store, services| import_activity(store, services, "/nowhere/ride.txt".into(), None));
+        settle(&dispatcher, &fakes, |store| !store.media.is_processing);
+        let message = dispatcher.with_store(|store| store.media.error_message.clone()).unwrap();
+        assert!(message.starts_with("Activity selection failed: ") && message.contains("Unsupported activity file format: ride.txt"), "{message}");
+    }
+
+    #[test]
+    fn the_activity_dialog_remembers_its_directory_and_imports_the_choice() {
+        let (parts, fakes) = fake_services(json!({}));
+        let dispatcher = Dispatcher::new(Store::default(), parts);
+        dispatcher.dispatch(open_activity_dialog);
+        let requests = fakes.dialogs.requests();
+        let crate::store::services::FileDialogRequest::OpenFile { filters, .. } = &requests[0] else { panic!("an open dialog") };
+        assert!(filters[0].extensions.contains(&"FIT".to_string()), "case-insensitive filters");
+        fakes.dialogs.answer(Some(&fixture("test.gpx")));
+        assert_eq!(fakes.preferences.saves.borrow().last().unwrap()[LAST_ACTIVITY_IMPORT_DIR_KEY], json!(std::path::Path::new(&fixture("test.gpx")).parent().unwrap().to_string_lossy()));
+        settle(&dispatcher, &fakes, |store| store.media.activity_summary.is_some());
+    }
+
+    #[test]
+    fn deleting_needs_an_activity_file() {
         let mut store = Store::default();
-        set_file_drag_hovering(&mut store, true);
-        assert!(!store.file_drop.hovering, "the startup screen shows");
-        store.bootstrap.set_startup_ready();
-        store.layout.initialize_left_drawer(Default::default());
-        set_file_drag_hovering(&mut store, true);
-        assert!(store.file_drop.hovering);
-        store.editor_shell.open_settings();
-        drop_files(&mut store, &dropped(&["/a/notes.txt"]));
-        assert_eq!(store.media.error_message, None);
-        assert!(!store.file_drop.hovering);
-        store.editor_shell.close_settings();
-        drop_files(&mut store, &dropped(&["/a/ride.fit"]));
-        assert_eq!(store.media.error_message.as_deref(), Some("Drop failed: activity files cannot be opened yet."));
+        assert!(delete_activity(&mut store).is_err());
     }
 
     #[test]

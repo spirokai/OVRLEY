@@ -12,9 +12,16 @@ use serde_json::{Map, Value};
 #[cfg(test)]
 use serde_json::json;
 
-/// `getThemeColor('ice')` and `getThemeColor('aqua')` (`index.css`).
-const ICE: &str = "#86aaaa";
-const AQUA: &str = "#40e0d0";
+/// The theme colours the fallbacks use, as `getThemeColor` reads them from the live theme.
+/// `ovrley_ui` reads them from the Slint `Theme` global, their one source, when it composes the
+/// window (`Store::theme`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ThemeColors {
+    /// `getThemeColor('ice')`.
+    pub ice: String,
+    /// `getThemeColor('aqua')`.
+    pub aqua: String,
+}
 
 /// JavaScript truthiness of an optional value.
 fn truthy(value: Option<&Value>) -> Option<&Value> {
@@ -57,11 +64,11 @@ fn set_font(data: &mut Map<String, Value>, resolved: &Map<String, Value>, global
     }
 }
 
-fn effective_label(data: &WidgetData, globals: &Map<String, Value>) -> WidgetData {
+fn effective_label(data: &WidgetData, globals: &Map<String, Value>, theme: &ThemeColors) -> WidgetData {
     let mut next = data.clone();
     set_font(&mut next, data, globals.get("font_text"));
     if truthy(next.get("color")).is_none() {
-        next.insert("color".into(), or_color(globals.get("color_text"), ICE));
+        next.insert("color".into(), or_color(globals.get("color_text"), &theme.ice));
     }
     if !next.contains_key("opacity") {
         next.insert("opacity".into(), globals.get("opacity").cloned().unwrap_or(Value::Null));
@@ -69,7 +76,7 @@ fn effective_label(data: &WidgetData, globals: &Map<String, Value>) -> WidgetDat
     next
 }
 
-fn effective_value(data: &WidgetData, globals: &Map<String, Value>) -> WidgetData {
+fn effective_value(data: &WidgetData, globals: &Map<String, Value>, theme: &ThemeColors) -> WidgetData {
     let resolved = resolve_active_widget_data(data);
     let mut next = resolved.clone();
     set_font(&mut next, &resolved, globals.get("font_values"));
@@ -79,7 +86,7 @@ fn effective_value(data: &WidgetData, globals: &Map<String, Value>) -> WidgetDat
         }
     }
     if truthy(next.get("color")).is_none() {
-        next.insert("color".into(), or_color(globals.get("color_values"), ICE));
+        next.insert("color".into(), or_color(globals.get("color_values"), &theme.ice));
     }
     let kind = resolved.get("value").and_then(Value::as_str).unwrap_or_default();
     if kind == "lap_timer" || kind == "splits_run" {
@@ -87,14 +94,14 @@ fn effective_value(data: &WidgetData, globals: &Map<String, Value>) -> WidgetDat
             next.insert("label_font".into(), globals.get("font_text").cloned().unwrap_or(Value::Null));
         }
         if truthy(next.get("label_color")).is_none() {
-            next.insert("label_color".into(), or_color(globals.get("color_text"), ICE));
+            next.insert("label_color".into(), or_color(globals.get("color_text"), &theme.ice));
         }
     }
     if resolved.get("display_type").and_then(Value::as_str) == Some("heading_tape") && next.get("label_font").is_none_or(Value::is_null) {
         next.insert("label_font".into(), globals.get("font_values").cloned().unwrap_or(Value::Null));
     }
     if !next.contains_key("icon_color") {
-        next.insert("icon_color".into(), or_color(globals.get("color_icons"), AQUA));
+        next.insert("icon_color".into(), or_color(globals.get("color_icons"), &theme.aqua));
     }
     if !next.contains_key("unit_color") && kind != "time" {
         next.insert("unit_color".into(), or_color(globals.get("color_units"), "#ffffff"));
@@ -125,7 +132,7 @@ fn chart_legend_series(series: &Value, language: Locale) -> Value {
     )
 }
 
-fn effective_plot(data: &WidgetData, globals: &Map<String, Value>, language: Locale) -> WidgetData {
+fn effective_plot(data: &WidgetData, globals: &Map<String, Value>, language: Locale, theme: &ThemeColors) -> WidgetData {
     let mut next = data.clone();
     let kind = data.get("value").and_then(Value::as_str).unwrap_or_default();
     if kind == "rolling_chart" {
@@ -133,7 +140,7 @@ fn effective_plot(data: &WidgetData, globals: &Map<String, Value>, language: Loc
         next.insert("series".into(), series);
     }
     if truthy(next.get("color")).is_none() {
-        next.insert("color".into(), or_color(globals.get("color_values"), ICE));
+        next.insert("color".into(), or_color(globals.get("color_values"), &theme.ice));
     }
     if !next.contains_key("opacity") {
         next.insert("opacity".into(), globals.get("opacity").cloned().unwrap_or(Value::Null));
@@ -152,25 +159,25 @@ fn effective_plot(data: &WidgetData, globals: &Map<String, Value>, language: Loc
 }
 
 /// `getEffectiveWidgetData`: one widget's render-effective data. `globals` are normalized.
-pub fn effective_widget_data(collection: Collection, data: &WidgetData, globals: &Map<String, Value>, language: Locale) -> WidgetData {
+pub fn effective_widget_data(collection: Collection, data: &WidgetData, globals: &Map<String, Value>, language: Locale, theme: &ThemeColors) -> WidgetData {
     match collection {
         Collection::Backdrops => resolve_active_widget_data(data),
-        Collection::Labels => effective_label(data, globals),
-        Collection::Values => effective_value(data, globals),
-        Collection::Plots => effective_plot(data, globals, language),
+        Collection::Labels => effective_label(data, globals, theme),
+        Collection::Values => effective_value(data, globals, theme),
+        Collection::Plots => effective_plot(data, globals, language, theme),
         Collection::Rasters => data.clone(),
     }
 }
 
 /// `createEditorEffectiveConfig`.
-pub fn editor_effective_config(config: &OverlayConfig, global_defaults: &Map<String, Value>, language: Locale) -> OverlayConfig {
+pub fn editor_effective_config(config: &OverlayConfig, global_defaults: &Map<String, Value>, language: Locale, theme: &ThemeColors) -> OverlayConfig {
     let globals = normalize_global_defaults(Some(global_defaults));
     let mut effective = OverlayConfig {
         scene: effective_scene(&config.scene, &globals),
         ..OverlayConfig::default()
     };
     for collection in Collection::ALL {
-        *effective.collection_mut(collection) = config.collection(collection).iter().map(|data| effective_widget_data(collection, data, &globals, language)).collect();
+        *effective.collection_mut(collection) = config.collection(collection).iter().map(|data| effective_widget_data(collection, data, &globals, language, theme)).collect();
     }
     effective
 }
@@ -181,6 +188,13 @@ mod tests {
 
     fn map(value: Value) -> Map<String, Value> {
         value.as_object().unwrap().clone()
+    }
+
+    fn theme() -> ThemeColors {
+        ThemeColors {
+            ice: "#010101".into(),
+            aqua: "#020202".into(),
+        }
     }
 
     fn globals() -> Map<String, Value> {
@@ -197,7 +211,7 @@ mod tests {
             "plots": [{"id": "p", "value": "elevation", "point_label": {}}]
         }))
         .unwrap();
-        let effective = editor_effective_config(&config, &globals(), Locale::En);
+        let effective = editor_effective_config(&config, &globals(), Locale::En, &theme());
         assert_eq!(effective.scene["width"], 1920);
         assert_eq!(effective.scene["opacity"], 0.5);
         let label = &effective.labels[0];
@@ -214,7 +228,7 @@ mod tests {
     #[test]
     fn values_resolve_their_active_display() {
         let data = map(json!({"id": "h", "value": "heading", "display_type": "heading_tape", "display_variants": {"heading_tape": {"width": 500}}}));
-        let effective = effective_widget_data(Collection::Values, &data, &globals(), Locale::En);
+        let effective = effective_widget_data(Collection::Values, &data, &globals(), Locale::En, &theme());
         assert_eq!(effective["width"], 500);
         assert_eq!(effective["label_font"], "Value.ttf", "an absent heading label font takes the value font");
     }
@@ -222,15 +236,22 @@ mod tests {
     #[test]
     fn chart_legends_are_named_in_the_app_language() {
         let data = map(json!({"id": "c", "value": "rolling_chart", "series": [{"metric": "speed"}]}));
-        let effective = effective_widget_data(Collection::Plots, &data, &globals(), Locale::En);
+        let effective = effective_widget_data(Collection::Plots, &data, &globals(), Locale::En, &theme());
         let expected = translations().t(Locale::En, &catalog().require_widget("speed").unwrap().short_name_key).to_uppercase();
         assert_eq!(effective["series"][0]["label"], Value::String(expected));
     }
 
     #[test]
+    fn missing_colours_fall_back_to_the_theme() {
+        let data = map(json!({"id": "v", "value": "speed"}));
+        let effective = effective_widget_data(Collection::Values, &data, &Map::new(), Locale::En, &theme());
+        assert_eq!((effective["color"].clone(), effective["icon_color"].clone()), (json!("#010101"), json!("#020202")));
+    }
+
+    #[test]
     fn explicit_widget_values_win() {
         let data = map(json!({"id": "l", "text": "x", "font": "Own.ttf", "color": "#abcdef", "opacity": 1}));
-        let effective = effective_widget_data(Collection::Labels, &data, &globals(), Locale::En);
+        let effective = effective_widget_data(Collection::Labels, &data, &globals(), Locale::En, &theme());
         assert_eq!((effective["font"].clone(), effective["color"].clone(), effective["opacity"].clone()), (json!("Own.ttf"), json!("#abcdef"), json!(1)));
     }
 }

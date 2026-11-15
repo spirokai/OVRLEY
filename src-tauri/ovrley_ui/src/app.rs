@@ -39,8 +39,9 @@ impl Projections {
 /// Wires `window` to a dispatcher over `store` and `services`: the component logic, the language,
 /// the features' callbacks and projections, and a first projection. The app and the window tests
 /// both start here; the tests pass fake services.
-pub fn compose(window: &AppWindow, store: Store, services: ServiceParts) -> Dispatcher {
+pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> Dispatcher {
     crate::install_component_logic(window);
+    store.theme = Some(theme_colors(window));
     let language = store.i18n.language;
     select_language(language);
     let dispatcher = Dispatcher::new(store, services);
@@ -59,12 +60,13 @@ pub fn compose(window: &AppWindow, store: Store, services: ServiceParts) -> Disp
 
 /// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
 /// the compositor (Phase 6). Agents reach the window through `agent_socket`.
-pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>, agent_socket: ovrley_mcp::link::SocketLocation) -> Result<(), String> {
+pub fn run(store: Store, paths: ovrley_core::paths::AppPaths, preferences: PreferencesStore, gpu: Option<GpuDevice>, agent_socket: ovrley_mcp::link::SocketLocation) -> Result<(), String> {
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
     let dispatcher = compose(
         &window,
         store,
         ServiceParts {
+            paths: Arc::new(paths),
             preferences,
             dialogs: Box::new(NativeDialogs { window: window.as_weak() }),
             ui_post: Arc::new(SlintUiPost),
@@ -127,6 +129,16 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>, 
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
     dispatcher.flush_preferences();
     result
+}
+
+/// The theme colours widget fallbacks use, from the `Theme` global, their one source.
+fn theme_colors(window: &AppWindow) -> ovrley_app::lib::template::ThemeColors {
+    let theme = window.global::<crate::Theme>();
+    let hex = |color: slint::Color| format!("#{:02x}{:02x}{:02x}", color.red(), color.green(), color.blue());
+    ovrley_app::lib::template::ThemeColors {
+        ice: hex(theme.get_theme_color_ice()),
+        aqua: hex(theme.get_theme_color_aqua()),
+    }
 }
 
 /// Every locale is bundled at build time, and English is the untranslated text, so a failure is a

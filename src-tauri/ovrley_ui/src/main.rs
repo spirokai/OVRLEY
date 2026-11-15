@@ -61,7 +61,8 @@ fn start() -> Result<(), String> {
 
     let gpu = ovrley_ui::platform::select_backend()?;
     let agent_socket = ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir);
-    ovrley_ui::app::run(store, preferences, gpu, agent_socket)
+    let paths = roots.app_paths()?;
+    ovrley_ui::app::run(store, paths, preferences, gpu, agent_socket)
 }
 
 /// The settings file. The debug snapshot tour (`OVRLEY_SNAPSHOT`) changes the language and the

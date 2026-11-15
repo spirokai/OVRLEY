@@ -77,7 +77,7 @@ pub(crate) fn deliver_drop(paths: Vec<PathBuf>) {
             path,
         })
         .collect();
-    dispatch_ui(move |store, _| app_shell::drop_files(store, &dropped));
+    dispatch_ui(move |store, services| app_shell::drop_files(store, services, &dropped));
 }
 
 pub(crate) fn set_hovering(hovering: bool) {
