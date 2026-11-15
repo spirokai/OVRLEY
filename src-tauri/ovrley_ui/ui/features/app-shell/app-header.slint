@@ -167,10 +167,20 @@ export component AppHeader inherits Rectangle {
                         content-width: 20rem;
                         Badge {
                             variant: BadgeVariant.outline;
-                            icon: Icons.sparkles;
+                            radius: 0px;
                             text: @tr("app-shell.agentConnected" => "Agent connected");
                             text-color: Theme.primary;
                             border-color: Theme.primary.transparentize(0.4);
+                            // The status dot: green while the agent is connected.
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 0.5rem;
+                                    height: 0.5rem;
+                                    border-radius: 0.25rem;
+                                    background: Theme.success;
+                                }
+                            }
                         }
                     }
                 }

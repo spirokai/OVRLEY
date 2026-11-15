@@ -50,6 +50,8 @@ export component Badge {
             size: 0.75rem;
             color: root.text-color;
         }
+        // Leading content other than an icon, such as a status dot.
+        @children
         AppText {
             content: root.text;
             uppercase: true;
