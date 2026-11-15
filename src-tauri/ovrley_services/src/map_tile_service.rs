@@ -17,19 +17,19 @@ use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::time::{Duration, SystemTime};
 use uuid::Uuid;
 
-pub(crate) const OPENFREEMAP_TILE_URL: &str =
+pub const OPENFREEMAP_TILE_URL: &str =
     "https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf";
-pub(crate) const OPENFREEMAP_CACHE_NAMESPACE: &str = "openfreemap-planet";
+pub const OPENFREEMAP_CACHE_NAMESPACE: &str = "openfreemap-planet";
 const MIB: u64 = 1024 * 1024;
 const TILE_CACHE_LIMIT_STEP: u64 = 128 * MIB;
-pub(crate) const DEFAULT_TILE_CACHE_LIMIT: u64 = 4 * TILE_CACHE_LIMIT_STEP;
+pub const DEFAULT_TILE_CACHE_LIMIT: u64 = 4 * TILE_CACHE_LIMIT_STEP;
 const MIN_TILE_CACHE_LIMIT: u64 = TILE_CACHE_LIMIT_STEP;
 const MAX_TILE_CACHE_LIMIT: u64 = 40 * TILE_CACHE_LIMIT_STEP;
 
 /// The cache's current size and its configurable limit bounds and step, in bytes.
 #[derive(Clone, Copy, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct TileCacheUsage {
+pub struct TileCacheUsage {
     used_bytes: u64,
     limit_bytes: u64,
     min_limit_bytes: u64,
@@ -38,7 +38,7 @@ pub(crate) struct TileCacheUsage {
 }
 
 /// Accepts a user-configured cache limit only on a step inside the supported bounds.
-pub(crate) fn validate_tile_cache_limit(limit: u64) -> Result<u64, String> {
+pub fn validate_tile_cache_limit(limit: u64) -> Result<u64, String> {
     if !(MIN_TILE_CACHE_LIMIT..=MAX_TILE_CACHE_LIMIT).contains(&limit)
         || limit % TILE_CACHE_LIMIT_STEP != 0
     {
@@ -50,7 +50,7 @@ pub(crate) fn validate_tile_cache_limit(limit: u64) -> Result<u64, String> {
 }
 
 #[derive(Clone)]
-pub(crate) struct MapTileService {
+pub struct MapTileService {
     cache_root: PathBuf,
     source_url: String,
     cache_namespace: String,
@@ -60,10 +60,10 @@ pub(crate) struct MapTileService {
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
-pub(crate) struct TileCoordinates {
-    pub(crate) zoom: u8,
-    pub(crate) x: u32,
-    pub(crate) y: u32,
+pub struct TileCoordinates {
+    pub zoom: u8,
+    pub x: u32,
+    pub y: u32,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -89,13 +89,13 @@ struct InFlightTile {
 }
 
 #[derive(Clone)]
-pub(crate) struct TilePayload {
-    pub(crate) bytes: Vec<u8>,
-    pub(crate) cache_status: TileCacheStatus,
+pub struct TilePayload {
+    pub bytes: Vec<u8>,
+    pub cache_status: TileCacheStatus,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum TileCacheStatus {
+pub enum TileCacheStatus {
     Hit,
     Miss,
     Revalidated,
@@ -104,7 +104,7 @@ pub(crate) enum TileCacheStatus {
 }
 
 impl TileCacheStatus {
-    pub(crate) fn as_header_value(self) -> &'static str {
+    pub fn as_header_value(self) -> &'static str {
         match self {
             Self::Hit => "hit",
             Self::Miss => "miss",
@@ -139,8 +139,8 @@ struct PersistentEntry {
 }
 
 impl MapTileService {
-    #[cfg(test)]
-    pub(crate) fn new(
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn new(
         cache_root: PathBuf,
         source_url: String,
         cache_namespace: String,
@@ -155,8 +155,8 @@ impl MapTileService {
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn new_with_timeouts(
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn new_with_timeouts(
         cache_root: PathBuf,
         source_url: String,
         cache_namespace: String,
@@ -173,8 +173,8 @@ impl MapTileService {
         )
     }
 
-    #[cfg(test)]
-    pub(crate) fn new_with_cache_limit(
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn new_with_cache_limit(
         cache_root: PathBuf,
         source_url: String,
         cache_namespace: String,
@@ -245,7 +245,7 @@ impl MapTileService {
         Ok(service)
     }
 
-    pub(crate) fn for_application_cache(
+    pub fn for_application_cache(
         application_cache: PathBuf,
         cache_limit: u64,
     ) -> Result<Self, String> {
@@ -259,7 +259,7 @@ impl MapTileService {
         )
     }
 
-    pub(crate) fn usage(&self) -> Result<TileCacheUsage, String> {
+    pub fn usage(&self) -> Result<TileCacheUsage, String> {
         let accounting = self
             .maintenance
             .accounting
@@ -275,7 +275,7 @@ impl MapTileService {
     }
 
     /// Applies a new limit and evicts least recently used tiles down to it.
-    pub(crate) fn set_limit(&self, cache_limit: u64) -> Result<TileCacheUsage, String> {
+    pub fn set_limit(&self, cache_limit: u64) -> Result<TileCacheUsage, String> {
         let cache_limit = validate_tile_cache_limit(cache_limit)?;
         self.maintenance
             .accounting
@@ -286,7 +286,7 @@ impl MapTileService {
         self.usage()
     }
 
-    pub(crate) fn resolve(&self, coordinates: TileCoordinates) -> Result<TilePayload, String> {
+    pub fn resolve(&self, coordinates: TileCoordinates) -> Result<TilePayload, String> {
         let (in_flight, owns_resolution) = {
             let mut requests = self.in_flight.lock().map_err(|error| error.to_string())?;
             if let Some(in_flight) = requests.get(&coordinates) {
@@ -695,7 +695,7 @@ impl MapTileService {
         Ok(())
     }
 
-    pub(crate) fn clear(&self) -> Result<(), String> {
+    pub fn clear(&self) -> Result<(), String> {
         let _maintenance = self
             .maintenance
             .gate
@@ -1019,7 +1019,7 @@ fn remove_if_present(path: &Path) -> Result<(), String> {
     }
 }
 
-pub(crate) fn parse_tile_path(path: &str) -> Option<TileCoordinates> {
+pub fn parse_tile_path(path: &str) -> Option<TileCoordinates> {
     let route = path.strip_prefix("/tiles/")?;
     let mut segments = route.split('/');
     let zoom = parse_decimal(segments.next()?)?;

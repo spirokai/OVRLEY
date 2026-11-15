@@ -1,138 +1,49 @@
-//! Runtime path resolution for the Tauri application shell.
-//!
-//! Owns: repository-root detection, `AppPaths` construction from an `AppHandle`,
-//!       and the resource-root decision for debug vs release builds.
-//! Does not own: template listing, render dispatch, or encoding — those live
-//!       in `ovrley_core::commands` and the render pipeline.
-//!
-//! Allowed dependencies: `ovrley_core`, `tauri`.
-//! Forbidden dependencies: none (this is a utility module for the shell layer).
+//! Tauri glue for `ovrley_services::runtime_paths`: fills the runtime roots from the `AppHandle`
+//! path resolver.
 
-use crate::map_styles::MapStyleDirs;
 use ovrley_core::paths::AppPaths;
-use std::path::{Path, PathBuf};
-use tauri::{AppHandle, Manager};
+use ovrley_services::runtime_paths::{PlatformDirs, RuntimeRoots};
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager, Runtime};
 
-/// Returns the repository root when running from the Tauri crate.
-///
-/// `CARGO_MANIFEST_DIR` points at `src-tauri`, so this walks one directory up
-/// to the project root used by bundled tooling and development assets.
-pub(crate) fn source_repo_root() -> PathBuf {
-    let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    root.pop();
-    root
-}
-
-/// Builds the backend path configuration for the current runtime mode.
-///
-/// Development builds read resources from the source checkout. Packaged builds
-/// read resources from Tauri's resource directory. User data lives under the
-/// user's documents directory in `OVRLEY`, with templates in `templates/`,
-/// render outputs at the root, and runtime scratch data in `.runtime/`.
-pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
-    let paths =
-        AppPaths::from_runtime_roots(source_repo_root(), resource_root(app)?, user_data_root(app)?);
-    paths.ensure_dirs().map_err(|e| e.to_string())?;
-    Ok(paths)
-}
-
-/// The installed map styles' folders: `map-styles` in the build, which a development build reads
-/// from `assets/`, and `map-styles` in the user's OVRLEY folder.
-pub(crate) fn map_style_dirs(app: &AppHandle) -> Result<MapStyleDirs, String> {
-    let bundled = if cfg!(debug_assertions) {
-        source_repo_root().join("assets").join("map-styles")
-    } else {
-        resource_root(app)?.join("map-styles")
-    };
-    Ok(MapStyleDirs {
-        bundled,
-        user: user_data_root(app)?.join("map-styles"),
-    })
-}
-
-/// The bundled map fonts' folder: `fonts/map` in the checkout in development, in the build's resources
-/// otherwise.
-pub(crate) fn map_font_dir(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(resource_root(app)?.join("fonts").join("map"))
-}
-
-/// The checkout in development, the build's resources otherwise.
-fn resource_root(app: &AppHandle) -> Result<PathBuf, String> {
-    // cfg!() is intentional here, not #[cfg(debug_assertions)]. Both branches
-    // must compile because this function serves both debug and release builds.
-    // #[cfg] would exclude the release branch during debug compilation, causing
-    // compile errors when a debug build of the app runs in dev mode.
-    if cfg!(debug_assertions) {
-        Ok(source_repo_root())
-    } else {
-        portable_resource_root()
-            .map_or_else(|| app.path().resource_dir().map_err(|e| e.to_string()), Ok)
-    }
-}
-
-/// Returns the `OVRLEY` user data root inside the user's documents directory.
-///
-/// The XDG documents entry is optional on Linux (`~/.config/user-dirs.dirs`
-/// may not define it), so its absence resolves to `$HOME/Documents`.
-pub(crate) fn user_data_root(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn runtime_roots<R: Runtime>(app: &AppHandle<R>) -> Result<RuntimeRoots, String> {
     let path = app.path();
-    resolve_user_data_root(path.document_dir().ok(), || path.home_dir()).map_err(|e| e.to_string())
+    RuntimeRoots::resolve(
+        PlatformDirs {
+            document_dir: path.document_dir().ok(),
+            home_dir: path.home_dir().ok(),
+            data_dir: path.data_dir().ok(),
+            cache_dir: path.cache_dir().ok(),
+        },
+        || path.resource_dir().map_err(|e| e.to_string()),
+    )
 }
 
-fn resolve_user_data_root(
-    document_dir: Option<PathBuf>,
-    home_dir: impl FnOnce() -> tauri::Result<PathBuf>,
-) -> tauri::Result<PathBuf> {
-    let documents_dir = match document_dir {
-        Some(dir) => dir,
-        None => home_dir()?.join("Documents"),
-    };
-    Ok(documents_dir.join("OVRLEY"))
+pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
+    runtime_roots(app)?.app_paths()
 }
 
-fn portable_resource_root() -> Option<PathBuf> {
-    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    has_bundled_ffmpeg(&exe_dir).then_some(exe_dir)
-}
-
-fn has_bundled_ffmpeg(root: &Path) -> bool {
-    let binary_name = if cfg!(windows) {
-        "ffmpeg.exe"
-    } else {
-        "ffmpeg"
-    };
-    root.join("vendor")
-        .join("ffmpeg")
-        .join("bin")
-        .join(binary_name)
-        .is_file()
+pub(crate) fn user_data_root(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(runtime_roots(app)?.user_data_root)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /// Tauri's desktop resolver and the `dirs` crate agree, so both apps share one settings file
+    /// and one tile cache.
     #[test]
-    fn user_data_root_lives_in_documents_dir() {
-        let root = resolve_user_data_root(Some(PathBuf::from("/home/rider/Docs")), || {
-            panic!("home dir must not be resolved when documents dir exists")
-        })
-        .unwrap();
-
-        assert_eq!(root, PathBuf::from("/home/rider/Docs/OVRLEY"));
+    fn tauri_roots_match_the_native_roots() {
+        let app = tauri::test::mock_app();
+        let tauri_roots = runtime_roots(app.handle()).unwrap();
+        let native_roots = RuntimeRoots::from_platform(|| unreachable!("debug build")).unwrap();
+        assert_eq!(tauri_roots, native_roots);
     }
 
     #[test]
-    fn user_data_root_uses_home_documents_when_documents_dir_is_undefined() {
-        let root = resolve_user_data_root(None, || Ok(PathBuf::from("/home/rider"))).unwrap();
-
-        assert_eq!(root, PathBuf::from("/home/rider/Documents/OVRLEY"));
-    }
-
-    #[test]
-    fn user_data_root_fails_without_home_dir() {
-        let result = resolve_user_data_root(None, || Err(tauri::Error::UnknownPath));
-
-        assert!(matches!(result, Err(tauri::Error::UnknownPath)));
+    fn app_identifier_is_the_bundle_identifier() {
+        let config: serde_json::Value = serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        assert_eq!(config["identifier"], ovrley_services::runtime_paths::APP_IDENTIFIER);
     }
 }

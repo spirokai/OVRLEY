@@ -12,10 +12,10 @@
 //! Forbidden dependencies: none (this is the Tauri boundary layer and may import
 //!       from any shell module).
 
-use crate::distribution::DistributionKind;
+use ovrley_services::distribution::DistributionKind;
 use crate::map_cache_settings;
-use crate::map_styles::MapData;
-use crate::map_tile_service::TileCacheUsage;
+use ovrley_services::map_styles::MapData;
+use ovrley_services::map_tile_service::TileCacheUsage;
 use crate::preview_import::{content_type_for_path, preview_warnings_for_metadata};
 use crate::runtime_paths;
 use crate::video_server::VideoServerHandle;
@@ -43,7 +43,7 @@ const WINDOWS_HEVC_EXTENSION_URL: &str = "https://apps.microsoft.com/detail/9nmz
 pub(crate) async fn backend_submit_batch(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
-    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    raster_resources: tauri::State<'_, ovrley_services::raster_resources::RasterResources>,
     map_data: tauri::State<'_, MapData>,
     request: BatchRenderRequest,
 ) -> Result<BatchAcceptance, BatchServiceError> {
@@ -191,7 +191,7 @@ pub(crate) async fn backend_font_data(
 pub(crate) async fn backend_render(
     app: AppHandle,
     state: tauri::State<'_, BackendState>,
-    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    raster_resources: tauri::State<'_, ovrley_services::raster_resources::RasterResources>,
     map_data: tauri::State<'_, MapData>,
     config_json: String,
     parsed_activity_json: String,
@@ -219,7 +219,7 @@ pub(crate) async fn backend_render(
 #[tauri::command]
 pub(crate) async fn backend_parse_csv_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -232,7 +232,7 @@ pub(crate) async fn backend_parse_csv_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_vbo_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -245,7 +245,7 @@ pub(crate) async fn backend_parse_vbo_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_tcx_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -258,7 +258,7 @@ pub(crate) async fn backend_parse_tcx_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_gpx_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -271,7 +271,7 @@ pub(crate) async fn backend_parse_gpx_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_fit_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -284,7 +284,7 @@ pub(crate) async fn backend_parse_fit_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_igc_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -297,7 +297,7 @@ pub(crate) async fn backend_parse_igc_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_srt_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -310,7 +310,7 @@ pub(crate) async fn backend_parse_srt_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_uddf_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -323,7 +323,7 @@ pub(crate) async fn backend_parse_uddf_activity(
 #[tauri::command]
 pub(crate) async fn backend_parse_subsurface_activity(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     path: String,
 ) -> Result<FinalizeActivityResponse, String> {
     previews.retain(
@@ -336,7 +336,7 @@ pub(crate) async fn backend_parse_subsurface_activity(
 #[tauri::command]
 pub(crate) async fn backend_render_preview_frame(
     app: AppHandle,
-    raster_resources: tauri::State<'_, crate::raster_resources::RasterResources>,
+    raster_resources: tauri::State<'_, ovrley_services::raster_resources::RasterResources>,
     map_data: tauri::State<'_, MapData>,
     config_json: String,
     parsed_activity_json: String,
@@ -625,7 +625,7 @@ pub(crate) async fn backend_import_preview_video(
 #[tauri::command]
 pub(crate) async fn backend_extract_video_telemetry(
     app: AppHandle,
-    previews: tauri::State<'_, crate::widget_preview::PreviewActivities>,
+    previews: tauri::State<'_, ovrley_services::widget_preview::PreviewActivities>,
     file_path: String,
 ) -> Result<Option<FinalizeActivityResponse>, String> {
     commands::backend_extract_video_telemetry(&runtime_paths::app_paths(&app)?, &file_path)

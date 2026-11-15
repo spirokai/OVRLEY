@@ -26,14 +26,14 @@ use std::sync::Arc;
 const ATTRIBUTION: &str = "<a href=\"https://openfreemap.org\">OpenFreeMap</a> <a href=\"https://www.openmaptiles.org/\">&copy; OpenMapTiles</a> Data from <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>";
 
 /// Where installed styles are read from.
-pub(crate) struct MapStyleDirs {
+pub struct MapStyleDirs {
     /// Shipped with the build. It must exist.
-    pub(crate) bundled: PathBuf,
+    pub bundled: PathBuf,
     /// The user's own. It is created when missing, so there is somewhere to put them.
-    pub(crate) user: PathBuf,
+    pub user: PathBuf,
 }
 
-pub(crate) struct MapStyleRegistry {
+pub struct MapStyleRegistry {
     catalog: MapStyleCatalog,
     /// Each installed style's document, as its file holds it.
     documents: HashMap<MapStyleId, Json>,
@@ -41,7 +41,7 @@ pub(crate) struct MapStyleRegistry {
 
 impl MapStyleRegistry {
     /// Fails when a bundled style can't be read or doesn't install, or the default isn't bundled.
-    pub(crate) fn load(dirs: &MapStyleDirs) -> Result<Self, String> {
+    pub fn load(dirs: &MapStyleDirs) -> Result<Self, String> {
         let mut documents = HashMap::new();
         let mut bundled = Vec::new();
         for path in read_dir(&dirs.bundled)? {
@@ -110,13 +110,13 @@ impl MapStyleRegistry {
         })
     }
 
-    pub(crate) fn catalog(&self) -> &MapStyleCatalog {
+    pub fn catalog(&self) -> &MapStyleCatalog {
         &self.catalog
     }
 
     /// The style as the preview's MapLibre reads it: its vector tiles from `tile_url_template`, the
     /// local tile service, at the zooms it serves. `None` when `id` isn't installed.
-    pub(crate) fn served(&self, id: &str, tile_url_template: &str) -> Option<Vec<u8>> {
+    pub fn served(&self, id: &str, tile_url_template: &str) -> Option<Vec<u8>> {
         let mut style = self.documents.get(&MapStyleId::new(id).ok()?)?.clone();
         let source = style["sources"][VECTOR_SOURCE]
             .as_object_mut()
@@ -162,14 +162,14 @@ fn read_style(path: &Path) -> Result<(MapStyleInfo, Json), String> {
 /// Everything a map's bytes come from: the installed styles, the tile service and the bundled fonts'
 /// glyphs.
 #[derive(Clone)]
-pub(crate) struct MapData {
+pub struct MapData {
     styles: Arc<MapStyleRegistry>,
     tiles: MapTileService,
     glyphs: Arc<GlyphService>,
 }
 
 impl MapData {
-    pub(crate) fn new(
+    pub fn new(
         styles: MapStyleRegistry,
         tiles: MapTileService,
         glyphs: Arc<GlyphService>,
@@ -181,22 +181,22 @@ impl MapData {
         }
     }
 
-    pub(crate) fn registry(&self) -> &MapStyleRegistry {
+    pub fn registry(&self) -> &MapStyleRegistry {
         &self.styles
     }
 
-    pub(crate) fn tiles(&self) -> &MapTileService {
+    pub fn tiles(&self) -> &MapTileService {
         &self.tiles
     }
 
     /// The bundled map font file `name`, for the preview's decode workers, which lay labels out with the
     /// same glyph service export uses.
-    pub(crate) fn font_file(&self, name: &str) -> Option<Vec<u8>> {
+    pub fn font_file(&self, name: &str) -> Option<Vec<u8>> {
         self.glyphs.font_file(name).map(<[u8]>::to_vec)
     }
 
     /// What a render's maps draw from.
-    pub(crate) fn map_source(&self) -> MapSource {
+    pub fn map_source(&self) -> MapSource {
         MapSource {
             styles: self.styles.catalog.clone(),
             data: Arc::new(self.clone()),

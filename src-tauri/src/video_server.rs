@@ -34,8 +34,8 @@ use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use uuid::Uuid;
 
-use crate::map_styles::MapData;
-use crate::map_tile_service::{parse_tile_path, TileCacheStatus};
+use ovrley_services::map_styles::MapData;
+use ovrley_services::map_tile_service::{parse_tile_path, TileCacheStatus};
 
 const CHUNK_SIZE: usize = 512 * 1024;
 const WORKER_COUNT: usize = 4;

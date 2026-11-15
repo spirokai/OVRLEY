@@ -1,46 +1,23 @@
-//! File-system command implementations for the Tauri application shell.
-//!
-//! Owns: template save-path resolution, template file writes, and parse-debug
-//!       file writes, and selected-file reads for frontend import flows.
-//! Does not own: template listing, template content retrieval, or rendering —
-//!       those live in `ovrley_core::commands` and the render pipeline.
-//!
-//! Allowed dependencies: `std`, `tauri`, `runtime_paths`, `ovrley_core`
-//!       (for template/image validation), `raster_resources` (session ownership).
+//! Tauri command wrappers for `ovrley_services::file_ops` and the selected-file reads of the
+//! frontend import flows.
 
-use crate::raster_resources::RasterResources;
 use crate::runtime_paths;
 use ovrley_core::error::RenderPathError;
-use serde::Serialize;
+use ovrley_services::file_ops::{self, RasterSelection, RasterSelectionError};
+use ovrley_services::raster_resources::RasterResources;
 use std::path::PathBuf;
 
 /// Returns the default save path for a user template under the documents folder.
 #[tauri::command]
-pub(crate) fn default_template_save_path(
-    app: tauri::AppHandle,
-    filename: String,
-) -> Result<String, String> {
-    let mut path = runtime_paths::user_data_root(&app)?.join("templates");
-    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
-    path.push(filename);
+pub(crate) fn default_template_save_path(app: tauri::AppHandle, filename: String) -> Result<String, String> {
+    let path = file_ops::default_template_save_path(&runtime_paths::user_data_root(&app)?, &filename)?;
     Ok(path.to_string_lossy().to_string())
 }
 
 /// Writes a user template file, creating parent directories as needed.
-///
-/// Validates the template content before writing — invalid JSON or config
-/// that fails the normalization seam is rejected with an error.
 #[tauri::command]
 pub(crate) fn write_template_file(path: String, contents: String) -> Result<String, String> {
-    ovrley_core::commands::validate_template_contents(&contents).map_err(|e| e.to_string())?;
-
-    let path_buf = PathBuf::from(&path);
-
-    if let Some(parent) = path_buf.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    std::fs::write(&path_buf, contents).map_err(|e| e.to_string())?;
+    file_ops::write_template_file(&PathBuf::from(&path), &contents)?;
     Ok(path)
 }
 
@@ -56,96 +33,23 @@ pub(crate) fn selected_path_is_file(path: String) -> bool {
     PathBuf::from(path).is_file()
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct RasterSelection {
-    width: u32,
-    height: u32,
-    resource_id: String,
-}
-
-#[derive(Serialize)]
-pub(crate) struct RasterSelectionError {
-    code: &'static str,
-    message: String,
-}
-
-impl From<ovrley_widgets::widgets::raster::error::RasterError> for RasterSelectionError {
-    fn from(error: ovrley_widgets::widgets::raster::error::RasterError) -> Self {
-        Self {
-            code: error.code(),
-            message: error.to_string(),
-        }
-    }
-}
-
 /// Validates a user-selected bitmap and registers its immutable oriented preview in Rust.
 #[tauri::command]
 pub(crate) fn load_selected_raster(
     resources: tauri::State<'_, RasterResources>,
     path: String,
 ) -> Result<RasterSelection, RasterSelectionError> {
-    let raster = ovrley_core::raster::load_selected_raster(PathBuf::from(path).as_path())
-        .map_err(RasterSelectionError::from)?;
-    let (width, height) = raster.dimensions();
-    let resource_id = resources.insert(raster);
-    Ok(RasterSelection {
-        width,
-        height,
-        resource_id,
-    })
+    file_ops::load_selected_raster(&resources, &PathBuf::from(path))
 }
 
 /// Returns display bytes from the immutable Rust-owned image snapshot.
 #[tauri::command]
-pub(crate) fn raster_preview_png(
-    resources: tauri::State<'_, RasterResources>,
-    resource_id: String,
-) -> Result<String, String> {
+pub(crate) fn raster_preview_png(resources: tauri::State<'_, RasterResources>, resource_id: String) -> Result<String, String> {
     resources.preview_png_base64(&resource_id)
 }
 
-const BATCH_VIDEO_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
-
 /// Lists supported video files directly inside a directory, sorted by name.
-///
-/// Used by the batch-render folder picker — does not recurse into
-/// subdirectories.
 #[tauri::command]
-pub(crate) fn list_directory_video_files(
-    directory: String,
-) -> Result<Vec<String>, RenderPathError> {
-    let directory = PathBuf::from(directory);
-    if !directory.is_absolute() {
-        return Err(RenderPathError::VideoDirectoryInvalid {
-            path: directory.display().to_string(),
-        });
-    }
-
-    let mut paths = Vec::new();
-    for entry in std::fs::read_dir(&directory)
-        .map_err(|error| RenderPathError::video_directory_io(&directory, error))?
-    {
-        let entry =
-            entry.map_err(|error| RenderPathError::video_directory_io(&directory, error))?;
-        let path = entry.path();
-        let is_video = entry
-            .file_type()
-            .map_err(|error| RenderPathError::video_directory_io(&directory, error))?
-            .is_file()
-            && path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| {
-                    BATCH_VIDEO_EXTENSIONS
-                        .iter()
-                        .any(|candidate| extension.eq_ignore_ascii_case(candidate))
-                });
-        if is_video {
-            paths.push(path.to_string_lossy().to_string());
-        }
-    }
-
-    paths.sort_by_key(|left| left.to_lowercase());
-    Ok(paths)
+pub(crate) fn list_directory_video_files(directory: String) -> Result<Vec<String>, RenderPathError> {
+    file_ops::list_directory_video_files(&PathBuf::from(directory))
 }

@@ -4,7 +4,7 @@
 //! frontend's preferences store also opens. Rust is the only writer of this key
 //! so the startup limit and the running limit always agree.
 
-use crate::map_tile_service::{validate_tile_cache_limit, DEFAULT_TILE_CACHE_LIMIT};
+use ovrley_services::map_tile_service::{validate_tile_cache_limit, DEFAULT_TILE_CACHE_LIMIT};
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_store::StoreExt;
 

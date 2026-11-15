@@ -10,9 +10,9 @@ use std::time::{Duration, SystemTime};
 
 use uuid::Uuid;
 
-use crate::map_styles::{MapData, MapStyleDirs, MapStyleRegistry};
+use ovrley_services::map_styles::{MapData, MapStyleDirs, MapStyleRegistry};
 use ovrley_map::gpu::labels::GlyphService;
-use crate::map_tile_service::MapTileService;
+use ovrley_services::map_tile_service::MapTileService;
 use crate::video_server::VideoServerHandle;
 
 #[test]
@@ -643,7 +643,7 @@ fn temp_cache_root(label: &str) -> PathBuf {
 fn installed_styles() -> MapStyleRegistry {
     let user = temp_cache_root("user-styles");
     let styles = MapStyleRegistry::load(&MapStyleDirs {
-        bundled: crate::runtime_paths::source_repo_root().join("assets").join("map-styles"),
+        bundled: ovrley_services::runtime_paths::source_repo_root().join("assets").join("map-styles"),
         user: user.clone(),
     })
     .expect("bundled styles");
@@ -653,7 +653,7 @@ fn installed_styles() -> MapStyleRegistry {
 
 /// The bundled map fonts, opened as the app opens them.
 fn glyph_service() -> Arc<GlyphService> {
-    let fonts = crate::runtime_paths::source_repo_root().join("fonts").join("map");
+    let fonts = ovrley_services::runtime_paths::source_repo_root().join("fonts").join("map");
     Arc::new(GlyphService::open(&fonts).expect("bundled map fonts"))
 }
 

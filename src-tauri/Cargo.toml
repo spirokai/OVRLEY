@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets", "ovrley_ui", "ovrley_app"]
+members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets", "ovrley_services", "ovrley_ui", "ovrley_app"]
 
 [package]
 name = "app"
@@ -36,6 +36,7 @@ open = "5"
 ovrley_core = { path = "ovrley_core" }
 ovrley_map = { path = "ovrley_map", features = ["gpu", "validate"] }
 ovrley_widgets = { path = "ovrley_widgets" }
+ovrley_services = { path = "ovrley_services" }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
@@ -43,6 +44,10 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
 http = "1.4"
 http-cache-semantics = "=2.1.0"
+
+[dev-dependencies]
+ovrley_services = { path = "ovrley_services", features = ["test-support"] }
+tauri = { version = "2.12.5", features = ["protocol-asset", "test"] }
 
 # The main window turns off a WebKitGTK feature through an API newer than the bindings, looked up at runtime.
 [target.'cfg(target_os = "linux")'.dependencies]

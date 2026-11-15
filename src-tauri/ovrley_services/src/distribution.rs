@@ -4,13 +4,13 @@ use std::path::PathBuf;
 /// The two supported application distribution modes.
 #[derive(Clone, Copy, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum DistributionKind {
+pub enum DistributionKind {
     Installed,
     Portable,
 }
 
 /// Detects the distribution mode once during Rust startup.
-pub(crate) fn detect() -> Result<DistributionKind, String> {
+pub fn detect() -> Result<DistributionKind, String> {
     let executable = std::env::current_exe().map_err(|error| error.to_string())?;
     let executable_dir = executable.parent().ok_or_else(|| {
         format!(

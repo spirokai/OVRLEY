@@ -7,7 +7,8 @@
 //! Does not own: rendering, encoding, activity parsing, or config validation —
 //!       those live in `ovrley_core`. Command wrappers live in `tauri_commands`,
 //!       file-system commands live in `file_ops`, path resolution lives in
-//!       `runtime_paths`, and preview helpers live in `preview_import`.
+//!       `runtime_paths`, and preview helpers live in `preview_import`. The services
+//!       behind those wrappers live in `ovrley_services`.
 //!
 //! Allowed dependencies: `ovrley_core`, `tauri`, `video_server`, and all
 //!       sibling shell modules.
@@ -28,8 +29,6 @@
 pub mod video_server; // test seam
 
 mod map_cache_settings;
-mod map_styles;
-mod map_tile_service;
 
 #[cfg(test)]
 mod video_server_tests;
@@ -39,14 +38,12 @@ mod map_tile_service_tests;
 
 #[cfg(target_os = "linux")]
 mod appimage_integration;
-mod distribution;
 mod file_ops;
 #[cfg(not(target_os = "macos"))]
 mod main_window;
 mod preview_import;
 mod progress_sink;
 mod project_file;
-mod raster_resources;
 mod runtime_paths;
 mod tauri_commands;
 #[cfg(target_os = "macos")]
@@ -56,6 +53,7 @@ mod widget_preview;
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::inspection::VideoInspectionService;
 use ovrley_map::gpu::labels::GlyphService;
+use ovrley_services::{distribution, map_styles, map_tile_service, raster_resources};
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -76,8 +74,8 @@ pub fn run() {
 
     tauri::Builder::default()
         .manage(video_server)
-        .manage(widget_preview::PreviewActivities::default())
-        .manage(widget_preview::MapDownload::default())
+        .manage(ovrley_services::widget_preview::PreviewActivities::default())
+        .manage(ovrley_services::widget_preview::MapDownload::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -173,17 +171,14 @@ pub fn run() {
                 ))),
             });
 
+            let roots = runtime_paths::runtime_roots(app.handle())?;
             let map_data = map_styles::MapData::new(
-                map_styles::MapStyleRegistry::load(&runtime_paths::map_style_dirs(app.handle())?)?,
+                map_styles::MapStyleRegistry::load(&roots.map_style_dirs())?,
                 map_tile_service::MapTileService::for_application_cache(
-                    app.path()
-                        .app_cache_dir()
-                        .map_err(|error| error.to_string())?,
+                    roots.app_cache_dir.clone(),
                     map_cache_settings::persisted_tile_cache_limit(app.handle())?,
                 )?,
-                Arc::new(GlyphService::open(&runtime_paths::map_font_dir(
-                    app.handle(),
-                )?)?),
+                Arc::new(GlyphService::open(&roots.map_font_dir())?),
             );
             app.manage(map_data.clone());
             app.state::<video_server::VideoServerHandle>()

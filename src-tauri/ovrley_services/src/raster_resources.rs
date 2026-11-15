@@ -7,14 +7,14 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 #[derive(Clone, Default)]
-pub(crate) struct RasterResources {
+pub struct RasterResources {
     // Retain every selected version for session undo/redo. Jobs hold their own
     // Arc snapshots; dropping app state releases the store's ownership.
     images: Arc<Mutex<HashMap<String, Arc<SelectedRaster>>>>,
 }
 
 impl RasterResources {
-    pub(crate) fn insert(&self, image: SelectedRaster) -> String {
+    pub fn insert(&self, image: SelectedRaster) -> String {
         let id = Uuid::new_v4().to_string();
         self.images
             .lock()
@@ -23,14 +23,14 @@ impl RasterResources {
         id
     }
 
-    pub(crate) fn preview_png_base64(&self, resource_id: &str) -> Result<String, String> {
+    pub fn preview_png_base64(&self, resource_id: &str) -> Result<String, String> {
         let image = self
             .resolve(resource_id)
             .ok_or_else(|| "Raster image resource is unavailable".to_string())?;
         Ok(base64::engine::general_purpose::STANDARD.encode(image.preview_png()))
     }
 
-    pub(crate) fn owned_assets(
+    pub fn owned_assets(
         &self,
         handles: HashMap<String, String>,
     ) -> Result<HashMap<String, Arc<SelectedRaster>>, String> {
