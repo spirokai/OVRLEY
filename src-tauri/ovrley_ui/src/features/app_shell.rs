@@ -11,17 +11,6 @@ use ovrley_app::store::services::WindowControl;
 use ovrley_app::store::{Dispatcher, Store};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
-/// `v<VITE_OVRLEY_VERSION>`, read at compile time from the variable CI already sets, with React's
-/// fallback.
-fn app_version() -> String {
-    let raw = option_env!("VITE_OVRLEY_VERSION").map(str::trim).filter(|version| !version.is_empty()).unwrap_or("0.00.0");
-    if raw.starts_with('v') {
-        raw.to_string()
-    } else {
-        format!("v{raw}")
-    }
-}
-
 fn to_slint_section(section: app_shell::SettingsSection) -> SettingsSection {
     match section {
         app_shell::SettingsSection::Settings => SettingsSection::Settings,
@@ -71,7 +60,7 @@ fn shortcut_groups_model(groups: Vec<ShortcutGroup>) -> ModelRc<ShortcutGroupVie
 /// Writes what never changes: the version and the language list.
 pub fn initialize(window: &AppWindow) {
     let shell = window.global::<AppShell>();
-    shell.set_version(app_version().into());
+    shell.set_version(ovrley_app::lib::utils::app_version().into());
     let languages: Vec<Choice> = LOCALES
         .iter()
         .map(|(locale, label)| Choice {
@@ -96,6 +85,8 @@ pub fn project(window: &AppWindow, store: &Store, language_changed: bool) {
         shell.set_traffic_light_inset(value)
     });
 
+    set_if_changed(shell.get_allow_agent_edits(), store.agent_session.allow_agent_edits, |value| shell.set_allow_agent_edits(value));
+    set_if_changed(shell.get_agent_connected(), store.agent_session.shows_indicator(), |value| shell.set_agent_connected(value));
     set_if_changed(shell.get_file_drag_hovering(), store.file_drop.hovering, |value| shell.set_file_drag_hovering(value));
 
     let editor_shell = &store.editor_shell;
@@ -134,6 +125,9 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         let locale = Locale::require(&serde_json::Value::String(code.to_string())).expect("the language select offers supported locales");
         dispatch.dispatch(move |store, services| ovrley_app::i18n::change_language_preference(store, services, locale));
     });
+
+    let dispatch = dispatcher.handle();
+    shell.on_set_allow_agent_edits(move |allowed| dispatch.dispatch(move |store, services| app_shell::set_allow_agent_edits(store, services, allowed)));
 
     // Minimise and maximise change no app state: they call the window directly (D3).
     let window_control = SlintWindowControl { window: window.as_weak() };

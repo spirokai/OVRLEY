@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// The drawer's tools, serialized as the React constants (`ACTIVITY_TOOL`, …).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum LeftDrawerTool {
     Projects,

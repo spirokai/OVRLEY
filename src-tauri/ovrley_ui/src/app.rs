@@ -36,8 +36,6 @@ impl Projections {
     }
 }
 
-/// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
-/// the compositor (Phase 6).
 /// Wires `window` to a dispatcher over `store` and `services`: the component logic, the language,
 /// the features' callbacks and projections, and a first projection. The app and the window tests
 /// both start here; the tests pass fake services.
@@ -59,7 +57,9 @@ pub fn compose(window: &AppWindow, store: Store, services: ServiceParts) -> Disp
     dispatcher
 }
 
-pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) -> Result<(), String> {
+/// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
+/// the compositor (Phase 6). Agents reach the window through `agent_socket`.
+pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>, agent_socket: ovrley_mcp::link::SocketLocation) -> Result<(), String> {
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
     let dispatcher = compose(
         &window,
@@ -73,6 +73,15 @@ pub fn run(store: Store, preferences: PreferencesStore, gpu: Option<GpuDevice>) 
         },
     );
     platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());
+
+    // The first window serves agents; a later one logs that it does not (Q6).
+    let _agent_link = match ovrley_mcp::link::serve(agent_socket, platform::agent_bridge_hooks()) {
+        Ok(server) => server,
+        Err(error) => {
+            log::warn!("agents cannot reach this window: {error}");
+            None
+        }
+    };
 
     // The close guard decides; the window stays until it does.
     let close = dispatcher.handle();

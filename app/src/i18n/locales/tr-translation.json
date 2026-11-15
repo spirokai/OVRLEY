@@ -25,6 +25,10 @@
     "processingYourActivity": "Etkinliğiniz işleniyor..."
   },
   "app-shell": {
+    "allowAgentEdits": "Ajan düzenlemelerine izin ver",
+    "allowAgentEditsHelp": "MCP (ovrley --mcp) üzerinden bağlanan bir yapay zekâ ajanının dil ve çekmeceler gibi bu pencereyi değiştirmesine izin verir. Kapatıldığında tüm ajan istekleri reddedilir.",
+    "agentConnected": "Ajan bağlı",
+    "agentConnectedHelp": "MCP üzerinden bağlı bir yapay zekâ ajanı bu pencereyi değiştirebilir. Durdurmak için Ayarlar'da \"Ajan düzenlemelerine izin ver\" seçeneğini kapatın.",
     "dropFilesToImport": "İçe aktarmak için dosyaları bırakın",
     "backendOffline": "Arka uç çevrim dışı",
     "blackBackground": "Siyah arka plan",

@@ -25,6 +25,10 @@
     "processingYourActivity": "Zpracování aktivity..."
   },
   "app-shell": {
+    "allowAgentEdits": "Povolit úpravy agentům",
+    "allowAgentEditsHelp": "Umožní agentovi AI připojenému přes MCP (ovrley --mcp) měnit toto okno, například jazyk a panely. Po vypnutí budou všechny požadavky agentů odmítnuty.",
+    "agentConnected": "Agent připojen",
+    "agentConnectedHelp": "Agent AI je připojen přes MCP a může měnit toto okno. Chcete-li ho zastavit, vypněte v Nastavení „Povolit úpravy agentům“.",
     "dropFilesToImport": "Přetáhněte soubory k importu",
     "backendOffline": "Backend není dostupný",
     "blackBackground": "Černé pozadí",

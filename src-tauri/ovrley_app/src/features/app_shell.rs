@@ -219,6 +219,51 @@ pub fn drop_files(store: &mut Store, paths: &[DroppedPath]) {
     }
 }
 
+/// The preference that lets an agent drive the window over MCP (D13); off when absent.
+pub const ALLOW_AGENT_EDITS_KEY: &str = "allowAgentEdits";
+
+/// MCP sessions with the window (D13).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct AgentSessionState {
+    /// The user allows agent edits (`allowAgentEdits`).
+    pub allow_agent_edits: bool,
+    /// Open connections from `ovrley --mcp` processes.
+    pub connections: usize,
+}
+
+impl AgentSessionState {
+    /// The header's indicator: an agent is connected and allowed.
+    pub fn shows_indicator(self) -> bool {
+        self.allow_agent_edits && self.connections > 0
+    }
+
+    pub fn session_opened(&mut self) {
+        self.connections += 1;
+    }
+
+    pub fn session_closed(&mut self) {
+        self.connections = self.connections.saturating_sub(1);
+    }
+}
+
+/// Reads `allowAgentEdits`: absent is off; a present value must be a boolean.
+pub fn hydrate_agent_preference(store: &mut Store, preferences: &crate::lib::preferences_store::PreferencesStore) -> Result<(), String> {
+    match preferences.get(ALLOW_AGENT_EDITS_KEY) {
+        None => Ok(()),
+        Some(serde_json::Value::Bool(allowed)) => {
+            store.agent_session.allow_agent_edits = *allowed;
+            Ok(())
+        }
+        Some(other) => Err(format!("Preference \"{ALLOW_AGENT_EDITS_KEY}\" must be true or false, found {other}")),
+    }
+}
+
+/// The Settings switch: applies and persists `allowAgentEdits`.
+pub fn set_allow_agent_edits(store: &mut Store, services: &mut Services, allowed: bool) {
+    store.agent_session.allow_agent_edits = allowed;
+    services.preferences.set(ALLOW_AGENT_EDITS_KEY, serde_json::Value::Bool(allowed));
+}
+
 /// The settings dialog's sections (`data/settingsSections.js`), in the navigation's order.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SettingsSection {
@@ -611,5 +656,28 @@ mod tests {
         store.editor_shell.close_settings();
         drop_files(&mut store, &dropped(&["/a/ride.fit"]));
         assert_eq!(store.media.error_message.as_deref(), Some("Drop failed: activity files cannot be opened yet."));
+    }
+
+    #[test]
+    fn the_agent_indicator_needs_a_connection_and_the_preference() {
+        let mut state = AgentSessionState::default();
+        state.session_opened();
+        assert!(!state.shows_indicator(), "edits are off");
+        state.allow_agent_edits = true;
+        assert!(state.shows_indicator());
+        state.session_closed();
+        state.session_closed();
+        assert_eq!(state.connections, 0);
+        assert!(!state.shows_indicator());
+    }
+
+    #[test]
+    fn the_agent_preference_is_off_when_absent_and_strict_when_present() {
+        let (preferences, _) = crate::lib::preferences_store::PreferencesStore::in_memory(json!({}));
+        assert!(!Store::hydrate(&preferences).unwrap().agent_session.allow_agent_edits);
+        let (preferences, _) = crate::lib::preferences_store::PreferencesStore::in_memory(json!({"allowAgentEdits": true}));
+        assert!(Store::hydrate(&preferences).unwrap().agent_session.allow_agent_edits);
+        let (preferences, _) = crate::lib::preferences_store::PreferencesStore::in_memory(json!({"allowAgentEdits": "yes"}));
+        assert!(Store::hydrate(&preferences).is_err());
     }
 }

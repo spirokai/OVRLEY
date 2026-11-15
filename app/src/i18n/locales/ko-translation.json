@@ -25,6 +25,10 @@
     "processingYourActivity": "활동 처리 중..."
   },
   "app-shell": {
+    "allowAgentEdits": "에이전트 편집 허용",
+    "allowAgentEditsHelp": "MCP(ovrley --mcp)로 연결된 AI 에이전트가 언어와 서랍 같은 이 창의 설정을 변경할 수 있게 합니다. 끄면 모든 에이전트 요청을 거부합니다.",
+    "agentConnected": "에이전트 연결됨",
+    "agentConnectedHelp": "AI 에이전트가 MCP로 연결되어 있으며 이 창을 변경할 수 있습니다. 중지하려면 설정에서 '에이전트 편집 허용'을 끄세요.",
     "dropFilesToImport": "가져올 파일을 놓으세요",
     "backendOffline": "백엔드 오프라인",
     "blackBackground": "검은색 배경",

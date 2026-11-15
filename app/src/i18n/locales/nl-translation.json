@@ -25,6 +25,10 @@
     "processingYourActivity": "Activiteit verwerken..."
   },
   "app-shell": {
+    "allowAgentEdits": "Wijzigingen door agents toestaan",
+    "allowAgentEditsHelp": "Laat een AI-agent die via MCP (ovrley --mcp) is verbonden dit venster wijzigen, zoals de taal en de lades. Zet dit uit om alle verzoeken van agents te weigeren.",
+    "agentConnected": "Agent verbonden",
+    "agentConnectedHelp": "Een AI-agent is via MCP verbonden en kan dit venster wijzigen. Zet 'Wijzigingen door agents toestaan' uit in Instellingen om hem te stoppen.",
     "dropFilesToImport": "Zet bestanden neer om te importeren",
     "backendOffline": "Backend offline",
     "blackBackground": "Zwarte achtergrond",

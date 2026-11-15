@@ -6,6 +6,7 @@ use serde_json::Value;
 
 /// A supported locale. Serialized as its code (`en`, `zh-CN`, …), as `lng` stores it.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum Locale {
     #[default]
     #[serde(rename = "en")]

@@ -7,6 +7,8 @@ import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { Select } from "../../components/select.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
 import { Kbd } from "../../components/kbd.slint";
+import { Switch } from "../../components/switch.slint";
+import { HelpTooltip } from "../../components/help-tooltip.slint";
 import { Choice, PlacementAlign } from "../../components/logic.slint";
 import { SettingsSection, ShortcutGroupView } from "index.slint";
 
@@ -127,12 +129,14 @@ component SettingsRow inherits HorizontalLayout {
     @children
 }
 
-// `GeneralSettingsPanel` (D15): the language select. Units arrive in Phase 3, the map tile cache
-// in Phase 5.
+// `GeneralSettingsPanel` (D15): the language select and whether agents may edit (D13). Units
+// arrive in Phase 3, the map tile cache in Phase 5.
 component GeneralSettingsPanel {
     in property <string> language;
     in property <[Choice]> languages;
+    in property <bool> allow-agent-edits;
     callback change-language(string);
+    callback set-allow-agent-edits(bool);
 
     ScrollArea {
         width: 100%;
@@ -158,6 +162,28 @@ component GeneralSettingsPanel {
                     accessible-label: @tr("app-shell.language" => "Language");
                     value-changed(value) => {
                         root.change-language(value);
+                    }
+                }
+            }
+            HorizontalLayout {
+                spacing: 1.5rem;
+                HorizontalLayout {
+                    spacing: 0.5rem;
+                    alignment: start;
+                    horizontal-stretch: 1;
+                    AppText {
+                        content: @tr("app-shell.allowAgentEdits" => "Allow agent edits");
+                        font-size: Theme.text-sm * 1rem;
+                    }
+                    HelpTooltip {
+                        content: @tr("app-shell.allowAgentEditsHelp" => "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request.");
+                    }
+                }
+                Switch {
+                    checked: root.allow-agent-edits;
+                    accessible-label: @tr("app-shell.allowAgentEdits" => "Allow agent edits");
+                    checked-changed(checked) => {
+                        root.set-allow-agent-edits(checked);
                     }
                 }
             }
@@ -285,9 +311,11 @@ export component SettingsDialog {
     in property <string> language;
     in property <[Choice]> languages;
     in property <[ShortcutGroupView]> shortcut-groups;
+    in property <bool> allow-agent-edits;
     callback close();
     callback select-section(SettingsSection);
     callback change-language(string);
+    callback set-allow-agent-edits(bool);
 
     property <string> section-title: root.section == SettingsSection.settings ? @tr("app-shell.settings" => "Settings") : @tr("app-shell.shortcuts" => "Shortcuts");
 
@@ -357,8 +385,12 @@ export component SettingsDialog {
                         vertical-stretch: 1;
                         language: root.language;
                         languages: root.languages;
+                        allow-agent-edits: root.allow-agent-edits;
                         change-language(value) => {
                             root.change-language(value);
+                        }
+                        set-allow-agent-edits(allowed) => {
+                            root.set-allow-agent-edits(allowed);
                         }
                     }
                     if root.section == SettingsSection.shortcuts: KeyboardShortcutsPanel {

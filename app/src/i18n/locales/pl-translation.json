@@ -25,6 +25,10 @@
     "processingYourActivity": "Przetwarzanie aktywności..."
   },
   "app-shell": {
+    "allowAgentEdits": "Zezwalaj agentom na zmiany",
+    "allowAgentEditsHelp": "Pozwala agentowi AI połączonemu przez MCP (ovrley --mcp) zmieniać to okno, na przykład język i panele. Po wyłączeniu wszystkie żądania agentów są odrzucane.",
+    "agentConnected": "Agent połączony",
+    "agentConnectedHelp": "Agent AI jest połączony przez MCP i może zmieniać to okno. Aby go zatrzymać, wyłącz „Zezwalaj agentom na zmiany” w Ustawieniach.",
     "dropFilesToImport": "Upuść pliki, aby je zaimportować",
     "backendOffline": "Backend niedostępny",
     "blackBackground": "Czarne tło",

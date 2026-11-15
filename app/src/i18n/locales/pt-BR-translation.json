@@ -25,6 +25,10 @@
     "processingYourActivity": "Processando sua atividade..."
   },
   "app-shell": {
+    "allowAgentEdits": "Permitir edições de agentes",
+    "allowAgentEditsHelp": "Permite que um agente de IA conectado via MCP (ovrley --mcp) altere esta janela, como o idioma e os painéis. Desative para recusar todas as solicitações de agentes.",
+    "agentConnected": "Agente conectado",
+    "agentConnectedHelp": "Um agente de IA está conectado via MCP e pode alterar esta janela. Desative \"Permitir edições de agentes\" nas Configurações para impedi-lo.",
     "dropFilesToImport": "Solte arquivos para importar",
     "backendOffline": "Backend offline",
     "blackBackground": "Fundo preto",

@@ -47,6 +47,19 @@ fn tour() -> Vec<Step> {
         }),
     ];
     let mut tour: Vec<Step> = steps.into_iter().map(|(name, action)| (name, Some(action))).collect();
+    tour.push((
+        "agent-connected",
+        Some(|store, _| {
+            store.agent_session.allow_agent_edits = true;
+            store.agent_session.session_opened();
+            store.editor_shell.set_settings_section(ovrley_app::features::app_shell::SettingsSection::Settings);
+            store.editor_shell.open_settings();
+        }),
+    ));
+    tour.push((
+        "agent-connected-closed",
+        Some(|store, _| store.editor_shell.close_settings()),
+    ));
     tour.push(("fullscreen", None));
     tour.push(("fullscreen-left", None));
     tour

@@ -13,7 +13,7 @@ mod reconcile;
 pub mod services;
 pub mod slices;
 
-use crate::features::app_shell::{AppBootstrapState, EditorShellState, TrafficLightInsetState, WindowCloseGuardState, WindowFileDropState};
+use crate::features::app_shell::{AgentSessionState, AppBootstrapState, EditorShellState, TrafficLightInsetState, WindowCloseGuardState, WindowFileDropState};
 use crate::features::toolbar::DrawerPreferenceState;
 use crate::i18n::I18nState;
 use crate::lib::preferences_store::PreferencesStore;
@@ -37,14 +37,17 @@ pub struct Store {
     pub close_guard: WindowCloseGuardState,
     pub traffic_light_inset: TrafficLightInsetState,
     pub file_drop: WindowFileDropState,
+    pub agent_session: AgentSessionState,
 }
 
 impl Store {
     /// Reads the preferences the shell needs before its first frame, as `main.jsx` and the startup
-    /// hooks do: the language (`lng`, strict) and the drawer preference (normalized, Q5).
+    /// hooks do: the language (`lng`, strict), whether agents may edit (strict), and the drawer
+    /// preference (normalized, Q5).
     pub fn hydrate(preferences: &PreferencesStore) -> Result<Self, String> {
         let mut store = Self::default();
         crate::i18n::hydrate_language_preference(&mut store, preferences)?;
+        crate::features::app_shell::hydrate_agent_preference(&mut store, preferences)?;
         crate::features::toolbar::hydrate_drawer_preference(&mut store, preferences);
         Ok(store)
     }
@@ -87,6 +90,11 @@ impl DispatchHandle {
         if let Some(shared) = self.0.upgrade() {
             Dispatcher(shared).dispatch(action);
         }
+    }
+
+    /// [`Dispatcher::dispatch_with_result`], if the dispatcher still exists.
+    pub fn dispatch_with_result<R: 'static>(&self, action: impl FnOnce(&mut Store, &mut Services) -> R + 'static) -> Option<R> {
+        self.0.upgrade().and_then(|shared| Dispatcher(shared).dispatch_with_result(action))
     }
 
     /// Writes pending preferences out, if the dispatcher still exists.

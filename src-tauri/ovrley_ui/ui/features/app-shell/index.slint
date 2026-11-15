@@ -40,10 +40,15 @@ export global AppShell {
     in property <[Choice]> languages;
     in property <[ShortcutGroupView]> shortcut-groups;
 
+    // MCP (D13): the user allows agent edits; an agent is connected and allowed (the badge).
+    in property <bool> allow-agent-edits;
+    in property <bool> agent-connected;
+
     callback open-settings();
     callback close-settings();
     callback select-settings-section(SettingsSection);
     callback change-language(string);
+    callback set-allow-agent-edits(bool);
 
     // Keys no focused control used (`key-pressed`) and the capture phase (`capture-key-pressed`),
     // as the window's root focus scope receives them. They answer whether the key was consumed.

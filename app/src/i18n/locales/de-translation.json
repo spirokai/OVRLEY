@@ -25,6 +25,10 @@
     "processingYourActivity": "Aktivität wird verarbeitet..."
   },
   "app-shell": {
+    "allowAgentEdits": "Änderungen durch Agenten erlauben",
+    "allowAgentEditsHelp": "Erlaubt einem über MCP (ovrley --mcp) verbundenen KI-Agenten, dieses Fenster zu ändern, etwa die Sprache und die Seitenleisten. Ausgeschaltet werden alle Anfragen von Agenten abgelehnt.",
+    "agentConnected": "Agent verbunden",
+    "agentConnectedHelp": "Ein KI-Agent ist über MCP verbunden und kann dieses Fenster ändern. Schalten Sie „Änderungen durch Agenten erlauben“ in den Einstellungen aus, um ihn zu stoppen.",
     "dropFilesToImport": "Dateien zum Importieren ablegen",
     "backendOffline": "Backend offline",
     "blackBackground": "Schwarzer Hintergrund",

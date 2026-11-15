@@ -25,6 +25,10 @@
     "processingYourActivity": "Bearbetar aktiviteten..."
   },
   "app-shell": {
+    "allowAgentEdits": "Tillåt ändringar från agenter",
+    "allowAgentEditsHelp": "Låter en AI-agent som är ansluten via MCP (ovrley --mcp) ändra det här fönstret, till exempel språket och lådorna. Stäng av för att neka alla förfrågningar från agenter.",
+    "agentConnected": "Agent ansluten",
+    "agentConnectedHelp": "En AI-agent är ansluten via MCP och kan ändra det här fönstret. Stäng av ”Tillåt ändringar från agenter” i Inställningar för att stoppa den.",
     "dropFilesToImport": "Släpp filer för att importera",
     "backendOffline": "Backend otillgänglig",
     "blackBackground": "Svart bakgrund",

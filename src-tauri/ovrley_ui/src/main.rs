@@ -1,4 +1,5 @@
-//! The native OVRLEY binary.
+//! The native OVRLEY binary. With `--mcp` it is instead an MCP server on stdio for an agent,
+//! forwarding to the running window.
 //!
 //! Startup, in order: logging; runtime paths and distribution; the preferences file; the language
 //! and drawer hydration; backend selection with the shared GPU device; then the window
@@ -13,10 +14,33 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
+    // MCP over stdio for an agent (D13), before anything touches Slint or winit: no window, Dock
+    // icon or GPU device. Standard output carries only the protocol; logs go to standard error.
+    if std::env::args().nth(1).as_deref() == Some("--mcp") {
+        return serve_mcp();
+    }
     match start() {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             ovrley_ui::platform::show_startup_failure(&message);
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn serve_mcp() -> ExitCode {
+    let roots = match RuntimeRoots::from_platform(installed_resource_dir) {
+        Ok(roots) => roots,
+        Err(error) => {
+            log::error!("{error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let mut client = ovrley_mcp::link::LinkClient::new(ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir));
+    match ovrley_mcp::protocol::run_stdio(&mut client) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            log::error!("the MCP connection failed: {error}");
             ExitCode::FAILURE
         }
     }
@@ -36,7 +60,8 @@ fn start() -> Result<(), String> {
     });
 
     let gpu = ovrley_ui::platform::select_backend()?;
-    ovrley_ui::app::run(store, preferences, gpu)
+    let agent_socket = ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir);
+    ovrley_ui::app::run(store, preferences, gpu, agent_socket)
 }
 
 /// The settings file. The debug snapshot tour (`OVRLEY_SNAPSHOT`) changes the language and the

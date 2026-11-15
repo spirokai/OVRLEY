@@ -25,6 +25,10 @@
     "processingYourActivity": "アクティビティを処理しています..."
   },
   "app-shell": {
+    "allowAgentEdits": "エージェントによる編集を許可",
+    "allowAgentEditsHelp": "MCP（ovrley --mcp）で接続した AI エージェントが、言語やドロワーなどこのウィンドウを変更できるようにします。オフにすると、エージェントからの要求をすべて拒否します。",
+    "agentConnected": "エージェント接続中",
+    "agentConnectedHelp": "AI エージェントが MCP で接続しており、このウィンドウを変更する可能性があります。停止するには、設定で「エージェントによる編集を許可」をオフにしてください。",
     "dropFilesToImport": "ファイルをドロップしてインポート",
     "backendOffline": "バックエンドがオフラインです",
     "blackBackground": "黒い背景",

@@ -116,6 +116,46 @@ pub fn install_ui_dispatch(dispatch: DispatchHandle, window: slint::Weak<AppWind
     APP_WINDOW.with(|slot| *slot.borrow_mut() = Some(window));
 }
 
+/// The window's side of MCP (D13): each call runs on the UI thread as one dispatch, and the
+/// connection's thread waits for its outcome; each connection is an agent session.
+pub fn agent_bridge_hooks() -> ovrley_mcp::link::BridgeHooks {
+    use ovrley_mcp::catalog::{self, ToolOutcome};
+    use std::sync::Arc;
+    ovrley_mcp::link::BridgeHooks {
+        call: Arc::new(|tool: String, arguments: serde_json::Value| {
+            let (reply, outcome) = std::sync::mpsc::channel();
+            let posted = slint::invoke_from_event_loop(move || {
+                let result = UI_DISPATCH.with(|slot| {
+                    slot.borrow()
+                        .as_ref()
+                        .and_then(|dispatch| dispatch.dispatch_with_result(move |store, services| catalog::call(&tool, arguments, store, services)))
+                });
+                let _ = reply.send(result.unwrap_or_else(|| ToolOutcome::Failed("OVRLEY is busy. Try again.".into())));
+            });
+            if posted.is_err() {
+                return ToolOutcome::Failed("OVRLEY is closing.".into());
+            }
+            outcome
+                .recv_timeout(ovrley_mcp::link::CALL_TIMEOUT)
+                .unwrap_or_else(|_| ToolOutcome::Failed("OVRLEY did not answer in time. The change may still be applied.".into()))
+        }),
+        session: Arc::new(|open: bool| {
+            let posted = slint::invoke_from_event_loop(move || {
+                dispatch_ui(move |store, _| {
+                    if open {
+                        store.agent_session.session_opened();
+                    } else {
+                        store.agent_session.session_closed();
+                    }
+                })
+            });
+            if let Err(error) = posted {
+                log::debug!("an agent session changed after the event loop ended: {error}");
+            }
+        }),
+    }
+}
+
 /// Dispatches into the app from code that runs outside Slint's callbacks (raw window events).
 pub(crate) fn dispatch_ui(action: impl FnOnce(&mut ovrley_app::store::Store, &mut ovrley_app::store::services::Services) + 'static) {
     UI_DISPATCH.with(|slot| {

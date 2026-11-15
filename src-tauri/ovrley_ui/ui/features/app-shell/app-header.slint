@@ -1,6 +1,8 @@
 import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
+import { Badge, BadgeVariant } from "../../components/badge.slint";
+import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 
 // One window button: 2.5rem wide, full height, muted; on hover `surface-elevated` and
 // `foreground`, or `destructive` with white text for close.
@@ -93,6 +95,7 @@ export component WindowControls {
 export component AppHeader inherits Rectangle {
     in property <bool> traffic-light-inset;
     in property <string> version;
+    in property <bool> agent-connected;
     callback minimize-window();
     callback toggle-maximize-window();
     callback close-window();
@@ -155,6 +158,22 @@ export component AppHeader inherits Rectangle {
             HorizontalLayout {
                 alignment: end;
                 spacing: 0.75rem;
+                // D13: an agent is connected over MCP and allowed to edit.
+                if root.agent-connected: VerticalLayout {
+                    alignment: center;
+                    SimpleTooltip {
+                        content: @tr("app-shell.agentConnectedHelp" => "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it.");
+                        side: bottom;
+                        content-width: 20rem;
+                        Badge {
+                            variant: BadgeVariant.outline;
+                            icon: Icons.sparkles;
+                            text: @tr("app-shell.agentConnected" => "Agent connected");
+                            text-color: Theme.primary;
+                            border-color: Theme.primary.transparentize(0.4);
+                        }
+                    }
+                }
                 WindowControls {
                     minimize => {
                         root.minimize-window();

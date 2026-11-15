@@ -25,6 +25,10 @@
     "processingYourActivity": "正在处理活动..."
   },
   "app-shell": {
+    "allowAgentEdits": "允许代理编辑",
+    "allowAgentEditsHelp": "允许通过 MCP（ovrley --mcp）连接的 AI 代理更改此窗口，例如语言和抽屉面板。关闭后将拒绝所有代理请求。",
+    "agentConnected": "代理已连接",
+    "agentConnectedHelp": "有 AI 代理通过 MCP 连接，可能会更改此窗口。在设置中关闭“允许代理编辑”即可阻止。",
     "dropFilesToImport": "拖放文件以导入",
     "backendOffline": "后端不可用",
     "blackBackground": "黑色背景",

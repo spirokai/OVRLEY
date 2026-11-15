@@ -23,6 +23,7 @@ path = "src/main.rs"
 [dependencies]
 ovrley_app = { path = "../ovrley_app" }
 ovrley_services = { path = "../ovrley_services" }
+ovrley_mcp = { path = "../ovrley_mcp" }
 arboard = { version = "3.7", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png"] }
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }

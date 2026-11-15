@@ -25,6 +25,10 @@
     "processingYourActivity": "Processing your activity..."
   },
   "app-shell": {
+    "allowAgentEdits": "Allow agent edits",
+    "allowAgentEditsHelp": "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request.",
+    "agentConnected": "Agent connected",
+    "agentConnectedHelp": "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it.",
     "dropFilesToImport": "Drop files to import",
     "backendOffline": "Backend offline",
     "blackBackground": "Black background",

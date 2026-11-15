@@ -42,6 +42,7 @@ export component AppWindow inherits FluidWindow {
         AppHeader {
             traffic-light-inset: AppShell.traffic-light-inset;
             version: AppShell.version;
+            agent-connected: AppShell.agent-connected;
             minimize-window => {
                 AppShell.minimize-window();
             }
@@ -105,6 +106,7 @@ export component AppWindow inherits FluidWindow {
         language: AppShell.language;
         languages: AppShell.languages;
         shortcut-groups: AppShell.shortcut-groups;
+        allow-agent-edits: AppShell.allow-agent-edits;
         close => {
             AppShell.close-settings();
         }
@@ -113,6 +115,9 @@ export component AppWindow inherits FluidWindow {
         }
         change-language(code) => {
             AppShell.change-language(code);
+        }
+        set-allow-agent-edits(allowed) => {
+            AppShell.set-allow-agent-edits(allowed);
         }
     }
 
