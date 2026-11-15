@@ -5,14 +5,16 @@ import { Popover } from "../../components/popover.slint";
 import { PlacementAlign } from "../../components/logic.slint";
 
 // `ActivitySection`'s `MenuItem`: a full-width ghost row, 0.7rem semibold uppercase, a 0.875rem
-// icon 0.75rem from the label, 0.5rem side padding, hover `muted-foreground` at 10%.
-component MenuItem {
+// icon 0.75rem from the label, 0.5rem side padding, hover `muted-foreground` at 10%. It fills the
+// popover's width (`w-full`), so the hover background spans the row.
+component MenuItem inherits HorizontalLayout {
     in property <string> icon;
     in property <string> label;
     in property <bool> disabled;
     callback clicked();
 
     Button {
+        horizontal-stretch: 1;
         variant: ButtonVariant.ghost;
         icon: root.icon;
         icon-size: 0.875rem;
