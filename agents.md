@@ -31,18 +31,20 @@ src-tauri/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encodi
 
 ## Commands (run from repo root)
 
-| Command                | What it does                                                                    |
-| ---------------------- | ------------------------------------------------------------------------------- |
-| `pnpm dev`             | Full dev: builds frontend + launches Tauri window                               |
-| `pnpm dev:frontend`    | Vite dev server only (port 5173)                                                |
-| `pnpm build`           | Production build (runs `pnpm tauri build` via wrapper)                          |
-| `pnpm lint`            | `vp lint` (Vite+ oxlint) on `app/`                                              |
-| `pnpm format`          | `vp fmt --write` (Vite+ formatter) on `app/`                                    |
-| `pnpm format:check`    | `vp fmt --check` on `app/`                                                      |
-| `pnpm test`            | Frontend Vitest suite (`vp test run`)                                           |
-| `pnpm release`         | semantic-release (auto-tags on `skia-render-backend` branch pushes)             |
-| `pnpm showcase:native` | Slint component showcase (`ovrley_ui` example, `dev-windows` feature)           |
-| `pnpm test:native-ui`  | `ovrley_app` unit tests and `ovrley_ui` component tests (Slint testing backend) |
+| Command                | What it does                                                                                                     |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`             | Full dev: builds frontend + launches Tauri window                                                                |
+| `pnpm dev:frontend`    | Vite dev server only (port 5173)                                                                                 |
+| `pnpm build`           | Production build (runs `pnpm tauri build` via wrapper)                                                           |
+| `pnpm lint`            | `vp lint` (Vite+ oxlint) on `app/`                                                                               |
+| `pnpm format`          | `vp fmt --write` (Vite+ formatter) on `app/`                                                                     |
+| `pnpm format:check`    | `vp fmt --check` on `app/`                                                                                       |
+| `pnpm test`            | Frontend Vitest suite (`vp test run`)                                                                            |
+| `pnpm release`         | semantic-release (auto-tags on `skia-render-backend` branch pushes)                                              |
+| `pnpm dev:native`      | Native (Slint) app: `cargo run -p ovrley_ui --bin ovrley`                                                        |
+| `pnpm dev:native:live` | Native app with Slint live preview (`live-preview` feature): `.slint` edits reload                               |
+| `pnpm showcase:native` | Slint component showcase (`ovrley_ui` example, `dev-windows` feature)                                            |
+| `pnpm test:native-ui`  | `ovrley_app`, `ovrley_services`, `ovrley_mcp` unit tests and `ovrley_ui` component tests (Slint testing backend) |
 
 `pnpm tauri build` is wrapped by `scripts/tauri.mjs` — it runs Tauri with `--no-bundle`, then creates a standalone `.zip` portable archive containing the binary + `vendor/ffmpeg/` + `fonts/` + `templates/`.
 
@@ -95,12 +97,18 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 - semantic-release auto-creates tags on pushes to `skia-render-backend` branch using `@semantic-release/commit-analyzer`.
 - The portable archive script (`packaging/portable.mjs`) packages: Tauri binary renamed to `OVRLEY(.exe)`, `vendor/ffmpeg/`, `fonts/`, `templates/`.
 
+## Native app (migration)
+
+- `ovrley --mcp` is an MCP server on stdio that drives the open window (enable "Allow agent edits" in Settings). Register it with an agent, e.g. `claude mcp add ovrley -- <path>/ovrley --mcp`.
+- Debug builds: `OVRLEY_SNAPSHOT=<dir>` renders a tour of shell states to PNGs through Slint's own `take_snapshot()` (no screen-recording permission needed) and quits; it reads but never writes the shared `ovrley-settings.json`.
+- Translations: `.slint` files use `@tr("<json key>" => "<English text>")`; `build.rs` converts `app/src/i18n/locales/*.json` to bundled gettext catalogs. `tests/translations.rs` checks every `@tr` against `en-translation.json`.
+
 ## Testing
 
 - **Frontend**: Vitest + Testing Library. Run with `pnpm test` from the repository root. Test files live in `app/src/tests/`.
 - **Rust backend**: `cargo test` from inside `src-tauri/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
 - Run both from the repository root with `pnpm test` and `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
-- **Slint UI (migration)**: `pnpm test:native-ui` runs `ovrley_app`'s unit tests and `ovrley_ui`'s component tests (`src-tauri/ovrley_ui/tests/`; their Slint harness windows are in `tests/harness/` and compile into the crate only with the `dev-windows` feature). Slint's testing platform is process-wide and bound to one thread, so each test file has a single `#[test]` that runs its cases through `common::run_cases`.
+- **Slint UI (migration)**: `pnpm test:native-ui` runs the `ovrley_app`, `ovrley_services` and `ovrley_mcp` unit tests and `ovrley_ui`'s component tests (`src-tauri/ovrley_ui/tests/`; their Slint harness windows are in `tests/harness/` and compile into the crate only with the `dev-windows` feature). Slint's testing platform is process-wide and bound to one thread, so each test file has a single `#[test]` that runs its cases through `common::run_cases`.
 
 ## Agent skills
 
