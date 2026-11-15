@@ -144,15 +144,17 @@ impl WidgetRequest {
     }
 }
 
-/// Family geometry has optional rotation metadata, which translation does not change.
-#[derive(Deserialize, Serialize)]
-struct PlacementGeometry {
+/// A widget's presented geometry in scene pixels: its raster tile, its content rectangle and
+/// width, and the optional rotation metadata, which translation does not change. The WASM host
+/// receives it serialized; the native host reads it typed (Phase 3, D8).
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
+pub struct PresentedGeometry {
     #[serde(flatten)]
-    widget: WidgetGeometry,
+    pub widget: WidgetGeometry,
     #[serde(skip_serializing_if = "Option::is_none")]
-    rotation: Option<f32>,
+    pub rotation: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    rotation_origin: Option<[f32; 2]>,
+    pub rotation_origin: Option<[f32; 2]>,
 }
 
 pub struct PreviewInstance {
@@ -309,7 +311,7 @@ impl PreviewInstance {
             return Ok(());
         }
         // Always translate the original frame, avoiding accumulated drag error.
-        let mut geometry: PlacementGeometry = serde_json::from_slice(self.widget.geometry())
+        let mut geometry: PresentedGeometry = serde_json::from_slice(self.widget.geometry())
             .map_err(|error| WidgetError::Render(error.to_string()))?;
         let [dx, dy] = [
             self.position[0] - self.origin[0],
@@ -333,6 +335,16 @@ impl PreviewInstance {
         self.placed_geometry
             .as_ref()
             .unwrap_or_else(|| self.widget.geometry())
+    }
+    /// The typed form of [`Self::geometry`], or `None` while the widget presents nothing.
+    pub fn presented_geometry(&self) -> WidgetResult<Option<PresentedGeometry>> {
+        let bytes = self.geometry();
+        if bytes.is_empty() {
+            return Ok(None);
+        }
+        serde_json::from_slice(bytes)
+            .map(Some)
+            .map_err(|error| WidgetError::Render(error.to_string()))
     }
     /// Typed tile bounds at the instance's current placement, matching `geometry()`.
     pub fn bounds(&self) -> Option<TileBounds> {

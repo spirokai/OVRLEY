@@ -8,7 +8,7 @@ pub mod model;
 pub mod activity;
 pub mod host;
 pub mod preview;
-mod preview_instance;
+pub mod preview_instance;
 pub mod preview_widget;
 pub mod render;
 pub mod widgets;

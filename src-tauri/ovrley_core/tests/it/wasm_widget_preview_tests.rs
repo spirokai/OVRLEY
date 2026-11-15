@@ -268,6 +268,28 @@ fn every_preview_family_derives_serialized_geometry_from_typed_tile_bounds() {
     }
 }
 
+#[test]
+fn every_preview_family_presents_typed_geometry_equal_to_its_serialized_geometry() {
+    for (mut preview, mut request) in every_family_preview() {
+        let kind = request["type"].as_str().unwrap().to_owned();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        let assert_equal = |preview: &PreviewSession, stage: &str| {
+            let widget = &preview.widgets[&id];
+            let typed = widget.presented_geometry().unwrap().unwrap_or_else(|| panic!("{kind} {stage}: geometry"));
+            let serialized: ovrley_widgets::preview_instance::PresentedGeometry = serde_json::from_slice(widget.geometry()).unwrap();
+            assert_eq!(typed, serialized, "{kind} {stage}");
+            assert_eq!(serde_json::to_vec(&typed).unwrap(), *widget.geometry(), "{kind} {stage}: the bytes are this struct");
+        };
+        assert_equal(&preview, "rendered");
+        request["transient"] = json!(true);
+        request["widget"]["x"] = json!(request["widget"]["x"].as_f64().unwrap() + 12.125);
+        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        assert_equal(&preview, "dragged");
+    }
+}
+
 /// Every family reads its metric from this activity; speed crosses digit-count changes.
 fn every_family_activity() -> Vec<u8> {
     serde_json::to_vec(&every_family_parsed_activity()).unwrap()

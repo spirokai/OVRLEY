@@ -32,7 +32,7 @@ pub struct WidgetRequest {
     pub transient: bool,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct WidgetGeometry {
     pub left: f32,
     pub top: f32,
@@ -107,7 +107,7 @@ impl From<ContentBounds> for TileBounds {
 }
 
 /// Interaction rectangle in scene pixels, independent of raster allocation.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ContentBounds {
     pub left: f32,
     pub top: f32,
