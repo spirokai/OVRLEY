@@ -4,9 +4,13 @@
 pub mod choice_list;
 pub mod color_picker;
 pub mod file_dialog;
+pub mod fonts;
+pub mod format;
 pub mod gradient_stops;
 pub mod keyboard_shortcuts;
 pub mod number_input;
 pub mod placement;
 pub mod preferences_store;
+pub mod template;
 pub mod utils;
+pub mod widget;

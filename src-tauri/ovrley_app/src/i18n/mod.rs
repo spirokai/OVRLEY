@@ -78,6 +78,14 @@ impl Catalog {
             .unwrap_or_else(|| panic!("translation key {key} has no text"))
     }
 
+    /// `t(key, defaultValue)`: like [`Self::t`], with a default for keys no catalog has.
+    pub fn t_or<'a>(&'a self, locale: Locale, key: &str, default: &'a str) -> &'a str {
+        self.tables[locale.index()]
+            .get(key)
+            .or_else(|| self.tables[DEFAULT_LOCALE.index()].get(key))
+            .map_or(default, String::as_str)
+    }
+
     /// `t(key, {name: value, …})`.
     pub fn t_with(&self, locale: Locale, key: &str, values: &[(&str, &str)]) -> String {
         interpolate(self.t(locale, key), values)

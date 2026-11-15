@@ -9,17 +9,25 @@
 //! fired) is queued and runs right after, projections included. No `RefCell` borrow is ever taken
 //! twice.
 
+pub mod agent;
 mod reconcile;
 pub mod services;
 pub mod slices;
+pub mod sync;
 
-use crate::features::app_shell::{AgentSessionState, AppBootstrapState, EditorShellState, TrafficLightInsetState, WindowCloseGuardState, WindowFileDropState};
+use crate::features::app_shell::{
+    AgentSessionState, AppBootstrapState, EditorShellState, TrafficLightInsetState, UnsavedChangesConfirmState, WindowCloseGuardState, WindowFileDropState,
+};
+use crate::features::undo_redo::{EditorHistory, UndoableState};
+use crate::features::overlay_editor::drafts::WidgetDraftState;
 use crate::features::toolbar::DrawerPreferenceState;
 use crate::i18n::I18nState;
 use crate::lib::preferences_store::PreferencesStore;
 use services::{ServiceParts, Services};
+use slices::editor::EditorSlice;
 use slices::layout::LayoutSlice;
 use slices::media::MediaSlice;
+use slices::template::TemplateSlice;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
@@ -29,6 +37,14 @@ use std::rc::{Rc, Weak};
 pub struct Store {
     pub layout: LayoutSlice,
     pub media: MediaSlice,
+    pub editor: EditorSlice,
+    pub template: TemplateSlice,
+    /// The editor history (D6).
+    pub history: EditorHistory,
+    /// `useUnsavedChangesConfirm` (D15).
+    pub unsaved_confirm: UnsavedChangesConfirmState,
+    /// `useWidgetDraftState` (D7).
+    pub drafts: WidgetDraftState,
     pub i18n: I18nState,
     /// `useDrawerPreference`'s last observed preference.
     pub drawer_preference: DrawerPreferenceState,
@@ -178,8 +194,11 @@ impl Dispatcher {
             {
                 let mut state = self.0.state.borrow_mut();
                 let State { store, services } = &mut *state;
+                let before = UndoableState::of(store);
                 action(store, services);
                 reconcile::run(store, services);
+                // The history step (D6): after the reconcile steps, before the projections.
+                crate::features::undo_redo::record(store, before);
             }
             self.project();
         }

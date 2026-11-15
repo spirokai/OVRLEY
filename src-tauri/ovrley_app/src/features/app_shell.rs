@@ -320,6 +320,48 @@ impl EditorShellState {
     }
 }
 
+/// How the user answers the unsaved-changes dialog.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UnsavedAnswer {
+    Save,
+    Discard,
+    Cancel,
+}
+
+/// What runs once the user answers the unsaved-changes dialog. Phase 6 adds the project cases.
+#[derive(Debug)]
+pub enum UnsavedContinuation {
+    /// `handleCreateNewTemplate`; an agent's `template_new` waits on its reply.
+    NewTemplate { reply: Option<crate::store::agent::AgentReply> },
+}
+
+/// `useUnsavedChangesConfirm`: one pending confirmation (D15).
+#[derive(Debug, Default)]
+pub struct UnsavedChangesConfirmState {
+    pending: Option<UnsavedContinuation>,
+}
+
+impl UnsavedChangesConfirmState {
+    pub fn is_open(&self) -> bool {
+        self.pending.is_some()
+    }
+
+    pub fn continuation(&self) -> Option<&UnsavedContinuation> {
+        self.pending.as_ref()
+    }
+
+    /// Opens the dialog for `continuation`. A request while one is pending replaces it, as the
+    /// React hook's single resolver does; the replaced call's agent reply is cancelled.
+    pub fn request_confirm(&mut self, continuation: UnsavedContinuation) {
+        self.pending = Some(continuation);
+    }
+
+    /// Closes the dialog and hands back what was waiting.
+    pub fn take(&mut self) -> Option<UnsavedContinuation> {
+        self.pending.take()
+    }
+}
+
 /// One way to press a shortcut: modifier labels joined by `+`, then one or more alternative keys.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ShortcutOption {
