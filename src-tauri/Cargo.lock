@@ -5253,7 +5253,10 @@ dependencies = [
 name = "ovrley_app"
 version = "0.1.0"
 dependencies = [
+ "log",
  "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

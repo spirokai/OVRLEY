@@ -4,6 +4,9 @@
 pub mod choice_list;
 pub mod color_picker;
 pub mod color_utils;
+pub mod file_dialog;
 pub mod gradient_stops;
 pub mod number_input;
 pub mod placement;
+pub mod preferences_store;
+pub mod utils;
