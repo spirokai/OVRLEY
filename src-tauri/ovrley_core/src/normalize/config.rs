@@ -256,26 +256,34 @@ pub fn parse_template_value(value: &Value) -> CoreResult<RenderConfig> {
         )));
     }
 
-    let Some(version) = value.get("version").and_then(Value::as_u64) else {
+    let mut migrated = migrate_template_version(value)?;
+    migrate_saved_font_input(&mut migrated);
+    let mut config_value = migrated["config"].clone();
+    materialize_template_scene_defaults(&mut config_value, &migrated);
+    let mut config = parse_config_value(&config_value)?;
+    apply_template_global_defaults(&mut config, &migrated);
+    Ok(config)
+}
+
+/// The template file's version migration, shared by the render path and the editor's template
+/// ingress: version 2 gains an empty raster collection, which it must not already have, and the
+/// result is a current-version file whose `config.rasters` is an array.
+pub fn migrate_template_version(template: &Value) -> CoreResult<Value> {
+    let Some(version) = template.get("version").and_then(Value::as_u64) else {
         return Err(CoreError::Config("template version missing".into()));
     };
-
     if version != 2 && version != u64::from(TEMPLATE_FILE_VERSION) {
         return Err(CoreError::Config(format!(
             "unsupported template version: {version}. expected {TEMPLATE_FILE_VERSION}"
         )));
     }
-
-    let mut migrated = value.clone();
-    migrate_saved_font_input(&mut migrated);
-    let mut config_value = migrated
-        .get("config")
-        .cloned()
-        .ok_or_else(|| CoreError::Config("template config missing".into()))?;
+    let mut migrated = template.clone();
+    let config = migrated
+        .get_mut("config")
+        .ok_or_else(|| CoreError::Config("template config missing".into()))?
+        .as_object_mut()
+        .ok_or_else(|| CoreError::Config("template config must be an object".into()))?;
     if version == 2 {
-        let config = config_value
-            .as_object_mut()
-            .ok_or_else(|| CoreError::Config("template config must be an object".into()))?;
         if config.contains_key("rasters") {
             return Err(CoreError::Config(
                 "version 2 template cannot contain rasters".into(),
@@ -283,14 +291,13 @@ pub fn parse_template_value(value: &Value) -> CoreResult<RenderConfig> {
         }
         config.insert("rasters".into(), Value::Array(Vec::new()));
     }
-    config_value
-        .get("rasters")
-        .and_then(Value::as_array)
-        .ok_or_else(|| CoreError::Config("template config.rasters must be an array".into()))?;
-    materialize_template_scene_defaults(&mut config_value, &migrated);
-    let mut config = parse_config_value(&config_value)?;
-    apply_template_global_defaults(&mut config, &migrated);
-    Ok(config)
+    if !config.get("rasters").is_some_and(Value::is_array) {
+        return Err(CoreError::Config(
+            "template config.rasters must be an array".into(),
+        ));
+    }
+    migrated["version"] = Value::from(TEMPLATE_FILE_VERSION);
+    Ok(migrated)
 }
 
 /// Upgrades legacy saved documents in memory, including development v3 files.

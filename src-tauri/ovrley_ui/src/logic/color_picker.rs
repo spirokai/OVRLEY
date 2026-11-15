@@ -1,6 +1,6 @@
 use crate::{ColorPickerLogic, Hsl, Hsv, ParsedChannel, ParsedColor, Rgba};
 use ovrley_app::lib::color_picker::{self as cp, ColorFormat};
-use ovrley_app::lib::color_utils::normalize_hex_color;
+use ovrley_widgets::model::document::normalize_hex_color;
 
 fn to_app(color: Rgba) -> cp::Rgba {
     cp::Rgba {

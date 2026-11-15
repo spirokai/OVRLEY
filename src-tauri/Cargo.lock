@@ -5531,6 +5531,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "ovrley_core",
+ "ovrley_widgets",
  "regex",
  "schemars 1.2.0",
  "serde",
@@ -5639,6 +5640,7 @@ dependencies = [
  "ovrley_app",
  "ovrley_mcp",
  "ovrley_services",
+ "ovrley_widgets",
  "pollster",
  "regex",
  "rfd",
@@ -5658,6 +5660,7 @@ dependencies = [
  "chrono-tz",
  "image",
  "ovrley_map",
+ "schemars 1.2.0",
  "serde",
  "serde_json",
  "skia-safe",

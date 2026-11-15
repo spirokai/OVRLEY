@@ -84,8 +84,27 @@ fn validate_template_raster(raw: &RasterConfig, index: usize) -> CoreResult<()> 
             "Template raster cannot contain runtime resource state".into(),
         ));
     }
-    validate_raster_document(raw, index)?;
+    validate_raster_geometry(raw, index)?;
+    // A template may come from another platform, so its path is checked for the absolute forms
+    // of every platform; rendering checks it against this one.
+    if raw.path.as_deref().is_some_and(|path| !is_portable_absolute_path(path)) {
+        return Err(CoreError::Config(format!(
+            "Raster {} requires an absolute image path [raster_error:relative_path:{}]",
+            raw.id, raw.id
+        )));
+    }
     Ok(())
+}
+
+/// A POSIX path, a Windows drive path or a UNC path.
+fn is_portable_absolute_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    let drive = bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && matches!(bytes[2], b'\\' | b'/');
+    let unc = path
+        .strip_prefix("\\\\")
+        .and_then(|rest| rest.split_once('\\'))
+        .is_some_and(|(server, _)| !server.is_empty());
+    path.starts_with('/') || drive || unc
 }
 
 pub(crate) fn validate_raster(

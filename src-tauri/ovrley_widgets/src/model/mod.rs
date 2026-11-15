@@ -1,5 +1,6 @@
 //! Shared scene contracts, domain types, catalogues, and ingress validation.
 pub mod catalog;
+pub mod document;
 pub mod scene;
 pub mod standard_metrics;
 pub mod standard_widgets;

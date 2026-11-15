@@ -3,6 +3,7 @@
 mod config;
 mod raster;
 mod scene;
+pub mod template;
 mod widgets;
 
 use crate::error::CoreResult;
@@ -22,7 +23,7 @@ use widgets::validate_render_contents;
 
 pub(crate) use config::deserialize_render_presentation;
 pub use config::{
-    migrate_saved_font_input, parse_config_json, parse_config_value, parse_template_json,
+    migrate_saved_font_input, migrate_template_version, parse_config_json, parse_config_value, parse_template_json,
     parse_template_value, validate_saved_label_typography, RenderConfig, SceneConfig,
     TEMPLATE_FILE_FORMAT, TEMPLATE_FILE_VERSION,
 };

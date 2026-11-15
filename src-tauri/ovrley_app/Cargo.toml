@@ -13,6 +13,7 @@ schema = ["dep:schemars"]
 
 [dependencies]
 ovrley_core = { path = "../ovrley_core" }
+ovrley_widgets = { path = "../ovrley_widgets" }
 schemars = { version = "1", optional = true }
 log = "0.4"
 regex = "1"
