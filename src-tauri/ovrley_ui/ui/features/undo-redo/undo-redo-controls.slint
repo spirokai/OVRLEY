@@ -1,0 +1,49 @@
+import { Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { PlacementSide } from "../../components/logic.slint";
+
+// `UndoRedoControls`: two ghost 2rem buttons with 1rem Undo2 and Redo2. Their accessible labels
+// stay "Undo" and "Redo", in English, as today.
+export component UndoRedoControls inherits HorizontalLayout {
+    in property <bool> can-undo;
+    in property <bool> can-redo;
+    callback undo();
+    callback redo();
+
+    spacing: 0.25rem;
+    SimpleTooltip {
+        content: @tr("undo-redo.undoCtrlcmdz" => "Undo");
+        side: PlacementSide.bottom;
+        Button {
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            width: 2rem;
+            height: 2rem;
+            icon: Icons.undo-2;
+            icon-size: 1rem;
+            disabled: !root.can-undo;
+            accessible-label: "Undo";
+            clicked => {
+                root.undo();
+            }
+        }
+    }
+    SimpleTooltip {
+        content: @tr("undo-redo.redoCtrlcmdshiftz" => "Redo");
+        side: PlacementSide.bottom;
+        Button {
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            width: 2rem;
+            height: 2rem;
+            icon: Icons.redo-2;
+            icon-size: 1rem;
+            disabled: !root.can-redo;
+            accessible-label: "Redo";
+            clicked => {
+                root.redo();
+            }
+        }
+    }
+}

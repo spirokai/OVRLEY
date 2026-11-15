@@ -1,0 +1,56 @@
+// The canvas background behind the scene. Image and video arrive with Phase 6.
+export enum BackgroundMode { checker, black, white }
+
+// One widget on the canvas (D10): its image and its raster rectangle, in logical pixels relative
+// to the scene's top-left corner. Rotated families bake their rotation into the pixels.
+export struct WidgetView {
+    id: string,
+    image: image,
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
+// The overlay-editor feature's global (D5), written by `src/features/overlay_editor.rs`.
+export global OverlayEditor {
+    // The stage (the scroll area's content) and the scene inside it, in logical pixels.
+    in property <length> stage-width;
+    in property <length> stage-height;
+    in property <length> scene-left;
+    in property <length> scene-top;
+    in property <length> scene-width;
+    in property <length> scene-height;
+    // Rust owns the scroll position (D11).
+    in property <length> scroll-x;
+    in property <length> scroll-y;
+    in property <float> display-scale: 1;
+    // "1920 × 1080".
+    in property <string> scene-size-label;
+
+    in property <BackgroundMode> background-mode;
+    in property <color> background-color;
+    in property <bool> grid-visible;
+    // Grid lines as path commands in scene-display pixels, on device-pixel centres.
+    in property <string> grid-commands;
+    in property <bool> snap-to-grid;
+    // "100%".
+    in property <string> zoom-label;
+
+    // Widgets in stacking order.
+    in property <[WidgetView]> widgets;
+    // A resource or render failure.
+    in property <string> error;
+
+    // The editor area, the scroll area below the toolbar row, and the stage's padding.
+    callback viewport-changed(editor-width: length, editor-height: length, scroll-width: length, scroll-height: length, padding: length);
+    // A wheel over the stage: deltas in logical pixels as Slint reports them, the cursor in
+    // scroll-area coordinates, and the modifiers.
+    callback wheel(delta-x: length, delta-y: length, x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback zoom-in();
+    callback zoom-out();
+    callback reset-zoom();
+    callback set-background-mode(BackgroundMode);
+    callback set-grid-visible(bool);
+    callback set-snap-to-grid(bool);
+}

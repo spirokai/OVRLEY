@@ -6,6 +6,7 @@ import { ControlPanel, FileDropOverlay, LoadingOverlay, StartupError } from "../
 import { FocusedField } from "../components/focused-field.slint";
 import { SettingsDialog, UnsavedChangesDialog } from "../features/app-shell/dialogs.slint";
 import { TemplateManager, UnsavedAnswer } from "../features/template-manager/index.slint";
+import { OverlayEditorView } from "../features/overlay-editor/overlay-editor.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 
@@ -98,6 +99,7 @@ export component AppWindow inherits FluidWindow {
             Rectangle {
                 horizontal-stretch: 1;
                 background: Theme.surface-darken;
+                OverlayEditorView { }
                 if AppShell.processing: LoadingOverlay { }
             }
             Rectangle {

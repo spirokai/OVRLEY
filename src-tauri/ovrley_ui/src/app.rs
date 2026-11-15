@@ -19,6 +19,7 @@ use std::sync::Arc;
 /// when the language changed (every `@tr` then re-evaluates).
 struct Projections {
     window: slint::Weak<AppWindow>,
+    overlay: features::overlay_editor::Projection,
     language: Cell<Locale>,
     /// The first run writes what depends on the language even though it has not changed.
     first: Cell<bool>,
@@ -34,6 +35,8 @@ impl Projections {
         features::app_shell::project(&window, store, language_changed);
         features::toolbar::project(&window, store);
         features::template_manager::project(&window, store);
+        features::undo_redo::project(&window, store);
+        self.overlay.project(&window, store);
     }
 }
 
@@ -48,6 +51,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     let dispatcher = Dispatcher::new(store, services);
     let projections = Projections {
         window: window.as_weak(),
+        overlay: features::overlay_editor::Projection::new(dispatcher.handle()),
         language: Cell::new(language),
         first: Cell::new(true),
     };
@@ -55,6 +59,8 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::app_shell::bind(window, &dispatcher);
     features::toolbar::bind(window, &dispatcher);
     features::template_manager::bind(window, &dispatcher);
+    features::overlay_editor::bind(window, &dispatcher);
+    features::undo_redo::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher

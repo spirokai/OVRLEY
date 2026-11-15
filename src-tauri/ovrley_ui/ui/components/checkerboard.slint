@@ -4,7 +4,9 @@ import { Theme } from "../theme/theme.slint";
 // 2.37rem tile. Tiled, they form `grid-line`-at-20% diamonds with a 2.37rem diagonal centred on
 // the tile corners. This draws those diamonds.
 export component Checkerboard inherits Rectangle {
-    property <length> tile: Theme.checkerboard-tile * 1rem;
+    // The canvas draws the pattern inside the zoomed scene, so its tiles scale with the zoom.
+    in property <float> scale: 1;
+    property <length> tile: Theme.checkerboard-tile * 1rem * root.scale;
     property <int> columns: ceil(self.width / self.tile) + 1;
     property <int> rows: ceil(self.height / self.tile) + 1;
     clip: true;

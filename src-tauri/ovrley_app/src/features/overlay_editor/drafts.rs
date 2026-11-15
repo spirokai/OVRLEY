@@ -21,13 +21,25 @@ pub struct WidgetDraftState {
     /// The document and selection the drafts were made against (the reconcile step's memory).
     seen_config: Option<Rc<OverlayConfig>>,
     seen_selection: Vec<String>,
+    /// Counts changes to the drafts and patches, for the preview's dirty marking.
+    revision: u64,
 }
 
 impl WidgetDraftState {
+    /// Changes whenever a draft or a gesture patch changes.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    fn touch(&mut self) {
+        self.revision = self.revision.wrapping_add(1);
+    }
+
     /// `setLiveWidgetDraft`.
     pub fn set_widget_draft(&mut self, widget_id: &str, updates: &Map<String, Value>) {
         let merged = merge_widget_data(self.drafts.get(widget_id), updates);
         self.drafts.insert(widget_id.to_string(), merged);
+        self.touch();
     }
 
     /// `setLiveWidgetDrafts`.
@@ -48,23 +60,32 @@ impl WidgetDraftState {
     /// `clearWidgetDrafts`.
     pub fn clear_widget_drafts(&mut self, widget_ids: &[String]) {
         for widget_id in widget_ids {
-            self.drafts.remove(widget_id);
+            if self.drafts.remove(widget_id).is_some() {
+                self.touch();
+            }
         }
     }
 
     /// `resetWidgetDrafts`.
     pub fn reset_widget_drafts(&mut self) {
-        self.drafts.clear();
+        if !self.drafts.is_empty() {
+            self.drafts.clear();
+            self.touch();
+        }
     }
 
     /// `setGesturePatches`.
     pub fn set_gesture_patches(&mut self, patches: BTreeMap<String, Map<String, Value>>) {
         self.gesture_patches = patches;
+        self.touch();
     }
 
     /// `clearGesturePatches`.
     pub fn clear_gesture_patches(&mut self) {
-        self.gesture_patches.clear();
+        if !self.gesture_patches.is_empty() {
+            self.gesture_patches.clear();
+            self.touch();
+        }
     }
 
     pub fn gesture_patch(&self, widget_id: &str) -> Option<&Map<String, Value>> {

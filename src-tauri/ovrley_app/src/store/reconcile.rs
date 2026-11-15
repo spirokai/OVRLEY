@@ -16,6 +16,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     overlay_editor::drafts::reconcile_widget_drafts(store);
     // 3. The durable template state behind the save status, cached by pointers.
     crate::features::template_manager::reconcile_durable_state(store);
+    // 4. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame (D9).
+    crate::features::widget_preview::reconcile_widget_preview(store);
     // The plan's language step is not needed: `change_language_preference` validates, applies and
     // persists `lng` itself, as React's does, and every path (Settings, MCP) goes through it.
 }

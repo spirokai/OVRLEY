@@ -48,6 +48,10 @@ pub struct Store {
     /// The theme colours widget fallbacks use; `ovrley_ui` reads them from the Slint theme before
     /// the first dispatch.
     pub theme: Option<crate::lib::template::ThemeColors>,
+    /// `useOverlayEditorState`'s state: the viewport, and later the selection and gestures.
+    pub overlay_editor: crate::features::overlay_editor::OverlayEditorState,
+    /// The native preview host (D8).
+    pub preview: crate::features::widget_preview::PreviewHost,
     /// `useTemplateManagement`'s state and the cached durable state.
     pub template_manager: crate::features::template_manager::TemplateManagerState,
     pub i18n: I18nState,
