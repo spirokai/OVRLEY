@@ -39,6 +39,7 @@ mod gt_gauge_tests;
 mod heading_data_tests;
 mod heading_widget_tests;
 mod igc_activity;
+mod import_activity_tests;
 mod lap_timer_tests;
 mod lean_angle_tests;
 mod linear_gauge_tests;

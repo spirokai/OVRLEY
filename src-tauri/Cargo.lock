@@ -5530,6 +5530,7 @@ name = "ovrley_app"
 version = "0.1.0"
 dependencies = [
  "log",
+ "ovrley_core",
  "regex",
  "schemars 1.2.0",
  "serde",

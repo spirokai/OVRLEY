@@ -122,7 +122,7 @@ impl DropKind {
     }
 }
 
-const ACTIVITY_EXTENSIONS: [&str; 10] = ["gpx", "fit", "tcx", "srt", "igc", "csv", "vbo", "uddf", "ssrf", "xml"];
+use ovrley_core::activity::ACTIVITY_EXTENSIONS;
 const VIDEO_EXTENSIONS: [&str; 3] = ["mp4", "mov", "mkv"];
 /// Background images, in debug builds only, as the video import accepts them today.
 const DEBUG_IMAGE_EXTENSIONS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];

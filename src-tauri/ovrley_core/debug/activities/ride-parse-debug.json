@@ -1,0 +1,459 @@
+{
+  "generated_at": "2026-11-15T18:40:31.282Z",
+  "file_name": "ride.XML",
+  "file_format": "subsurface",
+  "idle_gap_fill": {
+    "detected_gaps": [],
+    "inserted_sample_count": 0,
+    "recording_interval_seconds": 1.0
+  },
+  "parsed_activity": {
+    "air_pressure": [],
+    "aperture": [],
+    "average_ppo2": [],
+    "barometric_altitude": [],
+    "brake_position": [],
+    "cadence": [],
+    "calories": [],
+    "color_temperature": [],
+    "core_temperature": [],
+    "depth": [0.0, 18.0, null, 20.0, 19.0],
+    "depth_vertical_speed": [null, -0.3, -0.3, -0.3, 0.016667],
+    "distance": [],
+    "distance_to_home": [],
+    "elevation": [],
+    "engine_load": [],
+    "engine_power": [],
+    "ev": [],
+    "first_stop_depth": [null, null, null, 3.0, 3.0],
+    "first_stop_time": [null, null, null, 2.0, 2.0],
+    "focal_length": [],
+    "fraction_he": [0.0, 0.0, 0.0, 0.0, 0.0],
+    "fraction_o2": [0.32, 0.32, 0.5, 0.5, 0.5],
+    "g_force": [],
+    "g_force_x": [],
+    "g_force_y": [],
+    "g_force_z": [],
+    "gradient": [],
+    "ground_contact_time": [],
+    "heading": [],
+    "heartrate": [],
+    "iso": [],
+    "lean_angle": [],
+    "left_right_balance": [],
+    "pace": [],
+    "power": [],
+    "rpm": [],
+    "shutter_speed": [],
+    "speed": [],
+    "stride_length": [],
+    "stroke_rate": [],
+    "temperature": [],
+    "throttle_position": [],
+    "time_to_surface": [null, null, null, 4.5, 4.5],
+    "torque": [],
+    "total_ascent": [],
+    "vertical_oscillation": [],
+    "vertical_ratio": [],
+    "vertical_speed": [],
+    "water_temperature": [24.0, 24.0, null, 22.0, 22.0],
+    "file_name": "ride.XML",
+    "file_format": "subsurface",
+    "metadata": {
+      "sport": "diving",
+      "dive_number": "7",
+      "creator": "subsurface",
+      "source_device_product": "Test DC",
+      "duration_seconds": 240.0,
+      "end_time": "2026-03-01T10:04:00.000Z",
+      "total_distance_m": 0.0,
+      "sample_count": 5,
+      "original_sample_count": 5,
+      "inserted_idle_sample_count": 0
+    },
+    "sync_time": "2026-03-01T10:00:00.000Z",
+    "sample_elapsed_seconds": [0.0, 60.0, 120.0, 180.0, 240.0],
+    "sample_distance_progress": [0.0, 0.0, 0.0, 0.0, 0.0],
+    "frame_elapsed_seconds": [],
+    "frame_timestamps": [],
+    "frame_distance_progress": [],
+    "trim_start_seconds": 0.0,
+    "trim_end_seconds": 240.0,
+    "sample_course_points": [
+      [null, null],
+      [null, null],
+      [null, null],
+      [null, null],
+      [null, null]
+    ],
+    "sample_elevations": [null, null, null, null, null],
+    "course": [
+      [null, null],
+      [null, null],
+      [null, null],
+      [null, null],
+      [null, null]
+    ],
+    "gear_position": [],
+    "time": [
+      "2026-03-01T10:00:00.000Z",
+      "2026-03-01T10:01:00.000Z",
+      "2026-03-01T10:02:00.000Z",
+      "2026-03-01T10:03:00.000Z",
+      "2026-03-01T10:04:00.000Z"
+    ],
+    "lap_number": [-1, -1, -1, -1, -1],
+    "lap_time_seconds": [null, null, null, null, null],
+    "lap_start_elapsed_seconds": [],
+    "delta_to_best_lap_seconds": [null, null, null, null, null],
+    "best_lap_time_seconds": null,
+    "lap_durations_seconds": [],
+    "lap_durations_best_so_far_seconds": [],
+    "coverage": {
+      "air_pressure": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "altitude": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "aperture": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "average_ppo2": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "barometric_altitude": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "brake_position": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "cadence": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "calories": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "color_temperature": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "core_temperature": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "course": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "depth": {
+        "source": "direct",
+        "availableCount": 4,
+        "nonzeroCount": 3,
+        "totalSamples": 5
+      },
+      "depth_vertical_speed": {
+        "source": "derived",
+        "availableCount": 4,
+        "nonzeroCount": 4,
+        "totalSamples": 5
+      },
+      "distance": {
+        "source": "direct",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "distance_to_home": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "diving_profile": {
+        "source": "direct",
+        "availableCount": 4,
+        "nonzeroCount": 3,
+        "totalSamples": 5
+      },
+      "elevation": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "engine_load": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "engine_power": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "ev": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "first_stop_depth": {
+        "source": "direct",
+        "availableCount": 2,
+        "nonzeroCount": 2,
+        "totalSamples": 5
+      },
+      "first_stop_time": {
+        "source": "direct",
+        "availableCount": 2,
+        "nonzeroCount": 2,
+        "totalSamples": 5
+      },
+      "focal_length": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "fraction_he": {
+        "source": "direct",
+        "availableCount": 5,
+        "totalSamples": 5
+      },
+      "fraction_o2": {
+        "source": "direct",
+        "availableCount": 5,
+        "nonzeroCount": 5,
+        "totalSamples": 5
+      },
+      "g_force": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "g_force_x": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "g_force_y": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "g_force_z": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "gas_mix": {
+        "source": "direct",
+        "availableCount": 5,
+        "nonzeroCount": 5,
+        "totalSamples": 5
+      },
+      "gear_position": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "gps_coordinates": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "gradient": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "ground_contact_time": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "heading": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "heartrate": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "iso": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "lean_angle": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "left_right_balance": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "map": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "pace": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "power": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "rpm": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "shutter_speed": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "speed": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "stride_length": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "stroke_rate": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "temperature": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "throttle_position": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "time": {
+        "source": "direct",
+        "availableCount": 5,
+        "totalSamples": 5
+      },
+      "time_to_surface": {
+        "source": "direct",
+        "availableCount": 2,
+        "nonzeroCount": 2,
+        "totalSamples": 5
+      },
+      "torque": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "total_ascent": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "vertical_oscillation": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "vertical_speed": {
+        "source": "missing",
+        "availableCount": 0,
+        "totalSamples": 5
+      },
+      "water_temperature": {
+        "source": "direct",
+        "availableCount": 4,
+        "nonzeroCount": 4,
+        "totalSamples": 5
+      }
+    },
+    "extended_attributes": ["diving_profile", "depth", "first_stop_depth", "first_stop_time", "time_to_surface", "gas_mix", "water_temperature"],
+    "metric_units": {
+      "air_pressure": "bar",
+      "aperture": "fnum",
+      "average_ppo2": "ata",
+      "barometric_altitude": "m",
+      "brake_position": "percent",
+      "cadence": "rpm",
+      "calories": "kcal",
+      "color_temperature": "kelvin",
+      "core_temperature": "celsius",
+      "depth": "m",
+      "depth_vertical_speed": "mps",
+      "distance": "m",
+      "distance_to_home": "m",
+      "elevation": "m",
+      "engine_load": "percent",
+      "engine_power": "watts",
+      "ev": "ev",
+      "first_stop_depth": "m",
+      "first_stop_time": "min",
+      "focal_length": "mm",
+      "fraction_he": "fraction",
+      "fraction_o2": "fraction",
+      "g_force": "g",
+      "g_force_x": "g",
+      "g_force_y": "g",
+      "g_force_z": "g",
+      "gradient": "percent",
+      "ground_contact_time": "ms",
+      "heading": "degrees",
+      "heartrate": "bpm",
+      "iso": "iso",
+      "lean_angle": "degrees",
+      "left_right_balance": "raw",
+      "pace": "seconds_per_km",
+      "power": "watts",
+      "rpm": "rpm",
+      "shutter_speed": "seconds",
+      "speed": "mps",
+      "stride_length": "raw",
+      "stroke_rate": "strokes_per_minute",
+      "temperature": "celsius",
+      "throttle_position": "percent",
+      "time_to_surface": "min",
+      "torque": "nm",
+      "total_ascent": "m",
+      "vertical_oscillation": "raw",
+      "vertical_speed": "mps",
+      "water_temperature": "celsius",
+      "delta_to_best_lap_seconds": "s",
+      "gear_position": "raw",
+      "lap_time_seconds": "s"
+    },
+    "valid_attributes": ["time"]
+  }
+}

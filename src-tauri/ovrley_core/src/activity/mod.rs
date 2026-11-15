@@ -57,6 +57,51 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     normalize_parsed_activity(activity)
 }
 
+/// The activity file extensions OVRLEY imports, lowercase. The file dialogs offer them
+/// case-insensitively, and the drop classifier uses the same list.
+pub const ACTIVITY_EXTENSIONS: [&str; 10] = [
+    "gpx", "fit", "tcx", "srt", "igc", "csv", "vbo", "uddf", "ssrf", "xml",
+];
+
+/// The one activity import entry: picks the parser by the file's extension, case-insensitively,
+/// and returns the finalized activity without its debug payload.
+pub fn import_activity_path(
+    paths: &crate::paths::AppPaths,
+    path: &str,
+) -> CoreResult<crate::activity::finalize::FinalizeActivityResponse> {
+    use std::path::Path;
+    let filename = path
+        .rsplit(['/', '\\'])
+        .next()
+        .filter(|name| !name.is_empty())
+        .ok_or_else(|| CoreError::Activity(format!("Invalid activity path: {path}")))?;
+    let extension = filename
+        .rsplit('.')
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let file = Path::new(path);
+    let repo_root = Some(paths.repo_root.as_path());
+    let mut response = match extension.as_str() {
+        "csv" => csv::parse_csv_activity_path(file, repo_root),
+        "fit" => parsers::fit::parse_fit_activity_path(file, repo_root),
+        "gpx" => parsers::gpx::parse_gpx_activity_path(file, repo_root),
+        "igc" => parsers::igc::parse_igc_activity_path(file, repo_root),
+        "srt" => parsers::srt::parse_srt_activity_path(file, repo_root),
+        "ssrf" | "xml" => parsers::subsurface::parse_subsurface_activity_path(file, repo_root),
+        "tcx" => parsers::tcx::parse_tcx_activity_path(file, repo_root),
+        "uddf" => parsers::uddf::parse_uddf_activity_path(file, repo_root),
+        "vbo" => vbo::parse_vbo_activity_path(file, repo_root),
+        _ => {
+            return Err(CoreError::Activity(format!(
+                "Unsupported activity file format: {filename}"
+            )))
+        }
+    }?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
 /// Shared ingress for already deserialized activity, including batch submission.
 pub fn normalize_parsed_activity(mut activity: ParsedActivity) -> CoreResult<ParsedActivity> {
     activity.timezone = parse_activity_timezone(&activity.metadata)?;
