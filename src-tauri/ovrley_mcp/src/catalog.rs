@@ -259,6 +259,22 @@ pub fn tools() -> Vec<ToolDefinition> {
             read_only: false,
         },
         ToolDefinition {
+            name: "history_undo",
+            title: "Undo",
+            description: "Undoes the last edit, as Undo in the canvas toolbar does. Fails when there is nothing to undo or a confirmation \
+                          dialog is open.",
+            input_schema: input_schema::<NoArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "history_redo",
+            title: "Redo",
+            description: "Redoes the last undone edit, as Redo in the canvas toolbar does. Fails when there is nothing to redo or a \
+                          confirmation dialog is open.",
+            input_schema: input_schema::<NoArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
             name: "template_list",
             title: "List templates",
             description: "Lists the bundled and user templates, grouped by resolution as the template select shows them. \
@@ -425,6 +441,18 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             "template_list" => {
                 arguments::<NoArguments>(arguments_value)?;
                 now(template_list(store))
+            }
+            "history_undo" | "history_redo" => {
+                arguments::<NoArguments>(arguments_value)?;
+                use ovrley_app::features::undo_redo::{history_enabled, redo, undo};
+                if !history_enabled(store) {
+                    return Err(ToolOutcome::Failed("Undo and redo are unavailable while a confirmation dialog is open in OVRLEY.".into()));
+                }
+                let done = if name == "history_undo" { undo(store) } else { redo(store) };
+                if !done {
+                    return Err(ToolOutcome::Failed(format!("There is nothing to {}.", if name == "history_undo" { "undo" } else { "redo" })));
+                }
+                now(json!({ "history": { "canUndo": store.history.can_undo(), "canRedo": store.history.can_redo() } }))
             }
             "widget_get" => {
                 let arguments: WidgetArguments = arguments(arguments_value)?;
@@ -620,6 +648,23 @@ mod tests {
         let ToolOutcome::Ok(left) = run(&dispatcher, "widget_delete", json!({"widgetId": "a"})) else { panic!() };
         assert_eq!(left["widgets"], json!([]));
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2);
+    }
+
+    #[test]
+    fn history_tools_undo_and_redo_and_fail_when_empty() {
+        let (dispatcher, _) = dispatcher(true);
+        dispatcher.dispatch(|store, _| {
+            store.history.set_mode(ovrley_app::features::undo_redo::HistoryMode::Reset);
+            store.editor.set_config(ovrley_widgets::model::document::OverlayConfig::from_value(&json!({"scene": {"width": 1920, "height": 1080}, "labels": [{"id": "a", "text": "A", "x": 1, "y": 2}]})).unwrap());
+        });
+        assert!(matches!(run(&dispatcher, "history_undo", json!({})), ToolOutcome::Failed(_)), "nothing to undo after a load");
+        run(&dispatcher, "widget_move", json!({"widgetId": "a", "x": 40, "y": 50}));
+        assert_eq!(run(&dispatcher, "history_undo", json!({})), ToolOutcome::Ok(json!({"history": {"canUndo": false, "canRedo": true}})));
+        assert_eq!(dispatcher.with_store(|store| store.editor.config.widget("a").unwrap()["x"].clone()), json!(1));
+        assert_eq!(run(&dispatcher, "history_redo", json!({})), ToolOutcome::Ok(json!({"history": {"canUndo": true, "canRedo": false}})));
+        assert_eq!(dispatcher.with_store(|store| store.editor.config.widget("a").unwrap()["x"].clone()), json!(40));
+        assert!(matches!(run(&dispatcher, "history_redo", json!({})), ToolOutcome::Failed(_)));
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 1, "undo and redo are not steps themselves");
     }
 
     #[test]
