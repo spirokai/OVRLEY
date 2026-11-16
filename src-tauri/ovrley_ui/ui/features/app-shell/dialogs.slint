@@ -13,7 +13,7 @@ import { Choice, ChoiceKind, PlacementAlign } from "../../components/logic.slint
 import { SettingsSection, ShortcutGroupView } from "index.slint";
 
 // A dialog panel: `rounded-sm`, `accent-border` at 80%, `card`, `shadow-2xl`.
-component DialogPanel inherits Rectangle {
+export component DialogPanel inherits Rectangle {
     Shadow {
         size: ShadowSize.xxl;
         radius: Theme.radius-sm * 1rem;

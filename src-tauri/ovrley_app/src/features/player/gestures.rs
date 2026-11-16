@@ -9,7 +9,7 @@ use super::playback::{commit_scrub, player_timing, scrub_to};
 use super::viewport::pan_by;
 use crate::lib::activity::{resolve_activity_window, trim_activity_edge, ActivityTrim, TrimEdge};
 use crate::lib::utils::clamp;
-use crate::store::slices::video_import::ClipLane;
+use crate::store::slices::video_import::{ClipLane, SelectedClip};
 use crate::store::Store;
 
 /// `DRAG_THRESHOLD_PX`: a cut or trim drag starts after 3 px; a press that does not move is a click.
@@ -119,6 +119,7 @@ pub fn surface_up(store: &mut Store, x: f64) {
 pub fn surface_cancel(store: &mut Store) {
     store.player.surface_gesture = None;
     store.player.trim_drag = None;
+    store.player.cut_drag = None;
     clip_cancel(store);
 }
 
@@ -349,6 +350,236 @@ pub fn commit_nudge(store: &mut Store) {
     let _ = crate::store::slices::video_import::set_video_drag_preview(store, None);
 }
 
+// --- Cut drags (`utils/cutDrag.js`, `useCutDrag`) ---------------------------------------------
+
+use super::lanes::{EDGE_END, EDGE_START};
+use crate::lib::video_program::edits::segment_before_cut;
+use crate::lib::video_program::segments::TrimSide;
+use crate::lib::video_program::{Clip, Cut, SegmentEdits, FIRST_SEGMENT_KEY};
+
+/// `edgeCutSide`: which end an edge cut trims; `None` for a real cut.
+pub fn edge_cut_side(cut_id: &str) -> Option<TrimSide> {
+    match cut_id {
+        EDGE_START => Some(TrimSide::Start),
+        EDGE_END => Some(TrimSide::End),
+        _ => None,
+    }
+}
+
+/// `segmentOfCut`: the segment a pressed cut belongs to: the part an edge cut trims into, or the
+/// part before a cut.
+pub fn segment_of_cut(clip: &Clip, cut_id: &str) -> Result<String, String> {
+    match edge_cut_side(cut_id) {
+        Some(TrimSide::Start) => Ok(FIRST_SEGMENT_KEY.into()),
+        Some(TrimSide::End) => Ok(clip.cuts().last().map_or(FIRST_SEGMENT_KEY.to_string(), |cut| cut.id.clone())),
+        None => segment_before_cut(&clip.edits, cut_id),
+    }
+}
+
+/// A dragged cut at its draft frame.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CutDraft {
+    pub video_id: String,
+    pub cut_id: String,
+    pub frame: i64,
+}
+
+/// `applyCutDraftToSelection`: a dragged start edge cut hands a selected first segment to the part
+/// it now starts.
+pub fn apply_cut_draft_to_selection(selection: Option<&SelectedClip>, draft: Option<&CutDraft>) -> Option<SelectedClip> {
+    let selection = selection?.clone();
+    let Some(draft) = draft.filter(|draft| edge_cut_side(&draft.cut_id) == Some(TrimSide::Start)) else { return Some(selection) };
+    if selection.lane.video_id() != Some(draft.video_id.as_str()) || selection.segment_key.as_deref() != Some(FIRST_SEGMENT_KEY) {
+        return Some(selection);
+    }
+    Some(SelectedClip { lane: selection.lane, segment_key: Some(draft.cut_id.clone()) })
+}
+
+fn cut_bounds(clip: &Clip, cut_id: &str) -> (i64, i64) {
+    let cuts = clip.cuts();
+    let index = cuts.iter().position(|cut| cut.id == cut_id).expect("a dragged cut is one of its clip's");
+    (if index == 0 { 0 } else { cuts[index - 1].frame }, cuts.get(index + 1).map_or(clip.frame_count(), |cut| cut.frame))
+}
+
+/// `segmentKeptByDroppedCut`: a cut dropped on its neighbour or the clip's end removes the part it
+/// closes up; the part on its other side is kept.
+pub fn segment_kept_by_dropped_cut(clip: &Clip, cut_id: &str, frame: i64) -> Option<String> {
+    if edge_cut_side(cut_id).is_some() {
+        return None;
+    }
+    let (lower, upper) = cut_bounds(clip, cut_id);
+    if frame <= lower {
+        return Some(cut_id.to_string());
+    }
+    if frame >= upper {
+        return segment_before_cut(&clip.edits, cut_id).ok();
+    }
+    None
+}
+
+/// `cutSnapEdges`: the clip's ends, its other cuts (not for an edge cut), the other clips' ends and
+/// the activity's.
+pub fn cut_snap_edges(clip: &Clip, cut_id: &str, clips: &[Clip], activity_duration_seconds: f64) -> Vec<f64> {
+    let mut edges = vec![clip.offset_seconds(), clip.end_second()];
+    if edge_cut_side(cut_id).is_none() {
+        edges.extend(clip.cuts().iter().filter(|cut| cut.id != cut_id).map(|cut| clip.offset_seconds() + clip.fps().frames_to_seconds(cut.frame)));
+    }
+    edges.extend(clips.iter().filter(|other| other.id() != clip.id()).flat_map(|other| [other.offset_seconds(), other.end_second()]));
+    if activity_duration_seconds > 0.0 {
+        edges.extend([0.0, activity_duration_seconds]);
+    }
+    edges
+}
+
+/// `clampCutFrame`: a cut stays between its neighbours and may reach them; an edge cut stops before
+/// the nearest cut, and back past its edge it trims nothing (`None`).
+pub fn clamp_cut_frame(clip: &Clip, cut_id: &str, frame: i64) -> Option<i64> {
+    match edge_cut_side(cut_id) {
+        Some(side) => {
+            let cuts: Vec<&Cut> = clip.cuts().iter().filter(|cut| cut.id != cut_id).collect();
+            match side {
+                TrimSide::Start => (frame > 0).then(|| frame.min(cuts.first().map_or(clip.frame_count(), |cut| cut.frame) - 1)),
+                TrimSide::End => (frame < clip.frame_count()).then(|| frame.max(cuts.last().map_or(0, |cut| cut.frame) + 1)),
+            }
+        }
+        None => {
+            let (lower, upper) = cut_bounds(clip, cut_id);
+            Some(frame.clamp(lower, upper))
+        }
+    }
+}
+
+/// `applyCutDraft`: the clips with a dragged cut at its draft frame; a dragged edge cut shows as a
+/// cut with the outer part excluded.
+pub fn apply_cut_draft(clips: &[Clip], draft: Option<&CutDraft>) -> Vec<Clip> {
+    let Some(draft) = draft else { return clips.to_vec() };
+    clips
+        .iter()
+        .map(|clip| {
+            if clip.id() != draft.video_id {
+                return clip.clone();
+            }
+            let mut shown = clip.clone();
+            let edits = &mut shown.edits;
+            match edge_cut_side(&draft.cut_id) {
+                Some(TrimSide::Start) => {
+                    let first = edits.segments[FIRST_SEGMENT_KEY];
+                    edits.cuts.insert(0, Cut { id: draft.cut_id.clone(), frame: draft.frame });
+                    edits.segments.insert(FIRST_SEGMENT_KEY.into(), SegmentEdits { excluded: true, transition_in: None, ..first });
+                    edits.segments.insert(draft.cut_id.clone(), first);
+                }
+                Some(TrimSide::End) => {
+                    let last_key = clip.cuts().last().map_or(FIRST_SEGMENT_KEY.to_string(), |cut| cut.id.clone());
+                    let last = edits.segments[&last_key];
+                    edits.cuts.push(Cut { id: draft.cut_id.clone(), frame: draft.frame });
+                    edits.segments.insert(draft.cut_id.clone(), SegmentEdits { excluded: true, transition_in: None, ..last });
+                }
+                None => {
+                    if let Some(cut) = edits.cuts.iter_mut().find(|cut| cut.id == draft.cut_id) {
+                        cut.frame = draft.frame;
+                    }
+                }
+            }
+            shown
+        })
+        .collect()
+}
+
+/// `useCutDrag`'s gesture: the cut follows the pointer frame by frame after 3 px and commits once.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CutDrag {
+    pub video_id: String,
+    pub cut_id: String,
+    start_x: f64,
+    start_frame: i64,
+    frame: i64,
+    pub guideline_second: Option<f64>,
+    moving: bool,
+}
+
+impl CutDrag {
+    /// The draft to show, once the drag moved.
+    pub fn draft(&self) -> Option<CutDraft> {
+        self.moving.then(|| CutDraft { video_id: self.video_id.clone(), cut_id: self.cut_id.clone(), frame: self.frame })
+    }
+}
+
+fn committed_clip<'a>(store: &'a Store, video_id: &str) -> Option<&'a Clip> {
+    store.player.timeline.timeline().displayed.clips.iter().find(|clip| clip.id() == video_id)
+}
+
+/// A press on a cut marker: keeps its clip selected, or selects the pressed cut's segment.
+pub fn cut_down(store: &mut Store, video_id: &str, cut_id: &str, x: f64) {
+    use crate::store::slices::video_import::select_clip;
+    let Some(clip) = committed_clip(store, video_id) else { return };
+    let start_frame = match edge_cut_side(cut_id) {
+        Some(TrimSide::Start) => 0,
+        Some(TrimSide::End) => clip.frame_count(),
+        None => match clip.cuts().iter().find(|cut| cut.id == cut_id) {
+            Some(cut) => cut.frame,
+            None => return,
+        },
+    };
+    let lane = ClipLane::Video(video_id.to_string());
+    if store.video_import.selected_clip.as_ref().map(|selection| &selection.lane) != Some(&lane) {
+        if let Ok(segment_key) = segment_of_cut(clip, cut_id) {
+            let _ = select_clip(store, Some(SelectedClip { lane, segment_key: Some(segment_key) }));
+        }
+    }
+    store.player.cut_drag = Some(CutDrag { video_id: video_id.into(), cut_id: cut_id.into(), start_x: x, start_frame, frame: start_frame, guideline_second: None, moving: false });
+}
+
+/// The pointer moved over a pressed cut marker.
+pub fn cut_move(store: &mut Store, x: f64) {
+    let Some(mut drag) = store.player.cut_drag.clone() else { return };
+    let delta_px = x - drag.start_x;
+    if !drag.moving && delta_px.abs() < DRAG_THRESHOLD_PX {
+        return;
+    }
+    drag.moving = true;
+    let displayed = &store.player.timeline.timeline().displayed.clips;
+    let Some(clip) = displayed.iter().find(|clip| clip.id() == drag.video_id) else { return };
+    let start_second = clip.fps().frames_to_seconds(drag.start_frame);
+    let activity = store.media.activity_summary.as_ref().map_or(0.0, |summary| summary.duration_seconds);
+    let snap = super::lanes::snap_clip_delta(
+        view_px_to_seconds(store, delta_px),
+        &[clip.offset_seconds() + start_second],
+        &cut_snap_edges(clip, &drag.cut_id, displayed, activity),
+        store.editor.timeline_viewport,
+        store.player.viewport.metrics.width_px,
+        super::lanes::SNAP_THRESHOLD_PX,
+    );
+    let proposed = clip.fps().seconds_to_frames(start_second + snap.delta);
+    let legal = clamp_cut_frame(clip, &drag.cut_id, proposed);
+    drag.frame = legal.unwrap_or(drag.start_frame);
+    // The guideline shows only while the cut sits where it snapped, not where a neighbour stops it.
+    drag.guideline_second = if legal == Some(proposed) { snap.guideline_second } else { None };
+    store.player.cut_drag = Some(drag);
+}
+
+/// The release: an edge cut trims, a cut dropped on a neighbour or an edge removes the part it
+/// closes up, any other cut moves. Returns whether the press was a click (no drag), which opens a
+/// real cut's popover.
+pub fn cut_up(store: &mut Store) -> bool {
+    use crate::store::slices::video_import::{move_cut, request_cut_removal, trim_video};
+    let Some(drag) = store.player.cut_drag.take() else { return false };
+    if !drag.moving {
+        return true;
+    }
+    if drag.frame == drag.start_frame {
+        return false;
+    }
+    let Some(clip) = committed_clip(store, &drag.video_id).cloned() else { return false };
+    if let Some(side) = edge_cut_side(&drag.cut_id) {
+        let _ = trim_video(store, &drag.video_id, side, drag.frame);
+    } else if let Some(kept) = segment_kept_by_dropped_cut(&clip, &drag.cut_id, drag.frame) {
+        let _ = request_cut_removal(store, &drag.video_id, &drag.cut_id, Some(&kept));
+    } else {
+        let _ = move_cut(store, &drag.video_id, &drag.cut_id, drag.frame);
+    }
+    false
+}
+
 /// The segment of a video clip under a timeline x (D8): React reads it from the pressed element.
 pub fn segment_at(store: &Store, video_id: &str, x: f64) -> Option<String> {
     let second = store.editor.timeline_viewport.view_start + view_px_to_seconds(store, x);
@@ -537,5 +768,80 @@ mod tests {
         let before = store.editor.timeline_viewport.view_start;
         assert!(clip_drag_auto_scroll(&mut store, std::time::Instant::now()));
         assert!(store.editor.timeline_viewport.view_start > before);
+    }
+
+    fn cut_clip(cuts: &[(String, i64, SegmentEdits)], offset: f64) -> Clip {
+        let mut edits = cut_edits(cuts, SegmentEdits::INCLUDED);
+        edits.offset_seconds = offset;
+        clip(simple("ride", 10.0, 0), edits)
+    }
+
+    #[test]
+    fn a_pressed_cut_belongs_to_its_part_and_a_dragged_start_edge_carries_the_selection() {
+        let ride = cut_clip(&[cut("cut", 150, excluded())], 0.0);
+        assert_eq!(segment_of_cut(&ride, EDGE_START).unwrap(), "start");
+        assert_eq!(segment_of_cut(&ride, EDGE_END).unwrap(), "cut");
+        assert_eq!(segment_of_cut(&ride, "cut").unwrap(), "start");
+        let selection = SelectedClip { lane: ClipLane::Video("ride".into()), segment_key: Some("start".into()) };
+        let draft = |cut_id: &str, frame| CutDraft { video_id: "ride".into(), cut_id: cut_id.into(), frame };
+        assert_eq!(apply_cut_draft_to_selection(Some(&selection), Some(&draft(EDGE_START, 40))).unwrap().segment_key.as_deref(), Some(EDGE_START));
+        assert_eq!(apply_cut_draft_to_selection(Some(&selection), Some(&draft(EDGE_END, 280))), Some(selection.clone()));
+        assert_eq!(apply_cut_draft_to_selection(Some(&selection), None), Some(selection));
+    }
+
+    #[test]
+    fn outer_cuts_reach_their_neighbours_and_dropped_there_keep_the_other_side() {
+        let twice = cut_clip(&[cut("first", 100, SegmentEdits::INCLUDED), cut("last", 200, SegmentEdits::INCLUDED)], 100.0);
+        assert_eq!(clamp_cut_frame(&twice, "first", -20), Some(0));
+        assert_eq!(clamp_cut_frame(&twice, "first", 250), Some(200));
+        assert_eq!(clamp_cut_frame(&twice, "last", 50), Some(100));
+        assert_eq!(clamp_cut_frame(&twice, "last", 400), Some(300));
+        assert_eq!(segment_kept_by_dropped_cut(&twice, "first", 0).as_deref(), Some("first"));
+        assert_eq!(segment_kept_by_dropped_cut(&twice, "first", 200).as_deref(), Some("start"));
+        assert_eq!(segment_kept_by_dropped_cut(&twice, "last", 100).as_deref(), Some("last"));
+        assert_eq!(segment_kept_by_dropped_cut(&twice, "last", 300).as_deref(), Some("first"));
+        assert_eq!(segment_kept_by_dropped_cut(&twice, "first", 150), None);
+        let other = clip(simple("other", 5.0, 1), crate::lib::video_program::VideoEdits { offset_seconds: 120.0, ..Default::default() });
+        let clips = [twice.clone(), other];
+        assert_eq!(cut_snap_edges(&twice, "first", &clips, 300.0), [100.0, 110.0, 100.0 + 200.0 / 30.0, 120.0, 125.0, 0.0, 300.0]);
+        assert_eq!(cut_snap_edges(&twice, EDGE_START, &clips, 0.0), [100.0, 110.0, 120.0, 125.0]);
+    }
+
+    #[test]
+    fn edge_cuts_stop_before_the_nearest_cut_and_show_as_a_trim_while_dragged() {
+        let ride = cut_clip(&[cut("cut", 150, excluded())], 0.0);
+        assert_eq!(super::super::lanes::edge_cuts(&ride), [Cut { id: EDGE_START.into(), frame: 0 }]);
+        assert_eq!(clamp_cut_frame(&ride, EDGE_START, 40), Some(40));
+        assert_eq!(clamp_cut_frame(&ride, EDGE_START, 200), Some(149));
+        assert_eq!(clamp_cut_frame(&ride, EDGE_START, -5), None);
+        let uncut = cut_clip(&[], 0.0);
+        assert_eq!(clamp_cut_frame(&uncut, EDGE_END, 280), Some(280));
+        assert_eq!(clamp_cut_frame(&uncut, EDGE_END, 300), None);
+        let shown = apply_cut_draft(std::slice::from_ref(&ride), Some(&CutDraft { video_id: "ride".into(), cut_id: EDGE_START.into(), frame: 40 })).remove(0);
+        assert_eq!(shown.cuts(), [Cut { id: EDGE_START.into(), frame: 40 }, Cut { id: "cut".into(), frame: 150 }]);
+        assert_eq!(shown.segment("start"), &SegmentEdits { excluded: true, transition_in: None, skip_overlay: false });
+        assert_eq!(shown.segment(EDGE_START), ride.segment("start"));
+        assert_eq!(clamp_cut_frame(&shown, EDGE_START, 100), Some(100), "its own draft does not limit it");
+    }
+
+    #[test]
+    fn a_cut_drag_commits_once_and_a_still_press_is_a_click() {
+        let mut store = clips_store(vec![simple("ride", 100.0, 0)], &[]);
+        let cut_id = crate::store::slices::video_import::cut_video(&mut store, "ride", 1500).unwrap();
+        reconcile_player(&mut store);
+        // 250 px over 100 s: 2.5 px per second. The cut sits at 50 s, 125 px.
+        cut_down(&mut store, "ride", &cut_id, 125.0);
+        cut_move(&mut store, 126.0);
+        assert!(cut_up(&mut store), "under 3 px it is a click");
+        cut_down(&mut store, "ride", &cut_id, 125.0);
+        cut_move(&mut store, 150.0);
+        assert_eq!(store.player.cut_drag.as_ref().unwrap().draft().unwrap().frame, 1800);
+        assert!(!cut_up(&mut store));
+        assert_eq!(store.video_import.video_edits["ride"].cuts[0].frame, 1800);
+        reconcile_player(&mut store);
+        cut_down(&mut store, "ride", EDGE_START, 0.0);
+        cut_move(&mut store, 25.0);
+        cut_up(&mut store);
+        assert!(store.video_import.video_edits["ride"].segments["start"].excluded, "a dragged edge cut trims");
     }
 }

@@ -130,6 +130,29 @@ export global Player {
     // A player popover or dialog is open: presses outside the player keep the clip selection.
     in-out property <bool> keeps-clip-selection;
 
+    // Edits at the playhead (D16) and the trim buttons.
+    in property <bool> trim-visible;
+    in property <bool> trim-targets-video;
+    in property <bool> can-trim-start;
+    in property <bool> can-trim-end;
+    in property <bool> video-edit-visible;
+    in property <bool> can-cut;
+    in property <bool> exclude-disabled;
+    in property <bool> excluded;
+    // The real cut whose "Remove cut" popover is open (`video:<id>` and the cut id).
+    in property <string> cut-popover-lane;
+    in property <string> cut-popover-cut;
+    // A removed cut waits for the user's choice (D19).
+    in property <bool> cut-removal-open;
+
+    callback trim(start: bool);
+    callback cut();
+    callback toggle-excluded();
+    callback close-cut-popover();
+    callback remove-cut(lane-id: string, cut-id: string);
+    callback resolve-cut-removal(excluded: bool);
+    callback keep-cut();
+
     callback play();
     callback pause();
     callback reset-to-start();

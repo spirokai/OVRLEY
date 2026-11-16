@@ -2,6 +2,9 @@ import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { Popover } from "../../components/popover.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { PlacementSide } from "../../components/logic.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { BandView, ClipTooltipView, ClipView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView } from "index.slint";
 
@@ -193,6 +196,37 @@ component LaneMarker {
                 background: Theme.primary;
                 opacity: root.marker.dragging || area.has-hover ? 1 : 0;
                 animate opacity { duration: 150ms; }
+            }
+            // A real cut's click opens "Remove cut": a 14rem popover, `p-3`, its label (`text-xs`,
+            // semibold) and a `secondary` button (`h-7`, full width, `text-xs`).
+            if root.marker.removable: Popover {
+                open: Player.cut-popover-lane == root.marker.lane-id && Player.cut-popover-cut == root.marker.cut-id;
+                side: PlacementSide.top;
+                content-width: 14rem;
+                content-padding: 0.75rem;
+                open-changed(open) => {
+                    if !open {
+                        Player.close-cut-popover();
+                    }
+                }
+                VerticalLayout {
+                    spacing: 0.5rem;
+                    AppText {
+                        content: root.marker.label;
+                        font-size: Theme.text-xs * 1rem;
+                        font-weight: Theme.font-weight-semibold;
+                        wrap: word-wrap;
+                    }
+                    Button {
+                        variant: ButtonVariant.secondary;
+                        height: 1.75rem;
+                        font-size: Theme.text-xs * 1rem;
+                        text: @tr("player.removeCut" => "Remove cut");
+                        clicked => {
+                            Player.remove-cut(root.marker.lane-id, root.marker.cut-id);
+                        }
+                    }
+                }
             }
             area := TouchArea {
                 mouse-cursor: MouseCursor.ew-resize;

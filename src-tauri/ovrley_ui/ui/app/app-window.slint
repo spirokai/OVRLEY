@@ -9,6 +9,7 @@ import { TemplateManager, UnsavedAnswer } from "../features/template-manager/ind
 import { OverlayEditorView } from "../features/overlay-editor/overlay-editor.slint";
 import { OverlayPlayer } from "../features/player/overlay-player.slint";
 import { Player } from "../features/player/index.slint";
+import { CutRemovalDialog } from "../features/player/cut-removal-dialog.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 
@@ -176,6 +177,15 @@ export component AppWindow inherits FluidWindow {
             TemplateManager.answer-confirm(UnsavedAnswer.discard);
         }
     }
+
+    CutRemovalDialog { }
+
+    changed cut-removal-open => {
+        if !self.cut-removal-open {
+            keys.focus();
+        }
+    }
+    property <bool> cut-removal-open: Player.cut-removal-open;
 
     SettingsDialog {
         open: AppShell.settings-open;

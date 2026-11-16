@@ -59,6 +59,82 @@ pub struct VideosShiftArguments {
     pub delta_seconds: f64,
 }
 
+/// A clip-local second of a clip.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoSecondArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// Seconds from the clip's first frame; it is converted to the clip's nearest frame.
+    pub second: f64,
+}
+
+/// A cut of a clip, and where to move it.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoCutMoveArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// A cut id from `video_get`'s cuts.
+    pub cut_id: String,
+    /// The new clip-local second; converted to the nearest frame, which stays strictly between the neighbouring cuts.
+    pub second: f64,
+}
+
+/// The export state of a merged part.
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum MergedState {
+    Include,
+    Exclude,
+}
+
+/// A cut to remove.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoCutRemoveArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// A cut id from `video_get`'s cuts.
+    pub cut_id: String,
+    /// When the parts on either side differ (one exported, one excluded): `include` or `exclude` the merged part. Without it
+    /// OVRLEY asks the user and this call waits for the answer. Ignored when both parts are in the same state.
+    #[serde(default)]
+    pub merged: Option<MergedState>,
+}
+
+/// Which end of a clip to trim.
+#[derive(Clone, Copy, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum TrimSideArgument {
+    Start,
+    End,
+}
+
+/// A trim of one end of a clip.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoTrimArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// `start` excludes the part before the second, `end` the part after it.
+    pub side: TrimSideArgument,
+    /// The clip-local second of the trim; converted to the nearest frame.
+    pub second: f64,
+}
+
+/// A segment's export state.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoSegmentSetExcludedArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// A segment key from `video_get`'s segments.
+    pub segment_key: String,
+    /// `true` leaves the segment out of the export; it stays on the timeline and in the preview.
+    pub excluded: bool,
+}
+
 pub fn tools() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
@@ -128,6 +204,49 @@ pub fn tools() -> Vec<ToolDefinition> {
             read_only: false,
         },
         ToolDefinition {
+            name: "video_cut",
+            title: "Cut a video clip",
+            description: "Splits a clip at a clip-local second, as C at the playhead does. The second is converted to the clip's \
+                          nearest frame; the call fails on the clip's first or last frame or on an existing cut. The new part keeps the \
+                          export state of the part it comes from. One undo step.",
+            input_schema: input_schema::<VideoSecondArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_cut_move",
+            title: "Move a cut",
+            description: "Moves a cut to another clip-local second (its nearest frame), strictly between its neighbouring cuts or the \
+                          clip's ends, as dragging the cut marker does. Both parts keep their edits. One undo step.",
+            input_schema: input_schema::<VideoCutMoveArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_cut_remove",
+            title: "Remove a cut",
+            description: "Removes a cut, merging its two parts, as the cut marker's Remove cut does. When one part is exported and the \
+                          other excluded, give merged (include or exclude); without it OVRLEY asks the user and the call waits for the \
+                          answer ({removed: false} when the user keeps the cut). One undo step.",
+            input_schema: input_schema::<VideoCutRemoveArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_trim",
+            title: "Trim a video clip",
+            description: "Trims one end of a clip at a clip-local second (its nearest frame), as [ and ] at the playhead do: the outer \
+                          part is excluded from export. An end already trimmed moves its trim instead. A trim never passes another \
+                          cut. One undo step.",
+            input_schema: input_schema::<VideoTrimArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_segment_set_excluded",
+            title: "Exclude or include a part",
+            description: "Excludes a part (segment) of a clip from the export or includes it again, as X does. Segment keys come from \
+                          video_get. One undo step.",
+            input_schema: input_schema::<VideoSegmentSetExcludedArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
             name: "activity_trim_reset",
             title: "Reset the activity trim",
             description: "Removes the activity trim, so the whole activity renders, as Mod+X does. One undo step.",
@@ -152,6 +271,14 @@ fn find_clip<'a>(store: &'a Store, video_id: &str) -> Result<&'a ovrley_app::lib
         .iter()
         .find(|clip| clip.id() == video_id)
         .ok_or_else(|| ToolOutcome::Failed(format!("There is no video {video_id}.")))
+}
+
+/// A clip-local second as the clip's nearest frame.
+fn finite_frame(clip: &ovrley_app::lib::video_program::Clip, second: f64) -> Result<i64, ToolOutcome> {
+    if !second.is_finite() {
+        return Err(ToolOutcome::InvalidParams("second must be a finite number".into()));
+    }
+    Ok(clip.fps().seconds_to_frames(second))
 }
 
 fn file_name(path: &str) -> &str {
@@ -286,7 +413,7 @@ fn require_something_to_play(store: &Store) -> Result<(), ToolOutcome> {
 }
 
 /// Runs a player tool; `None` for a name that is not one.
-pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &mut Services, _reply: Reply) -> Option<Result<Answer, ToolOutcome>> {
+pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &mut Services, reply: Reply) -> Option<Result<Answer, ToolOutcome>> {
     let now = |value: Value| Ok(Answer::Now(ToolOutcome::Ok(value)));
     Some(match name {
         "playback_play" => arguments::<NoArguments>(arguments_value).and_then(|_| {
@@ -348,6 +475,58 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &m
             ovrley_app::features::player::remove_video(store, &arguments.video_id).map_err(ToolOutcome::Failed)?;
             ovrley_app::features::player::reconcile_player(store);
             now(json!({ "videos": describe_videos(store) }))
+        }),
+        "video_cut" => arguments::<VideoSecondArguments>(arguments_value).and_then(|arguments| {
+            let clip = find_clip(store, &arguments.video_id)?;
+            let frame = finite_frame(clip, arguments.second)?;
+            ovrley_app::store::slices::video_import::cut_video(store, &arguments.video_id, frame).map_err(ToolOutcome::Failed)?;
+            answer_video(store, &arguments.video_id)
+        }),
+        "video_cut_move" => arguments::<VideoCutMoveArguments>(arguments_value).and_then(|arguments| {
+            let frame = finite_frame(find_clip(store, &arguments.video_id)?, arguments.second)?;
+            ovrley_app::store::slices::video_import::move_cut(store, &arguments.video_id, &arguments.cut_id, frame).map_err(ToolOutcome::Failed)?;
+            answer_video(store, &arguments.video_id)
+        }),
+        "video_cut_remove" => arguments::<VideoCutRemoveArguments>(arguments_value).and_then(|arguments| {
+            use ovrley_app::store::slices::video_import::{request_cut_removal, resolve_cut_removal, CutRemoval};
+            find_clip(store, &arguments.video_id)?;
+            if store.video_import.cut_removal_request.is_some() {
+                return Err(ToolOutcome::Failed("OVRLEY is already asking the user about removing a cut.".into()));
+            }
+            match request_cut_removal(store, &arguments.video_id, &arguments.cut_id, None).map_err(ToolOutcome::Failed)? {
+                CutRemoval::Merged => answer_video(store, &arguments.video_id),
+                CutRemoval::Asked => match arguments.merged {
+                    Some(merged) => {
+                        resolve_cut_removal(store, matches!(merged, MergedState::Exclude)).map_err(ToolOutcome::Failed)?;
+                        answer_video(store, &arguments.video_id)
+                    }
+                    None => {
+                        store.player.cut_removal_reply = Some(ovrley_app::store::agent::AgentReply::new(move |result| reply(result.into())));
+                        Ok(Answer::Later)
+                    }
+                },
+            }
+        }),
+        "video_trim" => arguments::<VideoTrimArguments>(arguments_value).and_then(|arguments| {
+            use ovrley_app::lib::video_program::segments::{plan_video_trim, TrimPlan, TrimSide};
+            let clip = find_clip(store, &arguments.video_id)?;
+            let frame = finite_frame(clip, arguments.second)?;
+            let side = match arguments.side {
+                TrimSideArgument::Start => TrimSide::Start,
+                TrimSideArgument::End => TrimSide::End,
+            };
+            let plan = plan_video_trim(clip, side, frame).ok_or_else(|| ToolOutcome::Failed("The clip cannot be trimmed there: the frame is on the clip's edge or past a cut.".into()))?;
+            match plan {
+                TrimPlan::Trim => ovrley_app::store::slices::video_import::trim_video(store, &arguments.video_id, side, frame).map(drop),
+                TrimPlan::Move { cut_id } => ovrley_app::store::slices::video_import::move_cut(store, &arguments.video_id, &cut_id, frame),
+            }
+            .map_err(ToolOutcome::Failed)?;
+            answer_video(store, &arguments.video_id)
+        }),
+        "video_segment_set_excluded" => arguments::<VideoSegmentSetExcludedArguments>(arguments_value).and_then(|arguments| {
+            find_clip(store, &arguments.video_id)?;
+            ovrley_app::store::slices::video_import::set_video_segment_excluded(store, &arguments.video_id, &arguments.segment_key, arguments.excluded).map_err(ToolOutcome::Failed)?;
+            answer_video(store, &arguments.video_id)
         }),
         "activity_trim_reset" => arguments::<NoArguments>(arguments_value).and_then(|_| {
             store.media.set_activity_trim(None);
@@ -437,6 +616,72 @@ pub(crate) mod tests {
         assert_eq!(removed["videos"].as_array().unwrap().len(), 1);
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2, "removal is no undo step");
         assert!(matches!(run(&dispatcher, "video_get", json!({ "videoId": "a" })), ToolOutcome::Failed(_)));
+    }
+
+    #[test]
+    fn cuts_trims_and_exclusion_are_one_undo_step_each() {
+        let dispatcher = dispatcher_with(with_videos(&[("a", 0.0, 10.0)]));
+        let cut = ok(run(&dispatcher, "video_cut", json!({ "videoId": "a", "second": 5 })));
+        let cut_id = cut["cuts"][0]["id"].as_str().unwrap().to_string();
+        assert_eq!(cut["cuts"][0]["frame"], 150);
+        assert!(matches!(run(&dispatcher, "video_cut", json!({ "videoId": "a", "second": 5 })), ToolOutcome::Failed(_)));
+        let moved = ok(run(&dispatcher, "video_cut_move", json!({ "videoId": "a", "cutId": cut_id, "second": 6 })));
+        assert_eq!(moved["cuts"][0]["frame"], 180);
+        let trimmed = ok(run(&dispatcher, "video_trim", json!({ "videoId": "a", "side": "start", "second": 1 })));
+        assert_eq!(trimmed["segments"][0]["excluded"], true);
+        let excluded = ok(run(&dispatcher, "video_segment_set_excluded", json!({ "videoId": "a", "segmentKey": cut_id, "excluded": true })));
+        assert_eq!(excluded["segments"][2]["excluded"], true);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 4);
+    }
+
+    #[test]
+    fn removing_a_cut_between_alike_parts_merges_at_once_and_merged_answers_the_question() {
+        let dispatcher = dispatcher_with(with_videos(&[("a", 0.0, 10.0)]));
+        let cut = |dispatcher: &Dispatcher| ok(run(dispatcher, "video_cut", json!({ "videoId": "a", "second": 5 })))["cuts"][0]["id"].as_str().unwrap().to_string();
+        let first = cut(&dispatcher);
+        let merged = ok(run(&dispatcher, "video_cut_remove", json!({ "videoId": "a", "cutId": first, "merged": "exclude" })));
+        assert_eq!((merged["cuts"].as_array().unwrap().len(), merged["segments"][0]["excluded"].clone()), (0, json!(false)), "alike parts ignore merged");
+        let second = cut(&dispatcher);
+        ok(run(&dispatcher, "video_segment_set_excluded", json!({ "videoId": "a", "segmentKey": second, "excluded": true })));
+        let answered = ok(run(&dispatcher, "video_cut_remove", json!({ "videoId": "a", "cutId": second, "merged": "exclude" })));
+        assert_eq!(answered["segments"][0]["excluded"], true);
+        assert!(dispatcher.with_store(|store| store.video_import.cut_removal_request.is_none()));
+    }
+
+    #[test]
+    fn without_merged_the_call_waits_for_the_user() {
+        let dispatcher = dispatcher_with(with_videos(&[("a", 0.0, 10.0)]));
+        let cut_id = ok(run(&dispatcher, "video_cut", json!({ "videoId": "a", "second": 5 })))["cuts"][0]["id"].as_str().unwrap().to_string();
+        ok(run(&dispatcher, "video_segment_set_excluded", json!({ "videoId": "a", "segmentKey": cut_id, "excluded": true })));
+        for (answer, expected) in [(Some(false), json!({ "removed": true, "excluded": false, "videoId": "a" })), (None, json!({ "removed": false }))] {
+            let (sender, receiver) = std::sync::mpsc::channel();
+            let arguments = json!({ "videoId": "a", "cutId": cut_id });
+            let later = dispatcher
+                .dispatch_with_result(move |store, services| catalog_call("video_cut_remove", arguments, store, services, Box::new(move |outcome| sender.send(outcome).unwrap())))
+                .unwrap();
+            assert!(matches!(later, Answer::Later));
+            assert!(dispatcher.with_store(|store| store.video_import.cut_removal_request.is_some()), "the dialog asks");
+            match answer {
+                Some(excluded) => dispatcher.dispatch(move |store, _| ovrley_app::features::player::resolve_cut_removal(store, excluded)),
+                None => dispatcher.dispatch(|store, _| ovrley_app::features::player::dismiss_cut_removal(store)),
+            }
+            assert_eq!(receiver.try_recv().unwrap(), ToolOutcome::Ok(expected));
+            if answer.is_some() {
+                let again = ok(run(&dispatcher, "video_cut", json!({ "videoId": "a", "second": 5 })));
+                let id = again["cuts"][0]["id"].as_str().unwrap().to_string();
+                ok(run(&dispatcher, "video_segment_set_excluded", json!({ "videoId": "a", "segmentKey": id.clone(), "excluded": true })));
+                return assert_cancelled(&dispatcher, &id);
+            }
+        }
+    }
+
+    fn assert_cancelled(dispatcher: &Dispatcher, cut_id: &str) {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let arguments = json!({ "videoId": "a", "cutId": cut_id });
+        dispatcher.dispatch_with_result(move |store, services| catalog_call("video_cut_remove", arguments, store, services, Box::new(move |outcome| sender.send(outcome).unwrap()))).unwrap();
+        dispatcher.dispatch(|store, _| ovrley_app::features::player::dismiss_cut_removal(store));
+        assert_eq!(receiver.try_recv().unwrap(), ToolOutcome::Ok(json!({ "removed": false })), "keeping the cut answers removed: false");
+        assert_eq!(dispatcher.with_store(|store| store.video_import.video_edits["a"].cuts.len()), 1);
     }
 
     #[test]

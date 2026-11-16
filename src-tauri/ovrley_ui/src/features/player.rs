@@ -118,7 +118,9 @@ impl Projection {
         let playhead = metrics.snap_to_screen_pixel(px(timing.clamped_playhead) - 6.5);
         set_if_changed(player.get_playhead_x(), playhead as f32, |value| player.set_playhead_x(value));
         project_lanes(&player, store);
-        let guideline = store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second);
+        project_edits(&player, store);
+        // One drag runs at a time: the guideline of a dragged cut, or of a dragged clip.
+        let guideline = store.player.cut_drag.as_ref().and_then(|drag| drag.guideline_second).or_else(|| store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second));
         set_if_changed(player.get_guideline_visible(), guideline.is_some(), |value| player.set_guideline_visible(value));
         if let Some(second) = guideline {
             set_if_changed(player.get_guideline_x(), metrics.round_to_device_pixel(px(second)) as f32, |value| player.set_guideline_x(value));
@@ -261,6 +263,29 @@ fn project_lanes(player: &Player<'_>, store: &Store) {
     }
 }
 
+fn project_edits(player: &Player<'_>, store: &Store) {
+    use ovrley_app::features::player::{edits::video_edit_state, video_sync_mode};
+    let sync = video_sync_mode(store);
+    let has_video = store.video_import.has_videos();
+    let has_activity_data = store.media.activity_summary.is_some();
+    let state = video_edit_state(store);
+    set_if_changed(player.get_trim_visible(), !sync && (has_video || has_activity_data), |value| player.set_trim_visible(value));
+    set_if_changed(player.get_trim_targets_video(), has_video, |value| player.set_trim_targets_video(value));
+    let (can_start, can_end) = if has_video { (state.can_trim_start, state.can_trim_end) } else { (has_activity_data, has_activity_data) };
+    set_if_changed(player.get_can_trim_start(), !sync && can_start, |value| player.set_can_trim_start(value));
+    set_if_changed(player.get_can_trim_end(), !sync && can_end, |value| player.set_can_trim_end(value));
+    set_if_changed(player.get_video_edit_visible(), !sync && has_video, |value| player.set_video_edit_visible(value));
+    set_if_changed(player.get_can_cut(), state.can_cut, |value| player.set_can_cut(value));
+    set_if_changed(player.get_exclude_disabled(), state.excluded.is_none(), |value| player.set_exclude_disabled(value));
+    set_if_changed(player.get_excluded(), state.excluded == Some(true), |value| player.set_excluded(value));
+    let (lane, cut) = store.player.cut_popover.as_ref().map_or((String::new(), String::new()), |(video_id, cut_id)| (ClipLane::Video(video_id.clone()).id(), cut_id.clone()));
+    set_if_changed(player.get_cut_popover_lane(), SharedString::from(lane), |value| player.set_cut_popover_lane(value));
+    set_if_changed(player.get_cut_popover_cut(), SharedString::from(cut), |value| player.set_cut_popover_cut(value));
+    let asking = store.video_import.cut_removal_request.is_some();
+    set_if_changed(player.get_cut_removal_open(), asking, |value| player.set_cut_removal_open(value));
+    set_if_changed(player.get_keeps_clip_selection(), asking || store.player.cut_popover.is_some(), |value| player.set_keeps_clip_selection(value));
+}
+
 fn surface(kind: TimelineSurfaceKind) -> SurfaceGesture {
     match kind {
         TimelineSurfaceKind::Axis => SurfaceGesture::Scrub,
@@ -333,7 +358,19 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         let x = f64::from(x);
         let cut_id = cut_id.to_string();
         marker.dispatch(move |store, _| {
-            if lane != ClipLane::Activity {
+            use ovrley_app::features::player::gestures::{cut_down, cut_move, cut_up};
+            if let Some(video_id) = lane.video_id() {
+                match phase {
+                    PointerPhase::Down => cut_down(store, video_id, &cut_id, x),
+                    PointerPhase::Move => cut_move(store, x),
+                    PointerPhase::Up => {
+                        let removable = cut_id != ovrley_app::features::player::lanes::EDGE_START && cut_id != ovrley_app::features::player::lanes::EDGE_END;
+                        if cut_up(store) && removable {
+                            store.player.cut_popover = Some((video_id.to_string(), cut_id.clone()));
+                        }
+                    }
+                    PointerPhase::Cancel => surface_cancel(store),
+                }
                 return;
             }
             let edge = if cut_id == "start" { TrimEdge::Start } else { TrimEdge::End };
@@ -345,6 +382,43 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             }
         });
     });
+    let trim = dispatcher.clone();
+    player.on_trim(move |start| {
+        trim.dispatch(move |store, _| {
+            use ovrley_app::lib::video_program::segments::TrimSide;
+            let side = if start { TrimSide::Start } else { TrimSide::End };
+            if store.video_import.has_videos() {
+                ovrley_app::features::player::edits::trim_at_playhead(store, side);
+            } else {
+                ovrley_app::features::player::trim_activity_at_playhead(store, side);
+            }
+        });
+    });
+    player.on_cut(on(dispatcher, |store| {
+        ovrley_app::features::player::edits::cut_at_playhead(store);
+    }));
+    player.on_toggle_excluded(on(dispatcher, |store| {
+        ovrley_app::features::player::edits::toggle_excluded_at_playhead(store);
+    }));
+    player.on_close_cut_popover(on(dispatcher, |store| store.player.cut_popover = None));
+    let remove = dispatcher.clone();
+    player.on_remove_cut(move |lane_id, cut_id| {
+        let lane = ClipLane::from_id(&lane_id);
+        let cut_id = cut_id.to_string();
+        remove.dispatch(move |store, _| {
+            store.player.cut_popover = None;
+            if let Some(video_id) = lane.video_id() {
+                let _ = ovrley_app::store::slices::video_import::request_cut_removal(store, video_id, &cut_id, None);
+            }
+        });
+    });
+    let resolve = dispatcher.clone();
+    player.on_resolve_cut_removal(move |excluded| {
+        resolve.dispatch(move |store, _| {
+            ovrley_app::features::player::resolve_cut_removal(store, excluded);
+        });
+    });
+    player.on_keep_cut(on(dispatcher, ovrley_app::features::player::dismiss_cut_removal));
     let wheel = dispatcher.clone();
     player.on_wheel(move |delta_y, x, ctrl| {
         wheel.dispatch(move |store, _| {
