@@ -5,5 +5,6 @@ pub mod player;
 pub mod template_manager;
 pub mod toolbar;
 pub mod undo_redo;
+pub mod video_preview;
 pub mod widget_editor;
 pub mod widget_preview;

@@ -48,6 +48,19 @@ export struct SegmentView {
     seam-after: bool,
     selected: bool,
     stripes: string,
+    has-tiles: bool,
+}
+
+// A filmstrip tile in timeline pixels: one frame (`frame-x`, `frame-width` in sprite pixels) of a
+// strip's sprite, clipped to its segment's box (`clip-x`, `clip-width`).
+export struct TileView {
+    x: length,
+    width: length,
+    clip-x: length,
+    clip-width: length,
+    image: image,
+    frame-x: int,
+    frame-width: int,
 }
 
 // A striped span: an overlap band or an activity trim mask.
@@ -116,6 +129,7 @@ export global Player {
     in property <bool> video-lane-visible;
     in property <[ClipView]> video-clips;
     in property <[SegmentView]> segments;
+    in property <[TileView]> tiles;
     in property <[BandView]> overlap-bands;
     in property <[MarkerView]> cut-markers;
     // The activity lane.

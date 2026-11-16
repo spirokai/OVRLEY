@@ -76,18 +76,28 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
 
 /// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
 /// the compositor (Phase 6). Agents reach the window through `agent_socket`.
-pub fn run(store: Store, paths: ovrley_core::paths::AppPaths, preferences: PreferencesStore, gpu: Option<GpuDevice>, agent_socket: ovrley_mcp::link::SocketLocation) -> Result<(), String> {
+pub fn run(
+    store: Store,
+    paths: ovrley_core::paths::AppPaths,
+    app_cache_dir: &std::path::Path,
+    preferences: PreferencesStore,
+    gpu: Option<GpuDevice>,
+    agent_socket: ovrley_mcp::link::SocketLocation,
+) -> Result<(), String> {
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
+    let paths = Arc::new(paths);
+    let video_tools = Arc::new(ovrley_app::store::services::NativeVideoTools::open(Arc::clone(&paths), app_cache_dir, &preferences)?);
     let dispatcher = compose(
         &window,
         store,
         ServiceParts {
-            paths: Arc::new(paths),
+            paths,
             preferences,
             dialogs: Box::new(NativeDialogs { window: window.as_weak() }),
             ui_post: Arc::new(SlintUiPost),
             clipboard: Box::new(SystemClipboard::default()),
             window: Box::new(SlintWindowControl { window: window.as_weak() }),
+            video_tools,
         },
     );
     platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());

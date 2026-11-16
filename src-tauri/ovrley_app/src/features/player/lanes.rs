@@ -154,6 +154,19 @@ pub struct SegmentView {
     pub stripes: String,
     /// How far the box starts after the segment's true left edge (filmstrip tiles shift by it).
     pub offset: f64,
+    /// The segment shows filmstrip tiles (inside a `primary` border).
+    pub has_tiles: bool,
+}
+
+/// A filmstrip tile in timeline pixels, clipped to its segment's box.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TileView {
+    pub x: f64,
+    pub width: f64,
+    pub clip_x: f64,
+    pub clip_width: f64,
+    pub strip: std::sync::Arc<crate::store::slices::video_filmstrip::ReadyStrip>,
+    pub sample: u32,
 }
 
 /// A striped span (an activity trim mask, an overlap band), in timeline pixels.
@@ -200,6 +213,7 @@ pub struct MarkerView {
 pub struct VideoLaneView {
     pub clips: Vec<ClipView>,
     pub segments: Vec<SegmentView>,
+    pub tiles: Vec<TileView>,
     pub bands: Vec<BandView>,
     pub cut_markers: Vec<MarkerView>,
 }
@@ -233,6 +247,7 @@ pub struct LaneInputs<'a> {
     pub show_cut_markers: bool,
     /// The cut being dragged: `(video id, cut id)`.
     pub dragged_cut: Option<(&'a str, &'a str)>,
+    pub filmstrips: &'a crate::store::slices::video_filmstrip::VideoFilmstripSlice,
 }
 
 fn text(locale: Locale, key: &str, default: &'static str) -> String {
@@ -301,7 +316,22 @@ fn clip_view(input: ClipInput, inputs: &LaneInputs<'_>) -> Option<ClipView> {
     })
 }
 
-fn segment_views(clip: &Clip, inputs: &LaneInputs<'_>) -> Vec<SegmentView> {
+/// `clipFilmstripView`: the ready strips of a clip's video once its base strip is ready.
+fn ready_strips(clip: &Clip, inputs: &LaneInputs<'_>) -> Vec<std::sync::Arc<crate::store::slices::video_filmstrip::ReadyStrip>> {
+    use crate::store::slices::video_filmstrip::StripState;
+    let Some(strips) = inputs.filmstrips.strips.get(&clip.video.path) else { return Vec::new() };
+    if !matches!(strips.get("base"), Some(StripState::Ready(_))) {
+        return Vec::new();
+    }
+    strips.values().filter_map(|strip| if let StripState::Ready(strip) = strip { Some(std::sync::Arc::clone(strip)) } else { None }).collect()
+}
+
+fn segment_views(clip: &Clip, inputs: &LaneInputs<'_>, tiles: &mut Vec<TileView>) -> Vec<SegmentView> {
+    use crate::features::video_preview::filmstrips::{list_filmstrip_tiles, tile_width_px};
+    let strips = ready_strips(clip, inputs);
+    let span = inputs.view.view_end - inputs.view.view_start;
+    let px_per_second = if span > 0.0 { inputs.metrics.width_px / span } else { 0.0 };
+    let tile_width = tile_width_px(clip.video.resolution, VIDEO_CLIP_HEIGHT_REM * inputs.metrics.rem);
     let width_px = inputs.metrics.width_px;
     let segments = list_video_segments(clip);
     let selected_key = inputs.selected.filter(|selection| selection.lane.video_id() == Some(clip.id())).and_then(|selection| selection.segment_key.as_deref());
@@ -319,7 +349,14 @@ fn segment_views(clip: &Clip, inputs: &LaneInputs<'_>) -> Vec<SegmentView> {
                 return None;
             }
             let (box_x, box_width, offset) = visible_span(x, width, width_px);
+            let source_start = clip.fps().frames_to_seconds(segment.start_frame);
+            let source_end = clip.fps().frames_to_seconds(segment.end_frame);
+            let segment_tiles = list_filmstrip_tiles(&strips, source_start, source_end, x, px_per_second, tile_width, width_px);
+            let has_tiles = !segment_tiles.is_empty();
+            // The border's 1 px inset clips the tiles, as `overflow-hidden` inside `border` does.
+            tiles.extend(segment_tiles.into_iter().map(|tile| TileView { x: x + tile.x, width: tile.width, clip_x: box_x + 1.0, clip_width: (box_width - 2.0).max(0.0), strip: tile.strip, sample: tile.sample }));
             Some(SegmentView {
+                has_tiles,
                 video_id: clip.id().to_string(),
                 excluded: segment.edits.excluded,
                 stripes: if segment.edits.excluded { stripes_commands(box_width, height, 3.0, false) } else { String::new() },
@@ -440,7 +477,8 @@ pub fn video_lane(inputs: &LaneInputs<'_>) -> Option<VideoLaneView> {
         };
         if let Some(view) = clip_view(input, inputs) {
             lane.clips.push(view);
-            lane.segments.extend(segment_views(clip, inputs));
+            let segments = segment_views(clip, inputs, &mut lane.tiles);
+            lane.segments.extend(segments);
         }
     }
     let band_height = VIDEO_CLIP_HEIGHT_REM * inputs.metrics.rem;
@@ -552,6 +590,7 @@ mod tests {
     }
 
     struct Fixture {
+        filmstrips: crate::store::slices::video_filmstrip::VideoFilmstripSlice,
         clips: Vec<Clip>,
         warnings: VideoWarnings,
         summary: ActivitySummary,
@@ -570,7 +609,7 @@ mod tests {
             file_name: Some("activity.fit".into()),
             ..ActivitySummary::of(&ParsedActivity::default())
         };
-        Fixture { clips, warnings: VideoWarnings::new(), summary }
+        Fixture { clips, warnings: VideoWarnings::new(), summary, filmstrips: Default::default() }
     }
 
     fn inputs<'a>(fixture: &'a Fixture, viewport: TimelineViewport, trim: Option<(ActivityWindow, Option<TrimEdge>)>) -> LaneInputs<'a> {
@@ -589,6 +628,7 @@ mod tests {
             activity_trim: trim,
             show_cut_markers: true,
             dragged_cut: None,
+            filmstrips: &fixture.filmstrips,
         }
     }
 
@@ -634,6 +674,20 @@ mod tests {
         assert_eq!(lane.cut_markers.iter().map(|marker| (marker.align, marker.removable)).collect::<Vec<_>>(), [(MarkerAlign::Start, false), (MarkerAlign::End, false)]);
         let narrow = video_lane(&inputs(&fixture, view(0.0, 1000.0), None)).unwrap();
         assert!(narrow.cut_markers.is_empty(), "10 px is too narrow for markers");
+    }
+
+    #[test]
+    fn a_ready_base_strip_shows_tiles_as_tall_as_the_clip() {
+        use crate::store::slices::video_filmstrip::{ReadyStrip, StripState};
+        let mut fixture = fixture();
+        let strip = std::sync::Arc::new(ReadyStrip { pixels: std::sync::Arc::new(Vec::new()), width: 85, height: 48, start_seconds: 0.0, spacing_seconds: 20.0, sample_count: 1 });
+        fixture.filmstrips.set("C:\\clips\\ride.mp4", "base", StripState::Generating { job: 1 });
+        assert!(video_lane(&inputs(&fixture, view(0.0, 100.0), None)).unwrap().tiles.is_empty(), "no tiles until the base strip is ready");
+        fixture.filmstrips.set("C:\\clips\\ride.mp4", "base", StripState::Ready(strip));
+        let lane = video_lane(&inputs(&fixture, view(0.0, 100.0), None)).unwrap();
+        // 5 px per second: the 20 s clip at 5 s is 100 px wide and holds two 85 px tiles.
+        assert_eq!(lane.tiles.iter().map(|tile| (tile.x, tile.width, tile.sample)).collect::<Vec<_>>(), [(25.0, 85.0, 0), (110.0, 85.0, 0)]);
+        assert!(lane.segments[0].has_tiles);
     }
 
     #[test]

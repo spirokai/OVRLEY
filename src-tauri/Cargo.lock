@@ -4173,6 +4173,7 @@ checksum = "cd6f44aed642f18953a158afeb30206f4d50da59fbc66ecb53c66488de73563b"
 dependencies = [
  "bytemuck",
  "byteorder-lite",
+ "image-webp",
  "num-traits",
  "png 0.17.16",
  "tiff",
@@ -5807,9 +5808,11 @@ dependencies = [
 name = "ovrley_app"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "icu",
+ "image",
  "log",
  "ovrley_core",
  "ovrley_services",

@@ -81,6 +81,8 @@ pub struct VideoImportSlice {
     pub cut_removal_request: Option<CutRemovalRequest>,
     pub transition_defaults: TransitionDefaults,
     pub selected_clip: Option<SelectedClip>,
+    /// `availableCodecs`: detected once, for filmstrip decoding (and the render dialog in Phase 7).
+    pub available_codecs: crate::features::video_preview::filmstrips::CodecDetection,
 }
 
 impl Default for VideoImportSlice {
@@ -92,6 +94,7 @@ impl Default for VideoImportSlice {
             cut_removal_request: None,
             transition_defaults: transition_defaults().clone(),
             selected_clip: None,
+            available_codecs: Default::default(),
         }
     }
 }

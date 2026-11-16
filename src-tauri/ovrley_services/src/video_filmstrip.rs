@@ -24,9 +24,9 @@ use std::process::{Command, Stdio};
 use std::time::UNIX_EPOCH;
 
 /// Most frames in one strip.
-const FRAMES_PER_STRIP: u32 = 24;
+pub const FRAMES_PER_STRIP: u32 = 24;
 /// Closest spacing of frames, on the finest zoom level.
-const FINEST_SPACING_SECONDS: f64 = 10.0;
+pub const FINEST_SPACING_SECONDS: f64 = 10.0;
 /// Deepest zoom level: frames about 7.6 days apart, past any video.
 const MAX_ZOOM_LEVEL: u32 = 16;
 /// Longest video a strip is planned for.
@@ -86,12 +86,12 @@ struct SamplePlan {
 }
 
 /// Spacing of the base strip: at most 24 frames, never closer than 10 s.
-fn base_spacing_seconds(duration_seconds: f64) -> f64 {
+pub fn base_spacing_seconds(duration_seconds: f64) -> f64 {
     FINEST_SPACING_SECONDS.max(duration_seconds / f64::from(FRAMES_PER_STRIP))
 }
 
 /// Frame spacing on a zoom level.
-fn zoom_spacing_seconds(level: u32) -> f64 {
+pub fn zoom_spacing_seconds(level: u32) -> f64 {
     FINEST_SPACING_SECONDS * f64::from(1u32 << level)
 }
 
@@ -192,6 +192,11 @@ impl FilmstripRequest {
             frame_width,
             frame_height,
         })
+    }
+
+    /// The stretch of the video the strip covers.
+    pub fn window(&self) -> FilmstripWindow {
+        self.window
     }
 
     fn frame_len(&self) -> usize {

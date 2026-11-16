@@ -21,6 +21,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     crate::features::template_manager::reconcile_durable_state(store);
     // 5. The player: the cached timeline, the playback effects and the viewport rules (phase 4).
     crate::features::player::reconcile_player(store);
+    //    The filmstrips of the clips and the zoom windows the view wants (phase 4 D12).
+    crate::features::video_preview::filmstrips::reconcile_filmstrips(store, services);
     // 6. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame (D9).
     crate::features::widget_preview::reconcile_widget_preview(store);
     // The plan's language step is not needed: `change_language_preference` validates, applies and

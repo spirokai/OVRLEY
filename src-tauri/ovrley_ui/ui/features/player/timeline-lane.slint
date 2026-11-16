@@ -6,7 +6,7 @@ import { Popover } from "../../components/popover.slint";
 import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
 import { PlacementSide } from "../../components/logic.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
-import { BandView, ClipTooltipView, ClipView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView } from "index.slint";
+import { BandView, ClipTooltipView, ClipView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TileView } from "index.slint";
 
 // Pointer events of a lane element with the x of `area` in timeline coordinates.
 global LanePointer {
@@ -394,6 +394,32 @@ export component TimelineLane {
                     x: parent.width - 1px;
                     width: 1px;
                     background: Theme.background;
+                }
+            }
+            // Filmstrip tiles, each clipped to its segment, inside a `primary` border.
+            for tile in Player.tiles: Rectangle {
+                x: tile.clip-x;
+                width: tile.clip-width;
+                y: 1px;
+                height: parent.height - 2px;
+                clip: true;
+                Image {
+                    x: tile.x - tile.clip-x;
+                    width: tile.width;
+                    height: parent.height;
+                    source: tile.image;
+                    source-clip-x: tile.frame-x;
+                    source-clip-width: tile.frame-width;
+                    image-fit: fill;
+                }
+            }
+            for segment in Player.segments: Rectangle {
+                x: segment.x;
+                width: segment.width;
+                if segment.has-tiles: Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 1px;
+                    border-color: Theme.primary;
                 }
                 if segment.excluded: Stripes {
                     background: Theme.background.transparentize(0.1);

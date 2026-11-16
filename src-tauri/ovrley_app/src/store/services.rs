@@ -6,6 +6,7 @@
 //! record every call.
 
 use super::{DispatchHandle, SendAction};
+use serde_json::Value;
 use crate::lib::preferences_store::PreferencesStore;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -92,6 +93,59 @@ impl Workers {
     }
 }
 
+/// The video tools the player uses off the UI thread (phase 4 D12): filmstrips through
+/// `ovrley_services::video_filmstrip`, the code the Tauri commands use, and codec detection.
+pub trait VideoTools: Send + Sync {
+    /// The strip from the disk cache, or `None` on a miss. Cheap: no decode.
+    fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String>;
+    /// The strip from the cache, or decoded (with `hwaccel`, or in software) and cached. `None`
+    /// when FFmpeg decodes no frame.
+    fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String>;
+    /// `detectCodecs`: the encoders and decoders the bundled FFmpeg offers.
+    fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String>;
+}
+
+pub use ovrley_services::video_filmstrip::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
+
+/// The native video tools: the filmstrip cache in the application cache directory, with the limit
+/// the Tauri app keeps in the shared settings file, and the bundled FFmpeg.
+pub struct NativeVideoTools {
+    paths: Arc<ovrley_core::paths::AppPaths>,
+    cache: ovrley_services::filmstrip_cache::FilmstripCache,
+}
+
+/// The settings key of the filmstrip cache limit, shared with the Tauri app.
+pub const FILMSTRIP_CACHE_LIMIT_KEY: &str = "filmstripCacheLimitBytes";
+
+impl NativeVideoTools {
+    /// Opens the cache. The saved limit restores state at startup: a malformed one falls back to
+    /// the default, so a bad value never keeps OVRLEY from starting.
+    pub fn open(paths: Arc<ovrley_core::paths::AppPaths>, app_cache_dir: &std::path::Path, preferences: &PreferencesStore) -> Result<Self, String> {
+        use ovrley_services::filmstrip_cache::{validate_filmstrip_cache_limit, FilmstripCache, DEFAULT_FILMSTRIP_CACHE_LIMIT};
+        let limit = preferences
+            .get(FILMSTRIP_CACHE_LIMIT_KEY)
+            .and_then(Value::as_u64)
+            .and_then(|limit| validate_filmstrip_cache_limit(limit).ok())
+            .unwrap_or(DEFAULT_FILMSTRIP_CACHE_LIMIT);
+        Ok(Self { cache: FilmstripCache::for_application_cache(app_cache_dir, limit)?, paths })
+    }
+}
+
+impl VideoTools for NativeVideoTools {
+    fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String> {
+        ovrley_services::video_filmstrip::cached_filmstrip(&self.cache, request)
+    }
+
+    fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String> {
+        let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&self.paths.repo_root).map_err(|error| error.to_string())?;
+        ovrley_services::video_filmstrip::filmstrip(&self.cache, &ffmpeg, request, hwaccel)
+    }
+
+    fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String> {
+        ovrley_core::encode::ffmpeg::detect::detect_codecs(&self.paths.repo_root).map_err(|error| error.to_string())
+    }
+}
+
 /// Everything an action may use besides the store.
 pub struct Services {
     /// The runtime paths `ovrley_core` reads templates, fonts and tools from.
@@ -104,6 +158,7 @@ pub struct Services {
     pub ui_post: Arc<dyn UiPost>,
     pub clipboard: Box<dyn Clipboard>,
     pub window: Box<dyn WindowControl>,
+    pub video_tools: Arc<dyn VideoTools>,
     /// Dispatches later on the UI thread, for replies that arrive there (dialogs).
     pub dispatch: DispatchHandle,
 }
@@ -116,6 +171,7 @@ pub struct ServiceParts {
     pub ui_post: Arc<dyn UiPost>,
     pub clipboard: Box<dyn Clipboard>,
     pub window: Box<dyn WindowControl>,
+    pub video_tools: Arc<dyn VideoTools>,
 }
 
 impl ServiceParts {
@@ -128,6 +184,7 @@ impl ServiceParts {
             workers: Workers::new(self.ui_post.clone()),
             ui_post: self.ui_post,
             clipboard: self.clipboard,
+            video_tools: self.video_tools,
             window: self.window,
             dispatch,
         }
@@ -232,6 +289,37 @@ pub mod fakes {
         pub ui_post: FakeUiPost,
         pub clipboard: FakeClipboard,
         pub window: FakeWindow,
+        pub video_tools: Arc<FakeVideoTools>,
+    }
+
+    /// Video tools answering from a table: a strip per window key (cached or decoded), and
+    /// the codecs.
+    #[derive(Default)]
+    pub struct FakeVideoTools {
+        pub cached: Mutex<std::collections::HashMap<String, Filmstrip>>,
+        pub decoded: Mutex<std::collections::HashMap<String, Filmstrip>>,
+        pub decodes: Mutex<Vec<(String, Option<FilmstripHwaccel>)>>,
+        pub codecs: Mutex<ovrley_core::encode::ffmpeg::detect::AvailableCodecs>,
+    }
+
+    /// A strip's table key: its window as `crate::features::video_preview::filmstrips` keys it.
+    fn key(request: &FilmstripRequest) -> String {
+        crate::features::video_preview::filmstrips::request_key(request)
+    }
+
+    impl VideoTools for FakeVideoTools {
+        fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String> {
+            Ok(self.cached.lock().unwrap().get(&key(request)).cloned())
+        }
+
+        fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String> {
+            self.decodes.lock().unwrap().push((key(request), hwaccel));
+            Ok(self.decoded.lock().unwrap().get(&key(request)).cloned())
+        }
+
+        fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String> {
+            Ok(self.codecs.lock().unwrap().clone())
+        }
     }
 
     /// The checkout's runtime paths: its bundled templates, fonts and tools.
@@ -249,6 +337,7 @@ pub mod fakes {
             ui_post: FakeUiPost::default(),
             clipboard: FakeClipboard::default(),
             window: FakeWindow::default(),
+            video_tools: Arc::new(FakeVideoTools::default()),
         };
         let parts = ServiceParts {
             paths: Arc::new(repository_paths()),
@@ -257,6 +346,7 @@ pub mod fakes {
             ui_post: Arc::new(fakes.ui_post.clone()),
             clipboard: Box::new(fakes.clipboard.clone()),
             window: Box::new(fakes.window.clone()),
+            video_tools: fakes.video_tools.clone(),
         };
         (parts, fakes)
     }

@@ -43,6 +43,10 @@ pub struct Store {
     pub video_import: VideoImportSlice,
     /// `createRenderSettingsSlice`'s state (phase 4 D15).
     pub render_settings: RenderSettings,
+    /// The timeline filmstrips (phase 4 D12).
+    pub video_filmstrip: slices::video_filmstrip::VideoFilmstripSlice,
+    /// `useVideoFilmstripQueue`'s state.
+    pub filmstrip_queue: crate::features::video_preview::filmstrips::FilmstripQueue,
     /// The player's hook state and cached timeline (phase 4 D3, D5).
     pub player: crate::features::player::PlayerState,
     /// The editor history (D6).

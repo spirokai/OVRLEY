@@ -7,7 +7,7 @@
 //! paused.
 
 use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
-use crate::{AppWindow, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TimelineSurfaceKind};
+use crate::{AppWindow, TileView, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TimelineSurfaceKind};
 use ovrley_app::features::player::lanes::{self, MarkerTarget};
 use ovrley_app::lib::activity::TrimEdge;
 use ovrley_app::store::slices::video_import::ClipLane;
@@ -36,11 +36,21 @@ pub struct Projection {
     /// animation-frame loop.
     scroll_timer: slint::Timer,
     strip: RefCell<Option<TickStrip>>,
+    /// Each loaded filmstrip's sprite, uploaded once however many tiles show it (D12).
+    sprites: RefCell<std::collections::HashMap<usize, (std::sync::Arc<ovrley_app::store::slices::video_filmstrip::ReadyStrip>, slint::Image)>>,
+    /// Publishes the timeline's wanted filmstrip windows once the view settled.
+    wanted_timer: slint::Timer,
+    wanted_deadline: std::cell::Cell<Option<Instant>>,
 }
 
 impl Projection {
     pub fn new(dispatch: DispatchHandle) -> Self {
-        Self { dispatch, timer: Rc::new(slint::Timer::default()), scroll_timer: slint::Timer::default(), strip: RefCell::new(None) }
+        Self { dispatch, timer: Rc::new(slint::Timer::default()), scroll_timer: slint::Timer::default(),
+            strip: RefCell::new(None),
+            sprites: RefCell::default(),
+            wanted_timer: slint::Timer::default(),
+            wanted_deadline: std::cell::Cell::new(None),
+        }
     }
 
     /// Runs the playback timer while the timeline clock plays.
@@ -81,6 +91,65 @@ impl Projection {
         });
     }
 
+    fn drive_wanted_windows(&self, store: &Store) {
+        let deadline = store.filmstrip_queue.wanted_deadline();
+        if deadline == self.wanted_deadline.get() {
+            return;
+        }
+        self.wanted_deadline.set(deadline);
+        let Some(deadline) = deadline else {
+            self.wanted_timer.stop();
+            return;
+        };
+        let dispatch = self.dispatch.clone();
+        self.wanted_timer.start(slint::TimerMode::SingleShot, deadline.saturating_duration_since(Instant::now()), move || {
+            dispatch.dispatch(|store, _| ovrley_app::features::video_preview::filmstrips::publish_wanted_windows(store, Instant::now()));
+        });
+    }
+
+    /// The sprite of a strip as one Slint image, cached by the strip.
+    fn sprite(&self, strip: &std::sync::Arc<ovrley_app::store::slices::video_filmstrip::ReadyStrip>) -> slint::Image {
+        let key = std::sync::Arc::as_ptr(strip) as usize;
+        let mut sprites = self.sprites.borrow_mut();
+        sprites
+            .entry(key)
+            .or_insert_with(|| {
+                let buffer = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(&strip.pixels, strip.width, strip.height);
+                (std::sync::Arc::clone(strip), slint::Image::from_rgba8(buffer))
+            })
+            .1
+            .clone()
+    }
+
+    fn project_lanes(&self, player: &Player<'_>, store: &Store) {
+        let (video, activity) = ovrley_app::features::player::lanes_view(store);
+        let tiles: Vec<TileView> = project_lanes(player, video, activity)
+            .iter()
+            .map(|tile| {
+                let frame_width = tile.strip.width / tile.strip.sample_count.max(1);
+                TileView {
+                    x: tile.x as f32,
+                    width: tile.width as f32,
+                    clip_x: tile.clip_x as f32,
+                    clip_width: tile.clip_width as f32,
+                    image: self.sprite(&tile.strip),
+                    frame_x: (tile.sample * frame_width) as i32,
+                    frame_width: frame_width as i32,
+                }
+            })
+            .collect();
+        // Sprites no strip holds any more are released.
+        let live: std::collections::HashSet<usize> = store
+            .video_filmstrip
+            .strips
+            .values()
+            .flat_map(|strips| strips.values())
+            .filter_map(|strip| if let ovrley_app::store::slices::video_filmstrip::StripState::Ready(strip) = strip { Some(std::sync::Arc::as_ptr(strip) as usize) } else { None })
+            .collect();
+        self.sprites.borrow_mut().retain(|key, _| live.contains(key));
+        replace_if_changed(player.get_tiles(), tiles, |model| player.set_tiles(model));
+    }
+
     pub fn project(&self, window: &AppWindow, store: &Store) {
         let player = window.global::<Player>();
         let timing = player_timing(store);
@@ -117,7 +186,7 @@ impl Projection {
         // The playhead's line centre (6.5 px into its 13 px) sits on the playhead.
         let playhead = metrics.snap_to_screen_pixel(px(timing.clamped_playhead) - 6.5);
         set_if_changed(player.get_playhead_x(), playhead as f32, |value| player.set_playhead_x(value));
-        project_lanes(&player, store);
+        self.project_lanes(&player, store);
         project_edits(&player, store);
         // One drag runs at a time: the guideline of a dragged cut, or of a dragged clip.
         let guideline = store.player.cut_drag.as_ref().and_then(|drag| drag.guideline_second).or_else(|| store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second));
@@ -127,6 +196,7 @@ impl Projection {
         }
         self.drive_playback(store);
         self.drive_auto_scroll(store);
+        self.drive_wanted_windows(store);
     }
 
     fn project_ticks(&self, player: &Player<'_>, store: &Store) {
@@ -201,8 +271,7 @@ fn marker_view(marker: &lanes::MarkerView) -> MarkerView {
     }
 }
 
-fn project_lanes(player: &Player<'_>, store: &Store) {
-    let (video, activity) = ovrley_app::features::player::lanes_view(store);
+fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activity: Option<lanes::ActivityLaneView>) -> Vec<lanes::TileView> {
     set_if_changed(player.get_video_lane_visible(), video.is_some(), |value| player.set_video_lane_visible(value));
     set_if_changed(player.get_activity_lane_visible(), activity.is_some(), |value| player.set_activity_lane_visible(value));
     let video = video.unwrap_or_default();
@@ -221,6 +290,7 @@ fn project_lanes(player: &Player<'_>, store: &Store) {
             seam_after: segment.seam_after,
             selected: segment.selected,
             stripes: segment.stripes.as_str().into(),
+            has_tiles: segment.has_tiles,
         })
         .collect();
     replace_if_changed(player.get_segments(), segments, |model| player.set_segments(model));
@@ -261,6 +331,7 @@ fn project_lanes(player: &Player<'_>, store: &Store) {
     if !same {
         player.set_tooltip(view);
     }
+    video.tiles
 }
 
 fn project_edits(player: &Player<'_>, store: &Store) {

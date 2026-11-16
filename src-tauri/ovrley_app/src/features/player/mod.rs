@@ -55,6 +55,7 @@ pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes:
         activity_trim: (!sync).then(|| (resolve_activity_window(duration, trim), dragged_edge)),
         show_cut_markers: !sync,
         dragged_cut: draft.as_ref().map(|draft| (draft.video_id.as_str(), draft.cut_id.as_str())),
+        filmstrips: &store.video_filmstrip,
     };
     (lanes::video_lane(&inputs), lanes::activity_lane(&inputs))
 }
