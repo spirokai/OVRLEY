@@ -38,10 +38,17 @@ pub fn project(window: &AppWindow, store: &Store) {
     project_activity_drawer(&toolbar, store);
 }
 
+/// Writes `next` into the model. Rows of an unchanged length update in place, so the repeater
+/// keeps their elements and their animations play (a lap's switch slides instead of jumping).
 fn replace_if_changed<T: Clone + PartialEq + 'static>(current: ModelRc<T>, next: Vec<T>, set: impl FnOnce(ModelRc<T>)) {
-    let same = current.row_count() == next.len() && current.iter().zip(&next).all(|(left, right)| &left == right);
-    if !same {
+    if current.row_count() != next.len() {
         set(ModelRc::new(VecModel::from(next)));
+        return;
+    }
+    for (row, value) in next.into_iter().enumerate() {
+        if current.row_data(row).as_ref() != Some(&value) {
+            current.set_row_data(row, value);
+        }
     }
 }
 

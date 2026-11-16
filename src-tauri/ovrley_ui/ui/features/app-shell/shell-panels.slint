@@ -116,7 +116,7 @@ export component StartupError inherits Rectangle {
 }
 
 // The window-wide drop overlay (D10, Q2): `FileDropZone`'s hover state scaled to the window. A
-// `surface-overlay` scrim at 70%, then a zone inset 1rem with a `primary` border on
+// `surface-overlay` scrim at 70%, then a zone covering the whole window with a `primary` border on
 // `surface-accent-soft` at 30%, the file icon and the label. It takes no input: the drop arrives
 // through winit, not through Slint. Slint has no dashed borders, so the border is solid (review).
 export component FileDropOverlay inherits Rectangle {
@@ -127,11 +127,6 @@ export component FileDropOverlay inherits Rectangle {
     background: Theme.surface-overlay.transparentize(0.3);
 
     Rectangle {
-        x: 1rem;
-        y: 1rem;
-        width: parent.width - 2rem;
-        height: parent.height - 2rem;
-        border-radius: Theme.radius-xs * 1rem;
         border-width: 1px;
         border-color: Theme.primary;
         background: Theme.surface-accent-soft.transparentize(0.7);

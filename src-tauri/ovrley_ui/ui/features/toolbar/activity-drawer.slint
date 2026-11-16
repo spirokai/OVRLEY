@@ -103,14 +103,14 @@ component MetricGrid inherits VerticalLayout {
     }
 }
 
-// `ActivityLapTable`: lap, duration, start and a switch, `text-xs`; a hidden lap's row is muted.
+// `ActivityLapTable`: lap, duration, start and a switch, `text-xs`; header cells `pb-1.5`, body
+// cells `py-1`; a hidden lap's row is muted.
 component ActivityLapTable inherits VerticalLayout {
     in property <[ActivityLapView]> laps;
     callback lap-enabled-changed(id: int, enabled: bool);
 
-    spacing: 0.25rem;
     HorizontalLayout {
-        padding-bottom: 0.125rem;
+        padding-bottom: 0.375rem;
         Cell {
             width: 2.5rem;
             content: @tr("toolbar.lapNumber" => "Lap");
@@ -137,6 +137,8 @@ component ActivityLapTable inherits VerticalLayout {
         }
     }
     for lap in root.laps: HorizontalLayout {
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
         property <color> text-color: lap.enabled ? Theme.foreground.transparentize(0.1) : Theme.muted-foreground.transparentize(0.3);
         Cell {
             width: 2.5rem;

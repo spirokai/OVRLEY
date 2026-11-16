@@ -37,27 +37,36 @@ export component ScrollArea {
         width: root.bar-size;
         height: root.height;
 
-        thumb := Rectangle {
+        property <length> thumb-y: (root.height - root.thumb-length) * (-flick.content-y / root.scroll-range);
+        property <bool> thumb-hovered: track-touch.has-hover && track-touch.mouse-y >= self.thumb-y && track-touch.mouse-y < self.thumb-y + root.thumb-length;
+        property <bool> dragging;
+
+        Rectangle {
             x: root.inset;
-            y: (root.height - root.thumb-length) * (-flick.content-y / root.scroll-range) + root.inset;
+            y: parent.thumb-y + root.inset;
             width: parent.width - 2 * root.inset;
             height: root.thumb-length - 2 * root.inset;
             border-radius: root.thin ? 1px : Theme.scrollbar-thumb-radius * 1rem - root.inset;
-            background: thumb-touch.has-hover || thumb-touch.pressed ? Theme.scrollbar-thumb-hover : Theme.scrollbar-thumb;
+            background: parent.thumb-hovered || parent.dragging ? Theme.scrollbar-thumb-hover : Theme.scrollbar-thumb;
+        }
 
-            thumb-touch := TouchArea {
-                pointer-event(event) => {
-                    if event.kind == PointerEventKind.down {
-                        root.drag-start-content-y = flick.content-y;
-                    }
+        // The touch area covers the fixed track, not the moving thumb: pointer positions inside the
+        // thumb would shift as it moves and feed back into the drag.
+        track-touch := TouchArea {
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                    parent.dragging = parent.thumb-hovered;
+                    root.drag-start-content-y = flick.content-y;
+                } else if event.kind == PointerEventKind.up {
+                    parent.dragging = false;
                 }
-                moved => {
-                    if self.pressed {
-                        flick.content-y = clamp(
-                            root.drag-start-content-y - (self.mouse-y - self.pressed-y) * root.scroll-range / (root.height - root.thumb-length),
-                            -root.scroll-range,
-                            0px);
-                    }
+            }
+            moved => {
+                if parent.dragging {
+                    flick.content-y = clamp(
+                        root.drag-start-content-y - (self.mouse-y - self.pressed-y) * root.scroll-range / (root.height - root.thumb-length),
+                        -root.scroll-range,
+                        0px);
                 }
             }
         }
