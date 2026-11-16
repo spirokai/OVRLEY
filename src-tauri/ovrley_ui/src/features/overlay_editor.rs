@@ -8,7 +8,7 @@ use ovrley_app::features::overlay_editor::geometry::GuideStyle;
 use ovrley_app::features::overlay_editor::interaction::{self, Handle, PointerModifiers};
 use ovrley_app::features::app_shell::EditorBackgroundMode;
 use ovrley_app::features::overlay_editor::{self as editor, viewport::ViewportMetrics, WheelInput};
-use ovrley_app::features::widget_preview::{preview_frame, widget_layer};
+use ovrley_app::features::widget_preview::{present_pending_frame, preview_frame, widget_layer};
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
 use slint::{ComponentHandle, Image, Model, ModelRc, Rgba8Pixel, SharedPixelBuffer, SharedString, VecModel};
 use std::cell::{Cell, RefCell};
@@ -135,18 +135,25 @@ impl Projection {
         }
         views.sort_by_key(|(layer, order, _)| (*layer, *order));
         let next: Vec<WidgetView> = views.into_iter().map(|(_, _, view)| view).collect();
-        let current = global.get_widgets();
-        let same = current.row_count() == next.len() && current.iter().zip(&next).all(|(left, right)| left == *right);
-        if !same {
-            global.set_widgets(ModelRc::new(VecModel::from(next)));
-        }
+        replace_model(global.get_widgets(), next, |model| global.set_widgets(model));
     }
 }
 
+/// Updates a repeater's model. Rows change in place, so a drag moves the existing items instead
+/// of recreating them (and their textures) every frame; a changed row count resets the model.
 fn replace_model<T: Clone + PartialEq + 'static>(current: ModelRc<T>, next: Vec<T>, set: impl FnOnce(ModelRc<T>)) {
-    let same = current.row_count() == next.len() && current.iter().zip(&next).all(|(left, right)| left == *right);
-    if !same {
+    let Some(model) = current.as_any().downcast_ref::<VecModel<T>>() else {
         set(ModelRc::new(VecModel::from(next)));
+        return;
+    };
+    if model.row_count() != next.len() {
+        model.set_vec(next);
+        return;
+    }
+    for (row, value) in next.into_iter().enumerate() {
+        if model.row_data(row).as_ref() != Some(&value) {
+            model.set_row_data(row, value);
+        }
     }
 }
 
@@ -292,9 +299,12 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let dispatch = dispatcher.handle();
     global.on_pointer_move(move |x, y, alt, control, shift, meta| {
         let modifiers = modifiers(alt, control, shift, meta);
-        dispatch.dispatch(move |store, _| {
+        dispatch.dispatch(move |store, services| {
             let point = stage_point(store, x, y);
             interaction::pointer_move(store, point, modifiers);
+            // The moved widgets present in this action, so their images and the selection
+            // outline reach the same rendered frame instead of the images trailing by a turn.
+            present_pending_frame(store, services);
         });
     });
     let dispatch = dispatcher.handle();
