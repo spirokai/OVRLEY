@@ -3,7 +3,6 @@
 //! the history need them.
 
 use super::editor::{default_config, EditorSlice};
-use crate::store::sync::sync_scene_timing_from_config;
 use ovrley_core::normalize::template::{template_manifest, DurableTemplateState};
 use ovrley_widgets::model::document::OverlayConfig;
 use serde::Deserialize;
@@ -89,7 +88,6 @@ pub fn create_new_template(editor: &mut EditorSlice, template: &mut TemplateSlic
     template.aspect_ratio = "16:9".into();
     template.loaded_template_source = None;
     template.last_saved_template_state = None;
-    sync_scene_timing_from_config(editor, None, true);
 }
 
 /// `hydrateTemplateState`: a loaded document, its global defaults and its source; the aspect
@@ -98,7 +96,6 @@ pub fn hydrate_template_state(editor: &mut EditorSlice, template: &mut TemplateS
     editor.config = Rc::new(config);
     template.global_defaults = Rc::new(global_defaults);
     template.loaded_template_source = source;
-    sync_scene_timing_from_config(editor, None, true);
 }
 
 #[cfg(test)]
@@ -129,16 +126,16 @@ mod tests {
         assert!(editor.config.labels.is_empty());
         assert_eq!(template.loaded_template_source, None);
         assert_eq!(template.aspect_ratio, "16:9");
-        assert_eq!(editor.selected_second, 30.0, "the default scene has no start to move to");
+        assert_eq!(editor.selected_second, 30.0, "a new template keeps the playhead");
     }
 
     #[test]
-    fn hydration_keeps_the_aspect_ratio_and_moves_the_playhead_to_the_scene_start() {
+    fn hydration_keeps_the_aspect_ratio_and_the_playhead() {
         let mut editor = EditorSlice::default();
         let mut template = TemplateSlice { aspect_ratio: "custom".into(), ..TemplateSlice::default() };
         let config = OverlayConfig::from_value(&json!({"scene": {"start": 4, "end": 20}})).unwrap();
         hydrate_template_state(&mut editor, &mut template, config, Map::new(), Some(TemplateSource::Bundled { template_id: "a.json".into() }));
         assert_eq!(template.aspect_ratio, "custom");
-        assert_eq!((editor.start_second, editor.end_second, editor.selected_second), (4.0, 20.0, 4.0));
+        assert_eq!(editor.selected_second, 0.0, "hydration no longer moves the playhead");
     }
 }

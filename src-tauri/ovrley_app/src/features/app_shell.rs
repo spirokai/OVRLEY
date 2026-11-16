@@ -14,7 +14,7 @@ use crate::features::undo_redo::HistoryMode;
 use crate::lib::file_dialog::{open_single_path, DialogOptions};
 use crate::store::agent::AgentReply;
 use crate::store::services::{DialogFilter, Services};
-use crate::store::slices::media::{ActivitySource, ImportedActivity, ParsedActivitySource};
+use crate::store::slices::media::{ActivitySource, ImportedActivity};
 use crate::store::Store;
 use ovrley_widgets::model::document::{course_widget_dimensions, number};
 
@@ -342,10 +342,7 @@ pub fn activate_parsed_activity(store: &mut Store, source: ActivitySource, impor
     let whole = duration.floor();
     let editor = &mut store.editor;
     editor.set_fallback_duration_seconds(whole);
-    editor.set_start_second(0.0);
-    editor.set_end_second(whole);
     editor.set_selected_second(0.0);
-    crate::store::sync::sync_scene_timing_to_config(editor, Some(0.0), Some(whole));
     let sizing = ovrley_widgets::model::catalog::catalog()
         .require_widget("course")
         .expect("the catalog defines course")
@@ -362,9 +359,9 @@ pub fn activate_parsed_activity(store: &mut Store, source: ActivitySource, impor
     }
 }
 
-/// The activity drawer's delete: only an activity file can be deleted.
+/// The activity drawer's delete: offered while there is an external activity.
 pub fn delete_activity(store: &mut Store) -> Result<(), String> {
-    if store.media.parsed_activity_source != Some(ParsedActivitySource::ActivityFile) {
+    if store.media.parsed_activity.is_none() {
         return Err("No activity file is loaded.".into());
     }
     store.media.clear_activity_file(true);
@@ -998,9 +995,7 @@ mod tests {
         dispatcher.with_store(|store| {
             assert_eq!(store.media.activity_source, Some(ActivitySource::File { path: path.clone() }));
             let duration = store.media.parsed_activity.as_ref().unwrap().activity.metadata["duration_seconds"].as_f64().unwrap();
-            assert_eq!(store.editor.end_second, duration.floor());
             assert_eq!(store.editor.fallback_duration_seconds, duration.floor());
-            assert_eq!(store.editor.config.scene["end"], json!(duration.floor() as i64));
             assert_ne!(store.editor.config.plots[0]["width"], json!(1), "course widgets are sized to the route");
             assert_eq!(store.history.past.len(), 1, "only the config edit before the import is recorded");
             assert!(!store.media.preview_bytes_empty());

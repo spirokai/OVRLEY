@@ -4,6 +4,7 @@
 //! action. It compares the undoable projection (`partializeUndoableState`) before and after the
 //! action and its reconcile steps: pointers first (D1), then values.
 
+use crate::lib::activity::ActivityTrim;
 use crate::store::Store;
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};
@@ -12,15 +13,13 @@ use std::rc::Rc;
 /// `HISTORY_LIMIT`.
 pub const HISTORY_LIMIT: usize = 20;
 
-/// `partializeUndoableState`, Phase 3 part. `renderSettings` (Phase 7) and
-/// `videoSyncOffsetSeconds` (Phase 8) join with their phases.
+/// `partializeUndoableState`.
 #[derive(Clone, Debug)]
 pub struct UndoableState {
     pub config: Rc<OverlayConfig>,
     pub global_defaults: Rc<Map<String, Value>>,
     pub aspect_ratio: String,
-    pub start_second: f64,
-    pub end_second: f64,
+    pub activity_trim: Option<ActivityTrim>,
 }
 
 impl UndoableState {
@@ -29,8 +28,7 @@ impl UndoableState {
             config: Rc::clone(&store.editor.config),
             global_defaults: Rc::clone(&store.template.global_defaults),
             aspect_ratio: store.template.aspect_ratio.clone(),
-            start_second: store.editor.start_second,
-            end_second: store.editor.end_second,
+            activity_trim: store.media.activity_trim,
         }
     }
 
@@ -39,15 +37,13 @@ impl UndoableState {
         (Rc::ptr_eq(&self.config, &other.config) || self.config == other.config)
             && (Rc::ptr_eq(&self.global_defaults, &other.global_defaults) || self.global_defaults == other.global_defaults)
             && self.aspect_ratio == other.aspect_ratio
-            && self.start_second == other.start_second
-            && self.end_second == other.end_second
+            && self.activity_trim == other.activity_trim
     }
 
     fn restore(self, store: &mut Store) {
         store.template.global_defaults = self.global_defaults;
         store.template.aspect_ratio = self.aspect_ratio;
-        store.editor.start_second = self.start_second;
-        store.editor.end_second = self.end_second;
+        store.media.activity_trim = self.activity_trim;
         // zundo writes the fields back without `setConfig`. The selection is trimmed to widgets that
         // still exist, so it never names a removed widget (React leaves it stale).
         store.editor.config = self.config;
@@ -210,7 +206,7 @@ mod tests {
         dispatcher.dispatch(|store, _| store.editor.set_config(label_config("one")));
         dispatcher.dispatch(|store, _| {
             store.history.set_mode(HistoryMode::Skip);
-            store.editor.set_end_second(40.0);
+            store.media.set_activity_trim(Some(ActivityTrim { start_second: 1.0, end_second: 4.0 }));
         });
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 1);
         dispatcher.dispatch(|store, _| {

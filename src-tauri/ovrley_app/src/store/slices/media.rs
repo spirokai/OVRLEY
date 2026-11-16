@@ -2,6 +2,7 @@
 //! (Phase 3). Video telemetry, render progress and video import arrive with Phases 6 and 7.
 
 use ovrley_core::activity::schema::ParsedActivity;
+use crate::lib::activity::ActivityTrim;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -9,12 +10,6 @@ use std::sync::Arc;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ActivitySource {
     File { path: String },
-}
-
-/// Which kind of source the parsed activity is. Video telemetry joins in Phase 6.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ParsedActivitySource {
-    ActivityFile,
 }
 
 /// The imported activity: the parsed data, and the serialized copy the preview's sampler reads
@@ -132,10 +127,12 @@ pub struct MediaSlice {
     pub is_processing: bool,
     pub activity_source: Option<ActivitySource>,
     pub activity_summary: Option<ActivitySummary>,
+    /// The external activity file; embedded video telemetry stays on each imported video (Phase 6).
     pub parsed_activity: Option<ImportedActivity>,
-    pub parsed_activity_source: Option<ParsedActivitySource>,
     /// Strictly increasing lap ids excluded from lap widgets.
     pub disabled_laps: Vec<usize>,
+    /// The trimmed part of the activity, or `None` for the whole activity.
+    pub activity_trim: Option<ActivityTrim>,
 }
 
 impl MediaSlice {
@@ -164,34 +161,36 @@ impl MediaSlice {
         self.activity_source = source;
     }
 
-    /// Replaces the parsed activity; lap ids belong to one activity, so any replacement or removal
-    /// purges the disabled laps (`setActivityState`).
-    fn set_parsed_activity(&mut self, activity: Option<ImportedActivity>, source: Option<ParsedActivitySource>) {
-        if self.parsed_activity != activity {
-            self.disabled_laps.clear();
-        }
+    /// `setActivityTrim`; callers pass a trim from `trim_activity_edge`.
+    pub fn set_activity_trim(&mut self, trim: Option<ActivityTrim>) {
+        self.activity_trim = trim;
+    }
+
+    /// Replaces the parsed activity. Lap ids and the trim belong to one activity, so any
+    /// replacement or removal purges them.
+    fn set_parsed_activity(&mut self, activity: Option<ImportedActivity>) {
+        self.activity_summary = activity.as_ref().map(|imported| ActivitySummary::of(&imported.activity));
         self.parsed_activity = activity;
-        self.parsed_activity_source = source;
+        self.disabled_laps.clear();
+        self.activity_trim = None;
     }
 
-    /// `activateActivityFile`.
+    /// `activateActivityFile`, media part. The store-level action (`app_shell`) also clears an
+    /// activity-lane clip selection.
     pub fn activate_activity_file(&mut self, activity: ImportedActivity) {
-        let summary = ActivitySummary::of(&activity.activity);
-        self.set_parsed_activity(Some(activity), Some(ParsedActivitySource::ActivityFile));
-        self.activity_summary = Some(summary);
+        self.set_parsed_activity(Some(activity));
     }
 
-    /// `clearActivityFile`: only an activity file is cleared. Without video telemetry to restore
-    /// (Phase 6), the activity and its summary go. `clear_filename` false keeps the source.
+    /// `clearActivityFile`, media part: removes the external activity, if any. `clear_filename`
+    /// false keeps the source.
     pub fn clear_activity_file(&mut self, clear_filename: bool) {
-        if self.parsed_activity_source != Some(ParsedActivitySource::ActivityFile) {
+        if self.parsed_activity.is_none() {
             return;
         }
         if clear_filename {
             self.activity_source = None;
         }
-        self.set_parsed_activity(None, None);
-        self.activity_summary = None;
+        self.set_parsed_activity(None);
     }
 
     /// Whether the imported activity has no preview copy (none imported, or an empty one).
@@ -241,13 +240,13 @@ mod tests {
         assert_eq!(summary.available_metrics[2].source, MetricSource::Derived);
         assert_eq!(summary.sport.as_deref(), Some("cycling"));
         assert_eq!(summary.original_sample_count, Some(12.0));
-        assert_eq!(media.parsed_activity_source, Some(ParsedActivitySource::ActivityFile));
     }
 
     #[test]
-    fn laps_stay_sorted_and_a_new_activity_clears_them() {
+    fn laps_stay_sorted_and_a_new_activity_clears_them_and_the_trim() {
         let mut media = MediaSlice::default();
         media.activate_activity_file(imported(4));
+        media.set_activity_trim(Some(ActivityTrim { start_second: 1.0, end_second: 20.0 }));
         media.set_lap_enabled(3, false);
         media.set_lap_enabled(1, false);
         media.set_lap_enabled(3, true);
@@ -255,6 +254,7 @@ mod tests {
         assert_eq!(media.disabled_laps, [1, 2]);
         media.activate_activity_file(imported(4));
         assert!(media.disabled_laps.is_empty());
+        assert_eq!(media.activity_trim, None);
     }
 
     #[test]

@@ -5,7 +5,7 @@ use crate::i18n::catalog;
 use crate::lib::file_dialog::filename_from_selected_path;
 use crate::lib::format::{compare_text, format_clock_duration, format_locale_number, format_zoned_date_time};
 use crate::lib::widget::activity_attribute_label;
-use crate::store::slices::media::{ActivitySource, ActivitySummary, MetricSource, ParsedActivitySource};
+use crate::store::slices::media::{ActivitySource, ActivitySummary, MetricSource};
 use ovrley_widgets::model::document::js_round;
 use ovrley_widgets::widgets::lap_timer::format::format_lap_duration;
 use crate::lib::keyboard_shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
@@ -169,7 +169,8 @@ pub fn activity_drawer_view(store: &Store) -> Option<ActivityDrawerView> {
     };
     Some(ActivityDrawerView {
         file_name,
-        can_delete: store.media.parsed_activity_source == Some(ParsedActivitySource::ActivityFile),
+        // `hasExternalActivity`.
+        can_delete: store.media.parsed_activity.is_some(),
         format_label: summary.file_format.as_deref().map_or(unknown, str::to_uppercase),
         metadata,
         extracted,
@@ -286,7 +287,10 @@ mod tests {
         let mut store = Store::default();
         assert!(activity_drawer_view(&store).is_none());
         store.media.activity_source = Some(ActivitySource::File { path: "/rides/day 2.fit".into() });
-        store.media.parsed_activity_source = Some(ParsedActivitySource::ActivityFile);
+        store.media.parsed_activity = Some(crate::store::slices::media::ImportedActivity {
+            activity: std::sync::Arc::new(Default::default()),
+            preview_bytes: std::sync::Arc::new(Vec::new()),
+        });
         store.media.activity_summary = Some(ActivitySummary {
             available_metrics: vec![
                 AvailableMetric { attribute: "speed".into(), source: MetricSource::Direct },

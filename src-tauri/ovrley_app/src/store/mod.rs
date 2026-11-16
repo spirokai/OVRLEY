@@ -13,7 +13,6 @@ pub mod agent;
 mod reconcile;
 pub mod services;
 pub mod slices;
-pub mod sync;
 
 use crate::features::app_shell::{
     AgentSessionState, AppBootstrapState, EditorShellState, TrafficLightInsetState, UnsavedChangesConfirmState, WindowCloseGuardState, WindowFileDropState,

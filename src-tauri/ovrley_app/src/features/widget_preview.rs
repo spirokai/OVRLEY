@@ -15,7 +15,9 @@
 //!   repeat across documents.
 
 use crate::features::overlay_editor::{raster_scale, scene_size};
+use crate::lib::activity::ActivityTrim;
 use crate::lib::template::{effective_widget_data, ThemeColors};
+use crate::lib::utils::clamp;
 use crate::lib::widget::build_config_widgets;
 use crate::store::services::Services;
 use crate::store::Store;
@@ -173,15 +175,54 @@ fn activity_duration(activity: Option<&ovrley_core::activity::schema::ParsedActi
     }
 }
 
-/// `buildWasmScene` with `resolvePreviewWindow`'s whole-activity window: the preview scene from the
-/// global defaults, the scene size and the fallback duration. The activity trim and the video
-/// bounds that narrow the window are not ported yet.
-pub fn preview_scene(
-    globals: &Map<String, Value>,
-    scene: (f64, f64),
-    activity: Option<&ovrley_core::activity::schema::ParsedActivity>,
-    fallback_duration: f64,
-) -> Value {
+/// A timeline interval, in seconds.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SecondsRange {
+    pub start_second: f64,
+    pub end_second: f64,
+}
+
+/// `resolvePreviewWindow`'s result: the activity window widgets read in the preview.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PreviewWindow {
+    pub export_start_second: f64,
+    pub start_second: f64,
+    pub end_second: f64,
+    pub is_scoped: bool,
+}
+
+/// `resolvePreviewWindow`: the telemetry clip's own duration, else the interval covered by the
+/// videos, else the activity trim, clamped to the activity. A range outside it scopes nothing.
+pub fn resolve_preview_window(
+    activity_duration_seconds: f64,
+    activity_trim: Option<ActivityTrim>,
+    activity_clip_duration_seconds: Option<f64>,
+    video_bounds: Option<SecondsRange>,
+) -> PreviewWindow {
+    let range = match (activity_clip_duration_seconds, video_bounds) {
+        (Some(duration), _) => Some(SecondsRange { start_second: 0.0, end_second: duration }),
+        (None, Some(bounds)) => Some(bounds),
+        (None, None) => activity_trim.map(|trim| SecondsRange { start_second: trim.start_second, end_second: trim.end_second }),
+    };
+    let whole = |export_start_second| PreviewWindow { export_start_second, start_second: 0.0, end_second: activity_duration_seconds, is_scoped: false };
+    let Some(range) = range else { return whole(0.0) };
+    let start_second = clamp(range.start_second, 0.0, activity_duration_seconds);
+    let end_second = clamp(range.end_second, 0.0, activity_duration_seconds);
+    if !(end_second > start_second) {
+        return whole(range.start_second);
+    }
+    PreviewWindow { export_start_second: range.start_second, start_second, end_second, is_scoped: true }
+}
+
+/// The preview window of the store. Video bounds and embedded telemetry join with the video model.
+pub fn store_preview_window(store: &Store) -> PreviewWindow {
+    let activity = store.media.parsed_activity.as_ref().map(|imported| imported.activity.as_ref());
+    resolve_preview_window(activity_duration(activity), store.media.activity_trim, None, None)
+}
+
+/// `buildWasmScene`: the preview scene from the global defaults, the scene size, the preview
+/// window and the fallback duration.
+pub fn preview_scene(globals: &Map<String, Value>, scene: (f64, f64), window: PreviewWindow, fallback_duration: f64) -> Value {
     let global = |key: &str| globals.get(key).cloned().unwrap_or(Value::Null);
     json!({
         "width": number(scene.0),
@@ -194,10 +235,10 @@ pub fn preview_scene(
         "fixed_width_digits": global("fixed_width_digits"),
         "scale": global("scale"),
         "opacity": global("opacity"),
-        "export_start_seconds": 0.0,
-        "start": 0.0,
-        "end": activity_duration(activity),
-        "custom_export_range_active": false,
+        "export_start_seconds": window.export_start_second,
+        "start": window.start_second,
+        "end": window.end_second,
+        "custom_export_range_active": window.is_scoped,
         "preview_duration_seconds": fallback_duration,
     })
 }
@@ -277,6 +318,7 @@ struct FrameInputs {
     second: f64,
     document_revision: u64,
     fallback_duration: f64,
+    window: PreviewWindow,
 }
 
 /// `createPreviewSession`'s state, natively.
@@ -406,6 +448,7 @@ pub fn reconcile_widget_preview(store: &mut Store) {
         second: store.editor.selected_second,
         document_revision: store.editor.editor_document_revision,
         fallback_duration: store.editor.fallback_duration_seconds,
+        window: store_preview_window(store),
     };
     if store.preview.seen.as_ref() != Some(&inputs) {
         store.preview.seen = Some(inputs);
@@ -659,16 +702,7 @@ fn sync(
         store.preview.applied_raster_scale = Some(scale);
     }
 
-    let scene = preview_scene(
-        &globals,
-        scene_size(store),
-        store
-            .media
-            .parsed_activity
-            .as_ref()
-            .map(|imported| imported.activity.as_ref()),
-        store.editor.fallback_duration_seconds,
-    );
+    let scene = preview_scene(&globals, scene_size(store), store_preview_window(store), store.editor.fallback_duration_seconds);
     let activity_ready = store.preview.activity.is_some() || store.media.parsed_activity.is_none();
     for widget in widgets {
         // A raster waits for its image and hides meanwhile.
@@ -878,20 +912,37 @@ mod tests {
     #[test]
     fn the_scene_takes_the_globals_and_the_whole_activity_window() {
         let globals = normalize_global_defaults(None);
-        let scene = preview_scene(
-            &globals,
-            (1920.0, 1080.0),
-            None,
-            73.0,
-        );
+        let scene = preview_scene(&globals, (1920.0, 1080.0), resolve_preview_window(0.0, None, None, None), 73.0);
         assert_eq!(scene["width"], 1920);
         assert_eq!(scene["preview_duration_seconds"], 73.0);
         assert_eq!(scene["custom_export_range_active"], false);
         assert_eq!(scene["end"], 0.0);
-        let activity = ovrley_core::activity::schema::ParsedActivity { trim_end_seconds: 90.0, ..Default::default() };
-        let scene = preview_scene(&globals, (1920.0, 1080.0), Some(&activity), 73.0);
+        let scene = preview_scene(&globals, (1920.0, 1080.0), resolve_preview_window(90.0, None, None, None), 73.0);
         assert_eq!((scene["start"].as_f64(), scene["end"].as_f64()), (Some(0.0), Some(90.0)));
+        let trim = Some(ActivityTrim { start_second: 10.0, end_second: 40.0 });
+        let scene = preview_scene(&globals, (1920.0, 1080.0), resolve_preview_window(90.0, trim, None, None), 73.0);
+        assert_eq!((scene["export_start_seconds"].as_f64(), scene["end"].as_f64(), scene["custom_export_range_active"].as_bool()), (Some(10.0), Some(40.0), Some(true)));
         assert_eq!(scene["scale"], globals["scale"]);
+    }
+
+    #[test]
+    fn the_preview_window_prefers_the_telemetry_clip_then_the_videos_then_the_trim() {
+        let trim = Some(ActivityTrim { start_second: 5.0, end_second: 20.0 });
+        let bounds = Some(SecondsRange { start_second: -10.0, end_second: 30.0 });
+        let window = |start_second, end_second| PreviewWindow { export_start_second: start_second, start_second, end_second, is_scoped: true };
+        assert_eq!(resolve_preview_window(60.0, trim, Some(12.0), bounds), window(0.0, 12.0));
+        assert_eq!(
+            resolve_preview_window(60.0, trim, None, bounds),
+            PreviewWindow { export_start_second: -10.0, start_second: 0.0, end_second: 30.0, is_scoped: true },
+            "clamped to the activity, the export starts with the videos"
+        );
+        assert_eq!(resolve_preview_window(60.0, trim, None, None), window(5.0, 20.0));
+        let outside = Some(SecondsRange { start_second: 70.0, end_second: 90.0 });
+        assert_eq!(
+            resolve_preview_window(60.0, None, None, outside),
+            PreviewWindow { export_start_second: 70.0, start_second: 0.0, end_second: 60.0, is_scoped: false },
+            "a range outside the activity scopes nothing"
+        );
     }
 
     #[test]
