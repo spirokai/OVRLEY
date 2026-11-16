@@ -5,6 +5,7 @@
 //! become the descriptions. What the agent reads (names, descriptions, errors) is English and is not
 //! in the locale files.
 
+use ovrley_app::features::widget_preview::present_pending_frame;
 use ovrley_app::features::{app_shell, template_manager};
 use ovrley_app::i18n::{change_language_preference, Locale};
 use ovrley_app::features::overlay_editor::interaction::{resize_widget, rotate_widget, ResizeTarget};
@@ -468,6 +469,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                 patch.insert("y".into(), ovrley_widgets::model::document::number(arguments.y));
                 store.editor.config.widget(&arguments.widget_id).map_err(ToolOutcome::Failed)?;
                 store.editor.edit_config(|config| config.update_widgets(&[(arguments.widget_id.clone(), patch)])).map_err(ToolOutcome::Failed)?;
+                present_pending_frame(store, services);
                 now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
             }
             "widget_resize" => {
@@ -478,6 +480,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                     _ => return Err(ToolOutcome::InvalidParams("Give width and height, or factor.".into())),
                 };
                 resize_widget(store, &arguments.widget_id, target).map_err(ToolOutcome::Failed)?;
+                present_pending_frame(store, services);
                 now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
             }
             "widget_rotate" => {
@@ -486,6 +489,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                     return Err(ToolOutcome::InvalidParams("rotation must be a finite number".into()));
                 }
                 rotate_widget(store, &arguments.widget_id, arguments.rotation).map_err(ToolOutcome::Failed)?;
+                present_pending_frame(store, services);
                 now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
             }
             "widget_delete" => {
@@ -551,7 +555,8 @@ mod tests {
 
     fn dispatcher(allowed: bool) -> (Dispatcher, ovrley_app::store::services::fakes::Fakes) {
         let (parts, fakes) = fake_services(json!({ "allowAgentEdits": allowed }));
-        let store = Store::hydrate(&parts.preferences).unwrap();
+        let mut store = Store::hydrate(&parts.preferences).unwrap();
+        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() });
         (Dispatcher::new(store, parts), fakes)
     }
 

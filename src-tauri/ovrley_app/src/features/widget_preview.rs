@@ -540,6 +540,16 @@ pub fn preview_frame(store: &mut Store, services: &mut Services) {
     store.preview.error = None;
 }
 
+/// Runs the frame an action just made pending inside that action, for an answer that reads what
+/// the widgets present (an agent's `widget_move`). The frame `ovrley_ui` schedules then finds the
+/// host clean. A widget still waiting for a resource keeps its last presentation.
+pub fn present_pending_frame(store: &mut Store, services: &mut Services) {
+    reconcile_widget_preview(store);
+    if store.preview.is_dirty() {
+        preview_frame(store, services);
+    }
+}
+
 fn sync(
     store: &mut Store,
     services: &mut Services,
@@ -944,6 +954,28 @@ mod tests {
             dispatcher.with_store(|store| store.preview.presented()["t"].pixels_revision),
             first
         );
+    }
+
+    #[test]
+    fn a_pending_frame_presents_within_the_action() {
+        let (dispatcher, fakes) = dispatcher();
+        with_document(
+            &dispatcher,
+            json!({"scene": {"width": 1920, "height": 1080}, "labels": [{"id": "t", "text": "A", "x": 0, "y": 0, "font_size": 40, "font": "Inter.ttf", "font_weight": 400, "italic": false, "letter_spacing": 0}]}),
+        );
+        settle(&dispatcher, &fakes);
+        let before = dispatcher.with_store(|store| store.preview.presented()["t"].geometry.widget.content.left);
+        let after = dispatcher
+            .dispatch_with_result(|store, services| {
+                store
+                    .editor
+                    .edit_config(|config| config.labels[0].insert("x".into(), json!(40)));
+                present_pending_frame(store, services);
+                store.preview.presented()["t"].geometry.widget.content.left
+            })
+            .unwrap();
+        assert_eq!(after - before, 40.0);
+        assert!(!dispatcher.with_store(|store| store.preview.is_dirty()), "the scheduled frame has nothing left to do");
     }
 
     #[test]
