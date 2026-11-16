@@ -1,9 +1,16 @@
 import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
-import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import {
+    Button,
+    ButtonVariant,
+    ButtonSize,
+} from "../../components/button.slint";
 import { Badge, BadgeVariant } from "../../components/badge.slint";
-import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
+import {
+    SectionHeading,
+    SectionHeadingVariant,
+} from "../../components/section-heading.slint";
 import { Switch } from "../../components/switch.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
 import { ActivityRowView, ActivityLapView } from "index.slint";
@@ -59,15 +66,18 @@ component FileDropZone inherits Rectangle {
                 color: Theme.muted-foreground;
             }
         }
+
         AppText {
             content: root.label;
             horizontal-alignment: center;
             font-size: Theme.text-xs * 1rem;
             font-weight: Theme.font-weight-extrabold;
         }
+
         Rectangle {
             height: 0.25rem;
         }
+
         AppText {
             content: root.sublabel;
             horizontal-alignment: center;
@@ -118,6 +128,7 @@ component ActivityLapTable inherits VerticalLayout {
             weight: Theme.font-weight-bold;
             color: Theme.muted-foreground;
         }
+
         Cell {
             horizontal-stretch: 1;
             preferred-width: 0px;
@@ -125,6 +136,7 @@ component ActivityLapTable inherits VerticalLayout {
             weight: Theme.font-weight-bold;
             color: Theme.muted-foreground;
         }
+
         Cell {
             horizontal-stretch: 1;
             preferred-width: 0px;
@@ -132,10 +144,12 @@ component ActivityLapTable inherits VerticalLayout {
             weight: Theme.font-weight-bold;
             color: Theme.muted-foreground;
         }
+
         Rectangle {
             width: 3rem;
         }
     }
+
     for lap in root.laps: HorizontalLayout {
         padding-top: 0.25rem;
         padding-bottom: 0.25rem;
@@ -145,18 +159,21 @@ component ActivityLapTable inherits VerticalLayout {
             content: lap.number;
             color: parent.text-color;
         }
+
         Cell {
             horizontal-stretch: 1;
             preferred-width: 0px;
             content: lap.duration;
             color: parent.text-color;
         }
+
         Cell {
             horizontal-stretch: 1;
             preferred-width: 0px;
             content: lap.start;
             color: parent.text-color;
         }
+
         HorizontalLayout {
             width: 3rem;
             alignment: end;
@@ -202,19 +219,23 @@ export component ActivityDrawer inherits ScrollArea {
                 root.load-activity();
             }
         }
+
         Rectangle {
             height: 1rem;
         }
+
         FileDropZone {
             label: @tr("toolbar.dropActivityFile" => "Drop activity file");
             sublabel: "GPX, FIT, TCX, SRT, IGC, CSV, VBO";
         }
+
         if root.has-activity: VerticalLayout {
             padding-top: 2.5rem;
             Rectangle {
-                height: 1px;
+                height: Theme.hairline;
                 background: Theme.border.transparentize(0.2);
             }
+
             VerticalLayout {
                 padding-top: 0.5rem;
                 spacing: 2rem;
@@ -229,11 +250,12 @@ export component ActivityDrawer inherits ScrollArea {
                             content: root.file-name;
                             horizontal-alignment: left;
                             font-size: Theme.text-sm * 0.95rem;
-                            font-weight: Theme.font-weight-bold;
+                            font-weight: Theme.font-weight-extrabold;
                             overflow: elide;
                             max-lines: 1;
                             vertical-alignment: center;
                         }
+
                         if root.can-delete: Button {
                             variant: ButtonVariant.ghost;
                             size: ButtonSize.icon;
@@ -250,6 +272,7 @@ export component ActivityDrawer inherits ScrollArea {
                             }
                         }
                     }
+
                     SectionHeading {
                         icon: Icons.route;
                         title: @tr("toolbar.details" => "Details");
@@ -267,6 +290,7 @@ export component ActivityDrawer inherits ScrollArea {
                             }
                         }
                     }
+
                     VerticalLayout {
                         padding-left: 0.5rem;
                         padding-right: 0.5rem;
@@ -282,6 +306,7 @@ export component ActivityDrawer inherits ScrollArea {
                                 font-weight: Theme.font-weight-bold;
                                 color: Theme.muted-foreground;
                             }
+
                             AppText {
                                 width: (parent.width - parent.spacing) / 2;
                                 content: row.value;
@@ -294,6 +319,7 @@ export component ActivityDrawer inherits ScrollArea {
                         }
                     }
                 }
+
                 VerticalLayout {
                     spacing: 1rem;
                     SectionHeading {
@@ -301,11 +327,13 @@ export component ActivityDrawer inherits ScrollArea {
                         title: @tr("toolbar.extracted" => "Extracted");
                         variant: SectionHeadingVariant.drawer;
                     }
+
                     MetricGrid {
                         metrics: root.extracted;
                         empty-label: @tr("toolbar.noDataExtracted" => "No data were extracted");
                     }
                 }
+
                 VerticalLayout {
                     spacing: 1rem;
                     SectionHeading {
@@ -313,11 +341,13 @@ export component ActivityDrawer inherits ScrollArea {
                         title: @tr("toolbar.calculated" => "Calculated");
                         variant: SectionHeadingVariant.drawer;
                     }
+
                     MetricGrid {
                         metrics: root.derived;
                         empty-label: @tr("toolbar.noDataCalculated" => "No data were calculated");
                     }
                 }
+
                 if root.laps.length > 0: VerticalLayout {
                     spacing: 1rem;
                     SectionHeading {
@@ -325,6 +355,7 @@ export component ActivityDrawer inherits ScrollArea {
                         title: @tr("toolbar.detectedLaps" => "Detected laps");
                         variant: SectionHeadingVariant.drawer;
                     }
+
                     ActivityLapTable {
                         laps: root.laps;
                         lap-enabled-changed(id, enabled) => {

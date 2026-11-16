@@ -54,8 +54,8 @@ export component TabsList {
         border-color: Theme.border.transparentize(0.5);
     }
     if root.variant == TabsListVariant.main: Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
+        y: parent.height - Theme.hairline;
+        height: Theme.hairline;
         background: Theme.border;
     }
 

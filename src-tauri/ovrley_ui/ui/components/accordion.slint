@@ -11,7 +11,7 @@ import { FocusRing } from "focus-ring.slint";
 export component AccordionItem inherits VerticalLayout {
     @children
     Rectangle {
-        height: 1px;
+        height: Theme.hairline;
         background: Theme.border;
     }
 }
@@ -69,7 +69,7 @@ export component AccordionTrigger {
                 line-height: Theme.text-sm-line-height;
                 if root.underline-on-hover && touch.has-hover: Rectangle {
                     y: parent.height / 2 + parent.font-size * 0.35 + 1px;
-                    height: 1px;
+                    height: Theme.hairline;
                     background: root.current-text;
                 }
             }

@@ -38,7 +38,7 @@ component WindowButton inherits Rectangle {
 }
 
 component WindowButtonSeparator inherits Rectangle {
-    width: 1px;
+    width: Theme.hairline;
     VerticalLayout {
         alignment: center;
         Rectangle {
@@ -50,8 +50,8 @@ component WindowButtonSeparator inherits Rectangle {
 
 // `WindowControls` on Windows and Linux: minimise, maximise and close in a 2.25rem row. On macOS
 // the native traffic lights are used and only a 0.025rem spacer remains. "Minimize" and "Maximize"
-// are hard-coded English, as today.
-export component WindowControls {
+// are hard-coded English, as today. A layout root, so the conditional rows give it their width.
+export component WindowControls inherits HorizontalLayout {
     callback minimize();
     callback toggle-maximize();
     callback close();
@@ -115,8 +115,8 @@ export component AppHeader inherits Rectangle {
 
     background: Theme.card;
     Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
+        y: parent.height - Theme.hairline;
+        height: Theme.hairline;
         background: Theme.border;
     }
 
@@ -150,7 +150,7 @@ export component AppHeader inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Rectangle {
-                        width: 1px;
+                        width: Theme.hairline;
                         height: 2rem;
                         background: Theme.border.transparentize(0.4);
                     }
@@ -171,7 +171,7 @@ export component AppHeader inherits Rectangle {
               VerticalLayout {
                   alignment: center;
                   Rectangle {
-                      width: 1px;
+                      width: Theme.hairline;
                       height: 2rem;
                       background: Theme.border.transparentize(0.4);
                   }

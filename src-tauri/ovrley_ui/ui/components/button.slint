@@ -124,7 +124,7 @@ export component Button {
             // `link` underlines on hover, 4px below the text. Slint text has no underline.
             if root.variant == ButtonVariant.link && touch.has-hover: Rectangle {
                 y: parent.height / 2 + parent.font-size * 0.35 + 4px;
-                height: 1px;
+                height: Theme.hairline;
                 background: root.current-text;
             }
         }

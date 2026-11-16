@@ -53,6 +53,10 @@ fn window_controls_are_drawn_except_on_macos() {
     for label in ["Minimize", "Maximize", "Close"] {
         let found = i_slint_backend_testing::ElementHandle::find_by_accessible_label(&window, label).next();
         assert_eq!(found.is_some(), !cfg!(target_os = "macos"), "{label}");
+        if let Some(button) = found {
+            let right = button.absolute_position().x + button.size().width;
+            assert!(right <= window.window().size().to_logical(window.window().scale_factor()).width + 0.5, "{label} lies inside the window");
+        }
     }
 }
 

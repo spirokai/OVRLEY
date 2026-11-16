@@ -16,9 +16,15 @@ export component FluidWindow inherits Window {
     default-font-weight: Theme.font-weight-normal;
     background: Theme.background;
 
+    property <length> hairline: max(1px, 1phx);
+
     init => {
         WindowMetrics.width = self.width;
         WindowMetrics.height = self.height;
+        Theme.hairline = self.hairline;
+    }
+    changed hairline => {
+        Theme.hairline = self.hairline;
     }
     changed width => {
         WindowMetrics.width = self.width;

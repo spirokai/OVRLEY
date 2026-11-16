@@ -134,6 +134,11 @@ export global Theme {
     out property <float> overlay-enter-scale: 0.95;
     out property <float> overlay-enter-slide: 0.5;
 
+    // A 1px line that covers at least one physical pixel. Skia snaps rect edges to the pixel grid,
+    // so below scale 1 (KDE at 0.9) a 1px rect that does not cross a pixel centre draws nothing.
+    // A global does not know the scale factor, so FluidWindow writes it.
+    in-out property <length> hairline: 1px;
+
     // Focus rings, in rem or px as Tailwind writes them. Ring colour is `ring` at 50%.
     out property <float> ring-width: 0.222;
     out property <color> ring-color: ring.transparentize(0.5);

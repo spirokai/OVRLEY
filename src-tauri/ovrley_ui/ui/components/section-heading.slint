@@ -29,15 +29,18 @@ export component SectionHeading inherits HorizontalLayout {
             size: 1rem;
             color: Theme.primary;
         }
+
         AppText {
             content: root.title;
             uppercase: true;
             font-size: 0.741rem;
-            font-weight: Theme.font-weight-bold;
+            font-weight: Theme.font-weight-extrabold;
             tracking: Theme.tracking-wider;
             color: Theme.muted-foreground.transparentize(0.3);
         }
+
         Separator { }
     }
+
     @children
 }

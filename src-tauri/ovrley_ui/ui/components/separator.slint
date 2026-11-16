@@ -10,20 +10,20 @@ export component Separator {
     in property <color> line-color: Theme.border;
 
     property <bool> horizontal: root.orientation == Orientation.horizontal;
-    min-height: root.horizontal ? 1px : 0px;
-    preferred-height: root.horizontal ? 1px : 0px;
-    min-width: root.horizontal ? 0px : 1px;
-    preferred-width: root.horizontal ? 0px : 1px;
+    min-height: root.horizontal ? Theme.hairline : 0px;
+    preferred-height: root.horizontal ? Theme.hairline : 0px;
+    min-width: root.horizontal ? 0px : Theme.hairline;
+    preferred-width: root.horizontal ? 0px : Theme.hairline;
     max-height: root.horizontal ? 100000px : 100000px;
     horizontal-stretch: root.horizontal ? 1 : 0;
     vertical-stretch: root.horizontal ? 0 : 1;
     accessible-role: AccessibleRole.none;
 
     Rectangle {
-        x: root.horizontal ? 0px : (root.width - 1px) / 2;
-        y: root.horizontal ? (root.height - 1px) / 2 : 0px;
-        width: root.horizontal ? root.width : 1px;
-        height: root.horizontal ? 1px : root.height;
+        x: root.horizontal ? 0px : (root.width - Theme.hairline) / 2;
+        y: root.horizontal ? (root.height - Theme.hairline) / 2 : 0px;
+        width: root.horizontal ? root.width : Theme.hairline;
+        height: root.horizontal ? Theme.hairline : root.height;
         background: root.line-color;
         opacity: 0.5;
     }

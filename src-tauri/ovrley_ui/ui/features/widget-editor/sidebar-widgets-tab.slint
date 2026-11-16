@@ -200,7 +200,7 @@ export component SidebarWidgetsTab inherits VerticalLayout {
                         if item.open && WidgetEditor.has-inspector: WidgetInspector { }
                     }
                     Rectangle {
-                        height: 1px;
+                        height: Theme.hairline;
                         background: Theme.border.transparentize(0.3);
                     }
                 }
@@ -217,12 +217,12 @@ export component SidebarWidgetsTab inherits VerticalLayout {
         // `border-t border-r`.
         Rectangle {
             y: 0px;
-            height: 1px;
+            height: Theme.hairline;
             background: Theme.border.transparentize(0.3);
         }
         Rectangle {
-            x: parent.width - 1px;
-            width: 1px;
+            x: parent.width - Theme.hairline;
+            width: Theme.hairline;
             background: Theme.border.transparentize(0.3);
         }
     }

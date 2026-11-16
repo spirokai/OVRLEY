@@ -16,10 +16,14 @@ export component ShellHarness inherits FluidWindow {
     out property <string> window-call;
 
     VerticalLayout {
-        WindowControls {
-            minimize => { root.window-call = "minimize"; }
-            toggle-maximize => { root.window-call = "maximize"; }
-            close => { root.window-call = "close"; }
+        // End-aligned, as in the header's right column, so the controls get their preferred width.
+        HorizontalLayout {
+            alignment: end;
+            WindowControls {
+                minimize => { root.window-call = "minimize"; }
+                toggle-maximize => { root.window-call = "maximize"; }
+                close => { root.window-call = "close"; }
+            }
         }
         ToolbarDrawerLayout {
             vertical-stretch: 1;

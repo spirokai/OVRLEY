@@ -52,8 +52,8 @@ export component VerticalToolbar inherits Rectangle {
 
     background: Theme.card;
     Rectangle {
-        x: parent.width - 1px;
-        width: 1px;
+        x: parent.width - Theme.hairline;
+        width: Theme.hairline;
         background: Theme.border;
     }
     VerticalLayout {
@@ -164,8 +164,8 @@ export component ToolbarDrawerLayout {
             background: Theme.card;
         }
         Rectangle {
-            x: parent.width - 1px;
-            width: 1px;
+            x: parent.width - Theme.hairline;
+            width: Theme.hairline;
             background: Theme.border;
         }
         // Presses inside the drawer do not reach the workspace under it.
