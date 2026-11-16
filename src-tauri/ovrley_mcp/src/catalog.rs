@@ -202,13 +202,15 @@ pub fn input_schema<T: JsonSchema>() -> Value {
 
 /// The tools, in `tools/list` order.
 pub fn tools() -> Vec<ToolDefinition> {
-    vec![
+    let mut tools = vec![
         ToolDefinition {
             name: "ovrley_summary",
             title: "OVRLEY summary",
             description: "Describes the open OVRLEY window: the app version, the language, the left drawer, the activity \
                           (file, format, duration, laps and which are disabled), the template (source, name, save status), the \
-                          unit system, the widgets (id, type, name, position, selected) and whether undo and redo are available. The project and video sections are empty until those features arrive.",
+                          unit system, the widgets (id, type, name, position, selected), whether undo and redo are available, and \
+                          playback (state, playhead, timeline minimum and total duration). The project and video sections are empty \
+                          until those features arrive.",
             input_schema: input_schema::<NoArguments>(),
             read_only: true,
         },
@@ -373,7 +375,9 @@ pub fn tools() -> Vec<ToolDefinition> {
             input_schema: input_schema::<PathArguments>(),
             read_only: false,
         },
-    ]
+    ];
+    tools.extend(crate::player::tools());
+    tools
 }
 
 pub fn is_tool(name: &str) -> bool {
@@ -407,6 +411,7 @@ fn summary(store: &Store) -> Value {
         "template": describe_template(store),
         "activity": describe_activity(store),
         "video": null,
+        "playback": crate::player::describe_playback(store),
         "widgets": describe_widgets(store),
         "history": { "canUndo": store.history.can_undo(), "canRedo": store.history.can_redo() },
     })
@@ -583,7 +588,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                 template_manager::save_template(store, services, path, template_manager::reply_with(agent_reply(reply), describe_template));
                 Ok(Answer::Later)
             }
-            other => Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}"))),
+            other => crate::player::call(other, arguments_value, store, services, reply).unwrap_or_else(|| Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}")))),
         }
     };
     match run(store, services) {

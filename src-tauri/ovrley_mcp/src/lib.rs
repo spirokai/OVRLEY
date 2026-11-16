@@ -4,4 +4,5 @@
 
 pub mod catalog;
 pub mod link;
+pub mod player;
 pub mod protocol;
