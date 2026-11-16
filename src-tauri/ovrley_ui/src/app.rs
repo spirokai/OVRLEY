@@ -100,10 +100,12 @@ pub fn run(store: Store, paths: ovrley_core::paths::AppPaths, preferences: Prefe
         slint::CloseRequestResponse::KeepWindowShown
     });
 
-    // AppKit puts the traffic lights back in the corner on every resize.
-    #[cfg(target_os = "macos")]
+    // On every resize: a restored window fits its screen, and on macOS the traffic lights return
+    // to their inset (AppKit puts them back in the corner).
     window.window().on_winit_window_event(move |slint_window, event| {
         if let winit::event::WindowEvent::Resized(_) = event {
+            slint_window.with_winit_window(platform::fit_restored_window);
+            #[cfg(target_os = "macos")]
             slint_window.with_winit_window(platform::macos::apply_traffic_light_inset);
         }
         EventResult::Propagate
@@ -155,9 +157,16 @@ fn theme_colors(window: &AppWindow) -> ovrley_app::lib::template::ThemeColors {
 }
 
 /// Every locale is bundled at build time, and English is the untranslated text, so a failure is a
-/// build that lost its catalogs.
+/// build that lost its catalogs. Live preview interprets the `.slint` sources without the bundled
+/// catalogs, so there the UI stays in English.
 fn select_language(locale: Locale) {
-    slint::select_bundled_translation(locale.code()).unwrap_or_else(|error| panic!("the {} translation is not bundled: {error:?}", locale.code()));
+    let selected = slint::select_bundled_translation(locale.code());
+    #[cfg(feature = "live-preview")]
+    if let Err(error) = selected {
+        log::warn!("live preview has no bundled translations; showing English instead of {}: {error:?}", locale.code());
+        return;
+    }
+    selected.unwrap_or_else(|error| panic!("the {} translation is not bundled: {error:?}", locale.code()));
 }
 
 /// Platform work that needs the winit window, which exists only after the first event-loop turn:

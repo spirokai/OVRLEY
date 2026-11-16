@@ -89,6 +89,29 @@ fn window_attributes(attributes: winit::window::WindowAttributes) -> winit::wind
     attributes
 }
 
+/// The window opens maximised, and leaving that restores the 1920×1080 preferred size, which winit
+/// (unlike Tauri's tao) does not constrain to a smaller screen. A restored window larger than its
+/// monitor shrinks to 90% of it, centred.
+pub fn fit_restored_window(window: &winit::window::Window) {
+    if window.is_maximized() || window.fullscreen().is_some() {
+        return;
+    }
+    let Some(monitor) = window.current_monitor() else { return };
+    let screen = monitor.size();
+    let outer = window.outer_size();
+    if outer.width <= screen.width && outer.height <= screen.height {
+        return;
+    }
+    let width = screen.width * 9 / 10;
+    let height = screen.height * 9 / 10;
+    let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(width, height));
+    let origin = monitor.position();
+    window.set_outer_position(winit::dpi::PhysicalPosition::new(
+        origin.x + ((screen.width - width) / 2) as i32,
+        origin.y + ((screen.height - height) / 2) as i32,
+    ));
+}
+
 /// The window icon on Windows and Linux, from the Tauri app's icons.
 #[cfg(not(target_os = "macos"))]
 fn window_icon() -> Option<winit::window::Icon> {
