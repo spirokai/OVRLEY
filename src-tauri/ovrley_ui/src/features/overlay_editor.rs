@@ -3,7 +3,7 @@
 
 use crate::hooks::app_store_selectors::set_if_changed;
 use crate::platform::key_input::{key_input, SlintModifiers};
-use crate::{AppWindow, BackgroundMode, BadgeView, EditorCursor, GuideLabelView, HandleView, OverlayEditor, WidgetView};
+use crate::{AppWindow, BackgroundMode, BadgeView, EditorCursor, GuideLabelView, HandleView, OverlayEditor, Theme, WidgetView};
 use ovrley_app::features::overlay_editor::geometry::GuideStyle;
 use ovrley_app::features::overlay_editor::interaction::{self, Handle, PointerModifiers};
 use ovrley_app::features::app_shell::EditorBackgroundMode;
@@ -93,6 +93,13 @@ impl Projection {
         if shell.editor_grid_visible {
             let commands = editor::grid_commands((scene_width, scene_height), display);
             set_if_changed(global.get_grid_commands(), SharedString::from(commands), |value| global.set_grid_commands(value));
+        } else if shell.editor_background_mode == EditorBackgroundMode::Checker && viewport.metrics.rem > 0.0 {
+            // The tiles are in rem, which the viewport reports after its first layout.
+            let tile = f64::from(window.global::<Theme>().get_checkerboard_tile()) * viewport.metrics.rem * display;
+            let columns = (stage.scene_width / tile).ceil() as u32;
+            let rows = (stage.scene_height / tile).ceil() as u32;
+            let commands = editor::checkerboard_commands(columns, rows);
+            set_if_changed(global.get_checkerboard_commands(), SharedString::from(commands), |value| global.set_checkerboard_commands(value));
         }
         set_if_changed(global.get_snap_to_grid(), shell.editor_snap_to_grid, |value| global.set_snap_to_grid(value));
         let zoom = format!("{}%", (shell.editor_zoom_level * 100.0).round());

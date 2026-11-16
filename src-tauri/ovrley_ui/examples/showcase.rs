@@ -10,6 +10,7 @@ use slint::ComponentHandle;
 fn main() -> Result<(), slint::PlatformError> {
     let window = ovrley_ui::ShowcaseWindow::new()?;
     ovrley_ui::install_component_logic(&window);
+    window.set_checkerboard_commands(ovrley_app::features::overlay_editor::checkerboard_commands(7, 3).into());
     if let Some(dir) = std::env::var_os("OVRLEY_SHOWCASE_SNAPSHOT").map(PathBuf::from) {
         if let Some((w, h)) = std::env::var("OVRLEY_SHOWCASE_SIZE")
             .ok()

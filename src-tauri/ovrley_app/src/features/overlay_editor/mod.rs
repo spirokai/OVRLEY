@@ -56,6 +56,20 @@ pub fn grid_commands(scene: (f64, f64), display_scale: f64) -> String {
     commands.trim_end().to_string()
 }
 
+/// `.bg-overlay-grid-muted`'s diamonds as path commands in tile units: one diamond with a one-tile
+/// diagonal centred on every tile corner of a `columns` × `rows` tile area. One path is one draw,
+/// where an element per diamond made Slint walk thousands of items every frame.
+pub fn checkerboard_commands(columns: u32, rows: u32) -> String {
+    let mut commands = String::new();
+    for row in 0..=rows {
+        for column in 0..=columns {
+            let (x, y) = (f64::from(column), f64::from(row));
+            commands.push_str(&format!("M {x} {} L {} {y} L {x} {} L {} {y} Z ", y - 0.5, x + 0.5, y + 0.5, x - 0.5));
+        }
+    }
+    commands.trim_end().to_string()
+}
+
 /// `useOverlayEditorState`'s state that is not in the store's slices.
 #[derive(Debug, Default)]
 pub struct OverlayEditorState {
