@@ -6,10 +6,15 @@
  * playback stays paused.
  */
 
-import { renderHook, waitFor } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '@/features/video-preview/hooks/useVideoPreview'
+import { useVideoPlaybackClock } from '@/features/video-preview/hooks/useVideoPlaybackClock'
+import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
+import { listTransitionProxyJobs } from '@/lib/video-program/transition-proxies'
+import { buildTimelineProgram } from '@/lib/video-program/timeline'
+import { createTestVideo, cutEdits, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 vi.mock('@/features/video-preview/hooks/useVideoPlaybackClock', () => ({
   useVideoPlaybackClock: vi.fn(),
@@ -40,20 +45,19 @@ describe('useVideoPreview', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState({
-      importedVideoDuration: 30,
-      importedVideoPath: 'C:\\clips\\ride.mp4',
-      importedVideoPreviewUrl: 'http://127.0.0.1:3210/preview/ride.mp4',
+      ...videoStoreState([createTestVideo({ path: 'C:\\clips\\ride.mp4', durationSeconds: 30 })], { 'video-1': 5 }),
       previewPlaybackSource: 'timeline',
       previewPlaybackState: 'paused',
       selectedSecond: 8,
-      videoSyncOffsetSeconds: 5,
+      // Hard cuts unless a test adds transitions.
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'none' },
     })
   })
 
   test('seeks to the paused playhead as soon as video view becomes active', async () => {
     const video = createVideoStub()
     const videoRef = { current: null }
-    const { rerender } = renderHook(({ isActive }) => useVideoPreview(videoRef, isActive), {
+    const { rerender } = renderHook(({ isActive }) => useVideoPreview([videoRef, { current: null }], isActive), {
       initialProps: {
         isActive: false,
       },
@@ -73,16 +77,14 @@ describe('useVideoPreview', () => {
 
   test('does not seek or restart the ended video while timeline playback continues', () => {
     useStore.setState({
-      importedVideoDuration: 30,
       previewPlaybackSource: 'timeline',
       previewPlaybackState: 'playing',
       selectedSecond: 35,
-      videoSyncOffsetSeconds: 5,
     })
 
     const video = createVideoStub({ currentTime: 30 })
     const videoRef = { current: video }
-    renderHook(() => useVideoPreview(videoRef, true))
+    renderHook(() => useVideoPreview([videoRef, { current: createVideoStub() }], true))
 
     expect(video.play).not.toHaveBeenCalled()
     expect(video.currentTime).toBe(30)
@@ -100,7 +102,7 @@ describe('useVideoPreview', () => {
     })
     const videoRef = { current: video }
 
-    renderHook(() => useVideoPreview(videoRef, true))
+    renderHook(() => useVideoPreview([videoRef, { current: createVideoStub() }], true))
 
     await waitFor(() => {
       expect(useStore.getState().previewPlaybackState).toBe('paused')
@@ -108,5 +110,143 @@ describe('useVideoPreview', () => {
 
     expect(useStore.getState().previewPlaybackSource).toBe('video')
     expect(useStore.getState().selectedSecond).toBe(8)
+  })
+
+  test('keeps playing when a play request is superseded', async () => {
+    useStore.setState({ previewPlaybackSource: 'video', previewPlaybackState: 'playing' })
+    const abort = Object.assign(new Error('The play() request was interrupted'), { name: 'AbortError' })
+    const play = vi.fn(() => Promise.reject(abort))
+    renderHook(() => useVideoPreview([{ current: createVideoStub({ play }) }, { current: createVideoStub() }], true))
+
+    await waitFor(() => expect(play).toHaveBeenCalled())
+    await Promise.resolve()
+    expect(useStore.getState().previewPlaybackState).toBe('playing')
+  })
+
+  function lastClock() {
+    return vi.mocked(useVideoPlaybackClock).mock.calls.at(-1)[0]
+  }
+
+  function playingAt(second) {
+    useStore.setState({ previewPlaybackSource: 'video', previewPlaybackState: 'playing', selectedSecond: second })
+  }
+
+  test('continues with the next piece at its start when a piece ends, skipping the gap', () => {
+    useStore.setState(
+      videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 10 }),
+          createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 }),
+        ],
+        { 'video-1': 0, 'video-2': 20 },
+      ),
+    )
+    playingAt(9)
+    const playing = createVideoStub({ duration: 10, paused: false, currentTime: 9 })
+    const parked = createVideoStub({ duration: 10, currentTime: 3 })
+    const slotRefs = [{ current: playing }, { current: parked }]
+    const { result } = renderHook(() => useVideoPreview(slotRefs, true))
+    expect(lastClock()).toMatchObject({ isActive: true, pieceEndSourceSecond: 10, videoOffsetSeconds: 0, videoRef: slotRefs[0] })
+    expect(parked.currentTime).toBe(0)
+    expect(result.current.slots.map((slot) => slot.src)).toEqual([
+      'http://127.0.0.1:4321/video/import-video-1',
+      'http://127.0.0.1:4321/video/import-video-2',
+    ])
+
+    act(() => lastClock().onPlaybackEnded())
+
+    expect(useStore.getState()).toMatchObject({ previewPlaybackState: 'playing', previewPlaybackSource: 'video', selectedSecond: 20 })
+    expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 10, videoOffsetSeconds: 20, videoRef: slotRefs[1] })
+    expect(result.current.slots.map((slot) => slot.isActive)).toEqual([false, true])
+    expect(parked.play).toHaveBeenCalled()
+    expect(playing.pause).toHaveBeenCalled()
+  })
+
+  test('jumps over an excluded segment within the same video by swapping to the element parked after it', () => {
+    const video = createTestVideo({ id: 'video-1', path: 'C:\\clips\\ride.mp4', durationSeconds: 30 })
+    const state = videoStoreState([video], { 'video-1': 5 })
+    Object.assign(
+      state.videoEdits['video-1'],
+      cutEdits([
+        { id: 'c1', frame: 300, excluded: true },
+        { id: 'c2', frame: 600 },
+      ]),
+    )
+    useStore.setState(state)
+    playingAt(14.9)
+    const element = createVideoStub({ duration: 30, paused: false, currentTime: 9.9 })
+    const twin = createVideoStub({ duration: 30 })
+    const slotRefs = [{ current: element }, { current: twin }]
+    renderHook(() => useVideoPreview(slotRefs, true))
+    expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 10 })
+    expect(twin.currentTime).toBe(20)
+
+    act(() => lastClock().onPlaybackEnded())
+
+    expect(useStore.getState().selectedSecond).toBe(25)
+    expect(lastClock()).toMatchObject({ pieceEndSourceSecond: 30, videoRef: slotRefs[1] })
+    expect(twin.play).toHaveBeenCalled()
+    expect(element.pause).toHaveBeenCalled()
+  })
+
+  function fadeBetweenTwoVideos() {
+    useStore.setState({
+      ...videoStoreState(
+        [
+          createTestVideo({ id: 'video-1', path: 'C:\\clips\\first.mp4', durationSeconds: 10 }),
+          createTestVideo({ id: 'video-2', path: 'C:\\clips\\second.mp4', durationSeconds: 10, importOrder: 1 }),
+        ],
+        { 'video-1': 0, 'video-2': 20 },
+      ),
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS, type: 'fade', durationSeconds: 2 },
+    })
+    playingAt(8.5)
+    const parked = createVideoStub({ duration: 10 })
+    const slotRefs = [{ current: createVideoStub({ duration: 10, paused: false, currentTime: 8.5 }) }, { current: parked }]
+    const { result } = renderHook(() => useVideoPreview(slotRefs, true))
+    return { parked, result }
+  }
+
+  function renderProxy() {
+    const { importedVideos, videoEdits, transitionDefaults } = useStore.getState()
+    const { clips, program } = buildTimelineProgram({ videos: importedVideos, videoEdits, dragPreview: null, transitionDefaults })
+    const [job] = listTransitionProxyJobs(program, clips)
+    act(() => useStore.getState().setTransitionProxy(job.key, { status: 'ready', importId: 'proxy', url: 'http://127.0.0.1:4321/video/proxy' }))
+  }
+
+  test('shows the proxy over a transition window and continues after the start it showed', () => {
+    const { parked, result } = fadeBetweenTwoVideos()
+    expect(result.current.transition).toEqual({ proxyStatus: 'queued', proxyUrl: null, isInWindow: true, elapsedSeconds: 0.5, isPlaying: true })
+
+    renderProxy()
+    expect(result.current.transition).toMatchObject({ proxyStatus: 'ready', proxyUrl: 'http://127.0.0.1:4321/video/proxy' })
+    // The second video waits where playback continues: after the two seconds the fade showed.
+    expect(parked.currentTime).toBe(2)
+
+    act(() => lastClock().onPlaybackEnded())
+    expect(useStore.getState().selectedSecond).toBe(22)
+    expect(result.current.transition).toBeNull()
+  })
+
+  test('loads the proxy of the transition the playing piece ends with ahead of its window', () => {
+    const { result } = fadeBetweenTwoVideos()
+    renderProxy()
+    act(() => useStore.setState({ selectedSecond: 3 }))
+    expect(result.current.transition).toEqual({
+      proxyStatus: 'ready',
+      proxyUrl: 'http://127.0.0.1:4321/video/proxy',
+      isInWindow: false,
+      elapsedSeconds: 0,
+      isPlaying: true,
+    })
+  })
+
+  test('without a rendered proxy cuts hard and continues from the first frame of the next video', () => {
+    const { parked, result } = fadeBetweenTwoVideos()
+    expect(result.current.transition).toMatchObject({ proxyStatus: 'queued', proxyUrl: null })
+    expect(parked.currentTime).toBe(0)
+
+    act(() => lastClock().onPlaybackEnded())
+    expect(useStore.getState().selectedSecond).toBe(20)
   })
 })

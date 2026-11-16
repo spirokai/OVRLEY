@@ -14,7 +14,7 @@ import useBackendStatus from './useBackendStatus'
 import useEditorShellState from './useEditorShellState'
 import useWindowCloseGuard from './useWindowCloseGuard'
 import { useAppUpdate } from '@/features/app-update'
-import { useVideoImport } from '@/features/video-preview'
+import { useVideoFilmstripQueue, useVideoImport } from '@/features/video-preview'
 import { useUndoRedo } from '@/features/undo-redo'
 import * as backend from '@/api/backend'
 import { loadRememberedRenderDirectory } from '@/lib/file-dialog'
@@ -51,12 +51,12 @@ export default function useAppShellComposition() {
   const renderWorkflow = useRenderWorkflow({ backendStatus: backendState.backendStatus })
   const videoControls = useVideoImport({ debugModeEnabled: editorShell.debugModeEnabled, onSetBackgroundMode: editorShell.setEditorBackgroundMode })
   useAppBootstrap()
+  useVideoFilmstripQueue()
   const startupReady = backendState.backendReady && templateRestoreComplete
   const projectLifecycle = useProjectLifecycle({
-    clearImportedVideo: videoControls.clearImportedVideo,
+    clearImportedVideos: videoControls.clearImportedVideos,
     onSetBackgroundMode: editorShell.setEditorBackgroundMode,
     prepareActivityPath: activityImport.prepareActivityPath,
-    prepareVideoPath: videoControls.prepareVideoPath,
     startupReady,
   })
   useWindowCloseGuard(projectLifecycle.handleCloseRequest)

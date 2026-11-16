@@ -2,7 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { useTranslation } from 'react-i18next'
 
-export function MissingSourceDialog({ sourceRole, open, onLocate, onLoadAnyway, onCancel }) {
+export function MissingSourceDialog({ sourceRole, fileName, open, onLocate, onLoadAnyway, onCancel }) {
   const { t } = useTranslation()
   const sourceRoleLabel = sourceRole === 'video' ? t('projects.video', 'Video') : t('projects.activity', 'Activity')
   return (
@@ -21,6 +21,7 @@ export function MissingSourceDialog({ sourceRole, open, onLocate, onLoadAnyway, 
             { sourceRole: sourceRoleLabel },
           )}
         </DialogDescription>
+        <p className="mt-3 text-sm font-medium break-all select-text">{fileName}</p>
         <div className="mt-6 flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onCancel}>
             {t('projects.cancel', 'Cancel')}

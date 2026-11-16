@@ -32,7 +32,7 @@ export default function MapTileCacheSettings({ usage, limitBytes, pending, onLim
                 limit: formatCacheBytes(usage.limitBytes),
               })}
             </span>
-            <HelpTooltip portal content={t('app-shell.mapTileCacheHelp')} />
+            <HelpTooltip content={t('app-shell.mapTileCacheHelp')} />
           </div>
         </div>
         <Button type="button" variant="outline" size="sm" className="shrink-0" disabled={pending || usage.usedBytes === 0} onClick={onClear}>

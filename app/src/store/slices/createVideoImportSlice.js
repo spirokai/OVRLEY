@@ -1,267 +1,356 @@
 import { detectCodecs } from '@/api/backend'
-import { parseVideoFilenameCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
-import { resolveVideoSyncState, videoOverlapsActivity } from '@/lib/video-sync'
+import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
+import { videoIdFromLaneId, videoLaneId } from '@/features/player/utils/timelineGeometry'
 import { createCachedPromise } from '@/lib/cached-promise'
 import { clamp } from '@/lib/utils'
-import { getTimelineMinimum, getTotalPlaybackDuration } from '@/features/player/utils/playerTiming'
+import {
+  applyFilenameCreationTimes,
+  cutVideo,
+  findVideo,
+  moveCut,
+  placeAutomaticVideos,
+  removeCut,
+  removeVideo,
+  resetCreationTimes,
+  resetVideoOffset,
+  segmentBeforeCut,
+  setSegmentExcluded,
+  setSegmentSkipOverlay,
+  setSegmentTransition,
+  setVideoCreationTimeSource,
+  setVideoOffset,
+  setVideosTimezoneMode,
+  setVideoTimezoneMode,
+  shiftVideoOffsets,
+  syncVideos,
+  trimVideo,
+} from '@/lib/video-program/collection-edits'
+import { requireTelemetry } from '@/lib/video-program/imported-video'
+import { DEFAULT_TRANSITION_SETTINGS, requireTransitionDefaults } from '@/lib/video-program/transition-catalog'
+import { getVideosTimelineBounds, joinVideoEdits, sortVideosByTimeline } from '@/lib/video-program/video-collection'
+import { FIRST_SEGMENT_KEY, fitCutsToFrameCount } from '@/lib/video-program/video-segments'
+import { applyCoursePlotDimensions } from '../store-utils'
 
 let fetchCodecsOnce = null
 
-function displayResolutionForImportedVideo(metadata) {
-  const resolution = metadata?.resolution
-  if (!resolution) {
-    throw new Error('Imported video metadata must include a resolution')
-  }
-
-  const width = Number(resolution.width)
-  const height = Number(resolution.height)
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    throw new Error('Imported video metadata contains an invalid resolution')
-  }
-
-  const rotation = metadata.rotationDegrees === null || metadata.rotationDegrees === undefined ? 0 : Number(metadata.rotationDegrees)
-  if (!Number.isFinite(rotation)) {
-    throw new Error('Imported video metadata contains an invalid rotation')
-  }
-
-  const normalizedRotation = ((rotation % 360) + 360) % 360
-  if (![0, 90, 180, 270].includes(normalizedRotation)) {
-    throw new Error('Imported video metadata contains an unsupported rotation')
-  }
-
-  if (normalizedRotation === 90 || normalizedRotation === 270) {
-    return { width: height, height: width }
-  }
-
-  return { width, height }
+function clampPlayheadToVideos(draft, deltaSeconds) {
+  const bounds = getVideosTimelineBounds(joinVideoEdits(draft.importedVideos, draft.videoEdits))
+  const timelineMinimum = getTimelineMinimum({ videoBounds: bounds })
+  const totalDuration = getTotalPlaybackDuration({
+    activityDurationSeconds: draft.activitySummary?.durationSeconds,
+    fallbackDurationSeconds: draft.fallbackDurationSeconds,
+    videoBounds: bounds,
+  })
+  draft.selectedSecond = clamp(draft.selectedSecond + deltaSeconds, timelineMinimum, totalDuration)
 }
 
-function validateImportedVideoTiming(metadata) {
-  if (typeof metadata.path !== 'string' || metadata.path.length === 0) {
-    throw new Error('Imported video metadata must include a path')
-  }
-  if (!Number.isFinite(metadata.duration) || metadata.duration <= 0) {
-    throw new Error('Imported video metadata contains an invalid duration')
-  }
-  if (!Number.isFinite(metadata.fps) || metadata.fps <= 0) {
-    throw new Error('Imported video metadata contains an invalid frame rate')
-  }
-}
-
-export function createImportedVideoState(metadata) {
-  validateImportedVideoTiming(metadata)
-  return {
-    importedVideoPath: metadata.path,
-    importedVideoDuration: metadata.duration,
-    importedVideoFps: metadata.fps,
-    importedVideoFpsNum: metadata.fpsNum,
-    importedVideoFpsDen: metadata.fpsDen,
-    importedVideoResolution: displayResolutionForImportedVideo(metadata),
-    importedVideoCreationTime: metadata.creationTime,
-    importedVideoTimeSource: metadata.timeSource ?? null,
-    detectedVideoCreationTime: metadata.creationTime,
-    detectedVideoTimeSource: metadata.timeSource ?? null,
-    importedVideoImportId: metadata.importId ?? null,
-    importedVideoPreviewUrl: metadata.previewUrl ?? null,
-    importedVideoPreviewWarnings: metadata.previewWarnings ?? [],
-    importedBackgroundImagePath: null,
-    videoSyncOffsetPreviewSeconds: null,
-    videoSyncTimezoneMode: null,
-    importedVideoCodecName: metadata.codecName ?? null,
-    importedVideoCodecLongName: metadata.codecLongName ?? null,
-    importedVideoBitRate: metadata.bitRate ?? null,
-    importedVideoCameraType: metadata.cameraType ?? null,
-    importedVideoCameraModel: metadata.cameraModel ?? null,
-  }
-}
-
-function validateVideoSyncOffset(seconds, videoDuration, label = 'Video sync offset') {
-  if (!Number.isFinite(seconds)) {
-    throw new Error(`${label} must be a finite number`)
-  }
-  if (videoDuration === null) return
-  if (!videoOverlapsActivity({ videoStart: seconds, videoDuration })) {
-    throw new Error(`${label} must leave a positive overlap with the imported video`)
-  }
+/**
+ * Removes a cut (see `removeCut`). A selected segment that goes with it stays selected
+ * as the merged segment.
+ */
+function applyCutRemoval(draft, videoId, cutId, state) {
+  const mergedKey = segmentBeforeCut(draft.videoEdits[videoId], cutId)
+  removeCut(draft, videoId, cutId, { excluded: state.excluded, skipOverlay: state.skipOverlay })
+  const selection = draft.selectedClip
+  if (selection?.laneId === videoLaneId(videoId) && selection.segmentKey === cutId) selection.segmentKey = mergedKey
 }
 
 export const createVideoImportSlice = (set, get) => ({
-  importedVideoPath: null, // absolute path from Tauri file dialog
-  importedVideoDuration: null, // seconds (float), read via ffprobe
-  importedVideoFps: null, // fps (float)
-  importedVideoFpsNum: null, // exact ffprobe FPS numerator
-  importedVideoFpsDen: null, // exact ffprobe FPS denominator
-  importedVideoResolution: null, // display-oriented { width, height }
-  importedVideoCreationTime: null, // ISO-8601 string or null
-  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | "filename" | null
-  detectedVideoCreationTime: null, // original creation time from imported metadata
-  detectedVideoTimeSource: null, // original creation-time source from imported metadata
-  importedVideoImportId: null, // opaque local preview server import ID
-  importedVideoPreviewUrl: null, // local HTTP preview URL for the video element
-  importedVideoPreviewWarnings: [],
+  importedVideos: [], // canonical imported-video entities (see createImportedVideo)
+  videoEdits: {}, // undoable user edits keyed by video ID (see createVideoEdits)
   importedBackgroundImagePath: null, // absolute path from Tauri file dialog
-  videoSyncOffsetSeconds: 0, // user-adjustable sync offset
-  videoSyncOffsetPreviewSeconds: null, // transient drag preview; committed on release
-  videoSyncWarning: null, // string warning or null
-  videoSyncTimezoneMode: null, // "local" or "utc" for camera timestamps; null requests automatic inference
+  videoDragPreview: null, // { videoId: string|null, deltaSeconds } while one clip (or, with null, every clip) is dragged
+  cutRemovalRequest: null, // { videoId, cutId } while the user chooses the state of the merged segment
+  transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
   availableCodecs: null,
-  importedVideoCodecName: null,
-  importedVideoCodecLongName: null,
-  importedVideoBitRate: null,
-  importedVideoCameraType: null,
-  importedVideoCameraModel: null,
+  selectedClip: null, // { laneId, segmentKey } of the clip selected on the timeline or in the video panel; the video drawer shows its video
 
-  setImportedVideo: (metadata) => {
-    const importedVideoState = createImportedVideoState(metadata)
-    get().clearVideoSyncForVideo()
-    set(importedVideoState)
+  /**
+   * Replaces the collection with video entities and their edits (a reviewed import or
+   * a loaded project). Every video but a missing one is registered for preview. A
+   * manual-sync selection of a video no longer in the collection moves to the first
+   * clip; the playhead stays on the timeline.
+   * @param {{importedVideos: Array<object>, videoEdits: object}} collection Collection to commit.
+   */
+  commitVideoCollection: ({ importedVideos, videoEdits }) => {
+    if (importedVideos.some((video) => !video.missing && video.preview === null)) throw new Error('Committed videos must be registered for preview')
+    set((draft) => {
+      draft.importedVideos = importedVideos
+      draft.videoEdits = videoEdits
+      draft.importedBackgroundImagePath = null
+      draft.videoDragPreview = null
+      draft.cutRemovalRequest = null
+      const selectedVideoId = draft.selectedClip === null ? null : videoIdFromLaneId(draft.selectedClip.laneId)
+      if (selectedVideoId !== null && !importedVideos.some((video) => video.id === selectedVideoId)) draft.selectedClip = null
+      clampPlayheadToVideos(draft, 0)
+    })
+    const { manualVideoSync } = get()
+    if (!importedVideos.some((video) => video.id === manualVideoSync.videoId)) {
+      const [first] = sortVideosByTimeline(joinVideoEdits(importedVideos, videoEdits))
+      get().selectVideoSyncVideo(first?.id ?? null)
+    }
+  },
 
-    get().syncVideoMetadata()
+  /**
+   * Replaces a missing video with the entity probed from the file the user located,
+   * keeping the video's edits. Cuts and manual-sync landmarks past the end of a
+   * shorter file are dropped.
+   * @param {object} video Registered entity with the missing video's ID.
+   */
+  relinkVideo: (video) => {
+    if (video.missing || video.preview === null) throw new Error('A relinked video must be registered for preview')
+    set((draft) => {
+      const index = draft.importedVideos.findIndex((candidate) => candidate.id === video.id)
+      if (index === -1 || !draft.importedVideos[index].missing) throw new Error(`Video is not missing: ${video.id}`)
+      draft.importedVideos[index] = video
+      const edits = draft.videoEdits[video.id]
+      Object.assign(edits, fitCutsToFrameCount(edits, video.frameCount))
+      if (draft.manualVideoSync.videoId === video.id) {
+        draft.manualVideoSync.landmarks = draft.manualVideoSync.landmarks.filter((landmark) => landmark.videoSecond <= video.durationSeconds)
+      }
+      const selection = draft.selectedClip
+      if (selection?.laneId === videoLaneId(video.id) && selection.segmentKey !== null && edits.segments[selection.segmentKey] === undefined) {
+        selection.segmentKey = null
+      }
+      draft.videoDragPreview = null
+      clampPlayheadToVideos(draft, 0)
+    })
+  },
 
-    return importedVideoState.importedVideoResolution
+  /**
+   * Selects a timeline clip, and on a video clip the segment under the pointer, or
+   * nothing. The timeline, the video panel, and the video drawer share this selection.
+   * @param {{laneId: string, segmentKey: string|null}|null} selection Lane of the clip and segment key (null for the whole clip).
+   */
+  selectClip: (selection) => {
+    const videoId = selection === null ? null : videoIdFromLaneId(selection.laneId)
+    if (videoId !== null) findVideo(get(), videoId)
+    set({ selectedClip: selection })
   },
 
   setImportedBackgroundImage: (path) => {
-    get().clearVideoSyncForVideo()
-    get().clearVideoTelemetry()
     set({
-      importedVideoPath: null,
-      importedVideoDuration: null,
-      importedVideoFps: null,
-      importedVideoFpsNum: null,
-      importedVideoFpsDen: null,
-      importedVideoResolution: null,
-      importedVideoCreationTime: null,
-      importedVideoTimeSource: null,
-      detectedVideoCreationTime: null,
-      detectedVideoTimeSource: null,
-      importedVideoImportId: null,
-      importedVideoPreviewUrl: null,
-      importedVideoPreviewWarnings: [],
+      importedVideos: [],
+      videoEdits: {},
       importedBackgroundImagePath: path || null,
-      videoSyncOffsetSeconds: 0,
-      videoSyncOffsetPreviewSeconds: null,
-      videoSyncWarning: null,
-      videoSyncTimezoneMode: null,
-      importedVideoCodecName: null,
-      importedVideoCodecLongName: null,
-      importedVideoBitRate: null,
-      importedVideoCameraType: null,
-      importedVideoCameraModel: null,
+      videoDragPreview: null,
+      cutRemovalRequest: null,
+      selectedClip: null,
     })
+    get().selectVideoSyncVideo(null)
   },
 
-  clearImportedVideo: () => {
-    get().clearVideoSyncForVideo()
-    get().clearVideoTelemetry()
+  clearImportedVideos: () => {
     set({
-      importedVideoPath: null,
-      importedVideoDuration: null,
-      importedVideoFps: null,
-      importedVideoFpsNum: null,
-      importedVideoFpsDen: null,
-      importedVideoResolution: null,
-      importedVideoCreationTime: null,
-      importedVideoTimeSource: null,
-      detectedVideoCreationTime: null,
-      detectedVideoTimeSource: null,
-      importedVideoImportId: null,
-      importedVideoPreviewUrl: null,
-      importedVideoPreviewWarnings: [],
+      importedVideos: [],
+      videoEdits: {},
       importedBackgroundImagePath: null,
-      videoSyncOffsetSeconds: 0,
-      videoSyncOffsetPreviewSeconds: null,
-      videoSyncWarning: null,
-      videoSyncTimezoneMode: null,
-      importedVideoCodecName: null,
-      importedVideoCodecLongName: null,
-      importedVideoBitRate: null,
-      importedVideoCameraType: null,
-      importedVideoCameraModel: null,
+      videoDragPreview: null,
+      cutRemovalRequest: null,
+      selectedClip: null,
+    })
+    get().selectVideoSyncVideo(null)
+  },
+
+  /**
+   * Removes one clip with its edits (see `removeVideo`). Manual sync moves to the
+   * first remaining clip when it targeted the removed one, and the playhead stays
+   * on the timeline. Compatibility, overlaps, and joins are derived and follow.
+   */
+  removeImportedVideo: (videoId) => {
+    set((draft) => {
+      removeVideo(draft, videoId)
+      draft.videoDragPreview = null
+      if (draft.cutRemovalRequest?.videoId === videoId) draft.cutRemovalRequest = null
+      if (draft.selectedClip?.laneId === videoLaneId(videoId)) draft.selectedClip = null
+      clampPlayheadToVideos(draft, 0)
+    })
+    if (get().manualVideoSync.videoId === videoId) {
+      const [first] = sortVideosByTimeline(joinVideoEdits(get().importedVideos, get().videoEdits))
+      get().selectVideoSyncVideo(first?.id ?? null)
+    }
+  },
+
+  /** Stores the project transition defaults chosen by the user. */
+  setTransitionDefaults: (defaults) => {
+    set({ transitionDefaults: requireTransitionDefaults(defaults) })
+  },
+
+  /** Places every automatic clip by detected time (see `placeAutomaticVideos`). */
+  computeVideoSync: () => {
+    set((draft) => placeAutomaticVideos(draft))
+  },
+
+  /** Places every clip by its detected recording time again (see `syncVideos`). */
+  syncAllVideos: () => {
+    set((draft) => syncVideos(draft))
+  },
+
+  /** Sets one clip's start by hand (see `setVideoOffset`). */
+  setVideoOffset: (videoId, seconds, { compensatePlayhead = false } = {}) => {
+    set((draft) => {
+      const deltaSeconds = seconds - (draft.videoEdits[videoId]?.offsetSeconds ?? 0)
+      setVideoOffset(draft, videoId, seconds)
+      draft.videoDragPreview = null
+      if (compensatePlayhead) clampPlayheadToVideos(draft, deltaSeconds)
     })
   },
 
-  setVideoSyncOffset: (seconds, { compensatePlayhead = false } = {}) => {
-    validateVideoSyncOffset(seconds, get().importedVideoDuration)
-    if (!compensatePlayhead) {
-      set({
-        videoSyncOffsetSeconds: seconds,
-        videoSyncWarning: null,
-      })
+  /** Returns a clip set by hand to automatic placement (see `resetVideoOffset`). */
+  resetVideoOffset: (videoId) => {
+    set((draft) => {
+      resetVideoOffset(draft, videoId)
+      draft.videoDragPreview = null
+      clampPlayheadToVideos(draft, 0)
+    })
+  },
+
+  /** Shifts every clip by the same amount, keeping their relative placement. */
+  shiftVideoOffsets: (deltaSeconds, { compensatePlayhead = false } = {}) => {
+    set((draft) => {
+      shiftVideoOffsets(draft, deltaSeconds)
+      draft.videoDragPreview = null
+      if (compensatePlayhead) clampPlayheadToVideos(draft, deltaSeconds)
+    })
+  },
+
+  /**
+   * Splits a video at a frame (see `cutVideo`).
+   * @returns {string} ID of the new cut.
+   */
+  cutVideo: (videoId, frame) => {
+    let cutId
+    set((draft) => {
+      cutId = cutVideo(draft, videoId, frame)
+    })
+    return cutId
+  },
+
+  /**
+   * Trims the start or end of a video, excluding the outer part (see `trimVideo`). A
+   * start trim moves the first segment's key to the trimmed-in part, so a selected
+   * first segment follows it.
+   */
+  trimVideo: (videoId, side, frame) => {
+    set((draft) => {
+      const cutId = trimVideo(draft, videoId, side, frame)
+      const selection = draft.selectedClip
+      if (side === 'start' && selection?.laneId === videoLaneId(videoId) && selection.segmentKey === FIRST_SEGMENT_KEY) {
+        selection.segmentKey = cutId
+      }
+    })
+  },
+
+  /** Moves a cut to another frame between its neighbours (see `moveCut`). */
+  moveCut: (videoId, cutId, frame) => {
+    set((draft) => moveCut(draft, videoId, cutId, frame))
+  },
+
+  /**
+   * Removes a cut. Segments in the same export state merge at once; otherwise the
+   * user chooses the state of the merged segment (`resolveCutRemoval`). With `keep`,
+   * the merged segment takes that segment's state and nothing is asked: a first or
+   * last cut dropped on its edge keeps the inner part.
+   * @param {string} videoId Video ID.
+   * @param {string} cutId Cut ID.
+   * @param {{keep?: string}} [options] Key of the segment (either side of the cut) whose state the merged segment takes.
+   */
+  requestCutRemoval: (videoId, cutId, { keep } = {}) => {
+    const edits = get().videoEdits[videoId]
+    const earlier = edits.segments[segmentBeforeCut(edits, cutId)]
+    if (keep !== undefined) {
+      const kept = edits.segments[keep]
+      set((draft) => applyCutRemoval(draft, videoId, cutId, kept))
       return
     }
+    if (earlier.excluded === edits.segments[cutId].excluded) {
+      set((draft) => applyCutRemoval(draft, videoId, cutId, earlier))
+      return
+    }
+    set({ cutRemovalRequest: { videoId, cutId } })
+  },
 
-    const state = get()
-    const offsetDelta = seconds - state.videoSyncOffsetSeconds
-    const timelineMinimum = getTimelineMinimum({
-      hasVideo: state.importedVideoPath !== null,
-      videoSyncOffsetSeconds: seconds,
-    })
-    const totalDuration = getTotalPlaybackDuration({
-      activityDurationSeconds: state.activitySummary?.durationSeconds,
-      fallbackDurationSeconds: state.fallbackDurationSeconds,
-      importedVideoDuration: state.importedVideoDuration,
-      importedVideoPath: state.importedVideoPath,
-      videoSyncOffsetSeconds: seconds,
-    })
-
+  /** Removes the requested cut, giving the merged segment the chosen export state. */
+  resolveCutRemoval: (excluded) => {
+    const { videoId, cutId } = get().cutRemovalRequest
     set((draft) => {
-      draft.videoSyncOffsetSeconds = seconds
-      draft.videoSyncWarning = null
-      draft.selectedSecond = clamp(state.selectedSecond + offsetDelta, timelineMinimum, totalDuration)
-      draft.videoSyncOffsetPreviewSeconds = null
+      const edits = draft.videoEdits[videoId]
+      applyCutRemoval(draft, videoId, cutId, { excluded, skipOverlay: edits.segments[segmentBeforeCut(edits, cutId)].skipOverlay })
+      draft.cutRemovalRequest = null
     })
   },
 
-  setVideoSyncOffsetPreview: (seconds) => {
-    if (seconds !== null) validateVideoSyncOffset(seconds, get().importedVideoDuration, 'Video sync offset preview')
-    set({
-      videoSyncOffsetPreviewSeconds: seconds,
-    })
+  dismissCutRemoval: () => {
+    set({ cutRemovalRequest: null })
   },
 
-  setVideoSyncWarning: (msg) =>
-    set({
-      videoSyncWarning: msg,
-    }),
+  /** Excludes a segment from export or includes it again. */
+  setVideoSegmentExcluded: (videoId, segmentKey, excluded) => {
+    set((draft) => setSegmentExcluded(draft, videoId, segmentKey, excluded))
+  },
 
+  /** Hides or shows the activity widgets over a segment, in the preview and the render. */
+  setVideoSegmentSkipOverlay: (videoId, segmentKey, skipOverlay) => {
+    set((draft) => setSegmentSkipOverlay(draft, videoId, segmentKey, skipOverlay))
+  },
+
+  /**
+   * Overrides the transition of a program join, or with `null` returns it to the defaults.
+   * @param {{videoId: string, segmentKey: string}} join Join from `buildProgram`.
+   * @param {{type: string, durationSeconds: number}|null} transition Override.
+   */
+  setJoinTransition: ({ videoId, segmentKey }, transition) => {
+    set((draft) => setSegmentTransition(draft, videoId, segmentKey, transition))
+  },
+
+  /** Sets or clears the transient shift of the dragged clip, or of every clip when `videoId` is null. */
+  setVideoDragPreview: (dragPreview) => {
+    if (dragPreview !== null) {
+      if (dragPreview.videoId !== null) findVideo(get(), dragPreview.videoId)
+      if (!Number.isFinite(dragPreview.deltaSeconds)) throw new Error('Video drag shift must be a finite number')
+    }
+    set({ videoDragPreview: dragPreview })
+  },
+
+  /** Reads every clip's ambiguous camera clock in local time or UTC (see `setVideosTimezoneMode`). */
   setVideoSyncTimezoneMode: (mode) => {
-    if (mode !== 'local' && mode !== 'utc') {
-      throw new Error('Video sync timezone mode must be local or utc')
-    }
-
-    set({ videoSyncTimezoneMode: mode })
-    get().computeVideoSync(get().activitySummary)
+    set((draft) => setVideosTimezoneMode(draft, mode))
   },
 
-  setVideoCreationTimeFromFilename: () => {
-    const creationTime = parseVideoFilenameCreationTime(get().importedVideoPath)
-    if (creationTime === null) {
-      throw new Error('Video filename does not contain a valid YYYYMMDD_HHMMSS timestamp')
-    }
+  /** Reads one clip's ambiguous camera clock in local time or UTC (see `setVideoTimezoneMode`). */
+  setVideoTimezoneMode: (videoId, mode) => {
+    set((draft) => setVideoTimezoneMode(draft, videoId, mode))
+  },
 
-    set({
-      importedVideoCreationTime: creationTime,
-      importedVideoTimeSource: 'filename',
-      videoSyncTimezoneMode: 'local',
+  /** Takes one clip's recording time from its detected time or its filename (see `setVideoCreationTimeSource`). */
+  setVideoCreationTimeSource: (videoId, source) => {
+    set((draft) => setVideoCreationTimeSource(draft, videoId, source))
+  },
+
+  /** Uses the `YYYYMMDD_HHMMSS` filename timestamp of every clip that has one. */
+  setVideoCreationTimesFromFilenames: () => {
+    set((draft) => applyFilenameCreationTimes(draft))
+  },
+
+  resetVideoCreationTimes: () => {
+    set((draft) => resetCreationTimes(draft))
+  },
+
+  /**
+   * Stores the settled embedded-telemetry result of one clip. Results for clips
+   * removed in the meantime are discarded.
+   * @returns {boolean} Whether the result was stored.
+   */
+  setVideoTelemetry: (videoId, { status, activity }) => {
+    if (status === 'pending') throw new Error('Video telemetry results must be settled')
+    requireTelemetry({ status, activity })
+    if (!get().importedVideos.some((video) => video.id === videoId)) return false
+    set((draft) => {
+      draft.importedVideos.find((video) => video.id === videoId).telemetry = { status, activity }
+      if (status === 'ready' && draft.parsedActivity === null) applyCoursePlotDimensions(draft, activity.sample_course_points)
     })
-    get().computeVideoSync(get().activitySummary)
+    return true
   },
-
-  resetVideoCreationTime: () => {
-    const state = get()
-    set({
-      importedVideoCreationTime: state.detectedVideoCreationTime,
-      importedVideoTimeSource: state.detectedVideoTimeSource,
-      videoSyncTimezoneMode: null,
-    })
-    get().computeVideoSync(get().activitySummary)
-  },
-
-  setImportedVideoPreviewWarnings: (warnings) =>
-    set({
-      importedVideoPreviewWarnings: Array.isArray(warnings) ? warnings : [],
-    }),
 
   fetchAvailableCodecs: async () => {
     const cachedCodecs = get().availableCodecs
@@ -283,6 +372,4 @@ export const createVideoImportSlice = (set, get) => ({
       return null
     }
   },
-
-  computeVideoSync: (activitySummary) => set((state) => resolveVideoSyncState(state, activitySummary)),
 })

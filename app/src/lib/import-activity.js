@@ -4,10 +4,8 @@
  */
 
 import * as backend from '@/api/backend'
-import { getCourseWidgetDimensions } from '@/lib/widget/widget-defaults'
-import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
 import useStore from '@/store/useStore'
-import { syncSceneTimingToConfig } from '@/store/store-utils'
+import { applyCoursePlotDimensions } from '@/store/store-utils'
 
 const PARSERS_BY_EXTENSION = {
   csv: backend.parseCsvActivity,
@@ -32,26 +30,9 @@ export function activateParsedActivity({ source, parsedActivity }, storeState) {
   if (Number.isFinite(durationSeconds) && durationSeconds > 0) {
     const wholeSeconds = Math.floor(durationSeconds)
     storeState.setFallbackDurationSeconds(wholeSeconds)
-    storeState.setStartSecond(0)
-    storeState.setEndSecond(wholeSeconds)
     storeState.setSelectedSecond(0)
 
-    useStore.setState((state) => {
-      syncSceneTimingToConfig(state, { startSecond: 0, endSecond: wholeSeconds })
-
-      const coursePoints = parsedActivity?.sample_course_points
-      if (coursePoints && state.config?.plots) {
-        const dims = getCourseWidgetDimensions(coursePoints, WIDGET_TYPE_DEFINITIONS.course.courseSizing)
-        if (dims) {
-          for (const plot of state.config.plots) {
-            if (plot.value === 'course') {
-              plot.width = dims.width
-              plot.height = dims.height
-            }
-          }
-        }
-      }
-    })
+    useStore.setState((state) => applyCoursePlotDimensions(state, parsedActivity?.sample_course_points))
   }
 }
 

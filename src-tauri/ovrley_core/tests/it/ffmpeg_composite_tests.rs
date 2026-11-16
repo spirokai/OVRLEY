@@ -151,6 +151,8 @@ fn test_2_1_builds_command_for_29_97_fps_source_without_rounding() {
 
     assert_argument_pair(&built.input_1_args, "-r", "30000/1001");
     assert_argument_pair(&built.output_args, "-r", "30000/1001");
+    // The encoder stops at the planned frames, whatever the source's timestamps do.
+    assert!(built.output_args.iter().any(|arg| arg == "-frames:v"));
     assert!(!built.input_1_args.iter().any(|arg| arg == "30"));
     assert!(!built.output_args.iter().any(|arg| arg == "30"));
 }

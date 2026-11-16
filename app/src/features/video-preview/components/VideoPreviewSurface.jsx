@@ -1,10 +1,12 @@
 import { useRef } from 'react'
-import { AlertTriangle, ExternalLink } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Loader2, Scissors } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import useStore from '@/store/useStore'
 import { useVideoPreview } from '../hooks/useVideoPreview'
 import { useVideoFreezeFrame } from '../hooks/useVideoFreezeFrame'
+import { useTransitionProxyQueue } from '../hooks/useTransitionProxies'
+import { useTransitionProxyPlayback } from '../hooks/useTransitionProxyPlayback'
 
 function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp, platformOs, videoPreviewHelpAvailable }) {
   const { t } = useTranslation()
@@ -57,6 +59,21 @@ function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp,
   )
 }
 
+/** Stands in for a missing video's frames; the overlay is still drawn on top. */
+function MissingVideoPlaceholder({ displayScale }) {
+  const { t } = useTranslation()
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black">
+      <div className="flex flex-col items-center gap-3 p-8 text-center" style={{ transform: `scale(${0.5 + 0.5 / displayScale})` }}>
+        <AlertTriangle className="h-10 w-10 text-destructive" aria-hidden="true" />
+        <p role="status" className="text-base font-semibold text-white">
+          {t('video-preview.videoNotFound', 'Video not found')}
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /**
  * Renders the shared video preview surface used by the editor and video-sync workspace.
  *
@@ -67,36 +84,112 @@ function HevcPlaybackPlaceholder({ displayScale, importId, openVideoPreviewHelp,
  * @returns {JSX.Element} Video preview surface.
  */
 export default function VideoPreviewSurface({ children, displayScale, isActive }) {
-  const videoRef = useRef(null)
+  const firstVideoRef = useRef(null)
+  const secondVideoRef = useRef(null)
+  const proxyVideoRef = useRef(null)
   const freezeFrameRef = useRef(null)
   const isVideoMuted = useStore((state) => state.isVideoMuted)
   const platformOs = useStore((state) => state.platformOs)
-  const { videoSrc, importId, isOutOfRange, hevcPlaybackWarning, openVideoPreviewHelp, videoPreviewHelpAvailable } = useVideoPreview(
-    videoRef,
-    isActive,
-  )
+  const { t } = useTranslation()
+  const slotRefs = [firstVideoRef, secondVideoRef]
+  const {
+    slots,
+    videoSrc,
+    importId,
+    isMissing,
+    isOutOfRange,
+    isExcluded,
+    isInOverlap,
+    transition,
+    hevcPlaybackWarning,
+    openVideoPreviewHelp,
+    videoPreviewHelpAvailable,
+  } = useVideoPreview(slotRefs, isActive)
+  useTransitionProxyQueue()
+  const isProxyFrameReady = useTransitionProxyPlayback(proxyVideoRef, transition)
   const hasHevcPlaybackError = Boolean(hevcPlaybackWarning)
-  useVideoFreezeFrame({ videoRef, canvasRef: freezeFrameRef, enabled: platformOs === 'linux', videoSrc })
-  const videoClassName = cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')
+  // Inside the window the proxy shows the blend and plays its crossfaded audio, once it has a frame to show.
+  const isInTransitionWindow = transition?.isInWindow ?? false
+  const showsProxy = isInTransitionWindow && isProxyFrameReady
+  // The Linux freeze frame covers whichever slot shows the target piece.
+  const activeSlotIndex = slots.findIndex((slot) => slot.isActive)
+  const showsFreezeFrame = platformOs === 'linux' && activeSlotIndex !== -1 && Boolean(videoSrc) && !hasHevcPlaybackError
+  useVideoFreezeFrame({ videoRef: slotRefs[Math.max(activeSlotIndex, 0)], canvasRef: freezeFrameRef, enabled: showsFreezeFrame, videoSrc })
 
   return (
     <>
-      {videoSrc && !hasHevcPlaybackError ? (
-        <video
-          key={importId ?? 'no-video'}
-          ref={videoRef}
-          src={videoSrc}
-          className={videoClassName}
-          preload="auto"
-          playsInline
-          muted={isVideoMuted}
-          onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
+      {/* Both elements stay mounted; the parked one is invisible and silent until a cut swaps them. */}
+      {slots.map((slot, index) =>
+        slot.src && !(slot.isActive && hasHevcPlaybackError) ? (
+          <video
+            key={index}
+            ref={slotRefs[index]}
+            src={slot.src}
+            data-slot={slot.isActive ? 'active' : 'parked'}
+            className={cn(
+              'pointer-events-none absolute inset-0 h-full w-full object-cover',
+              !slot.isActive ? 'opacity-0' : isOutOfRange ? 'opacity-20' : 'opacity-100',
+            )}
+            preload="auto"
+            playsInline
+            muted={!slot.isActive || isVideoMuted || showsProxy}
+            onError={(event) => console.error('[VideoPreviewSurface] Video Error:', event)}
+          />
+        ) : null,
+      )}
+      {showsFreezeFrame ? (
+        <canvas
+          key={`${videoSrc}-freeze-frame`}
+          ref={freezeFrameRef}
+          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', isOutOfRange ? 'opacity-20' : 'opacity-100')}
+          style={{ visibility: 'hidden' }}
         />
       ) : null}
-      {videoSrc && !hasHevcPlaybackError && platformOs === 'linux' ? (
-        <canvas key={`${importId ?? 'no-video'}-freeze-frame`} ref={freezeFrameRef} className={videoClassName} style={{ visibility: 'hidden' }} />
+      {/* Mounted ahead of its window, invisible and silent, so the transition starts on a decoded frame. */}
+      {transition?.proxyUrl ? (
+        <video
+          key={transition.proxyUrl}
+          ref={proxyVideoRef}
+          src={transition.proxyUrl}
+          data-slot="transition"
+          className={cn('pointer-events-none absolute inset-0 h-full w-full object-cover', !showsProxy && 'opacity-0')}
+          preload="auto"
+          playsInline
+          muted={!showsProxy || isVideoMuted}
+        />
       ) : null}
+      {isMissing ? <MissingVideoPlaceholder displayScale={displayScale} /> : null}
       {children}
+      {isInTransitionWindow && !showsProxy && transition.proxyStatus !== 'failed' ? (
+        <div className="pointer-events-none absolute right-0 top-0 z-30 p-4">
+          <div role="status" className="flex items-center gap-2 rounded-sm bg-black/70 px-3 py-1.5 text-xs font-semibold text-white">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+            {t('video-preview.renderingTransition', 'Rendering transition preview…')}
+          </div>
+        </div>
+      ) : null}
+      {videoSrc && isExcluded ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-center p-4">
+          <div role="status" className="flex items-center gap-2 rounded-sm bg-black/80 px-4 py-2 text-sm font-semibold text-white shadow-lg">
+            <Scissors className="h-4 w-4 shrink-0" aria-hidden="true" />
+            {t('video-preview.excludedIndicator', 'Excluded from export')}
+          </div>
+        </div>
+      ) : null}
+      {videoSrc && isInOverlap ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center p-4">
+          <div
+            role="alert"
+            className="flex max-w-[90%] items-center gap-3 rounded-sm border-2 border-destructive bg-destructive/90 px-5 py-3 text-base font-bold text-white shadow-2xl"
+          >
+            <AlertTriangle className="h-6 w-6 shrink-0" aria-hidden="true" />
+            {t(
+              'video-preview.overlapPlaybackWarning',
+              'Videos overlap here. The preview plays the earlier video first; one combined export is not possible.',
+            )}
+          </div>
+        </div>
+      ) : null}
       {videoSrc && hasHevcPlaybackError ? (
         <HevcPlaybackPlaceholder
           displayScale={displayScale}

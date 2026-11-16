@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod atlas_export_tests;
+pub(crate) mod assemble;
 mod buffers;
 #[doc(hidden)]
 pub mod diagnostics;
@@ -113,7 +114,7 @@ impl VideoEncoding {
         stderr: &str,
     ) -> CoreError {
         if let Self::Composite(plan) = self {
-            let message = error.to_string();
+            let message = error.encode_message();
             if is_pipe_write_error(&message) {
                 return CoreError::Encode(format_pipe_write_failure(message, status, stderr, plan));
             }
@@ -121,7 +122,11 @@ impl VideoEncoding {
         if stderr.is_empty() {
             error
         } else {
-            CoreError::Encode(format!("{error}. FFmpeg stderr:\n{}", stderr_tail(stderr)))
+            CoreError::Encode(format!(
+                "{}. FFmpeg stderr:\n{}",
+                error.encode_message(),
+                stderr_tail(stderr)
+            ))
         }
     }
 }
@@ -129,7 +134,7 @@ impl VideoEncoding {
 pub(crate) fn encode_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
+    activity: Option<&ParsedActivity>,
     dense: &DenseActivityReport,
     controller: &RenderController,
     target: &RenderOutputTarget,
@@ -160,10 +165,12 @@ pub(crate) fn encode_video(
     };
     let mut prepare_profiler = RenderProfiler::default();
     let prepare_started = Instant::now();
+    // A video without telemetry samples no activity; its plan keeps rasters only.
+    let no_activity = ParsedActivity::default();
     let export = ExportWidgets::prepare(
         &paths.font_dirs,
         config,
-        activity,
+        activity.unwrap_or(&no_activity),
         dense,
         size,
         coverage.blank_leading_frame_count,

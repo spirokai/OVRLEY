@@ -48,6 +48,9 @@ mod runtime_paths;
 mod tauri_commands;
 #[cfg(target_os = "macos")]
 mod traffic_lights;
+mod filmstrip_cache_settings;
+mod video_filmstrip;
+mod video_thumbnail;
 mod widget_preview;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
@@ -113,6 +116,8 @@ pub fn run() {
             tauri_commands::backend_list_templates,
             tauri_commands::backend_get_template,
             tauri_commands::backend_open_output_directory,
+            tauri_commands::backend_render_transition_proxy,
+            tauri_commands::backend_release_transition_proxy,
             tauri_commands::backend_open_templates,
             tauri_commands::backend_open_video,
             tauri_commands::backend_probe_video,
@@ -122,10 +127,16 @@ pub fn run() {
             tauri_commands::backend_dispose_video_inspection,
             tauri_commands::backend_prepare_preview_video,
             tauri_commands::backend_register_preview_video,
-            tauri_commands::backend_import_preview_video,
             tauri_commands::backend_extract_video_telemetry,
-            tauri_commands::backend_clear_preview_video,
-            tauri_commands::backend_get_video_state,
+            tauri_commands::backend_remove_preview_video,
+            tauri_commands::backend_clear_preview_videos,
+            tauri_commands::backend_get_preview_videos,
+            video_thumbnail::backend_video_thumbnail,
+            video_filmstrip::backend_cached_video_filmstrip,
+            video_filmstrip::backend_video_filmstrip,
+            video_filmstrip::backend_get_filmstrip_cache,
+            video_filmstrip::backend_set_filmstrip_cache_limit,
+            video_filmstrip::backend_clear_filmstrip_cache,
             tauri_commands::backend_get_map_style_url_template,
             tauri_commands::backend_list_map_styles,
             tauri_commands::backend_get_map_tile_cache,
@@ -139,7 +150,6 @@ pub fn run() {
             file_ops::load_selected_raster,
             file_ops::raster_preview_png,
             file_ops::selected_path_is_file,
-            file_ops::list_directory_video_files,
             file_ops::write_template_file,
             project_file::default_project_directory,
             project_file::list_project_files,
@@ -151,6 +161,11 @@ pub fn run() {
             app.manage(raster_resources::RasterResources::default());
             #[cfg(target_os = "linux")]
             appimage_integration::register(app);
+            let roots = runtime_paths::runtime_roots(app.handle())?;
+            // Transition proxies of earlier sessions are no longer registered anywhere.
+            ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(
+                &roots.app_paths()?,
+            )?;
 
             #[cfg(debug_assertions)]
             {
@@ -171,7 +186,10 @@ pub fn run() {
                 ))),
             });
 
-            let roots = runtime_paths::runtime_roots(app.handle())?;
+            app.manage(ovrley_services::filmstrip_cache::FilmstripCache::for_application_cache(
+                &roots.app_cache_dir,
+                filmstrip_cache_settings::persisted_filmstrip_cache_limit(app.handle())?,
+            )?);
             let map_data = map_styles::MapData::new(
                 map_styles::MapStyleRegistry::load(&roots.map_style_dirs())?,
                 map_tile_service::MapTileService::for_application_cache(

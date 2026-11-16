@@ -2,7 +2,6 @@
 //! frontend import flows.
 
 use crate::runtime_paths;
-use ovrley_core::error::RenderPathError;
 use ovrley_services::file_ops::{self, RasterSelection, RasterSelectionError};
 use ovrley_services::raster_resources::RasterResources;
 use std::path::PathBuf;
@@ -46,10 +45,4 @@ pub(crate) fn load_selected_raster(
 #[tauri::command]
 pub(crate) fn raster_preview_png(resources: tauri::State<'_, RasterResources>, resource_id: String) -> Result<String, String> {
     resources.preview_png_base64(&resource_id)
-}
-
-/// Lists supported video files directly inside a directory, sorted by name.
-#[tauri::command]
-pub(crate) fn list_directory_video_files(directory: String) -> Result<Vec<String>, RenderPathError> {
-    file_ops::list_directory_video_files(&PathBuf::from(directory))
 }

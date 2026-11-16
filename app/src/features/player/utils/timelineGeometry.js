@@ -1,11 +1,11 @@
 /**
- * Pure timeline geometry helpers for pointer, clip, playhead, and export marker math.
+ * Pure timeline geometry helpers for pointer, clip, and playhead math.
  */
 
 import { clamp } from '@/lib/utils'
 
-export const EXPORT_RANGE_MIN_GAP_SECONDS = 1
-export const SNAP_THRESHOLD_PX = 5
+/** Snap distance on screen, in CSS pixels. */
+export const SNAP_THRESHOLD_PX = 10
 
 /**
  * Rounds a pixel value to the active device pixel grid.
@@ -87,91 +87,56 @@ export function getClipGeometry({ startSecond, durationSeconds, viewStart, viewE
 }
 
 /**
- * Clamps a dragged export marker to the legal export window.
+ * Snaps a proposed shift of a dragged clip or cut so that one moving edge lands on a fixed edge.
  *
- * @param {{ marker: 'from'|'to', second: number, fromSecond: number, toSecond: number, timelineMinimum?: number, totalDuration: number }} options
- * @returns {number} Clamped marker second.
+ * The threshold is expressed in screen pixels and converted to timeline seconds for
+ * the current viewport.
+ *
+ * @param {{ proposedDelta: number, movingEdges: number[], fixedEdges: number[], viewStart: number, viewEnd: number, widthPx: number, thresholdPx?: number }} options Snap inputs.
+ * @returns {{ delta: number, guidelineSecond: number|null }} Snapped shift and active guideline.
  */
-export function clampExportRangeMarkerSecond({ marker, second, fromSecond, toSecond, timelineMinimum = 0, totalDuration }) {
-  const from = clamp(fromSecond, timelineMinimum, totalDuration)
-  const to = clamp(toSecond, timelineMinimum, totalDuration)
-
-  if (marker === 'from') {
-    return clamp(second, timelineMinimum, Math.max(timelineMinimum, to - EXPORT_RANGE_MIN_GAP_SECONDS))
-  }
-
-  return clamp(second, Math.min(totalDuration, from + EXPORT_RANGE_MIN_GAP_SECONDS), totalDuration)
-}
-
-/**
- * Computes the clip-local overlay used to highlight the active export range.
- *
- * @param {{ startSecond: number, durationSeconds: number, exportFromSecond: number, exportToSecond: number }} options
- * @returns {{ isVisible: boolean, leftPercent: number, widthPercent: number }}
- */
-/**
- * Snaps a proposed sync offset to alignment points between two clips.
- *
- * Candidates: video‑start → activity‑start (0), video‑start → activity‑end,
- * video‑end → activity‑start, video‑end → activity‑end.
- *
- * The threshold is expressed in pixels, matching react-moveable's default
- * snapThreshold, and converted to timeline seconds for the current viewport.
- *
- * @param {{ proposedOffset: number, activityDuration: number, videoDuration: number, viewStart: number, viewEnd: number, widthPx: number, thresholdPx?: number }} options Snap inputs.
- * @returns {{ offset: number, guidelineSecond: number|null }} Snapped offset and active guideline.
- */
-export function snapClipOffset({ proposedOffset, activityDuration, videoDuration, viewStart, viewEnd, widthPx, thresholdPx = SNAP_THRESHOLD_PX }) {
-  const candidates = [
-    { guidelineSecond: 0, value: 0 },
-    { guidelineSecond: activityDuration, value: activityDuration },
-    { guidelineSecond: 0, value: -videoDuration },
-    { guidelineSecond: activityDuration, value: activityDuration - videoDuration },
-  ]
+export function snapClipDelta({ proposedDelta, movingEdges, fixedEdges, viewStart, viewEnd, widthPx, thresholdPx = SNAP_THRESHOLD_PX }) {
   const span = viewEnd - viewStart
   const thresholdSeconds = span > 0 && widthPx > 0 ? (thresholdPx / widthPx) * span : 0
 
-  let bestDelta = Infinity
-  let bestValue = proposedOffset
+  let bestDistance = Infinity
+  let delta = proposedDelta
   let guidelineSecond = null
 
-  for (const candidate of candidates) {
-    const delta = Math.abs(proposedOffset - candidate.value)
-    if (delta <= thresholdSeconds && delta < bestDelta) {
-      bestDelta = delta
-      bestValue = candidate.value
-      guidelineSecond = candidate.guidelineSecond
+  for (const movingEdge of movingEdges) {
+    for (const fixedEdge of fixedEdges) {
+      const candidate = fixedEdge - movingEdge
+      const distance = Math.abs(proposedDelta - candidate)
+      if (distance <= thresholdSeconds && distance < bestDistance) {
+        bestDistance = distance
+        delta = candidate
+        guidelineSecond = fixedEdge
+      }
     }
   }
 
-  return { guidelineSecond, offset: bestValue }
+  return { delta, guidelineSecond }
+}
+
+/** Timeline lane id of the external activity. */
+export const ACTIVITY_LANE_ID = 'activity'
+
+/**
+ * Returns the timeline lane id of an imported video's clip.
+ *
+ * @param {string} videoId Video id.
+ * @returns {string} Lane id `video:<videoId>`.
+ */
+export function videoLaneId(videoId) {
+  return `video:${videoId}`
 }
 
 /**
- * Converts horizontal clip movement into the canonical video sync offset.
+ * Returns the imported video addressed by a timeline lane, or null for the activity lane.
  *
- * @param {{ currentOffset: number, deltaSeconds: number, laneId: string }} options Movement inputs.
- * @returns {number} Video sync offset after applying lane-relative movement.
+ * @param {string} laneId Timeline lane id: `activity` or `video:<videoId>`.
+ * @returns {string|null} Video id.
  */
-export function moveClipOffset({ currentOffset, deltaSeconds, laneId }) {
-  const direction = laneId === 'activity' ? -1 : 1
-  return currentOffset + direction * deltaSeconds
-}
-
-export function getExportRangeHighlightGeometry({ startSecond, durationSeconds, exportFromSecond, exportToSecond }) {
-  if (durationSeconds <= 0) return { isVisible: false, leftPercent: 0, widthPercent: 0 }
-
-  const clipEnd = startSecond + durationSeconds
-  const highlightStart = Math.max(startSecond, exportFromSecond)
-  const highlightEnd = Math.min(clipEnd, exportToSecond)
-
-  if (!(highlightEnd > highlightStart)) {
-    return { isVisible: false, leftPercent: 0, widthPercent: 0 }
-  }
-
-  return {
-    isVisible: true,
-    leftPercent: ((highlightStart - startSecond) / durationSeconds) * 100,
-    widthPercent: ((highlightEnd - highlightStart) / durationSeconds) * 100,
-  }
+export function videoIdFromLaneId(laneId) {
+  return laneId === ACTIVITY_LANE_ID ? null : laneId.slice(videoLaneId('').length)
 }

@@ -131,26 +131,21 @@ pub fn canonical_source_path(path: &Path) -> CoreResult<String> {
         .map_err(|_| CoreError::Config("Source path cannot be represented as UTF-8".into()))
 }
 
-/// Telemetry-first probing with the existing ffprobe salvage policy. This is
-/// the common owner for interactive import and non-interactive inspection.
+/// Telemetry-first probing completed by ffprobe. This is the common owner for
+/// interactive import and non-interactive inspection. ffprobe always runs: it owns
+/// the timing the renderer's FFmpeg will see (see `merge_ffprobe_metadata`).
 pub fn probe_video_metadata(
     paths: &AppPaths,
     file_path: &str,
 ) -> CoreResult<crate::media::SourceVideoMetadata> {
     match crate::media::mp4_telemetry::probe_video_metadata(&paths.repo_root, file_path) {
-        Ok(metadata) => {
-            if needs_ffprobe_salvage(&metadata) {
-                match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
-                    Ok(ffprobe_metadata) => Ok(merge_ffprobe_metadata(metadata, ffprobe_metadata)),
-                    Err(error) => {
-                        log::warn!("ffprobe fallback failed for {file_path}: {error}");
-                        Ok(metadata)
-                    }
-                }
-            } else {
+        Ok(metadata) => match crate::media::video_probe::probe_video(&paths.repo_root, file_path) {
+            Ok(ffprobe_metadata) => Ok(merge_ffprobe_metadata(metadata, ffprobe_metadata)),
+            Err(error) => {
+                log::warn!("ffprobe failed for {file_path}: {error}");
                 Ok(metadata)
             }
-        }
+        },
         Err(error) => {
             log::warn!(
                 "telemetry-parser probe failed for {file_path}: {error}; falling back to ffprobe"
@@ -160,45 +155,35 @@ pub fn probe_video_metadata(
     }
 }
 
-fn needs_ffprobe_salvage(metadata: &crate::media::SourceVideoMetadata) -> bool {
-    metadata.duration.is_none()
-        || metadata.fps.is_none()
-        || metadata.fps_num.is_none()
-        || metadata.fps_den.is_none()
-        || metadata.sync_time.is_none()
-        || metadata.creation_time.is_none()
-        || metadata.codec_name.is_none()
-        || metadata.codec_long_name.is_none()
-        || metadata.codec_profile.is_none()
-        || metadata.pix_fmt.is_none()
-        || metadata.bits_per_raw_sample.is_none()
-        || metadata.resolution.is_none()
-        || metadata
-            .rotation_degrees
-            .map(|degrees| degrees.rem_euclid(360) == 0)
-            .unwrap_or(true)
-        || metadata.container_format.is_none()
-        || metadata.bit_rate.is_none()
-        || (metadata.has_audio && metadata.audio_bit_rate.is_none())
-        || !metadata.has_audio
+fn planned_frames(metadata: &crate::media::SourceVideoMetadata) -> Option<u64> {
+    Fps::new(metadata.fps_num?, metadata.fps_den?)
+        .ok()?
+        .frame_count_for_duration(metadata.duration?)
+        .ok()
 }
 
+/// ffprobe owns the timing (duration, where the video starts, and whether the
+/// nominal frame rate holds); every other field it only fills where
+/// telemetry-parser left a gap.
 fn merge_ffprobe_metadata(
     mut metadata: crate::media::SourceVideoMetadata,
     ffprobe_metadata: crate::media::SourceVideoMetadata,
 ) -> crate::media::SourceVideoMetadata {
-    if metadata.duration.is_none() {
-        metadata.duration = ffprobe_metadata.duration;
-    }
-    if metadata.fps.is_none() {
+    // The renderer's FFmpeg honours edit lists and ffprobe reports what it will
+    // read; telemetry-parser's duration is the whole track, edit list ignored.
+    metadata.duration = ffprobe_metadata.duration.or(metadata.duration);
+    // A nominal rate keeps clips of one camera joinable, but it must not plan more
+    // frames than the file holds: the render cannot produce them.
+    let keeps_nominal_rate = match (planned_frames(&metadata), planned_frames(&ffprobe_metadata)) {
+        (Some(nominal), Some(measured)) => nominal <= measured,
+        (nominal, _) => nominal.is_some(),
+    };
+    if !keeps_nominal_rate {
         metadata.fps = ffprobe_metadata.fps;
-    }
-    if metadata.fps_num.is_none() {
         metadata.fps_num = ffprobe_metadata.fps_num;
-    }
-    if metadata.fps_den.is_none() {
         metadata.fps_den = ffprobe_metadata.fps_den;
     }
+    metadata.video_start_offset = ffprobe_metadata.video_start_offset;
     if metadata.sync_time.is_none() {
         metadata.sync_time = ffprobe_metadata
             .sync_time
@@ -252,4 +237,51 @@ fn merge_ffprobe_metadata(
         metadata.audio_bit_rate = ffprobe_metadata.audio_bit_rate;
     }
     metadata
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn metadata(duration: f64, fps_num: u32, fps_den: u32) -> SourceVideoMetadata {
+        serde_json::from_value(serde_json::json!({
+            "path": "clip.mp4",
+            "duration": duration,
+            "fps": f64::from(fps_num) / f64::from(fps_den),
+            "fpsNum": fps_num,
+            "fpsDen": fps_den,
+            "hasAudio": false,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn ffprobe_gives_the_duration_and_where_the_video_starts() {
+        let mut probed = metadata(5.5, 25, 1);
+        probed.video_start_offset = Some(0.04);
+        let merged = merge_ffprobe_metadata(metadata(6.0, 25, 1), probed);
+        assert_eq!(merged.duration, Some(5.5));
+        assert_eq!(merged.file_seconds(1.0), 1.04);
+    }
+
+    #[test]
+    fn a_nominal_rate_that_plans_more_frames_than_the_file_holds_gives_way() {
+        let merged = merge_ffprobe_metadata(
+            metadata(4325.020733, 30, 1),
+            metadata(4325.020733, 1942335000, 64875311),
+        );
+        assert_eq!(
+            (merged.fps_num, merged.fps_den),
+            (Some(1942335000), Some(64875311))
+        );
+    }
+
+    #[test]
+    fn a_nominal_rate_that_fits_the_file_keeps_clips_of_one_camera_joinable() {
+        let merged = merge_ffprobe_metadata(
+            metadata(117.513333, 60000, 1001),
+            metadata(117.513333, 1056900, 17627),
+        );
+        assert_eq!((merged.fps_num, merged.fps_den), (Some(60000), Some(1001)));
+    }
 }

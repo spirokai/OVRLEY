@@ -11,7 +11,9 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     scene,
     rasterScale,
     activity,
+    activityOriginSecond,
     disabledLaps,
+    hasActivityCoverage,
     globalDefaults,
     setSceneElement,
     sceneSize,
@@ -28,6 +30,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     scene,
     rasterScale,
     activity,
+    activityOriginSecond,
     disabledLaps,
     defaultFont: globalDefaults.font_values,
   })
@@ -68,6 +71,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
             registerNode={widgetRefCallbacks[widget.id]}
             isMapView={widget.id === mapViewWidgetId}
             handleWidgetMouseDown={handleWidgetMouseDown}
+            isHidden={!hasActivityCoverage && widget.type !== 'raster'}
           />
         ))}
       </div>

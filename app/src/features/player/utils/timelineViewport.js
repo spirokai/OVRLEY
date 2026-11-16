@@ -72,6 +72,22 @@ function getMinimumZoomSpan(widthPx) {
 }
 
 /**
+ * Whether the viewport can zoom further: in until it reaches the minimum zoom span, out until it shows the whole timeline.
+ *
+ * @param {{ viewStart: number, viewEnd: number, totalDuration: number, timelineMinimum?: number, widthPx?: number }} options
+ * @returns {{ canZoomIn: boolean, canZoomOut: boolean }} Available zoom directions.
+ */
+export function getZoomLimits({ viewStart, viewEnd, totalDuration, timelineMinimum = 0, widthPx = 0 }) {
+  const bounds = getTimelineBounds(timelineMinimum, totalDuration)
+  const span = viewEnd - viewStart
+  const minSpan = Math.min(getMinimumZoomSpan(widthPx), bounds.span)
+  return {
+    canZoomIn: span > minSpan + VIEWPORT_MATCH_EPSILON_SECONDS,
+    canZoomOut: span < bounds.span - VIEWPORT_MATCH_EPSILON_SECONDS,
+  }
+}
+
+/**
  * Zooms the viewport by a factor around a pivot point.
  *
  * @param {{ viewStart: number, viewEnd: number, pivot: number, direction: 1|-1, totalDuration: number, timelineMinimum?: number, widthPx?: number }} options
@@ -176,29 +192,52 @@ export function followPlayhead({ playheadSecond, viewStart, viewEnd, totalDurati
 }
 
 /**
+ * Picks the clip the video fit target zooms to: the selected clip, otherwise the
+ * clip at the playhead (the earliest one where clips overlap), otherwise the clip
+ * nearest to the playhead.
+ *
+ * @param {Array<{id: string, offsetSeconds: number, durationSeconds: number}>} clips Timeline clips.
+ * @param {string|null} selectedVideoId Selected clip's video, if any.
+ * @param {number} second Playhead second.
+ * @returns {object|null} Clip, or null without clips.
+ */
+export function resolveFitVideoClip(clips, selectedVideoId, second) {
+  const selected = clips.find((clip) => clip.id === selectedVideoId)
+  if (selected !== undefined) return selected
+  const distance = (clip) => Math.max(0, clip.offsetSeconds - second, second - (clip.offsetSeconds + clip.durationSeconds))
+  return clips.reduce(
+    (nearest, clip) =>
+      nearest === null || distance(clip) < distance(nearest) || (distance(clip) === distance(nearest) && clip.offsetSeconds < nearest.offsetSeconds)
+        ? clip
+        : nearest,
+    null,
+  )
+}
+
+/**
  * Builds canonical fit targets for the current media shape.
  *
- * @param {{ totalDuration: number, widthPx?: number, hasVideo: boolean, videoSyncOffsetSeconds: number, importedVideoDuration: number, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
+ * The video target fits one clip (`resolveFitVideoClip`); the interval of every video sets the timeline's start.
+ *
+ * @param {{ totalDuration: number, widthPx?: number, videoBounds: {startSecond: number, endSecond: number}|null, videoClipRange: {startSecond: number, endSecond: number}|null, hasActivityData: boolean, activityDurationSeconds: number, fallbackDurationSeconds: number }} options
  * @returns {Array<{ id: 'all'|'video'|'activity', label: string, viewport: { viewStart: number, viewEnd: number } }>}
  */
 export function buildFitTargets({
   totalDuration,
   widthPx = 0,
-  hasVideo,
-  videoSyncOffsetSeconds,
-  importedVideoDuration,
+  videoBounds,
+  videoClipRange,
   hasActivityData,
   activityDurationSeconds,
   fallbackDurationSeconds,
 }) {
   const targets = []
-  const timelineMinimum = getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds })
+  const timelineMinimum = getTimelineMinimum({ videoBounds })
   const componentRanges = []
 
-  if (hasVideo) {
-    const start = videoSyncOffsetSeconds
-    const duration = importedVideoDuration
-    const end = start + duration
+  if (videoClipRange !== null) {
+    const start = videoClipRange.startSecond
+    const end = videoClipRange.endSecond
     componentRanges.push({ start, end })
     targets.push({
       id: 'video',

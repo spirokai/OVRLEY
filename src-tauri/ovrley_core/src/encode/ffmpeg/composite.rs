@@ -86,14 +86,14 @@ pub struct CompositeFfmpegSettings {
 /// The input seek is intentionally an implementation detail derived from the
 /// already validated `trim_start`; it is not part of the render config.
 #[derive(Debug, Clone, Copy, PartialEq)]
-struct CompositeInputWindow {
-    seek_start: f64,
-    filter_start: f64,
+pub(super) struct CompositeInputWindow {
+    pub(super) seek_start: f64,
+    pub(super) filter_start: f64,
 }
 
 const COMPOSITE_INPUT_SEEK_PREROLL_SECONDS: f64 = 5.0;
 
-fn derive_composite_input_window(trim_start: f64) -> CompositeInputWindow {
+pub(super) fn derive_composite_input_window(trim_start: f64) -> CompositeInputWindow {
     let seek_start = (trim_start - COMPOSITE_INPUT_SEEK_PREROLL_SECONDS).max(0.0);
     CompositeInputWindow {
         seek_start,
@@ -289,7 +289,14 @@ pub fn build_composite_ffmpeg_settings(
     if include_audio {
         output_args.extend(["-map".to_string(), "[aout]".to_string()]);
     }
-    output_args.extend(["-r".to_string(), render.source_fps.ffmpeg_arg()]);
+    // `-r` makes the output constant-rate, which keeps a frame whose timestamp the
+    // source repeats. The encoder stops at the planned frames: joined outputs count them.
+    output_args.extend([
+        "-r".to_string(),
+        render.source_fps.ffmpeg_arg(),
+        "-frames:v".to_string(),
+        render.output_frame_count.to_string(),
+    ]);
     output_args.extend([
         "-c:v".to_string(),
         selected_profile

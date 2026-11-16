@@ -8,12 +8,24 @@ import {
   followPlayhead,
   getMatchingFitTargetId,
   getTimelineTickStep,
+  getZoomLimits,
   panViewport,
   rangesMatch,
+  resolveFitVideoClip,
   zoomRange,
 } from '@/features/player/utils/timelineViewport'
 
 describe('timelineViewport utilities', () => {
+  test('tells whether the viewport can zoom further in or out', () => {
+    const bounds = { totalDuration: 100, timelineMinimum: 0, widthPx: 500 }
+    expect(getZoomLimits({ viewStart: 0, viewEnd: 100, ...bounds })).toEqual({ canZoomIn: true, canZoomOut: false })
+    expect(getZoomLimits({ viewStart: 20, viewEnd: 60, ...bounds })).toEqual({ canZoomIn: true, canZoomOut: true })
+
+    let viewport = { viewStart: 0, viewEnd: 100 }
+    for (let step = 0; step < 20; step += 1) viewport = zoomRange({ ...viewport, pivot: 50, direction: 1, ...bounds })
+    expect(getZoomLimits({ ...viewport, ...bounds })).toEqual({ canZoomIn: false, canZoomOut: true })
+  })
+
   test('clamps and fits viewports', () => {
     expect(clampToView(150, 250, 200)).toEqual({ viewStart: 100, viewEnd: 200 })
     expect(fitToFull(2.509)).toEqual({ viewStart: 0, viewEnd: 2.509 })
@@ -27,10 +39,9 @@ describe('timelineViewport utilities', () => {
         activityDurationSeconds: 25,
         fallbackDurationSeconds: 25,
         hasActivityData: true,
-        hasVideo: true,
-        importedVideoDuration: 30,
         totalDuration: 25,
-        videoSyncOffsetSeconds: -5,
+        videoBounds: { startSecond: -5, endSecond: 25 },
+        videoClipRange: { startSecond: -5, endSecond: 25 },
       })[0].viewport,
     ).toEqual({ viewStart: -5, viewEnd: 25 })
   })
@@ -71,15 +82,38 @@ describe('timelineViewport utilities', () => {
       activityDurationSeconds: 45,
       fallbackDurationSeconds: 73,
       hasActivityData: true,
-      hasVideo: true,
-      importedVideoDuration: 20,
       totalDuration: 100,
-      videoSyncOffsetSeconds: 10,
+      videoBounds: { startSecond: 10, endSecond: 30 },
+      videoClipRange: { startSecond: 10, endSecond: 30 },
     })
 
     expect(targets.map((target) => target.id)).toEqual(['all', 'video', 'activity'])
     expect(getMatchingFitTargetId({ targets, viewport: targets[1].viewport })).toBe('video')
     expect(rangesMatch({ viewStart: 0, viewEnd: 100 }, { viewStart: 0, viewEnd: 100.0005 })).toBe(true)
+  })
+
+  test('fits the video target to one clip: the selected one, else the one at the playhead, else the nearest', () => {
+    const clips = [
+      { id: 'a', offsetSeconds: 0, durationSeconds: 20 },
+      { id: 'b', offsetSeconds: 15, durationSeconds: 10 },
+      { id: 'c', offsetSeconds: 60, durationSeconds: 20 },
+    ]
+    expect(resolveFitVideoClip(clips, 'c', 5).id).toBe('c')
+    // Where clips overlap, the earliest one.
+    expect(resolveFitVideoClip(clips, null, 17).id).toBe('a')
+    expect(resolveFitVideoClip(clips, null, 50).id).toBe('c')
+    expect(resolveFitVideoClip([], null, 50)).toBeNull()
+
+    const targets = buildFitTargets({
+      activityDurationSeconds: undefined,
+      fallbackDurationSeconds: 73,
+      hasActivityData: false,
+      totalDuration: 80,
+      videoBounds: { startSecond: 0, endSecond: 80 },
+      videoClipRange: { startSecond: 60, endSecond: 80 },
+    })
+    expect(targets.map((target) => target.id)).toEqual(['all', 'video'])
+    expect(targets[1].viewport).toEqual(fitRangeToViewport({ rangeStart: 60, rangeEnd: 80, timelineMinimum: 0, totalDuration: 80 }))
   })
 
   test('computes a major and minor tick strip from its anchor', () => {

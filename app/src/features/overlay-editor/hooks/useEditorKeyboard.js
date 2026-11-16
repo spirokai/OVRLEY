@@ -4,7 +4,7 @@
 
 import { useEffect, useEffectEvent } from 'react'
 import { deleteWidgetsInConfig, duplicateWidgetsInConfig, updateWidgetsInConfig } from '@/lib/widget/widget-config'
-import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
+import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut, hasTextSelection } from '@/lib/keyboard-shortcuts'
 
 /**
  * Registers keyboard listeners for editor actions.
@@ -38,7 +38,7 @@ export function useEditorKeyboard({ config, onConfigChange, selectedWidgetIds, s
         setWidgetSelection([])
         return
       case 'editor.copy':
-        if (!selectedWidgets.length) return
+        if (!selectedWidgets.length || hasTextSelection()) return
         event.preventDefault()
         clipboardRef.current = {
           widgets: selectedWidgets.map((widget) => ({

@@ -71,10 +71,10 @@ describe('useTimelineViewport', () => {
       useTimelineViewport({
         activityDurationSeconds: 45,
         hasActivityData: true,
-        hasVideo: true,
-        importedVideoDuration: 20,
         totalDuration: 100,
-        videoSyncOffsetSeconds: 10,
+        videoBounds: { startSecond: 10, endSecond: 30 },
+        videoClipRange: { startSecond: 10, endSecond: 30 },
+        videoIdentity: 'video-1:20',
       }),
     )
 
@@ -98,14 +98,14 @@ describe('useTimelineViewport', () => {
     expect(result.current.displayedFitTargetId).toBe('activity')
   })
 
-  test('preserves the viewport when the sync offset changes across the timeline minimum', () => {
+  test('preserves the viewport when the video offset changes across the timeline minimum', () => {
     const { result, rerender } = renderHook(
-      ([videoSyncOffsetSeconds]) =>
+      ([startSecond]) =>
         useTimelineViewport({
-          hasVideo: true,
-          importedVideoDuration: 20,
           totalDuration: 100,
-          videoSyncOffsetSeconds,
+          videoBounds: { startSecond, endSecond: startSecond + 20 },
+          videoClipRange: { startSecond, endSecond: startSecond + 20 },
+          videoIdentity: 'video-1:20',
         }),
       { initialProps: [10] },
     )
@@ -122,6 +122,42 @@ describe('useTimelineViewport', () => {
 
     expect(result.current.viewport).toEqual({ viewStart: 9.2, viewEnd: 30.8 })
     expect(result.current.displayedFitTargetId).toBeNull()
+  })
+
+  test('re-fits the full range when the imported video collection changes', () => {
+    const { result, rerender } = renderHook(
+      ([videoBounds, videoIdentity, totalDuration]) => useTimelineViewport({ totalDuration, videoBounds, videoIdentity }),
+      { initialProps: [{ startSecond: 0, endSecond: 20 }, 'first:20', 20] },
+    )
+
+    act(() => {
+      result.current.fitTarget('video')
+      result.current.zoomIn()
+    })
+
+    expect(result.current.viewport).not.toEqual({ viewStart: 0, viewEnd: 20 })
+
+    act(() => {
+      rerender([{ startSecond: -5, endSecond: 60 }, 'first:20|second:30', 60])
+    })
+
+    expect(result.current.viewport).toEqual({ viewStart: -5, viewEnd: 60 })
+    expect(result.current.timelineMinimum).toBe(-5)
+  })
+
+  test('uses displayed drag bounds for the timeline minimum and the committed clip for the video fit target', () => {
+    const { result } = renderHook(() =>
+      useTimelineViewport({
+        displayedVideoBounds: { startSecond: -8, endSecond: 32 },
+        totalDuration: 100,
+        videoBounds: { startSecond: 0, endSecond: 40 },
+        videoClipRange: { startSecond: 20, endSecond: 40 },
+        videoIdentity: 'first:20|second:20',
+      }),
+    )
+
+    expect(result.current.timelineMinimum).toBe(-8)
+    expect(result.current.fitTargets.find((target) => target.id === 'video').viewport.viewStart).toBeCloseTo(19.2)
   })
 
   test('does not change viewport scale while a sync offset drag changes total duration', () => {
@@ -171,7 +207,7 @@ describe('useTimelineViewport', () => {
     const beforePan = { ...result.current.viewport }
 
     act(() => {
-      result.current.handleWheel({ clientX: 50, deltaY: 10, preventDefault, type: 'wheel' })
+      result.current.handleWheel({ clientX: 50, currentTarget: { contains: () => true }, deltaY: 10, preventDefault, type: 'wheel' })
     })
 
     expect(preventDefault).toHaveBeenCalled()
@@ -188,7 +224,7 @@ describe('useTimelineViewport', () => {
     })
 
     act(() => {
-      result.current.handleWheel({ clientX: 25, ctrlKey: true, deltaY: -100, preventDefault, type: 'wheel' })
+      result.current.handleWheel({ clientX: 25, ctrlKey: true, currentTarget: { contains: () => true }, deltaY: -100, preventDefault, type: 'wheel' })
     })
 
     expect(preventDefault).toHaveBeenCalled()

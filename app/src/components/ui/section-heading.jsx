@@ -1,3 +1,4 @@
+import { HelpTooltip } from '@/components/ui/help-tooltip'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
 import { useTranslation } from 'react-i18next'
@@ -27,11 +28,12 @@ const VARIANT_STYLES = {
  * @param {string} [props.title] - Explicit heading text.
  * @param {string} [props.titleKey] - Translation key used when title is absent.
  * @param {string} [props.defaultTitle] - Default translation used when title is absent.
+ * @param {string} [props.help] - Optional help, shown by an info icon right after the title.
  * @param {React.ReactNode} [props.trailing=null] - Optional trailing action.
  * @param {'compact'|'drawer'} [props.variant='compact'] - Canonical heading density.
  * @returns {JSX.Element} Rendered section heading.
  */
-export function SectionHeading({ icon: Icon, title, titleKey, defaultTitle, trailing = null, variant = 'compact' }) {
+export function SectionHeading({ icon: Icon, title, titleKey, defaultTitle, help, trailing = null, variant = 'compact' }) {
   const { t } = useTranslation()
   const styles = VARIANT_STYLES[variant]
   const Heading = styles.tag
@@ -42,6 +44,7 @@ export function SectionHeading({ icon: Icon, title, titleKey, defaultTitle, trai
       <div className={cn('flex min-w-0 flex-1 items-center', styles.content)}>
         <Icon className={cn('text-primary', styles.icon)} />
         <Heading className={cn('font-bold uppercase text-muted-foreground/70', styles.heading)}>{resolvedTitle}</Heading>
+        {help ? <HelpTooltip content={help} className="-ml-1" /> : null}
         <Separator className="flex-1" />
       </div>
       {trailing ? <div className="shrink-0">{trailing}</div> : null}

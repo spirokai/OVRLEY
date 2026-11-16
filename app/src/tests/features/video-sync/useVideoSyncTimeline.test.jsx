@@ -16,8 +16,8 @@ const baseProps = {
   timelineMinimum: 0,
   totalDuration: 20,
   videoDuration: 20,
-  videoSyncOffsetSeconds: 2,
-  videoSyncOffsetPreviewSeconds: null,
+  videoOffsetSeconds: 2,
+  displayedVideoOffsetSeconds: 2,
   viewEnd: 20,
   viewStart: 0,
   widthPx: 400,
@@ -76,11 +76,11 @@ describe('useVideoSyncTimeline', () => {
     expect(initialTimelineSecond).toBe(5)
   })
 
-  test('uses the preview offset to move landmark display geometry without committing a landmark', () => {
+  test('uses the displayed offset to move landmark display geometry without committing a landmark', () => {
     const moveLandmark = vi.fn()
     const { result, rerender } = renderHook((props) => useVideoSyncTimeline(props), { initialProps: { ...baseProps, moveLandmark } })
 
-    rerender({ ...baseProps, moveLandmark, videoSyncOffsetPreviewSeconds: 5 })
+    rerender({ ...baseProps, moveLandmark, displayedVideoOffsetSeconds: 5 })
 
     expect(result.current.landmarks[0].timelineSecond).toBe(8)
     expect(moveLandmark).not.toHaveBeenCalled()

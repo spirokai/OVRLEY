@@ -3,6 +3,7 @@
  */
 
 import { getEffectiveWidgetData } from '@/lib/template/template-state'
+import { clamp } from '@/lib/utils'
 import { isFramedWidget } from '@/lib/widget/widget-catalog'
 import { VIDEO_SYNC_PREVIEW_SCREEN_GAP } from '@/features/video-sync'
 import { EDITOR_GRID_DIVISIONS } from '../data/overlayEditorConstants'
@@ -82,8 +83,28 @@ export function getSceneSize(config) {
   return { width: config.scene.width, height: config.scene.height }
 }
 
-/** @param {object} exportRange Committed export range. @param {string|null} importedVideoPath Imported video. @param {number} importedVideoDuration Duration. @param {number} videoSyncOffsetSeconds Offset. @returns {object} Preview range. */
-export function getPreviewExportRange(exportRange, importedVideoPath, importedVideoDuration, videoSyncOffsetSeconds) {
-  if (importedVideoPath === null || exportRange.type === 'custom') return exportRange
-  return { type: 'custom', from: videoSyncOffsetSeconds, to: videoSyncOffsetSeconds + importedVideoDuration }
+/**
+ * The activity window widgets read in the preview: the telemetry clip's own
+ * duration, the interval covered by the videos, or, without videos, the
+ * activity trim. The window is clamped to the activity; one outside it scopes nothing.
+ * @param {object} options Window inputs.
+ * @param {number} options.activityDurationSeconds Duration of the previewed activity.
+ * @param {{startSecond: number, endSecond: number}|null} options.activityTrim Trim of the external activity.
+ * @param {number|null} options.activityClipDurationSeconds Duration of the clip supplying embedded telemetry, or null with an external activity.
+ * @param {{startSecond: number, endSecond: number}|null} options.videoBounds Interval covered by the videos.
+ * @returns {{exportStartSecond: number, startSecond: number, endSecond: number, isScoped: boolean}} Preview activity window.
+ */
+export function resolvePreviewWindow({ activityDurationSeconds, activityTrim, activityClipDurationSeconds, videoBounds }) {
+  const range =
+    activityClipDurationSeconds !== null
+      ? { startSecond: 0, endSecond: activityClipDurationSeconds }
+      : videoBounds !== null
+        ? videoBounds
+        : activityTrim
+  const whole = { startSecond: 0, endSecond: activityDurationSeconds, isScoped: false }
+  if (range === null) return { exportStartSecond: 0, ...whole }
+  const startSecond = clamp(range.startSecond, 0, activityDurationSeconds)
+  const endSecond = clamp(range.endSecond, 0, activityDurationSeconds)
+  if (!(endSecond > startSecond)) return { exportStartSecond: range.startSecond, ...whole }
+  return { exportStartSecond: range.startSecond, startSecond, endSecond, isScoped: true }
 }

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import useStore from '@/store/useStore'
 import { VIDEO_SYNC_TOOL } from '@/store/slices/createLayoutSlice'
+import { findVideoSyncTarget } from '@/store/slices/createManualVideoSyncSlice'
 import { VIDEO_SYNC_LANDMARK_TYPES, VIDEO_SYNC_MAX_LANDMARKS } from '../data/videoSyncConstants'
 import { buildVideoSyncDrawerPresentation } from '../utils/videoSyncPresentation'
 import useVideoSyncCalculation from './useVideoSyncCalculation'
@@ -13,18 +14,17 @@ import useVideoSyncCalculation from './useVideoSyncCalculation'
  *
  * @param {object} options Workspace inputs.
  * @param {{activeTool: string, visible: boolean}} options.toolbarDrawer Shared toolbar drawer state.
- * @param {object} options.videoSummary Imported video summary.
  * @param {object} options.videoSync Existing video-sync control state/actions.
  * @returns {object} Workspace state for the drawer, preview, and player.
  */
-export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, videoSync }) {
+export default function useVideoSyncWorkspace({ toolbarDrawer, videoSync }) {
   const { t } = useTranslation()
   const calculation = useVideoSyncCalculation()
   const {
     applyVideoSyncCandidate,
     clearVideoSyncLandmarks,
     clearVideoSyncDetectedLocation,
-    importedVideoDuration,
+    hasVideos,
     landmarks,
     manualVideoSyncDetection,
     manualVideoSyncResults,
@@ -36,14 +36,15 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     setVideoSyncDrawerTab,
     speedThresholdKmh,
     turnThresholdDegrees,
-    videoSyncOffsetSeconds,
+    targetDurationSeconds,
+    targetOffsetSeconds,
     videoSyncDrawerTab,
   } = useStore(
     useShallow((state) => ({
       applyVideoSyncCandidate: state.applyVideoSyncCandidate,
       clearVideoSyncLandmarks: state.clearVideoSyncLandmarks,
       clearVideoSyncDetectedLocation: state.clearVideoSyncDetectedLocation,
-      importedVideoDuration: state.importedVideoDuration,
+      hasVideos: state.importedVideos.length > 0,
       landmarks: state.manualVideoSync.landmarks,
       manualVideoSyncDetection: state.manualVideoSyncDetection,
       manualVideoSyncResults: state.manualVideoSyncResults,
@@ -55,7 +56,8 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       setVideoSyncDrawerTab: state.setVideoSyncDrawerTab,
       speedThresholdKmh: state.manualVideoSync.speedThresholdKmh,
       turnThresholdDegrees: state.manualVideoSync.turnThresholdDegrees,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      targetDurationSeconds: findVideoSyncTarget(state)?.durationSeconds ?? null,
+      targetOffsetSeconds: findVideoSyncTarget(state)?.offsetSeconds ?? 0,
       videoSyncDrawerTab: state.videoSyncDrawerTab,
     })),
   )
@@ -79,7 +81,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
   })
   const addLandmarkAtPlayhead = useCallback((type) => {
     const state = useStore.getState()
-    state.addVideoSyncLandmark(type, state.selectedSecond - state.videoSyncOffsetSeconds)
+    state.addVideoSyncLandmark(type, state.selectedSecond - findVideoSyncTarget(state).offsetSeconds)
   }, [])
 
   const markStop = useCallback(() => addLandmarkAtPlayhead(VIDEO_SYNC_LANDMARK_TYPES.STOP), [addLandmarkAtPlayhead])
@@ -91,7 +93,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
     videoSyncMode: toolbarDrawer.activeTool === VIDEO_SYNC_TOOL,
     drawer: {
       activeTab: videoSyncDrawerTab,
-      appliedOffset: videoSyncOffsetSeconds,
+      appliedOffset: targetOffsetSeconds,
       calculation,
       detectionCounts: drawerPresentation.detectionCounts,
       hasLocationLandmark,
@@ -110,14 +112,14 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       speedValueLabel: drawerPresentation.speedValueLabel,
       turnThresholdDraftDegrees,
       turnValueLabel: drawerPresentation.turnValueLabel,
-      videoSummary,
+      hasVideos,
       videoSync,
     },
     markControls: {
       detection: manualVideoSyncDetection,
       hasLandmarkCapacity,
       hasLocationLandmark,
-      importedVideoDuration,
+      videoDurationSeconds: targetDurationSeconds,
       landmarkLimitReason: t('videoSync.landmarkLimit', 'The maximum of five landmarks has been reached'),
       locationLimitReason: t('videoSync.locationLimit', 'Only one location landmark is allowed'),
       onMarkLeftTurn: markLeftTurn,
@@ -128,7 +130,7 @@ export default function useVideoSyncWorkspace({ toolbarDrawer, videoSummary, vid
       onDeleteCourseLocation: clearVideoSyncDetectedLocation,
       playheadOutsideVideoReason: t('videoSync.playheadInsideVideo', 'Move the playhead inside the video to mark a landmark'),
       videoRequiredReason: t('videoSync.videoRequired', 'A video is required to mark a landmark'),
-      videoSyncOffsetSeconds,
+      videoOffsetSeconds: targetOffsetSeconds,
     },
   }
 }

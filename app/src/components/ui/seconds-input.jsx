@@ -1,0 +1,145 @@
+/**
+ * The one input for times and durations: the value is typed as a clock (`05:30`),
+ * as plain seconds, or as a sum of both (`05:30+10`). While a complete draft is
+ * typed, a preview below the field reads it as a clock and in seconds.
+ */
+
+import { useId } from 'react'
+import { ChevronDown, ChevronUp, Clock, RotateCcw } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { useSecondsInput } from '@/hooks/useSecondsInput'
+import { cn } from '@/lib/utils'
+import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+
+/**
+ * Renders a seconds input. Typed text is kept until Enter or leaving the field,
+ * then snapped to the frame grid and committed; Escape discards it. The arrow keys
+ * step the value (`secondsInput.step` in the shortcut manifest).
+ *
+ * @param {object} props - Component props.
+ * @param {number} props.value - Stored value in seconds.
+ * @param {(seconds: number) => string|null|undefined} props.onCommit - Stores a snapped value; returns a message when it is rejected.
+ * @param {{num: number, den: number}|null} props.fps - Frame grid the value snaps to, or null.
+ * @param {'time'|'duration'} [props.mode='time'] - A duration is above 0 and at least one frame.
+ * @param {'clock'|'seconds'} [props.display='clock'] - Shows the value as a clock, or as seconds with one decimal and a `SEC` unit.
+ * @param {boolean} [props.signed=false] - Whether negative values are allowed.
+ * @param {number|null} [props.step=null] - Seconds the step buttons add or remove; null hides them.
+ * @param {{isManual: boolean, onReset: function, label: string, manualHint: string, autoHint: string}|null} [props.reset=null] - Placement
+ *   slot inside the field: a reset button for a value set by hand, a clock for an automatic one; null hides it.
+ * @param {string} [props.className] - Classes of the input element.
+ * @returns {JSX.Element} Rendered input.
+ */
+export function SecondsInput({
+  value,
+  onCommit,
+  fps,
+  mode = 'time',
+  display = 'clock',
+  signed = false,
+  step = null,
+  reset = null,
+  className,
+  ...props
+}) {
+  const { t } = useTranslation()
+  const messageId = useId()
+  const field = useSecondsInput({
+    value,
+    onCommit,
+    fps,
+    mode,
+    signed,
+    step,
+    display,
+    onReset: reset !== null && reset.isManual ? reset.onReset : null,
+  })
+  const slotPosition = field.onStep === null ? 'right-1' : 'right-7'
+  const showUnit = display === 'seconds' && field.onStep === null && reset === null
+  return (
+    <div className="space-y-1">
+      <div className="relative">
+        <Input
+          {...props}
+          type="text"
+          value={field.text}
+          onChange={field.onChange}
+          onBlur={field.onBlur}
+          onKeyDown={field.onKeyDown}
+          onKeyUp={field.onKeyUp}
+          aria-invalid={field.error !== null}
+          aria-describedby={field.error !== null || field.preview !== null ? messageId : undefined}
+          className={cn(
+            'border-border/70 tabular-nums transition-colors',
+            className,
+            field.onStep !== null && reset !== null ? 'pr-13' : (field.onStep !== null || reset !== null) && 'pr-7',
+            showUnit && 'pr-9',
+          )}
+        />
+        {showUnit ? (
+          <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-xs text-muted-foreground">
+            {t('components.secondsUnit', 'SEC')}
+          </span>
+        ) : null}
+        {field.onStep !== null ? (
+          <div className="absolute inset-y-1 right-1 flex w-5 flex-col overflow-hidden rounded bg-surface-strong">
+            <button
+              type="button"
+              className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => field.onStep(1)}
+              disabled={props.disabled}
+              aria-label={t('components.increaseValue', 'Increase value')}
+            >
+              <ChevronUp className="h-3 w-3" />
+            </button>
+            <div className="h-px bg-border/60" />
+            <button
+              type="button"
+              className="flex flex-1 items-center justify-center text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => field.onStep(-1)}
+              disabled={props.disabled}
+              aria-label={t('components.decreaseValue', 'Decrease value')}
+            >
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </div>
+        ) : null}
+        {field.onReset !== null ? (
+          <SimpleTooltip content={reset.manualHint} className={cn('absolute inset-y-1 w-5', slotPosition)}>
+            <button
+              type="button"
+              className="flex w-full items-center justify-center rounded text-muted-foreground transition-colors hover:bg-surface-accent-soft hover:text-primary disabled:pointer-events-none disabled:opacity-50"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={field.onReset}
+              disabled={props.disabled}
+              aria-label={reset.label}
+            >
+              <RotateCcw className="h-3 w-3" />
+            </button>
+          </SimpleTooltip>
+        ) : reset !== null ? (
+          <SimpleTooltip content={reset.autoHint} className={cn('absolute inset-y-1 w-5', slotPosition)}>
+            <span
+              role="img"
+              className={cn('flex w-full items-center justify-center text-muted-foreground/50', props.disabled && 'opacity-50')}
+              aria-label={reset.autoHint}
+            >
+              <Clock className="h-3 w-3" />
+            </span>
+          </SimpleTooltip>
+        ) : null}
+      </div>
+      {field.error !== null ? (
+        <p id={messageId} role="alert" className="text-[0.65rem] text-destructive">
+          {field.error}
+        </p>
+      ) : field.preview !== null ? (
+        <p id={messageId} className="text-[0.65rem] text-muted-foreground tabular-nums">
+          {field.preview}
+        </p>
+      ) : null}
+    </div>
+  )
+}

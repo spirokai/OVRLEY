@@ -2,7 +2,8 @@
  * Widgets catalog content for the shared left drawer.
  */
 
-import { useLayoutStore, useActivityStore } from '@/hooks/useAppStoreSelectors'
+import { useLayoutStore } from '@/hooks/useAppStoreSelectors'
+import { useAvailableMetrics } from '@/hooks/useVideoTimeline'
 import { useWidgetManager } from '@/features/widget-editor/hooks/useWidgetManager'
 import { WidgetButtonGrid } from './WidgetButtonGrid'
 
@@ -12,7 +13,7 @@ import { WidgetButtonGrid } from './WidgetButtonGrid'
  */
 export function WidgetDrawerContent({ widgetLiveEdits }) {
   const { dismissLeftDrawerOverlay } = useLayoutStore()
-  const { activitySummary } = useActivityStore()
+  const availableMetrics = useAvailableMetrics()
   const { addWidget } = useWidgetManager({ widgetLiveEdits })
 
   const handleAddWidget = (request) => {
@@ -20,5 +21,5 @@ export function WidgetDrawerContent({ widgetLiveEdits }) {
     dismissLeftDrawerOverlay()
   }
 
-  return <WidgetButtonGrid onAddWidget={handleAddWidget} availableMetrics={activitySummary?.availableMetrics ?? []} />
+  return <WidgetButtonGrid onAddWidget={handleAddWidget} availableMetrics={availableMetrics} />
 }

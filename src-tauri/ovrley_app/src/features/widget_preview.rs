@@ -15,7 +15,6 @@
 //!   repeat across documents.
 
 use crate::features::overlay_editor::{raster_scale, scene_size};
-use crate::lib::export_range::{resolve_export_range_window, ExportRange};
 use crate::lib::template::{effective_widget_data, ThemeColors};
 use crate::lib::widget::build_config_widgets;
 use crate::store::services::Services;
@@ -164,16 +163,25 @@ pub fn widget_fonts(kind: &str, data: &Map<String, Value>) -> Vec<FontKey> {
     }
 }
 
-/// `buildWasmScene`: the preview scene from the global defaults, the scene size, the export-range
-/// window and the fallback duration.
+/// The trimmed activity duration (always present natively), never negative.
+fn activity_duration(activity: Option<&ovrley_core::activity::schema::ParsedActivity>) -> f64 {
+    let duration = activity.map_or(0.0, |activity| activity.trim_end_seconds);
+    if duration.is_finite() {
+        duration.max(0.0)
+    } else {
+        0.0
+    }
+}
+
+/// `buildWasmScene` with `resolvePreviewWindow`'s whole-activity window: the preview scene from the
+/// global defaults, the scene size and the fallback duration. The activity trim and the video
+/// bounds that narrow the window are not ported yet.
 pub fn preview_scene(
     globals: &Map<String, Value>,
     scene: (f64, f64),
-    range: &ExportRange,
     activity: Option<&ovrley_core::activity::schema::ParsedActivity>,
     fallback_duration: f64,
 ) -> Value {
-    let window = resolve_export_range_window(activity, range);
     let global = |key: &str| globals.get(key).cloned().unwrap_or(Value::Null);
     json!({
         "width": number(scene.0),
@@ -186,10 +194,10 @@ pub fn preview_scene(
         "fixed_width_digits": global("fixed_width_digits"),
         "scale": global("scale"),
         "opacity": global("opacity"),
-        "export_start_seconds": range.from,
-        "start": window.start,
-        "end": window.end,
-        "custom_export_range_active": window.active,
+        "export_start_seconds": 0.0,
+        "start": 0.0,
+        "end": activity_duration(activity),
+        "custom_export_range_active": false,
         "preview_duration_seconds": fallback_duration,
     })
 }
@@ -654,7 +662,6 @@ fn sync(
     let scene = preview_scene(
         &globals,
         scene_size(store),
-        &ExportRange::default_range(),
         store
             .media
             .parsed_activity
@@ -875,13 +882,16 @@ mod tests {
         let scene = preview_scene(
             &globals,
             (1920.0, 1080.0),
-            &ExportRange::default_range(),
             None,
             73.0,
         );
         assert_eq!(scene["width"], 1920);
         assert_eq!(scene["preview_duration_seconds"], 73.0);
         assert_eq!(scene["custom_export_range_active"], false);
+        assert_eq!(scene["end"], 0.0);
+        let activity = ovrley_core::activity::schema::ParsedActivity { trim_end_seconds: 90.0, ..Default::default() };
+        let scene = preview_scene(&globals, (1920.0, 1080.0), Some(&activity), 73.0);
+        assert_eq!((scene["start"].as_f64(), scene["end"].as_f64()), (Some(0.0), Some(90.0)));
         assert_eq!(scene["scale"], globals["scale"]);
     }
 

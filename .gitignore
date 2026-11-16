@@ -50,6 +50,7 @@ src-tauri/binaries/
 /ffmpeg/
 .ffmpeg/
 vendor/ffmpeg/*
+vendor/wasm-bindgen/
 !vendor/ffmpeg/.gitkeep
 vendor/telemetry-parser/
 vendor/wasm-bindgen/

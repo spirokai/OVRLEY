@@ -2,38 +2,41 @@
  * Top-level player orchestration hook for the presentational overlay player components.
  */
 
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { hasOpenOverlay, isFormFieldShortcut, matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
-import { videoOverlapsActivity } from '@/lib/video-sync'
+import { useJoinTransitionModels } from '@/features/transitions'
+import { useVideoTimeline, useVideoWarnings } from '@/hooks/useVideoTimeline'
 import useStore from '@/store/useStore'
-import { snapTimelineSecondToFrame } from '../utils/playerTiming'
 import { PLAYHEAD_CENTER_X } from '../data/playheadGeometry'
-import { moveClipOffset, roundToDevicePixel, secondsToViewPx, snapToScreenPixel } from '../utils/timelineGeometry'
+import { applyCutDraft, applyCutDraftToSelection, segmentOfCut } from '../utils/cutDrag'
+import { roundToDevicePixel, secondsToViewPx, snapToScreenPixel, videoIdFromLaneId, videoLaneId } from '../utils/timelineGeometry'
+import { resolveFitVideoClip } from '../utils/timelineViewport'
 
+import useActivityTrim from './useActivityTrim'
 import useClipDrag from './useClipDrag'
-import useExportRangeTimeline from './useExportRangeTimeline'
+import useCutDrag from './useCutDrag'
 import usePlaybackEngine from './usePlaybackEngine'
 import useTimelineClips from './useTimelineClips'
 import useTimelineGestures from './useTimelineGestures'
 import useTimelineViewport from './useTimelineViewport'
+import useVideoCuts from './useVideoCuts'
+import useWantedFilmstripWindows from './useWantedFilmstripWindows'
 import useVideoSyncTimeline from '@/features/video-sync/hooks/useVideoSyncTimeline'
 
-function getMarkerClassName(marker) {
-  return `mt-1 h-4 w-2.5 bg-success/10 ${
-    marker === 'from' ? 'rounded-l-sm border-b-2 border-l-2 border-t-2' : 'rounded-r-sm border-b-2 border-r-2 border-t-2'
-  } border-success`
-}
+/** Elements whose clicks keep the clip selection: kept areas, and the portaled popups and dialogs they open. */
+const KEEPS_CLIP_SELECTION = '[data-keeps-clip-selection], [data-radix-popper-content-wrapper], [role="dialog"]'
 
 /**
- * Composes store selection, playback, viewport, export range, gestures, clips, and keyboard commands.
+ * Composes store selection, playback, viewport, activity trim, gestures, clips, and keyboard commands.
  *
  * @param {{ activeKeyboardWorkspace: string, backgroundMode: string, videoSyncMode?: boolean }} options Overlay player inputs.
  * @param {string} options.activeKeyboardWorkspace Active keyboard command workspace.
  * @param {string} options.backgroundMode Active preview background mode.
+ * @param {function} [options.onRemoveVideo] Removes a video clip by video ID.
  * @returns {object} Presentational view model for the overlay player.
  */
-export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode, videoSyncMode = false }) {
+export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMode, onRemoveVideo, videoSyncMode = false }) {
   // Store selector - gathers the entire player-facing store contract in one subscription.
   const playerStore = useStore(
     useShallow((state) => ({
@@ -42,14 +45,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       beginPreviewScrub: state.beginPreviewScrub,
       commitPreviewScrub: state.commitPreviewScrub,
       fallbackDurationSeconds: state.fallbackDurationSeconds,
-      importedVideoDuration: state.importedVideoDuration,
-      importedVideoFps: state.importedVideoFps,
-      importedVideoImportId: state.importedVideoImportId,
-      importedVideoPath: state.importedVideoPath,
+      hasVideoTelemetry: state.importedVideos.some((video) => video.telemetry.status === 'ready'),
       manualVideoSyncDetection: state.manualVideoSyncDetection,
       manualVideoSyncLandmarks: state.manualVideoSync.landmarks,
+      manualVideoSyncVideoId: state.manualVideoSync.videoId,
       moveVideoSyncLandmark: state.moveVideoSyncLandmark,
       pausePreviewPlayback: state.pausePreviewPlayback,
+      moveCut: state.moveCut,
+      trimVideo: state.trimVideo,
+      requestCutRemoval: state.requestCutRemoval,
       toggleVideoMute: state.toggleVideoMute,
       isVideoMuted: state.isVideoMuted,
       previewPlaybackSource: state.previewPlaybackSource,
@@ -57,118 +61,136 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       sceneFps: state.renderSettings.fps,
       selectedSecond: state.selectedSecond,
       setSelectedSecond: state.setSelectedSecond,
-      setVideoSyncOffset: state.setVideoSyncOffset,
-      setVideoSyncOffsetPreview: state.setVideoSyncOffsetPreview,
-      setVideoSyncWarning: state.setVideoSyncWarning,
+      setVideoDragPreview: state.setVideoDragPreview,
+      setVideoOffset: state.setVideoOffset,
+      shiftVideoOffsets: state.shiftVideoOffsets,
       startPreviewPlayback: state.startPreviewPlayback,
       selectedWidgetIds: state.selectedWidgetIds,
       updatePreviewScrub: state.updatePreviewScrub,
       updateRate: state.renderSettings.widgetUpdateRate,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
-      videoSyncOffsetPreviewSeconds: state.videoSyncOffsetPreviewSeconds,
+      videoFilmstrips: state.videoFilmstrips,
     })),
   )
+  const timeline = useVideoTimeline()
+  const videoWarnings = useVideoWarnings()
+  const displayedTimeline = timeline.displayed
+  const joinModels = useJoinTransitionModels(displayedTimeline)
+  const videoIdentity = useMemo(() => timeline.clips.map((clip) => `${clip.id}:${clip.durationSeconds}`).join('|'), [timeline.clips])
 
-  const [selectedClipId, setSelectedClipId] = useState(null)
-  const [keyboardSyncOffsetSeconds, setKeyboardSyncOffsetSeconds] = useState(null)
-
-  // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
-  const playback = usePlaybackEngine({ ...playerStore, backgroundMode })
-  const { hasActivity, isPlaying, pause, play, readPlayheadSecond, stepBySeconds } = playback
-  // Export boundary read - commands resolve the frame-snapped playhead when invoked, not on every playback frame.
-  const readExportBoundarySecond = useCallback(
-    () =>
-      playback.importedVideoPath
-        ? snapTimelineSecondToFrame(readPlayheadSecond(), playerStore.importedVideoFps, playback.videoSyncOffsetSeconds)
-        : readPlayheadSecond(),
-    [playback.importedVideoPath, playback.videoSyncOffsetSeconds, playerStore.importedVideoFps, readPlayheadSecond],
-  )
-  const exportTimeline = useExportRangeTimeline({
-    defaultEndSecond: playback.importedVideoPath ? playback.videoSyncOffsetSeconds + playback.importedVideoDuration : playback.totalDuration,
-    timelineMinimum: playback.timelineMinimum,
-    totalDuration: playback.totalDuration,
-  })
-  const gestures = useTimelineGestures({
-    cancelMarkerPreview: exportTimeline.cancelMarkerPreview,
-    cancelScrub: playback.cancelScrub,
-    commitMarker: exportTimeline.commitMarker,
-    commitScrub: playback.commitScrub,
-    previewMarker: exportTimeline.previewMarker,
-    scrubTo: playback.scrubTo,
-  })
-  const { getExportMarkerProps, updateTimelineMetrics } = gestures
+  // Clip selection - a clip, and on a video clip the segment under the pointer (null when selected from the keyboard).
+  // The store owns it, so the video panel and the video drawer show the same selection.
+  const selectedClip = useStore((state) => state.selectedClip)
+  const selectClip = useStore((state) => state.selectClip)
 
   // Media flags - downstream hooks need explicit availability booleans, not inferred path/summary checks.
-  const hasVideo = Boolean(playback.importedVideoPath)
+  const hasVideo = timeline.clips.length > 0
   const hasActivityData = Boolean(playerStore.activitySummary)
   const activityDurationSeconds = playerStore.activitySummary?.durationSeconds ?? 0
-  const canSelectClip = hasVideo && playback.hasActivity
+  const canSelectClip = hasVideo
 
-  // Clip nudge commands - stable identities keep lane view models memoized during playback.
-  const nudgeClip = useCallback(
-    (laneId, deltaSeconds) => {
-      setKeyboardSyncOffsetSeconds((currentOffset) => {
-        const nextOffset = moveClipOffset({
-          currentOffset: currentOffset ?? playerStore.videoSyncOffsetSeconds,
-          deltaSeconds,
-          laneId,
-        })
-        const roundedOffset = Math.round(nextOffset * 10) / 10
-        return videoOverlapsActivity({ videoStart: roundedOffset, videoDuration: playback.importedVideoDuration })
-          ? roundedOffset
-          : (currentOffset ?? playerStore.videoSyncOffsetSeconds)
-      })
-    },
-    [playback.importedVideoDuration, playerStore.videoSyncOffsetSeconds],
-  )
+  // Durable domains - each hook owns behavior for one player concern, while this hook wires them together.
+  const playback = usePlaybackEngine({
+    ...playerStore,
+    activityDurationSeconds,
+    backgroundMode,
+    hasActivityData: hasActivityData || playerStore.hasVideoTelemetry,
+    program: timeline.program,
+    videoBounds: timeline.bounds,
+    videoIdentity,
+  })
+  const { hasActivity, isPlaying, pause, play, readPlayheadSecond, stepBySeconds } = playback
+  const gestures = useTimelineGestures({
+    cancelScrub: playback.cancelScrub,
+    commitScrub: playback.commitScrub,
+    scrubTo: playback.scrubTo,
+  })
+  const { updateTimelineMetrics } = gestures
 
-  const { setVideoSyncOffset } = playerStore
-  const commitClipNudge = useCallback(() => {
-    if (keyboardSyncOffsetSeconds === null) return
-    setVideoSyncOffset(keyboardSyncOffsetSeconds)
-    setKeyboardSyncOffsetSeconds(null)
-  }, [keyboardSyncOffsetSeconds, setVideoSyncOffset])
-
-  // Selection is scoped to the current media pair and ends when the user clicks elsewhere.
+  // Selection ends when the user clicks outside the timeline, its toolbar, the video panel, and the video drawer;
+  // the store ends it when its clip leaves the timeline. Pickers, menus, and dialogs are portaled outside those
+  // areas but belong to the control that opened them, so using them keeps the selection.
   useEffect(() => {
-    setSelectedClipId(null)
-    setKeyboardSyncOffsetSeconds(null)
-  }, [playerStore.activitySummary, playerStore.importedVideoImportId, playback.importedVideoPath])
-
-  useEffect(() => {
-    const clearClipSelection = () => setSelectedClipId(null)
+    const clearClipSelection = (event) => {
+      if (useStore.getState().selectedClip !== null && !event.target.closest?.(KEEPS_CLIP_SELECTION)) selectClip(null)
+    }
     window.addEventListener('pointerdown', clearClipSelection, true)
     return () => window.removeEventListener('pointerdown', clearClipSelection, true)
-  }, [])
+  }, [selectClip])
 
-  // Clip drag - owns horizontal drag gesture state for sync offset adjustment.
+  // Clip drag - owns horizontal drag gestures and keyboard nudges for clip offsets.
   const clipDrag = useClipDrag({
-    setVideoSyncOffset: playerStore.setVideoSyncOffset,
-    setVideoSyncOffsetPreview: playerStore.setVideoSyncOffsetPreview,
-    activityDurationSeconds,
-    importedVideoDuration: playback.importedVideoDuration,
+    setVideoDragPreview: playerStore.setVideoDragPreview,
+    setVideoOffset: playerStore.setVideoOffset,
+    shiftVideoOffsets: playerStore.shiftVideoOffsets,
   })
-  const { getLaneDragProps, isDragging: isClipDragging, snapGuidelineSecond, updateMetrics: updateClipDragMetrics } = clipDrag
-  const timelineVideoSyncOffsetSeconds = keyboardSyncOffsetSeconds ?? playerStore.videoSyncOffsetPreviewSeconds ?? playback.videoSyncOffsetSeconds
+  const videoCuts = useVideoCuts({
+    clips: timeline.clips,
+    program: timeline.program,
+    playheadSecond: playback.clampedPlayhead,
+    readPlayheadSecond,
+    selectedClip,
+  })
+  const {
+    commitNudge: commitClipNudge,
+    getLaneDragProps,
+    isDragging: isClipDragging,
+    nudgeLane: nudgeClip,
+    snapGuidelineSecond,
+    updateMetrics: updateClipDragMetrics,
+  } = clipDrag
 
   // Viewport domain - owns measurement, fit targets, ticks, zoom, pan, and playback follow behavior.
+  // Video fit target - one clip (selected, at the playhead, or nearest to it), kept by value so playback frames
+  // do not rebuild the fit targets.
+  const fitVideoClip = resolveFitVideoClip(
+    timeline.clips,
+    selectedClip === null ? null : videoIdFromLaneId(selectedClip.laneId),
+    playback.clampedPlayhead,
+  )
+  const fitVideoStart = fitVideoClip?.offsetSeconds ?? null
+  const fitVideoEnd = fitVideoClip === null ? null : fitVideoClip.offsetSeconds + fitVideoClip.durationSeconds
+  const videoClipRange = useMemo(
+    () => (fitVideoStart === null ? null : { startSecond: fitVideoStart, endSecond: fitVideoEnd }),
+    [fitVideoEnd, fitVideoStart],
+  )
   const viewport = useTimelineViewport({
     activityDurationSeconds,
+    displayedVideoBounds: displayedTimeline.bounds,
     fallbackDurationSeconds: playerStore.fallbackDurationSeconds,
     hasActivityData,
-    hasVideo,
-    importedVideoDuration: playback.importedVideoDuration,
     isDragging: gestures.isTimelineDragging || isClipDragging,
     isPlaying: playback.isPlaying,
     playheadSecond: playback.clampedPlayhead,
     totalDuration: playback.totalDuration,
-    videoSyncOffsetPreviewSeconds: timelineVideoSyncOffsetSeconds,
-    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+    videoBounds: timeline.bounds,
+    videoClipRange,
+    videoIdentity,
   })
-  const { displayedFitTargetId, fitTarget, fitTargets: viewportFitTargets, viewport: timelineViewport, widthPx } = viewport
+  const { displayedFitTargetId, fitTarget, fitTargets: viewportFitTargets } = viewport
+
+  // Activity trim - edge handles on the activity lane and the trim shortcuts.
+  const activityTrim = useActivityTrim({
+    durationSeconds: activityDurationSeconds,
+    viewEnd: viewport.viewport.viewEnd,
+    viewStart: viewport.viewport.viewStart,
+    widthPx: viewport.widthPx,
+  })
+
+  // Trim at the playhead - the toolbar's [ ] and their shortcuts trim the video at the playhead, or the activity
+  // without videos: the part before the playhead (start) or after it (end).
+  const { setEdge: setActivityTrimEdge } = activityTrim
+  const { canTrim: canTrimVideo, trim: trimVideoAtPlayhead } = videoCuts
+  const canTrimStart = !videoSyncMode && (hasVideo ? canTrimVideo.start : hasActivityData)
+  const canTrimEnd = !videoSyncMode && (hasVideo ? canTrimVideo.end : hasActivityData)
+  const trimAtPlayhead = useCallback(
+    (side) => (hasVideo ? trimVideoAtPlayhead(side) : setActivityTrimEdge(side, readPlayheadSecond())),
+    [hasVideo, readPlayheadSecond, setActivityTrimEdge, trimVideoAtPlayhead],
+  )
 
   // Sync timeline - the feature hook receives the already-owned player viewport
   // and returns only render-ready graph and landmark geometry.
+  const syncTargetClip = timeline.clips.find((clip) => clip.id === playerStore.manualVideoSyncVideoId) ?? null
+  const displayedSyncTargetClip = displayedTimeline.clips.find((clip) => clip.id === playerStore.manualVideoSyncVideoId) ?? null
   const videoSyncTimeline = useVideoSyncTimeline({
     containerElement: viewport.containerElement,
     detection: playerStore.manualVideoSyncDetection,
@@ -179,9 +201,9 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     scrubTo: playback.scrubTo,
     timelineMinimum: viewport.timelineMinimum,
     totalDuration: playback.totalDuration,
-    videoDuration: playback.importedVideoDuration,
-    videoSyncOffsetPreviewSeconds: timelineVideoSyncOffsetSeconds,
-    videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
+    videoDuration: syncTargetClip?.durationSeconds ?? null,
+    videoOffsetSeconds: syncTargetClip?.offsetSeconds ?? 0,
+    displayedVideoOffsetSeconds: displayedSyncTargetClip?.offsetSeconds ?? 0,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,
@@ -202,17 +224,15 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     updateTimelineMetrics(metrics)
     updateClipDragMetrics({
       ...metrics,
-      hasVideo,
-      videoSyncOffsetSeconds: playback.videoSyncOffsetSeconds,
       activityDurationSeconds,
-      importedVideoDuration: playback.importedVideoDuration,
+      clips: timeline.clips,
+      hasActivityData,
     })
   }, [
     activityDurationSeconds,
-    hasVideo,
-    playback.importedVideoDuration,
+    hasActivityData,
     playback.totalDuration,
-    playback.videoSyncOffsetSeconds,
+    timeline.clips,
     viewport.containerElement,
     viewport.containerRef,
     viewport.followSecond,
@@ -260,30 +280,40 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         event.preventDefault()
         playerStore.toggleVideoMute()
         return
-      case 'export.setIn':
-        if (!hasActivityData && !hasVideo) return
+      case 'trim.start':
+        if (!canTrimStart) return
         event.preventDefault()
-        exportTimeline.setBoundary('from', readExportBoundarySecond())
+        trimAtPlayhead('start')
         return
-      case 'export.setOut':
-        if (!hasActivityData && !hasVideo) return
+      case 'trim.end':
+        if (!canTrimEnd) return
         event.preventDefault()
-        exportTimeline.setBoundary('to', readExportBoundarySecond())
+        trimAtPlayhead('end')
         return
-      case 'export.clear':
-        if (!hasActivityData && !hasVideo) return
+      case 'activityTrim.reset':
+        if (activityTrim.trim === null || videoSyncMode) return
         event.preventDefault()
-        exportTimeline.clear()
+        activityTrim.reset()
         return
-      case 'export.goToIn':
-        if (!exportTimeline.isCustom) return
+      case 'activityTrim.goToStart':
+        if (!hasActivityData) return
         event.preventDefault()
-        playback.commitScrub(exportTimeline.fromSecond)
+        playback.commitScrub(activityTrim.window.startSecond)
         return
-      case 'export.goToOut':
-        if (!exportTimeline.isCustom) return
+      case 'activityTrim.goToEnd':
+        if (!hasActivityData) return
         event.preventDefault()
-        playback.commitScrub(exportTimeline.toSecond)
+        playback.commitScrub(activityTrim.window.endSecond)
+        return
+      case 'videoEdit.cut':
+        if (videoSyncMode || !videoCuts.canCut) return
+        event.preventDefault()
+        videoCuts.cut()
+        return
+      case 'videoEdit.toggleExcluded':
+        if (videoSyncMode || videoCuts.excluded === null) return
+        event.preventDefault()
+        videoCuts.toggleExcluded()
         return
       case 'timeline.fitAll':
         if (!playback.hasActivity && !hasVideo) return
@@ -308,12 +338,7 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
       case 'sync.globalNudge':
         if (!hasVideo || !hasActivityData) return
         event.preventDefault()
-        try {
-          playerStore.setVideoSyncOffset(playerStore.videoSyncOffsetSeconds + match.binding.seconds)
-          playerStore.setVideoSyncWarning(null)
-        } catch (error) {
-          playerStore.setVideoSyncWarning(error.message)
-        }
+        playerStore.shiftVideoOffsets(match.binding.seconds)
         return
       default:
         return
@@ -328,22 +353,60 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
+  // Cut drag - the dragged cut is shown at its draft frame until it is committed on release. Cut markers keep the
+  // selection on press, so a press keeps its clip selected, or selects the pressed cut's segment instead.
+  const selectCutClip = useCallback(
+    (clip, cut) => {
+      const laneId = videoLaneId(clip.id)
+      if (useStore.getState().selectedClip?.laneId === laneId) return
+      selectClip({ laneId, segmentKey: segmentOfCut(clip, cut.id) })
+    },
+    [selectClip],
+  )
+  const cutSnapTargets = useMemo(
+    () => ({ clips: displayedTimeline.clips, activityDurationSeconds: hasActivityData ? activityDurationSeconds : 0 }),
+    [activityDurationSeconds, displayedTimeline.clips, hasActivityData],
+  )
+  const cutDrag = useCutDrag({
+    moveCut: playerStore.moveCut,
+    removeCut: playerStore.requestCutRemoval,
+    selectCutClip,
+    snapTargets: cutSnapTargets,
+    trimVideo: playerStore.trimVideo,
+    viewEnd: viewport.viewport.viewEnd,
+    viewStart: viewport.viewport.viewStart,
+    widthPx: viewport.widthPx,
+  })
+  const timelineClips = useMemo(() => applyCutDraft(displayedTimeline.clips, cutDrag.draft), [displayedTimeline.clips, cutDrag.draft])
+
   // Lane models - clip geometry and tooltip state are prepared before presentational rendering.
   const lanes = useTimelineClips({
     activityFilename: playerStore.activityFilename,
     activitySummary: playerStore.activitySummary,
     canSelect: canSelectClip,
+    clips: timelineClips,
     commitClipNudge,
-    exportHighlightRange: videoSyncMode ? null : exportTimeline.highlightRange,
+    getCutDragProps: cutDrag.getCutDragProps,
+    draggedCut: cutDrag.draft,
+    filmstrips: playerStore.videoFilmstrips,
+    activityTrim: videoSyncMode ? null : activityTrim,
     getLaneDragProps,
-    hasActivity: playback.hasActivity,
-    hasVideo,
-    importedVideoDuration: playback.importedVideoDuration,
-    importedVideoPath: playback.importedVideoPath,
+    hasActivity: hasActivityData && playback.hasActivity,
+    joinModels,
     nudgeClip,
-    selectedClipId,
-    setSelectedClipId,
-    videoSyncOffsetSeconds: timelineVideoSyncOffsetSeconds,
+    onRemoveCut: playerStore.requestCutRemoval,
+    onRemoveVideo,
+    overlaps: displayedTimeline.program.overlaps,
+    program: videoSyncMode ? null : displayedTimeline.program,
+    selectedClip: applyCutDraftToSelection(selectedClip, cutDrag.draft),
+    setSelectedClip: selectClip,
+    warnings: videoWarnings,
+    viewEnd: viewport.viewport.viewEnd,
+    viewStart: viewport.viewport.viewStart,
+    widthPx: viewport.widthPx,
+  })
+  useWantedFilmstripWindows({
+    clips: timelineClips,
     viewEnd: viewport.viewport.viewEnd,
     viewStart: viewport.viewport.viewStart,
     widthPx: viewport.widthPx,
@@ -361,53 +424,20 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
     }) - PLAYHEAD_CENTER_X,
     viewport.pixelGrid,
   )
+  // One drag runs at a time: the guideline of a dragged cut, or of a dragged clip.
+  const guidelineSecond = cutDrag.snapGuidelineSecond ?? snapGuidelineSecond
   const snapGuidelineLeft =
-    snapGuidelineSecond === null
+    guidelineSecond === null
       ? null
       : roundToDevicePixel(
           secondsToViewPx({
-            second: snapGuidelineSecond,
+            second: guidelineSecond,
             viewStart: viewport.viewport.viewStart,
             viewEnd: viewport.viewport.viewEnd,
             widthPx: viewport.widthPx,
           }),
           pixelRatio,
         )
-
-  // Export marker models - hide markers outside the viewport and attach gesture props to visible handles.
-  const exportMarkers = useMemo(() => {
-    if (videoSyncMode) return []
-
-    return exportTimeline.markers
-      .map((marker) => {
-        const isVisible =
-          marker.second >= timelineViewport.viewStart &&
-          marker.second <= timelineViewport.viewEnd &&
-          widthPx > 0 &&
-          timelineViewport.viewEnd > timelineViewport.viewStart
-
-        if (!isVisible) return null
-
-        const left = roundToDevicePixel(
-          secondsToViewPx({
-            second: marker.second,
-            viewStart: timelineViewport.viewStart,
-            viewEnd: timelineViewport.viewEnd,
-            widthPx,
-          }),
-          pixelRatio,
-        )
-
-        return {
-          ...marker,
-          handleClassName: getMarkerClassName(marker.marker),
-          lineStyle: { left },
-          markerProps: getExportMarkerProps(marker.marker),
-          style: { left },
-        }
-      })
-      .filter(Boolean)
-  }, [exportTimeline.markers, getExportMarkerProps, pixelRatio, timelineViewport.viewEnd, timelineViewport.viewStart, videoSyncMode, widthPx])
 
   // Fit target commands - presentational tabs only need active state, labels, and a command callback.
   const fitTargets = useMemo(
@@ -423,19 +453,26 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
 
   // Toolbar view model - memoized without the playhead so the toolbar skips playback frames; the time label
   // subscribes to the playhead itself.
-  const { clear: clearExportRange, isCustom: isExportRangeCustom, rangeLabel: exportRangeLabel, setBoundary: setExportBoundary } = exportTimeline
   const { jumpToEnd, resetToStart, timelineMinimum, totalDuration } = playback
   const { isVideoMuted, toggleVideoMute } = playerStore
-  const { isFullTimelineVisible, resetView, zoomIn, zoomOut } = viewport
+  const { canZoomIn, canZoomOut, isFullTimelineVisible, resetView, zoomIn, zoomOut } = viewport
+  const { canCut, cut: cutAtPlayhead, excluded: excludedAtPlayhead, toggleExcluded: toggleExcludedAtPlayhead } = videoCuts
   const toolbar = useMemo(
     () => ({
-      exportRange: {
-        clear: clearExportRange,
-        isCustom: isExportRangeCustom,
-        isDisabled: !hasActivityData && !hasVideo,
-        label: exportRangeLabel,
-        setEnd: () => setExportBoundary('to', readExportBoundarySecond()),
-        setStart: () => setExportBoundary('from', readExportBoundarySecond()),
+      videoEdit: {
+        isVisible: hasVideo,
+        canCut,
+        cut: cutAtPlayhead,
+        excluded: excludedAtPlayhead,
+        toggleExcluded: toggleExcludedAtPlayhead,
+      },
+      trim: {
+        isVisible: !videoSyncMode && (hasVideo || hasActivityData),
+        target: hasVideo ? 'video' : 'activity',
+        canTrimStart,
+        canTrimEnd,
+        trimStart: () => trimAtPlayhead('start'),
+        trimEnd: () => trimAtPlayhead('end'),
       },
       fitTargets,
       resetView: {
@@ -459,31 +496,36 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         stepBackward: () => stepBySeconds(-1),
         stepForward: () => stepBySeconds(1),
       },
-      zoomIn,
-      zoomOut,
+      zoomIn: { disabled: !canZoomIn, onClick: zoomIn },
+      zoomOut: { disabled: !canZoomOut, onClick: zoomOut },
     }),
     [
-      clearExportRange,
-      exportRangeLabel,
+      canCut,
+      canZoomIn,
+      canZoomOut,
+      canTrimEnd,
+      canTrimStart,
+      cutAtPlayhead,
+      excludedAtPlayhead,
       fitTargets,
       hasActivity,
       hasActivityData,
       hasVideo,
-      isExportRangeCustom,
       isFullTimelineVisible,
       isPlaying,
       isVideoMuted,
       jumpToEnd,
       pause,
       play,
-      readExportBoundarySecond,
       resetToStart,
       resetView,
-      setExportBoundary,
       stepBySeconds,
       timelineMinimum,
+      toggleExcludedAtPlayhead,
       toggleVideoMute,
       totalDuration,
+      trimAtPlayhead,
+      videoSyncMode,
       zoomIn,
       zoomOut,
     ],
@@ -498,7 +540,6 @@ export default function useOverlayPlayer({ activeKeyboardWorkspace, backgroundMo
         onWheel: viewport.handleWheel,
         ref: viewport.containerRef,
       },
-      exportMarkers,
       graph: videoSyncTimeline.graph,
       lanes,
       landmarks: videoSyncTimeline.landmarks,

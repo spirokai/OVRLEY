@@ -1,4 +1,7 @@
-import { captureVideoSyncTimezoneMode, createBatchCalibration } from '@/lib/video-sync'
+import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
+import { resolveActivityWindow } from '@/lib/activity/activity-trim'
+import { resolvePreviewTarget } from '@/lib/video-program/playback-target'
+import { selectVideoTimeline } from '@/lib/video-program/timeline'
 import { normalizeUpdateRateForFps } from '@/lib/update-rate'
 import { validateRenderSettings } from '@/store/slices/createRenderSettingsSlice'
 import { isQsvFullCodec } from './codecUtils'
@@ -9,6 +12,47 @@ export function isRendererBusy(state) {
   return state.renderingVideo || (state.batchSnapshot?.rendererBusy ?? false) || state.renderSubmissionTarget !== null
 }
 
+/**
+ * @param {object} state Editor snapshot.
+ * @param {{renderFullActivity?: boolean}|null} [settings] Render settings draft, when one is open.
+ * @returns {'single'|'batch'} Native transport: videos render through the batch service, unless the whole
+ *   activity is rendered as one overlay regardless of them.
+ */
+export function renderTransport(state, settings = null) {
+  return state.importedVideos.length > 0 && settings?.renderFullActivity !== true ? 'batch' : 'single'
+}
+
+/**
+ * Resolves the clip, activity, and activity window of a single native render:
+ * the activity overlay without videos, or a preview frame of the clip the
+ * preview shows at the playhead. With an external activity the clip keeps its
+ * committed offset; without one the clip's own telemetry drives the overlay in
+ * video-local time. The activity trim decides the window only without videos.
+ * @param {object} state Editor snapshot.
+ * @returns {{clip: object|null, activity: object|null, originSecond: number, window: {startSecond: number, endSecond: number, isTrimmed: boolean}}} Render inputs.
+ */
+function resolveSingleRenderInputs(state) {
+  const { clips, program } = selectVideoTimeline(state)
+  const target = resolvePreviewTarget(program, state.selectedSecond)
+  const clip = target === null ? null : clips.find((candidate) => candidate.id === target.videoId)
+  if (state.parsedActivity !== null || clip === null) {
+    const trim = state.importedVideos.length === 0 ? state.activityTrim : null
+    return {
+      clip,
+      activity: state.parsedActivity,
+      originSecond: 0,
+      window: resolveActivityWindow(getActivityDurationSeconds(state.parsedActivity), trim),
+    }
+  }
+  const activity = clip.telemetry.activity
+  return {
+    clip,
+    activity,
+    originSecond: clip.offsetSeconds,
+    window: resolveActivityWindow(activity === null ? 0 : getActivityDurationSeconds(activity), null),
+  }
+}
+
 function freezeRequest(value) {
   if (value !== null && typeof value === 'object') {
     for (const child of Object.values(value)) freezeRequest(child)
@@ -17,16 +61,21 @@ function freezeRequest(value) {
   return value
 }
 
-/** @param {object} state Editor snapshot. @returns {object} Editable settings using the store's canonical field names. */
+/**
+ * @param {object} state Editor snapshot.
+ * @returns {object} Editable settings using the store's canonical field names. A single video always renders to one file.
+ */
 export function createRenderSettingsDraft(state) {
-  const { renderSettings, importedVideoPath } = state
+  const { renderSettings, importedVideos } = state
   const fps = Math.trunc(renderSettings.fps)
   return {
     ...renderSettings,
+    outputMode: importedVideos.length > 1 ? renderSettings.outputMode : 'combined',
     fps,
     widgetUpdateRate: normalizeUpdateRateForFps(fps, renderSettings.widgetUpdateRate),
-    exportMode: renderSettings.renderTarget === 'batch' || importedVideoPath !== null ? renderSettings.exportMode : 'transparent',
-    range: { ...renderSettings.range },
+    exportMode: renderSettings.outputMode === 'separate' || importedVideos.length > 0 ? renderSettings.exportMode : 'transparent',
+    // Rendering the whole activity overrides the video parts; an export follows them unless asked.
+    renderFullActivity: false,
   }
 }
 
@@ -37,72 +86,51 @@ export function captureRenderEncoding(settings, availableCodecs) {
   return { exportMode, exportCodec: codec, fps, updateRate: widgetUpdateRate, qualityType, qualityValue, qsvFullInitArgs }
 }
 
-/** @param {object} editorSnapshot Editor synchronization inputs. @param {boolean} autoSync Whether sync and overlap are required. @returns {object} Synchronization context for inspection and submission. */
-export function captureBatchSync(editorSnapshot, autoSync) {
-  const hasExternalActivity = editorSnapshot.parsedActivitySource === 'activity-file'
+/** @param {object} editorSnapshot Editor synchronization inputs. @returns {object} Automatic synchronization context for inspection and submission. */
+export function captureBatchSync(editorSnapshot) {
+  const hasExternalActivity = editorSnapshot.parsedActivity !== null
   const activitySummary = hasExternalActivity ? editorSnapshot.activitySummary : null
   if (hasExternalActivity && activitySummary === null) throw new Error('External activity summary is required for batch synchronization')
-  return { activitySummary, timezoneMode: captureVideoSyncTimezoneMode(editorSnapshot.videoSyncTimezoneMode), autoSync }
+  return { activitySummary }
 }
 
-/** @param {object} options Captured editor/settings and inspected batch sources. @returns {Readonly<object>} Native BatchRenderRequest. */
-export function createBatchRenderRequest({ editorSnapshot, settings, language, inspectionId, outputDirectory, jobs, calibrationSource, sync }) {
-  const referenceVideo =
-    sync.activitySummary !== null && editorSnapshot.importedVideoPath !== null
-      ? {
-          path: editorSnapshot.importedVideoPath,
-          creationTime: editorSnapshot.importedVideoCreationTime,
-          timeSource: editorSnapshot.importedVideoTimeSource,
-          committedOffsetSeconds: editorSnapshot.videoSyncOffsetSeconds,
-        }
-      : null
-  const calibration = createBatchCalibration({
-    activitySummary: sync.activitySummary,
-    referenceVideo: !sync.autoSync && calibrationSource === null ? null : referenceVideo,
-    timezoneMode: sync.timezoneMode,
-    requireReferenceSync: sync.autoSync,
-  })
+/**
+ * Native destination of an export: one combined file at the output path, or one
+ * file per video in the output folder named after its source.
+ * @param {object} options Output mode, combined path, separate folder and overwrite choice.
+ * @returns {{kind: 'file', path: string, overwrite: boolean}|{kind: 'sourceNamed', directory: string}|null}
+ *   Native BatchDestination, or null while the path or folder is missing.
+ */
+export function createExportDestination({ outputMode, outputPath, outputDirectory, overwrite }) {
+  if (outputMode === 'combined') return outputPath === '' ? null : { kind: 'file', path: outputPath, overwrite }
+  return outputDirectory === null ? null : { kind: 'sourceNamed', directory: outputDirectory }
+}
+
+/**
+ * Builds the native export of reviewed outputs. With an external activity each
+ * source renders at its committed offset; without one each source uses its own
+ * embedded telemetry.
+ * @param {object} options Captured editor/settings, the inspection, reviewed outputs with their sources' offsets, and the destination.
+ * @returns {Readonly<object>} Native BatchRenderRequest.
+ */
+export function createBatchRenderRequest({ editorSnapshot, settings, language, inspectionId, outputs, offsets, destination }) {
   const activity =
-    calibration.mode === 'embeddedActivity'
+    editorSnapshot.parsedActivity === null
       ? { mode: 'embeddedActivity' }
-      : {
-          mode: 'externalActivity',
-          activity: editorSnapshot.parsedActivity,
-          disabledLaps: editorSnapshot.disabledLaps,
-          timezoneMode: calibration.timezoneMode,
-          reference:
-            calibration.reference === null
-              ? null
-              : {
-                  sourceId: calibrationSource.sourceId,
-                  creationTime: calibration.reference.creationTime,
-                  timeSource: calibration.reference.timeSource,
-                  committedOffsetSeconds: calibration.reference.committedOffsetSeconds,
-                  automaticOffsetSeconds: calibration.reference.automaticOffsetSeconds,
-                },
-          automaticOffsets: Object.fromEntries(
-            jobs.map(({ source, timing }) => [
-              source.sourceId,
-              source.sourceId === calibrationSource?.sourceId && calibration.reference !== null
-                ? calibration.reference.automaticOffsetSeconds
-                : timing.automaticOffsetSeconds,
-            ]),
-          ),
-        }
+      : { mode: 'externalActivity', activity: editorSnapshot.parsedActivity, offsets, disabledLaps: editorSnapshot.disabledLaps }
   return freezeRequest(
     structuredClone({
       inspectionId,
-      autoSync: sync.autoSync,
       template: createBatchRenderTemplate(editorSnapshot.config, editorSnapshot.globalDefaults, language),
       encoding: captureRenderEncoding(settings, editorSnapshot.availableCodecs),
       activity,
-      outputDirectory,
-      jobs: jobs.map(({ id, source, skipOverlay }) => ({ id, sourceId: source.sourceId, skipOverlay })),
+      destination,
+      outputs,
     }),
   )
 }
 
-function createCurrentRenderConfig(state, settings, language) {
+function createSingleRenderConfig(state, { clip, originSecond, window }, settings, language) {
   return createRenderEffectiveConfig({
     language,
     config: state.config,
@@ -114,49 +142,66 @@ function createCurrentRenderConfig(state, settings, language) {
     exportMode: settings.exportMode,
     qualityType: settings.qualityType,
     qualityValue: settings.qualityValue,
-    range: settings.range,
-    importedVideoPath: state.importedVideoPath,
-    importedVideoDuration: state.importedVideoDuration,
-    importedVideoFps: state.importedVideoFps,
-    importedVideoFpsNum: state.importedVideoFpsNum,
-    importedVideoFpsDen: state.importedVideoFpsDen,
-    importedVideoResolution: state.importedVideoResolution,
-    videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
-    disabledLaps: state.disabledLaps,
-    timelineStart: state.startSecond,
-    timelineEnd: state.endSecond,
+    video: clip,
+    videoOffsetSeconds: clip === null ? 0 : clip.offsetSeconds - originSecond,
+    // Embedded telemetry carries no editor lap selection.
+    disabledLaps: state.parsedActivity === null ? [] : state.disabledLaps,
+    activityWindow: window,
   })
 }
 
-/** @param {object} options Editor snapshot, canonical settings, app language naming chart legends, optional batch review and overwrite choice. @returns {object} Captured execution payload and accepted settings. */
+/**
+ * Captures one submission. With videos the batch service renders the reviewed
+ * outputs (combined or separate); without videos a single render produces the
+ * activity overlay.
+ * @param {object} options Editor snapshot, canonical settings, app language naming chart legends, the batch review for videos, and the overwrite choice.
+ * @returns {{target: 'single'|'batch', payload: object, settings: object}} Native transport, payload and accepted settings.
+ */
 export function createRenderRequest({ editorSnapshot, settings, language, batchReview, overwrite = false }) {
   validateRenderSettings(settings)
-  const { outputPath, renderTarget, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range } = settings
-  const acceptedSettings = { renderTarget, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue, range: { ...range } }
-  const target = settings.renderTarget
-  const payload =
-    target === 'batch'
-      ? createBatchRenderRequest({ editorSnapshot, settings, language, ...batchReview })
-      : {
-          config: createCurrentRenderConfig(editorSnapshot, settings, language),
-          parsedActivity: editorSnapshot.parsedActivity,
-          outputPath,
-          overwrite,
-        }
-  if (target === 'current') {
-    if (payload.parsedActivity === null) throw new Error('No parsed activity available')
-    if (!outputPath) throw new Error('Render output target is required')
-    if (payload.config.scene.start >= payload.config.scene.end) throw new Error('Start time must be before end time')
+  const { outputPath, outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue } = settings
+  const acceptedSettings = { outputMode, fps, widgetUpdateRate, exportMode, codec, qualityType, qualityValue }
+  const target = renderTransport(editorSnapshot, settings)
+  if (target === 'batch') {
+    const destination = createExportDestination({ outputMode, outputPath, outputDirectory: editorSnapshot.batchOutputFolder, overwrite })
+    if (destination === null) throw new Error('Render output target is required')
+    const { inspectionId, outputs, offsets } = batchReview
+    return {
+      target,
+      payload: createBatchRenderRequest({ editorSnapshot, settings, language, inspectionId, outputs, offsets, destination }),
+      settings: acceptedSettings,
+    }
   }
+  // The whole activity renders without a clip and untrimmed, whatever the videos cover.
+  const inputs = settings.renderFullActivity
+    ? {
+        clip: null,
+        activity: editorSnapshot.parsedActivity,
+        originSecond: 0,
+        window: resolveActivityWindow(getActivityDurationSeconds(editorSnapshot.parsedActivity), null),
+      }
+    : resolveSingleRenderInputs(editorSnapshot)
+  const payload = {
+    config: createSingleRenderConfig(editorSnapshot, inputs, settings, language),
+    parsedActivity: inputs.activity,
+    outputPath,
+    overwrite,
+  }
+  if (payload.parsedActivity === null) throw new Error('No parsed activity available')
+  if (!outputPath) throw new Error('Render output target is required')
+  if (payload.config.scene.start >= payload.config.scene.end) throw new Error('Start time must be before end time')
   return { target, payload, settings: acceptedSettings }
 }
 
 /** @param {object} state Captured editor snapshot. @param {string} language App language naming chart legends. @returns {object} Native preview frame inputs. */
 export function createPreviewRenderRequest(state, language) {
-  if (state.parsedActivity === null) throw new Error('No parsed activity available')
-  const hasVideo = state.importedVideoPath !== null
-  const config = createCurrentRenderConfig(
+  const inputs = resolveSingleRenderInputs(state)
+  const { activity, originSecond } = inputs
+  if (activity === null) throw new Error('No parsed activity available')
+  const hasVideo = state.importedVideos.length > 0
+  const config = createSingleRenderConfig(
     state,
+    inputs,
     {
       ...state.renderSettings,
       exportMode: hasVideo ? 'composite' : 'transparent',
@@ -166,5 +211,5 @@ export function createPreviewRenderRequest(state, language) {
   )
   // The native renderer narrows the full export scene to the frame at `second`,
   // keeping the export window that range-scoped plots follow.
-  return { config, parsedActivity: state.parsedActivity, second: state.selectedSecond }
+  return { config, parsedActivity: activity, second: state.selectedSecond - originSecond }
 }

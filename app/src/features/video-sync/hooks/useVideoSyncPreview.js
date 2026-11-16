@@ -65,6 +65,8 @@ export default function useVideoSyncPreview({
     // The scene scale already lays the speed readout out at its screen size.
     rasterScale: 1,
     activity,
+    // Manual sync aligns a video to the external activity, which starts at timeline second 0.
+    activityOriginSecond: 0,
     disabledLaps: VIDEO_SYNC_DISABLED_LAPS,
     second: previewSecond,
     defaultFont: VIDEO_SYNC_SPEED_FONT,

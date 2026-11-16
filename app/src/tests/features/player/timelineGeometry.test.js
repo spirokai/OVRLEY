@@ -1,13 +1,11 @@
 import { describe, expect, test } from 'vite-plus/test'
 import {
-  clampExportRangeMarkerSecond,
   getClipGeometry,
-  getExportRangeHighlightGeometry,
-  moveClipOffset,
   pointerToSecond,
   roundToDevicePixel,
   secondsToViewPx,
-  snapClipOffset,
+  snapClipDelta,
+  videoIdFromLaneId,
 } from '@/features/player/utils/timelineGeometry'
 
 describe('timelineGeometry utilities', () => {
@@ -19,7 +17,7 @@ describe('timelineGeometry utilities', () => {
     expect(pointerToSecond({ clientX: 999, rect: { left: 0 }, viewStart: 0, viewEnd: 100, widthPx: 500, totalDuration: 100 })).toBe(100)
   })
 
-  test('maps pointers and export markers to a negative timeline minimum', () => {
+  test('maps pointers to a negative timeline minimum', () => {
     expect(
       pointerToSecond({
         clientX: 0,
@@ -27,16 +25,6 @@ describe('timelineGeometry utilities', () => {
         viewStart: -5,
         viewEnd: 25,
         widthPx: 400,
-        timelineMinimum: -5,
-        totalDuration: 25,
-      }),
-    ).toBe(-5)
-    expect(
-      clampExportRangeMarkerSecond({
-        marker: 'from',
-        second: -20,
-        fromSecond: -5,
-        toSecond: 25,
         timelineMinimum: -5,
         totalDuration: 25,
       }),
@@ -57,58 +45,35 @@ describe('timelineGeometry utilities', () => {
     expect(getClipGeometry({ startSecond: 110, durationSeconds: 20, viewStart: 0, viewEnd: 100, widthPx: 500 }).isVisible).toBe(false)
   })
 
-  test('constrains export markers to a one-second minimum gap', () => {
-    const base = { fromSecond: 10, toSecond: 20, totalDuration: 60 }
-
-    expect(clampExportRangeMarkerSecond({ ...base, marker: 'from', second: 19.9 })).toBe(19)
-    expect(clampExportRangeMarkerSecond({ ...base, marker: 'to', second: 10.2 })).toBe(11)
-  })
-
-  test('computes export range highlight geometry inside a clip', () => {
-    expect(
-      getExportRangeHighlightGeometry({
-        durationSeconds: 40,
-        exportFromSecond: 20,
-        exportToSecond: 35,
-        startSecond: 10,
-      }),
-    ).toEqual({
-      isVisible: true,
-      leftPercent: 25,
-      widthPercent: 37.5,
-    })
-  })
-
   test('rounds to the active device pixel grid', () => {
     expect(roundToDevicePixel(10.26, 2)).toBe(10.5)
   })
 
   test('snaps clip edges using a screen-pixel threshold', () => {
-    expect(
-      snapClipOffset({
-        activityDuration: 100,
-        proposedOffset: 0.5,
-        videoDuration: 20,
-        viewEnd: 100,
-        viewStart: 0,
-        widthPx: 500,
-      }),
-    ).toEqual({ guidelineSecond: 0, offset: 0 })
+    const viewport = { viewEnd: 100, viewStart: 0, widthPx: 500 }
 
-    expect(
-      snapClipOffset({
-        activityDuration: 100,
-        proposedOffset: 2,
-        videoDuration: 20,
-        viewEnd: 100,
-        viewStart: 0,
-        widthPx: 500,
-      }),
-    ).toEqual({ guidelineSecond: null, offset: 2 })
+    expect(snapClipDelta({ ...viewport, proposedDelta: 0.5, movingEdges: [0, 20], fixedEdges: [0, 100] })).toEqual({ delta: 0, guidelineSecond: 0 })
+    // 1 px is 0.2 s: 2.5 s is 12.5 px, past the 10 px default.
+    expect(snapClipDelta({ ...viewport, proposedDelta: 2.5, movingEdges: [0, 20], fixedEdges: [0, 100] })).toEqual({
+      delta: 2.5,
+      guidelineSecond: null,
+    })
+    expect(snapClipDelta({ ...viewport, proposedDelta: 2.5, movingEdges: [0, 20], fixedEdges: [0, 100], thresholdPx: 15 })).toEqual({
+      delta: 0,
+      guidelineSecond: 0,
+    })
   })
 
-  test('moves either lane relative to the canonical video offset without discarding negative offsets', () => {
-    expect(moveClipOffset({ currentOffset: 0, deltaSeconds: -0.1, laneId: 'video' })).toBe(-0.1)
-    expect(moveClipOffset({ currentOffset: 0, deltaSeconds: 0.1, laneId: 'activity' })).toBe(-0.1)
+  test('snaps whichever moving edge lands closest to a fixed edge', () => {
+    expect(snapClipDelta({ proposedDelta: 9.6, movingEdges: [0, 20], fixedEdges: [0, 30, 10.2], viewEnd: 100, viewStart: 0, widthPx: 500 })).toEqual({
+      delta: 10,
+      guidelineSecond: 30,
+    })
+  })
+
+  test('maps timeline lane ids to imported video ids', () => {
+    expect(videoIdFromLaneId('activity')).toBeNull()
+    expect(videoIdFromLaneId('video:clip-a')).toBe('clip-a')
+    expect(videoIdFromLaneId('video:video:nested')).toBe('video:nested')
   })
 })

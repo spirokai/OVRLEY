@@ -7,6 +7,7 @@ import { useRasterSelection } from '../hooks/useRasterSelection'
 import { normalizeRotation } from '@/features/wasm-widgets/utils/widgetGestureGeometry'
 import { DimensionsSection } from './widgetEditorSections'
 import { SliderField } from './widgetFormControls'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 /** @param {{widget: object, updateWidgetDraft: Function, commitWidgetDraft: Function, setNumericField: Function}} props */
 export default function RasterWidgetEditor({ widget, updateWidgetDraft, commitWidgetDraft, setNumericField }) {
@@ -32,14 +33,15 @@ export default function RasterWidgetEditor({ widget, updateWidgetDraft, commitWi
         onSliderCommit={() => commitWidgetDraft(widget.id)}
       />
       <ButtonGroup className="w-full pt-4">
-        <Input
-          value={widget.data.path ?? ''}
-          readOnly
-          placeholder={t('raster.selectImage')}
-          title={widget.data.path ?? undefined}
-          className="h-9 min-w-0 flex-1 border-border/70 text-xs"
-          aria-label={t('raster.imageFiles')}
-        />
+        <SimpleTooltip content={widget.data.path} className="min-w-0 flex-1" wrapText>
+          <Input
+            value={widget.data.path ?? ''}
+            readOnly
+            placeholder={t('raster.selectImage')}
+            className="h-9 w-full min-w-0 rounded-r-none border-border/70 text-xs"
+            aria-label={t('raster.imageFiles')}
+          />
+        </SimpleTooltip>
         <Button
           type="button"
           variant="outline"

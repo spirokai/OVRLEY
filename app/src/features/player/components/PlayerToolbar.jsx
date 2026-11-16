@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { Pause, Play, Rewind, RotateCcw, StepBack, StepForward, Volume2, VolumeX, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { Eye, EyeOff, Pause, Play, Rewind, RotateCcw, Scissors, StepBack, StepForward, Volume2, VolumeX, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,6 +21,92 @@ function PlayerTimeLabel({ timeLabel }) {
   )
 }
 
+/** [ and ] trim the video at the playhead, or the activity without videos: the part before or after the playhead. */
+function TrimControls({ trim }) {
+  const { t } = useTranslation()
+  const startLabel =
+    trim.target === 'video'
+      ? t('player.trimVideoBeforePlayhead', 'Trim the video before the playhead')
+      : t('player.trimActivityBeforePlayhead', 'Trim the activity before the playhead')
+  const endLabel =
+    trim.target === 'video'
+      ? t('player.trimVideoAfterPlayhead', 'Trim the video after the playhead')
+      : t('player.trimActivityAfterPlayhead', 'Trim the activity after the playhead')
+  return (
+    <div className="ml-2 flex items-center gap-1">
+      <SimpleTooltip side="top" content={startLabel}>
+        <Button
+          type="button"
+          aria-label={startLabel}
+          size="toolbar-icon"
+          variant="ghost"
+          disabled={!trim.canTrimStart}
+          onClick={trim.trimStart}
+          aria-keyshortcuts="I"
+        >
+          <span aria-hidden="true" className="font-mono text-base font-normal">
+            [
+          </span>
+        </Button>
+      </SimpleTooltip>
+      <SimpleTooltip side="top" content={endLabel}>
+        <Button
+          type="button"
+          aria-label={endLabel}
+          size="toolbar-icon"
+          variant="ghost"
+          disabled={!trim.canTrimEnd}
+          onClick={trim.trimEnd}
+          aria-keyshortcuts="O"
+        >
+          <span aria-hidden="true" className="font-mono text-base font-normal">
+            ]
+          </span>
+        </Button>
+      </SimpleTooltip>
+    </div>
+  )
+}
+
+function VideoEditControls({ videoEdit }) {
+  const { t } = useTranslation()
+  const cutLabel = t('player.cutAtPlayhead', 'Cut the video at the playhead')
+  const excludedLabel = videoEdit.excluded
+    ? t('player.includeAtPlayhead', 'Include this part in export')
+    : t('player.excludeAtPlayhead', 'Exclude this part from export')
+  return (
+    <div className="ml-2 flex items-center gap-1">
+      <SimpleTooltip side="top" content={cutLabel}>
+        <Button
+          type="button"
+          aria-label={cutLabel}
+          size="toolbar-icon"
+          variant="ghost"
+          disabled={!videoEdit.canCut}
+          onClick={videoEdit.cut}
+          aria-keyshortcuts="C"
+        >
+          <Scissors className="h-3.5 w-3.5" />
+        </Button>
+      </SimpleTooltip>
+      <SimpleTooltip side="top" content={excludedLabel}>
+        <Button
+          type="button"
+          aria-label={excludedLabel}
+          aria-pressed={videoEdit.excluded === true}
+          size="toolbar-icon"
+          variant="ghost"
+          disabled={videoEdit.excluded === null}
+          onClick={videoEdit.toggleExcluded}
+          aria-keyshortcuts="X"
+        >
+          {videoEdit.excluded ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        </Button>
+      </SimpleTooltip>
+    </div>
+  )
+}
+
 /**
  * Presentational toolbar for zoom, fit target, transport, and time display controls.
  *
@@ -32,12 +118,26 @@ function PlayerToolbar({ toolbar, videoSyncMode }) {
     <div className="grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4">
       <div className="flex items-center gap-1">
         <SimpleTooltip side="top" content={t('player.zoomOut', 'Zoom out')}>
-          <Button type="button" aria-label={t('player.zoomOut', 'Zoom out')} size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomOut}>
+          <Button
+            type="button"
+            aria-label={t('player.zoomOut', 'Zoom out')}
+            size="toolbar-icon"
+            variant="toolbar"
+            disabled={toolbar.zoomOut.disabled}
+            onClick={toolbar.zoomOut.onClick}
+          >
             <ZoomOut className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
         <SimpleTooltip side="top" content={t('player.zoomIn', 'Zoom in')}>
-          <Button type="button" aria-label={t('player.zoomIn', 'Zoom in')} size="toolbar-icon" variant="toolbar" onClick={toolbar.zoomIn}>
+          <Button
+            type="button"
+            aria-label={t('player.zoomIn', 'Zoom in')}
+            size="toolbar-icon"
+            variant="toolbar"
+            disabled={toolbar.zoomIn.disabled}
+            onClick={toolbar.zoomIn.onClick}
+          >
             <ZoomIn className="h-4 w-4" />
           </Button>
         </SimpleTooltip>
@@ -70,58 +170,8 @@ function PlayerToolbar({ toolbar, videoSyncMode }) {
             ))}
           </TabsList>
         </Tabs>
-        {!videoSyncMode ? (
-          <div className="ml-2 flex items-center gap-1">
-            <SimpleTooltip side="top" content={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}>
-              <Button
-                type="button"
-                aria-label={t('player.setExportStartAtPlayhead', 'Set export start at playhead')}
-                size="toolbar-icon"
-                variant="ghost"
-                disabled={toolbar.exportRange.isDisabled}
-                onClick={toolbar.exportRange.setStart}
-                aria-keyshortcuts="I"
-              >
-                <span aria-hidden="true" className="font-mono text-base font-normal">
-                  [
-                </span>
-              </Button>
-            </SimpleTooltip>
-            <SimpleTooltip side="top" content={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}>
-              <Button
-                type="button"
-                aria-label={t('player.setExportEndAtPlayhead', 'Set export end at playhead')}
-                size="toolbar-icon"
-                variant="ghost"
-                disabled={toolbar.exportRange.isDisabled}
-                onClick={toolbar.exportRange.setEnd}
-                aria-keyshortcuts="O"
-              >
-                <span aria-hidden="true" className="font-mono text-base font-normal">
-                  ]
-                </span>
-              </Button>
-            </SimpleTooltip>
-            {toolbar.exportRange.isCustom ? (
-              <div className="ml-1 flex items-center gap-0.5 text-orange-400/90">
-                <span className="text-xs font-medium tabular-nums">{toolbar.exportRange.label}</span>
-                <SimpleTooltip side="top" content={t('player.clearCustomExportRange', 'Clear custom export range')}>
-                  <Button
-                    type="button"
-                    aria-label={t('player.clearCustomExportRange', 'Clear custom export range')}
-                    size="toolbar-icon"
-                    variant="ghost"
-                    className="text-orange-400/90 hover:text-orange-300"
-                    onClick={toolbar.exportRange.clear}
-                    aria-keyshortcuts="Mod+X"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </SimpleTooltip>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {toolbar.trim.isVisible ? <TrimControls trim={toolbar.trim} /> : null}
+        {!videoSyncMode && toolbar.videoEdit.isVisible ? <VideoEditControls videoEdit={toolbar.videoEdit} /> : null}
       </div>
 
       <div className="flex items-center gap-1 rounded-xs border border-border/30 p-0.5 shadow-sm">

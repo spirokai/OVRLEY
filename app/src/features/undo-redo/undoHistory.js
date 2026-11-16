@@ -19,9 +19,8 @@ function partializeUndoableState(state) {
     globalDefaults: state.globalDefaults,
     aspectRatio: state.aspectRatio,
     renderSettings: state.renderSettings,
-    videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
-    startSecond: state.startSecond,
-    endSecond: state.endSecond,
+    videoEdits: state.videoEdits,
+    activityTrim: state.activityTrim,
   }
 }
 
@@ -95,6 +94,40 @@ export function replaceEditorDocument(store, operation, ...args) {
       temporalState.resume()
     }
   }
+}
+
+function rebaseVideoEdits(historicalEdits, currentEdits, replacedVideoIds) {
+  return Object.fromEntries(
+    Object.keys(currentEdits).map((videoId) => [
+      videoId,
+      replacedVideoIds.has(videoId) ? currentEdits[videoId] : (historicalEdits[videoId] ?? currentEdits[videoId]),
+    ]),
+  )
+}
+
+/**
+ * Replaces or changes the imported-video collection without adding an undo/redo
+ * entry. History keeps earlier edits of videos that remain, starts removed videos'
+ * edits nowhere, and gives newly added videos their current edits. A replaced
+ * video (a missing one relinked to another file) is treated like a new one, so
+ * undo never restores edits that do not fit its file.
+ *
+ * @param {object} store - Zustand application store.
+ * @param {Function} operation - Synchronous collection change.
+ * @param {{replacedVideoIds?: Array<string>}} [options] Videos whose source the change replaced.
+ * @returns {*} Operation result.
+ */
+export function changeVideoCollection(store, operation, { replacedVideoIds = [] } = {}) {
+  const result = runWithoutEditorHistory(store, operation)
+  const currentEdits = store.getState().videoEdits
+  const temporalState = store.temporal.getState()
+  const replaced = new Set(replacedVideoIds)
+  const rebase = (historyState) => ({ ...historyState, videoEdits: rebaseVideoEdits(historyState.videoEdits, currentEdits, replaced) })
+  store.temporal.setState({
+    pastStates: temporalState.pastStates.map(rebase),
+    futureStates: temporalState.futureStates.map(rebase),
+  })
+  return result
 }
 
 /**

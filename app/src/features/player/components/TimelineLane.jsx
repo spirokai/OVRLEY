@@ -1,72 +1,293 @@
 import { memo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+import { JoinTransitionPanel } from '@/features/transitions'
+
+const stopPropagation = (event) => event.stopPropagation()
+
+/** Striped shade over a part left out of the export: an excluded video segment or the trimmed-off activity. */
+const EXCLUDED_STRIPES =
+  'bg-background/90 bg-[repeating-linear-gradient(45deg,transparent_0,transparent_3px,rgb(255_255_255/0.08)_3px,rgb(255_255_255/0.08)_6px)]'
+
+/** A join whose default transition did not fit: disabled, with the reason in a tooltip. Drawn outside the clip mask. */
+function SkippedJoinMarker({ marker }) {
+  return (
+    <div className="absolute -top-1.5 z-30 flex -translate-x-1/2 focus-within:z-50 hover:z-50" style={marker.style}>
+      <SimpleTooltip content={marker.disabledReason} contentClassName="w-64 whitespace-normal">
+        <button
+          type="button"
+          aria-disabled="true"
+          aria-label={marker.disabledReason}
+          className="h-3 w-3 rotate-45 cursor-not-allowed rounded-[2px] border border-dashed border-foreground/80 bg-background/70 outline-none focus-visible:ring-2 focus-visible:ring-foreground"
+          onPointerDown={stopPropagation}
+          onDoubleClick={stopPropagation}
+        />
+      </SimpleTooltip>
+    </div>
+  )
+}
+
+function JoinMarker({ marker }) {
+  return (
+    <Popover>
+      <div className="absolute top-1.5 z-30 flex -translate-x-1/2 focus-within:z-50 hover:z-50" style={marker.style}>
+        <SimpleTooltip content={marker.label}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              aria-label={marker.label}
+              className={`h-3 w-3 rotate-45 rounded-[2px] border shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-foreground ${
+                marker.isInvalid
+                  ? 'border-destructive bg-destructive'
+                  : marker.hasTransition
+                    ? 'border-foreground/70 bg-primary'
+                    : 'border-foreground/60 bg-background'
+              }`}
+              onPointerDown={stopPropagation}
+              onDoubleClick={stopPropagation}
+            />
+          </PopoverTrigger>
+        </SimpleTooltip>
+      </div>
+      <PopoverContent side="top" className="w-104 p-3">
+        <JoinTransitionPanel model={marker.control} />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 /**
- * Presentational clip lane renderer.
+ * Placement of a cut marker: its hit area is centred on a cut but sits inside the clip at an edge, so grabbing an edge
+ * never catches the neighbouring clip. The line is centred on the cut or edge, or inside the clip at an edge on the
+ * timeline's own edge (`isLineInside`), where the lane would clip its outer half.
+ */
+const CUT_MARKER_ALIGN = {
+  center: { area: '-translate-x-1/2', line: 'left-1/2 -translate-x-1/2', lineInside: 'left-1/2 -translate-x-1/2' },
+  start: { area: '', line: 'left-0 -translate-x-1/2', lineInside: 'left-0' },
+  end: { area: '-translate-x-full', line: 'right-0 translate-x-1/2', lineInside: 'right-0' },
+}
+
+/**
+ * A hit area over a cut: drag moves the cut, and the line shows on hover and while dragging. A real cut's click
+ * opens a popover that removes it; an edge cut (which trims the clip when dragged in) sits inside the clip's edge.
+ */
+function CutMarker({ marker }) {
+  const { t } = useTranslation()
+  const align = CUT_MARKER_ALIGN[marker.align]
+  const hitArea = (
+    <button
+      type="button"
+      aria-label={marker.label}
+      className="group/cut relative h-full w-full cursor-ew-resize touch-none bg-transparent outline-none"
+      onDoubleClick={stopPropagation}
+      {...marker.dragProps}
+    >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-0 w-1 bg-primary transition-opacity group-hover/cut:opacity-100 group-focus-visible/cut:opacity-100 ${marker.isLineInside ? align.lineInside : align.line} ${
+          marker.isDragging ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+    </button>
+  )
+  // The positioned box holds the tooltip, so the hit area keeps its place on the timeline while the tooltip wraps it.
+  // The wrapper is a block flex box: an inline one would sit on the text baseline, below the top of the clip.
+  const placed = (trigger) => (
+    <div className={`absolute top-3 bottom-1 z-20 w-3 hover:z-50 ${align.area}`} style={marker.style}>
+      <SimpleTooltip content={marker.label} className="flex h-full w-full">
+        {trigger}
+      </SimpleTooltip>
+    </div>
+  )
+  if (marker.onRemove === null) return placed(hitArea)
+  return (
+    <Popover>
+      {placed(<PopoverTrigger asChild>{hitArea}</PopoverTrigger>)}
+      <PopoverContent side="top" className="w-56 space-y-2 p-3">
+        <p className="text-xs font-semibold">{marker.label}</p>
+        <Button type="button" variant="secondary" className="h-7 w-full text-xs" onClick={marker.onRemove}>
+          {t('player.removeCut', 'Remove cut')}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/**
+ * One segment of a video clip: a block between cuts showing the visible tiles of the video's filmstrip, dimmed when
+ * excluded from export, red when the video's file is missing.
+ */
+function TimelineSegment({ segment }) {
+  return (
+    <div
+      data-segment-key={segment.key}
+      className={`absolute inset-y-0 border-background ${segment.missing ? 'bg-destructive/60' : 'bg-accent/70'} ${segment.hasSeamBefore ? 'border-l' : ''} ${segment.hasSeamAfter ? 'border-r' : ''}`}
+      style={segment.style}
+    >
+      {segment.tiles.length > 0 ? (
+        <div
+          data-testid="timeline-filmstrip"
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 overflow-hidden rounded-xs border border-primary"
+        >
+          {segment.tiles.map((tile) => (
+            <div key={tile.key} className="absolute inset-y-0 bg-no-repeat" style={tile.style} />
+          ))}
+        </div>
+      ) : null}
+      {segment.excluded ? (
+        <div data-testid="timeline-excluded-segment" aria-hidden="true" className={`pointer-events-none absolute inset-0 z-10 ${EXCLUDED_STRIPES}`} />
+      ) : null}
+      {segment.isSelected ? (
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 rounded-xs ring-2 ring-inset ring-primary" />
+      ) : null}
+    </div>
+  )
+}
+
+/** A video clip's icon, name and duration in a badge over its filmstrip, at the left edge of the clip's visible part. */
+function TimelineClipBadge({ clip }) {
+  const Icon = clip.icon
+  return (
+    <div className="pointer-events-none absolute top-0 z-20 flex p-1" style={clip.badgeStyle}>
+      <span className="flex min-w-0 items-center gap-3 rounded-xs bg-background/90 px-1.75 py-0.625 text-[0.75rem] font-bold uppercase leading-none text-foreground shadow-sm">
+        <Icon className="h-3.5 w-3.5 shrink-0" strokeWidth={3} aria-hidden="true" />
+        <span className="min-w-0 truncate">{clip.label}</span>
+        <span className="shrink-0 tabular-nums text-muted-foreground">{clip.durationLabel}</span>
+      </span>
+    </div>
+  )
+}
+
+function TimelineClip({ clip }) {
+  const Icon = clip.icon
+  return (
+    <button
+      type="button"
+      aria-describedby={clip.tooltip.isVisible ? clip.tooltip.id : undefined}
+      aria-label={clip.label || 'clip'}
+      className="group absolute top-3 bottom-1 z-10 cursor-grab touch-none appearance-none border-0 bg-transparent p-0 text-left outline-none active:cursor-grabbing"
+      style={clip.clipStyle}
+      {...clip.clipProps}
+    >
+      {/* A clip only a few pixels wide on screen still has a grabbable hit area, centred on it. */}
+      <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-full min-w-6 -translate-x-1/2" />
+      <div className={`absolute inset-0 overflow-visible ${clip.clipClassName}`}>
+        {clip.segments.map((segment) => (
+          <TimelineSegment key={segment.key} segment={segment} />
+        ))}
+        {clip.trimMasks.map((mask) => (
+          <div
+            key={mask.key}
+            data-testid="timeline-activity-trim-mask"
+            aria-hidden="true"
+            className={`pointer-events-none absolute inset-y-0 z-10 ${EXCLUDED_STRIPES}`}
+            style={mask.style}
+          />
+        ))}
+        {clip.showText && clip.isVideo ? <TimelineClipBadge clip={clip} /> : null}
+        {clip.showText && !clip.isVideo && (
+          <div
+            className={`pointer-events-none absolute inset-y-0 z-20 grid items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${clip.textClassName}`}
+            style={{ ...clip.textStyle, gridTemplateColumns: `${clip.sourceColumnWidth} minmax(0, 1fr) auto` }}
+          >
+            <span className={`flex min-w-0 items-center justify-left pl-2 ${clip.clipContentClassName}`}>
+              {Icon ? (
+                <Icon className="h-5 w-5 shrink-0 pb-0.5" strokeWidth={3} aria-hidden="true" />
+              ) : (
+                <span className="block max-w-full truncate text-[0.85rem] font-black leading-none">{clip.formatLabel}</span>
+              )}
+            </span>
+            <span className={`min-w-0 truncate leading-none ${clip.clipContentClassName}`}>{clip.label}</span>
+            <span className={`shrink-0 pl-1 tabular-nums leading-none ${clip.clipContentClassName}`}>{clip.durationLabel}</span>
+          </div>
+        )}
+        {/* The outline sits inside the clip, above its stripes: drawn outside, the lane below would cover its bottom side. */}
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute inset-0 z-30 rounded-xs ring-2 ring-inset ring-primary ${
+            clip.isSelected ? '' : clip.hasSelectedSegment ? 'hidden' : 'hidden group-focus-visible:block'
+          }`}
+        />
+      </div>
+    </button>
+  )
+}
+
+function TimelineClipTooltip({ clip }) {
+  const { t } = useTranslation()
+  return (
+    <div
+      id={clip.tooltip.id}
+      role="tooltip"
+      className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-124 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
+      style={clip.tooltip.style}
+    >
+      <div className="text-[0.72rem] font-semibold leading-snug">{clip.label}</div>
+      <div className="mt-1 flex items-center justify-between gap-4 border-t border-border/40 pt-1 text-[0.65rem] text-muted-foreground">
+        <span className="font-medium">{t('player.duration', 'Duration')}</span>
+        <span className="tabular-nums text-foreground">{clip.durationLabel}</span>
+      </div>
+      {clip.availableMetrics?.length > 0 && (
+        <p className="mt-1 border-t border-border/40 pt-1 text-[0.6rem] leading-relaxed text-foreground font-medium">
+          {clip.availableMetrics.join(', ')}
+        </p>
+      )}
+      {clip.warnings.length > 0 && (
+        <ul className="mt-1 border-t border-border/40 pt-1 text-[0.65rem] leading-relaxed text-destructive">
+          {/* Warnings may read alike: two overlapping videos can share a filename. */}
+          {clip.warnings.map((warning, index) => (
+            <li key={index}>{warning}</li>
+          ))}
+        </ul>
+      )}
+      <div className="absolute left-1/2 top-full -mt-px -translate-x-1/2 border-4 border-transparent border-t-surface-tooltip" />
+    </div>
+  )
+}
+
+/**
+ * Presentational lane renderer: the lane's clips, overlap bands, and clip tooltips.
  *
  * @param {{ lane: object }} props Lane view model.
  */
 function TimelineLane({ lane }) {
   const { t } = useTranslation()
-  const Icon = lane.icon
-
   return (
-    <div aria-label={lane.ariaLabel} className={`relative w-full ${lane.isVideo ? 'h-6 border-b-0' : 'h-6'}`}>
+    <div aria-label={lane.ariaLabel} className={`relative w-full ${lane.isVideo ? 'h-12 border-b-0' : 'h-6'}`}>
       <div data-testid="timeline-lane-clip-mask" className="absolute inset-x-0 -top-3 -bottom-1 overflow-hidden">
-        {lane.isVisible && (
-          <button
-            type="button"
-            aria-describedby={lane.tooltip.isVisible ? lane.tooltip.id : undefined}
-            aria-label={lane.label || 'clip'}
-            className="group absolute top-3 bottom-1 z-10 cursor-grab touch-none appearance-none border-0 bg-transparent p-0 text-left outline-none active:cursor-grabbing"
-            style={lane.clipStyle}
-            {...lane.clipProps}
-          >
+        {lane.clips.map((clip) => (clip.isVisible ? <TimelineClip key={clip.id} clip={clip} /> : null))}
+        {lane.conflictBands.map((band) => (
+          <div
+            key={band.key}
+            aria-label={t('player.overlapBand', 'Overlapping videos')}
+            className="pointer-events-none absolute top-3 bottom-1 z-20 bg-destructive/45 bg-[repeating-linear-gradient(135deg,transparent_0,transparent_4px,rgb(0_0_0/0.25)_4px,rgb(0_0_0/0.25)_8px)]"
+            role="img"
+            style={band.style}
+          />
+        ))}
+        {lane.joinMarkers.map((marker) =>
+          marker.bandStyle ? (
             <div
-              className={`absolute inset-0 overflow-visible group-focus-visible:ring-2 group-focus-visible:ring-foreground ${lane.isSelected ? 'ring-2 ring-foreground' : ''} ${lane.clipClassName}`}
-            >
-              {lane.highlightStyle && (
-                <div aria-hidden="true" className="pointer-events-none absolute -top-3 -bottom-1 bg-success/20" style={lane.highlightStyle} />
-              )}
-              {lane.showText && (
-                <div
-                  className={`relative grid h-full items-center gap-3 overflow-hidden whitespace-nowrap px-2.5 text-[0.7rem] font-bold uppercase leading-none ${lane.textClassName}`}
-                  style={{ gridTemplateColumns: `${lane.sourceColumnWidth} minmax(0, 1fr) auto` }}
-                >
-                  <span className={`flex min-w-0 items-center justify-left pl-2 ${lane.clipContentClassName}`}>
-                    {Icon ? (
-                      <Icon className="h-5 w-5 shrink-0 pb-0.5" strokeWidth={3} aria-hidden="true" />
-                    ) : (
-                      <span className="block max-w-full truncate text-[0.85rem] font-black leading-none">{lane.formatLabel}</span>
-                    )}
-                  </span>
-                  <span className={`min-w-0 truncate leading-none ${lane.clipContentClassName}`}>{lane.label}</span>
-                  <span className={`shrink-0 pl-1 tabular-nums leading-none ${lane.clipContentClassName}`}>{lane.durationLabel}</span>
-                </div>
-              )}
-            </div>
-          </button>
+              key={`${marker.key}:band`}
+              data-testid="timeline-transition-window"
+              aria-hidden="true"
+              className="pointer-events-none absolute top-3 bottom-1 z-20 bg-primary/35 bg-[linear-gradient(90deg,transparent,rgb(255_255_255/0.25))]"
+              style={marker.bandStyle}
+            />
+          ) : null,
         )}
+        {lane.cutMarkers.map((marker) => (
+          <CutMarker key={marker.key} marker={marker} />
+        ))}
+        {lane.joinMarkers.map((marker) => (marker.isVisible ? <JoinMarker key={marker.key} marker={marker} /> : null))}
       </div>
-      {lane.tooltip.isVisible && lane.label && (
-        <div
-          id={lane.tooltip.id}
-          role="tooltip"
-          className="pointer-events-none absolute bottom-full z-1000 mb-2 max-w-124 -translate-x-1/2 rounded border border-border/70 bg-surface-tooltip px-2.5 py-1.5 text-left text-xs text-foreground shadow-2xl"
-          style={lane.tooltip.style}
-        >
-          <div className="text-[0.72rem] font-semibold leading-snug">{lane.label}</div>
-          <div className="mt-1 flex items-center justify-between gap-4 border-t border-border/40 pt-1 text-[0.65rem] text-muted-foreground">
-            <span className="font-medium">{t('player.duration', 'Duration')}</span>
-            <span className="tabular-nums text-foreground">{lane.durationLabel}</span>
-          </div>
-          {lane.availableMetrics?.length > 0 && (
-            <p className="mt-1 border-t border-border/40 pt-1 text-[0.6rem] leading-relaxed text-foreground font-medium">
-              {lane.availableMetrics.join(', ')}
-            </p>
-          )}
-          <div className="absolute left-1/2 top-full -mt-px -translate-x-1/2 border-4 border-transparent border-t-surface-tooltip" />
-        </div>
-      )}
+      {lane.skippedJoinMarkers.map((marker) => (
+        <SkippedJoinMarker key={marker.key} marker={marker} />
+      ))}
+      {lane.clips.map((clip) => (clip.tooltip.isVisible && clip.label ? <TimelineClipTooltip key={clip.id} clip={clip} /> : null))}
     </div>
   )
 }

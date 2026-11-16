@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import HexColorPicker from '@/components/ui/hex-color-picker'
 import { Label } from '@/components/ui/label'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import { useGradientPicker } from '@/hooks/useGradientPicker'
 import { toLinearGradientCss } from '@/lib/gradient-stops'
 import { cn } from '@/lib/utils'
@@ -38,56 +39,62 @@ export default function GradientPicker({ stops, onChange, onCommit, label, class
       {/* Matches the slider's vertical rhythm; the track's ::before extends its hit area into this padding.
           The horizontal inset keeps stop nodes at 0% and 100% (half a node wide) inside the field width. */}
       <div className="px-2 py-2">
-        <div
-          ref={trackRef}
-          role="group"
-          aria-label={t('components.gradientStops', 'Gradient stops')}
-          title={canAddStop ? t('components.gradientAddStopHint', 'Click to add a color stop') : undefined}
-          className={cn(
-            'relative h-2.5 touch-none rounded-xs border border-border/70 shadow-xs before:absolute before:inset-x-0 before:-inset-y-2 before:content-[""]',
-            canAddStop ? 'cursor-copy' : 'cursor-default',
-          )}
-          style={{ backgroundImage: toLinearGradientCss(stops) }}
-          onPointerDown={handleTrackPointerDown}
+        {/* Hiding the bubble rather than dropping the tooltip keeps the track mounted while a click adds the last stop and drags it. */}
+        <SimpleTooltip
+          content={t('components.gradientAddStopHint', 'Click to add a color stop')}
+          className="flex w-full"
+          contentClassName={canAddStop ? '' : 'hidden'}
         >
-          {stops.map((stop, index) => (
-            // Keying on the stop count remounts nodes when stops are added or removed,
-            // so an open popover never moves to a different stop.
-            <div
-              key={`${stops.length}-${index}`}
-              className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-              style={{ left: `${stop.offset * 100}%` }}
-            >
-              <HexColorPicker
-                value={stop.color}
-                onChange={(color) => setStopColor(index, color)}
-                trigger={
-                  <button
-                    type="button"
-                    aria-label={t('components.gradientStopLabel', 'Color stop at {{percent}}%', { percent: Math.round(stop.offset * 100) })}
-                    className="block size-3.5 cursor-grab rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.5),0_1px_3px_rgb(0_0_0/0.4)] outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing data-[state=open]:scale-125"
-                    style={{ backgroundColor: stop.color }}
-                    {...getStopHandlers(index)}
-                  />
-                }
+          <div
+            ref={trackRef}
+            role="group"
+            aria-label={t('components.gradientStops', 'Gradient stops')}
+            className={cn(
+              'relative h-2.5 w-full touch-none rounded-xs border border-border/70 shadow-xs before:absolute before:inset-x-0 before:-inset-y-2 before:content-[""]',
+              canAddStop ? 'cursor-copy' : 'cursor-default',
+            )}
+            style={{ backgroundImage: toLinearGradientCss(stops) }}
+            onPointerDown={handleTrackPointerDown}
+          >
+            {stops.map((stop, index) => (
+              // Keying on the stop count remounts nodes when stops are added or removed,
+              // so an open popover never moves to a different stop.
+              <div
+                key={`${stops.length}-${index}`}
+                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${stop.offset * 100}%` }}
               >
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className="h-9 w-9 border-border/70 bg-surface text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
-                    aria-label={t('components.gradientRemoveStop', 'Remove stop')}
-                    disabled={!canRemoveStop}
-                    onClick={() => removeStop(index)}
-                  >
-                    <Trash2Icon />
-                  </Button>
-                </div>
-              </HexColorPicker>
-            </div>
-          ))}
-        </div>
+                <HexColorPicker
+                  value={stop.color}
+                  onChange={(color) => setStopColor(index, color)}
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label={t('components.gradientStopLabel', 'Color stop at {{percent}}%', { percent: Math.round(stop.offset * 100) })}
+                      className="block size-3.5 cursor-grab rounded-full border-2 border-white shadow-[0_0_0_1px_rgb(0_0_0/0.5),0_1px_3px_rgb(0_0_0/0.4)] outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing data-[state=open]:scale-125"
+                      style={{ backgroundColor: stop.color }}
+                      {...getStopHandlers(index)}
+                    />
+                  }
+                >
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 border-border/70 bg-surface text-muted-foreground hover:bg-surface-elevated hover:text-foreground"
+                      aria-label={t('components.gradientRemoveStop', 'Remove stop')}
+                      disabled={!canRemoveStop}
+                      onClick={() => removeStop(index)}
+                    >
+                      <Trash2Icon />
+                    </Button>
+                  </div>
+                </HexColorPicker>
+              </div>
+            ))}
+          </div>
+        </SimpleTooltip>
       </div>
     </div>
   )

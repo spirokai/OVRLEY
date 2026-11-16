@@ -34,22 +34,6 @@ export function timeToSeconds(timeStr) {
 }
 
 /**
- * Converts a numeric second value to HH:MM:SS.
- *
- * @param {number} seconds Whole or fractional second value.
- * @returns {string} Zero-padded HH:MM:SS string.
- */
-export function formatExportRangeTime(seconds) {
-  const sign = seconds < 0 ? '-' : ''
-  const wholeSeconds = Math.trunc(Math.abs(seconds))
-  const hours = Math.floor(wholeSeconds / 3600)
-  const minutes = Math.floor((wholeSeconds % 3600) / 60)
-  const remainingSeconds = wholeSeconds % 60
-
-  return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
-}
-
-/**
  * Formats seconds as a clock duration in mm:ss or h:mm:ss form.
  *
  * @param {number} seconds - Duration in seconds.
@@ -67,6 +51,24 @@ export function formatClockDuration(seconds) {
   }
 
   return `${sign}${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`
+}
+
+/**
+ * Formats seconds as a clock: `mm:ss`, or `hh:mm:ss` from one hour on, with up
+ * to three decimals when the value has a fraction (`330.5` → `05:30.5`).
+ *
+ * @param {number} seconds - Value in seconds.
+ * @returns {string} Clock text.
+ */
+export function formatSecondsClock(seconds) {
+  const rounded = Number(Math.abs(seconds).toFixed(3))
+  const sign = seconds < 0 && rounded > 0 ? '-' : ''
+  const wholeSeconds = Math.floor(rounded)
+  const fraction = String(Number((rounded - wholeSeconds).toFixed(3))).slice(1)
+  const hours = Math.floor(wholeSeconds / 3600)
+  const clock = [Math.floor((wholeSeconds % 3600) / 60), wholeSeconds % 60].map((part) => String(part).padStart(2, '0'))
+  if (hours > 0) clock.unshift(String(hours).padStart(2, '0'))
+  return `${sign}${clock.join(':')}${fraction}`
 }
 
 /**

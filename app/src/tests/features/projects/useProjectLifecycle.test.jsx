@@ -6,14 +6,20 @@ import { loadProject } from '@/features/projects/projectOperations'
 import useProjectLifecycle from '@/features/projects/hooks/useProjectLifecycle'
 import { prepareDocumentFonts } from '@/lib/font-resources'
 import { DEFAULT_RENDER_SETTINGS } from '@/store/slices/createRenderSettingsSlice'
+import { DEFAULT_TRANSITION_SETTINGS } from '@/lib/video-program/transition-catalog'
 import useStore from '@/store/useStore'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 const boundaries = vi.hoisted(() => ({
-  clearPreviewVideo: vi.fn(),
+  clearPreviewVideos: vi.fn(),
+  extractVideoTelemetry: vi.fn(),
   getDefaultProjectDirectory: vi.fn(),
+  getVideoThumbnail: vi.fn(),
+  preparePreviewVideo: vi.fn(),
   openSinglePath: vi.fn(),
   readProjectFile: vi.fn(),
   registerPreviewVideo: vi.fn(),
+  removePreviewVideo: vi.fn(),
   saveSinglePath: vi.fn(),
   selectedPathIsFile: vi.fn(),
   writeProjectFile: vi.fn(),
@@ -21,10 +27,14 @@ const boundaries = vi.hoisted(() => ({
 
 vi.mock('@/api/backend', async (importOriginal) => ({
   ...(await importOriginal()),
-  clearPreviewVideo: boundaries.clearPreviewVideo,
+  clearPreviewVideos: boundaries.clearPreviewVideos,
+  extractVideoTelemetry: boundaries.extractVideoTelemetry,
   getDefaultProjectDirectory: boundaries.getDefaultProjectDirectory,
+  getVideoThumbnail: boundaries.getVideoThumbnail,
+  preparePreviewVideo: boundaries.preparePreviewVideo,
   readProjectFile: boundaries.readProjectFile,
   registerPreviewVideo: boundaries.registerPreviewVideo,
+  removePreviewVideo: boundaries.removePreviewVideo,
   selectedPathIsFile: boundaries.selectedPathIsFile,
   writeProjectFile: boundaries.writeProjectFile,
 }))
@@ -35,13 +45,53 @@ vi.mock('@/lib/file-dialog', async (importOriginal) => ({
   saveSinglePath: boundaries.saveSinglePath,
 }))
 
+/** The native probe of a video file (`preparePreviewVideo`). */
+function preparedVideo(path, durationSeconds = 40) {
+  return {
+    metadata: { path, duration: durationSeconds, fpsNum: 30, fpsDen: 1, resolution: { width: 1920, height: 1080 }, hasAudio: true },
+    warnings: [],
+  }
+}
+
+function projectVideo(id, path, offsetSeconds = 0) {
+  return {
+    id,
+    path: { kind: 'project-relative', value: path },
+    offsetSeconds,
+    offsetSource: 'auto',
+    cuts: [],
+    segments: { start: { excluded: false, transitionIn: null, skipOverlay: false } },
+    placementAnchor: null,
+    timezoneMode: null,
+    // Saved as the probe of `preparedVideo` describes it.
+    metadata: {
+      frameCount: 1200,
+      fps: { num: 30, den: 1 },
+      resolution: { width: 1920, height: 1080 },
+      rotationDegrees: 0,
+      hasAudio: true,
+      codecName: null,
+      codecLongName: null,
+      bitRate: null,
+      cameraType: null,
+      cameraModel: null,
+      creationTime: null,
+      timeSource: null,
+    },
+  }
+}
+
 describe('useProjectLifecycle canonical load orchestration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     useStore.setState(useStore.getInitialState(), true)
     useStore.temporal.getState().clear()
-    boundaries.clearPreviewVideo.mockResolvedValue(null)
+    boundaries.clearPreviewVideos.mockResolvedValue(null)
+    boundaries.removePreviewVideo.mockResolvedValue(null)
     boundaries.registerPreviewVideo.mockResolvedValue({ importId: 'owner-import-id', previewUrl: 'http://preview/video' })
+    boundaries.preparePreviewVideo.mockImplementation(async (path) => preparedVideo(path))
+    boundaries.getVideoThumbnail.mockImplementation(async (path) => `thumbnail:${path}`)
+    boundaries.extractVideoTelemetry.mockResolvedValue(null)
   })
 
   test.each(['text', 'linear', 'arc', 'corner'])('normalizes legacy %s widget alignment at the frontend project-load seam', async (displayType) => {
@@ -56,33 +106,33 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     delete editor.config.values[0].content_alignment
     const project = {
       format: 'ovrley-project',
-      version: 3,
+      version: 6,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor,
-      sources: { activity: null, video: null },
+      sources: { activity: null, videos: [] },
       sync: {
-        videoOffsetSeconds: 0,
-        videoTimezoneMode: null,
-        manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      activityTrim: null,
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     boundaries.readProjectFile.mockResolvedValue({
       project,
-      resolvedSources: { activityPath: null, videoPath: null },
+      resolvedSources: { activityPath: null, videoPaths: [] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
 
     const loaded = await loadProject({
       path: 'C:\\Events\\Legacy.oly',
-      resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPath: null }),
+      resolveProjectSources: vi.fn().mockResolvedValue({ activityPath: null, videoPaths: [] }),
       prepareActivityPath: vi.fn(),
-      prepareVideoPath: vi.fn(),
     })
 
-    expect(loaded.editor.config.values[0].content_alignment).toBe('left')
+    expect(loaded.project.editor.config.values[0].content_alignment).toBe('left')
     expect(useStore.getState().config.values[0].content_alignment).toBe('left')
   })
 
@@ -93,7 +143,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 3,
+      version: 6,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({
         config: { ...initialState.config, scene: { ...initialState.config.scene, width: 1280 } },
@@ -101,17 +151,16 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       }),
       sources: {
         activity: { path: { kind: 'project-relative', value: 'ride.fit' } },
-        video: { path: { kind: 'project-relative', value: 'ride.mp4' } },
+        videos: [{ ...projectVideo('ride-video', 'ride.mp4', 12), timezoneMode: 'utc' }],
       },
       sync: {
-        videoOffsetSeconds: 12,
-        videoTimezoneMode: 'utc',
-        manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: { startSecond: 10, endSecond: 80 },
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
-        renderTarget: 'current',
-        batchVideoFolder: null,
+        outputMode: 'combined',
         batchOutputFolder: null,
         fps: 60,
         widgetUpdateRate: 2,
@@ -119,7 +168,6 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         codec: 'libx264',
         qualityType: 'bitrate',
         qualityValue: 20,
-        range: { type: 'custom', from: 10, to: 80 },
       },
       timeline: { playheadSecond: 30, viewStart: 20, viewEnd: 60 },
     }
@@ -130,8 +178,9 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Users\\test\\Documents\\OVRLEY\\projects')
     boundaries.readProjectFile.mockResolvedValue({
       project,
-      resolvedSources: { activityPath, videoPath },
+      resolvedSources: { activityPath, videoPaths: [videoPath] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     let finishActivityPreparation
@@ -155,29 +204,19 @@ describe('useProjectLifecycle canonical load orchestration', () => {
           finishActivityPreparation = () => resolve({ ...preparedActivity, source: { kind: 'file', path } })
         }),
     )
-    const prepareVideoPath = vi.fn(
+    boundaries.preparePreviewVideo.mockImplementation(
       (path) =>
         new Promise((resolve) => {
-          finishVideoPreparation = () =>
-            resolve({
-              path,
-              telemetry: null,
-              importedVideoState: {
-                importedVideoPath: path,
-                importedVideoDuration: 40,
-                importedVideoResolution: { width: 1920, height: 1080 },
-              },
-            })
+          finishVideoPreparation = () => resolve(preparedVideo(path))
         }),
     )
     const clearHistory = vi.spyOn(useStore.temporal.getState(), 'clear')
     const onSetBackgroundMode = vi.fn()
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         onSetBackgroundMode,
         prepareActivityPath,
-        prepareVideoPath,
       }),
     )
 
@@ -194,16 +233,16 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
     await waitFor(() => {
       expect(prepareActivityPath).toHaveBeenCalledOnce()
-      expect(prepareVideoPath).toHaveBeenCalledOnce()
+      expect(boundaries.preparePreviewVideo).toHaveBeenCalledOnce()
     })
     expect(result.current.loadingProject).toBe(true)
     expect(useStore.getState().activitySource).toBeNull()
-    expect(useStore.getState().importedVideoPath).toBeNull()
+    expect(useStore.getState().importedVideos).toEqual([])
     finishActivityPreparation()
     finishVideoPreparation()
     await act(async () => Promise.resolve())
     expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
-    expect(useStore.getState().importedVideoPath).toBeNull()
+    expect(useStore.getState().importedVideos).toEqual([])
     finishFonts()
     await act(async () => openPromise)
     expect(result.current.loadingProject).toBe(false)
@@ -213,7 +252,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       lastDirectoryKey: 'last-project-dir',
     })
     expect(prepareActivityPath).toHaveBeenCalledWith(activityPath)
-    expect(prepareVideoPath).toHaveBeenCalledWith(videoPath)
+    expect(boundaries.preparePreviewVideo).toHaveBeenCalledWith(videoPath)
     expect(boundaries.registerPreviewVideo).toHaveBeenCalledWith(videoPath)
 
     const state = useStore.getState()
@@ -221,12 +260,18 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.config.scene.width).toBe(1280)
     expect(state.globalDefaults.color_text).toBe('#123456')
     expect(state.loadedTemplateSource).toBeNull()
-    expect(state.importedVideoImportId).toBe('owner-import-id')
-    expect(state.videoSyncOffsetSeconds).toBe(12)
-    expect(state.videoSyncTimezoneMode).toBe('utc')
-    const { batchVideoFolder, batchOutputFolder, ...renderSettings } = project.render
+    expect(state.importedVideos).toHaveLength(1)
+    const [video] = state.importedVideos
+    expect(video).toMatchObject({ id: 'ride-video', path: videoPath, durationSeconds: 40, previewWarnings: [] })
+    expect(video.preview).toEqual({ importId: 'owner-import-id', url: 'http://preview/video' })
+    // Telemetry is extracted in the background once the video joined the collection.
+    await waitFor(() => expect(useStore.getState().importedVideos[0].telemetry).toEqual({ status: 'absent', activity: null }))
+    expect(boundaries.extractVideoTelemetry).toHaveBeenCalledWith(videoPath)
+    expect(state.videoEdits[video.id].offsetSeconds).toBe(12)
+    expect(state.manualVideoSync.videoId).toBe(video.id)
+    expect(state.videoEdits[video.id].timezoneMode).toBe('utc')
+    const { batchOutputFolder, ...renderSettings } = project.render
     expect(state.renderSettings).toEqual(renderSettings)
-    expect(state.batchVideoFolder).toBe(batchVideoFolder)
     expect(state.batchOutputFolder).toBe(batchOutputFolder)
     expect(state.selectedSecond).toBe(30)
     expect(state.timelineViewport).toEqual({ viewStart: 20, viewEnd: 60 })
@@ -250,20 +295,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     act(() => useStore.getState().setLoadedTemplateSource({ kind: 'bundled', templateId: 'another-template.json' }))
     expect(result.current.status).toBe('Saved')
 
-    act(() => useStore.getState().setRenderTarget('batch'))
+    act(() => useStore.getState().setOutputMode('separate'))
     expect(result.current.status).toBe('Modified')
-    act(() => useStore.getState().setRenderTarget('current'))
-    expect(result.current.status).toBe('Saved')
-    act(() => useStore.getState().setBatchVideoFolder('C:\\batch-videos'))
-    expect(result.current.status).toBe('Modified')
-    act(() => useStore.getState().setBatchVideoFolder(null))
+    act(() => useStore.getState().setOutputMode('combined'))
     expect(result.current.status).toBe('Saved')
     act(() => useStore.getState().setBatchOutputFolder('C:\\batch-renders'))
     expect(result.current.status).toBe('Modified')
     act(() => useStore.getState().setBatchOutputFolder(null))
-    expect(result.current.status).toBe('Saved')
-    act(() => useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4']))
-    expect(result.current.status).toBe('Saved')
     expect(result.current.status).toBe('Saved')
 
     act(() => useStore.getState().setVideoSyncDetectedLocation(20))
@@ -281,9 +319,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.saveSinglePath.mockResolvedValue(null)
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath: vi.fn(),
-        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -313,30 +350,24 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       },
       activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' },
       parsedActivity: { samples: [] },
-      parsedActivitySource: 'activity-file',
       activitySummary: { durationSeconds: 120 },
-      importedVideoPath: 'C:\\Media\\ride.mp4',
-      importedVideoDuration: 120,
+      ...videoStoreState([createTestVideo({ path: 'C:\\Media\\ride.mp4', durationSeconds: 120 })], { 'video-1': 12 }),
+      transitionDefaults: { type: 'fade', durationSeconds: 1, splitGapThresholdSeconds: 5 },
       selectedSecond: 45,
       timelineViewport: { viewStart: 30, viewEnd: 60 },
-      videoSyncOffsetSeconds: 12,
-      batchVideoFolder: 'C:\\batch-videos',
       batchOutputFolder: 'C:\\batch-renders',
       renderSettings: {
         ...DEFAULT_RENDER_SETTINGS,
-        renderTarget: 'batch',
+        outputMode: 'separate',
         fps: 60,
-        range: { type: 'custom', from: 10, to: 80 },
       },
     })
 
-    useStore.getState().setBatchQueueFromPaths(['C:\\batch-videos\\ride.mp4'])
-    const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
+    const clearImportedVideos = vi.fn(async () => useStore.getState().clearImportedVideos())
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo,
+        clearImportedVideos,
         prepareActivityPath: vi.fn(),
-        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -345,24 +376,23 @@ describe('useProjectLifecycle canonical load orchestration', () => {
       createPromise = result.current.handleNewProject()
     })
     await waitFor(() => expect(result.current.unsavedProjectDialog.open).toBe(true))
-    expect(clearImportedVideo).not.toHaveBeenCalled()
+    expect(clearImportedVideos).not.toHaveBeenCalled()
 
     act(() => result.current.unsavedProjectDialog.onDiscard())
     await act(async () => createPromise)
 
     const state = useStore.getState()
-    expect(clearImportedVideo).toHaveBeenCalledOnce()
+    expect(clearImportedVideos).toHaveBeenCalledOnce()
     expect(state.config.labels.map((widget) => widget.id)).toEqual(['template-widget'])
     expect(state.loadedTemplateSource).toEqual(templateSource)
     expect(state.lastSavedTemplateState).toEqual(templateState)
     expect(state.activitySource).toBeNull()
     expect(state.parsedActivity).toBeNull()
-    expect(state.importedVideoPath).toBeNull()
-    expect(state.videoSyncOffsetSeconds).toBe(0)
+    expect(state.importedVideos).toEqual([])
+    expect(state.videoEdits).toEqual({})
+    expect(state.transitionDefaults).toEqual(DEFAULT_TRANSITION_SETTINGS)
     expect(state.renderSettings).toEqual(DEFAULT_RENDER_SETTINGS)
-    expect(state.batchVideoFolder).toBeNull()
     expect(state.batchOutputFolder).toBeNull()
-    expect(state.batchQueue).toEqual([])
     expect(state.selectedSecond).toBe(0)
     expect(state.timelineViewport).toEqual({ viewStart: 0, viewEnd: 73 })
     expect(result.current.loadedProjectPath).toBeNull()
@@ -389,14 +419,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     })
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
     boundaries.saveSinglePath.mockResolvedValue('C:\\Projects\\project.oly')
-    boundaries.writeProjectFile.mockResolvedValue(null)
+    boundaries.writeProjectFile.mockResolvedValue({ path: 'C:\\Projects\\project.oly', backupPath: null })
 
-    const clearImportedVideo = vi.fn(async () => useStore.getState().clearImportedVideo())
+    const clearImportedVideos = vi.fn(async () => useStore.getState().clearImportedVideos())
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo,
+        clearImportedVideos,
         prepareActivityPath: vi.fn(),
-        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -419,12 +448,11 @@ describe('useProjectLifecycle canonical load orchestration', () => {
   test('New Project keeps the session when the user cancels the confirmation', async () => {
     useStore.setState({ activitySource: { kind: 'file', path: 'C:\\Media\\ride.fit' }, parsedActivity: { samples: [] } })
 
-    const clearImportedVideo = vi.fn()
+    const clearImportedVideos = vi.fn()
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo,
+        clearImportedVideos,
         prepareActivityPath: vi.fn(),
-        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -438,7 +466,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const outcome = await act(async () => createPromise)
 
     expect(outcome).toBe(false)
-    expect(clearImportedVideo).not.toHaveBeenCalled()
+    expect(clearImportedVideos).not.toHaveBeenCalled()
     expect(useStore.getState().activitySource).toEqual({ kind: 'file', path: 'C:\\Media\\ride.fit' })
     expect(result.current.status).toBe('Unsaved')
   })
@@ -449,44 +477,43 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const initialState = useStore.getState()
     const project = {
       format: 'ovrley-project',
-      version: 3,
+      version: 6,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
         activity: { path: { kind: 'project-relative', value: 'missing.fit' } },
-        video: null,
+        videos: [],
       },
       sync: {
-        videoOffsetSeconds: 0,
-        videoTimezoneMode: null,
-        manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      activityTrim: null,
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
       activitySource: { kind: 'file', path: 'C:\\Previous\\activity.fit' },
       parsedActivity: { samples: [] },
-      parsedActivitySource: 'activity-file',
       activitySummary: { durationSeconds: 50 },
     })
     boundaries.openSinglePath.mockResolvedValue(projectPath)
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Users\\test\\Documents\\OVRLEY\\projects')
     boundaries.readProjectFile.mockResolvedValue({
       project,
-      resolvedSources: { activityPath: missingActivityPath, videoPath: null },
+      resolvedSources: { activityPath: missingActivityPath, videoPaths: [] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockResolvedValue(false)
     const prepareActivityPath = vi.fn()
     const onSetBackgroundMode = vi.fn()
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         onSetBackgroundMode,
         prepareActivityPath,
-        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -510,20 +537,20 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Broken.oly'
     const project = {
       format: 'ovrley-project',
-      version: 3,
+      version: 6,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
       sources: {
         activity: { path: { kind: 'project-relative', value: 'broken.fit' } },
-        video: { path: { kind: 'project-relative', value: 'ride.mp4' } },
+        videos: [projectVideo('ride-video', 'ride.mp4')],
       },
       sync: {
-        videoOffsetSeconds: 0,
-        videoTimezoneMode: null,
-        manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
-      render: { ...DEFAULT_RENDER_SETTINGS, batchVideoFolder: null, batchOutputFolder: null, range: { ...DEFAULT_RENDER_SETTINGS.range } },
+      activityTrim: null,
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({
@@ -534,26 +561,25 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     boundaries.openSinglePath.mockResolvedValue(projectPath)
     boundaries.readProjectFile.mockResolvedValue({
       project,
-      resolvedSources: { activityPath: 'C:\\Events\\broken.fit', videoPath: 'C:\\Events\\ride.mp4' },
+      resolvedSources: { activityPath: 'C:\\Events\\broken.fit', videoPaths: ['C:\\Events\\ride.mp4'] },
       rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
     })
     boundaries.selectedPathIsFile.mockResolvedValue(true)
     const prepareActivityPath = vi.fn().mockRejectedValue(new Error('invalid activity'))
-    const prepareVideoPath = vi.fn().mockResolvedValue({ path: 'C:\\Events\\ride.mp4' })
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath,
-        prepareVideoPath,
       }),
     )
 
     await act(() => result.current.handleOpenProject())
 
     expect(prepareActivityPath).toHaveBeenCalledOnce()
-    expect(prepareVideoPath).toHaveBeenCalledOnce()
+    expect(boundaries.preparePreviewVideo).toHaveBeenCalledOnce()
     expect(boundaries.registerPreviewVideo).not.toHaveBeenCalled()
-    expect(boundaries.clearPreviewVideo).not.toHaveBeenCalled()
+    expect(boundaries.clearPreviewVideos).not.toHaveBeenCalled()
     expect(useStore.getState().activitySource.path).toBe('C:\\Current\\ride.fit')
     expect(useStore.getState().importedBackgroundImagePath).toBe('C:\\Current\\background.png')
     expect(result.current.loadingProject).toBe(false)
@@ -564,40 +590,42 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     const projectPath = 'C:\\Events\\Empty.oly'
     const project = {
       format: 'ovrley-project',
-      version: 3,
+      version: 6,
       savedAt: '2026-08-27T12:00:00.000Z',
       editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
-      sources: { activity: null, video: null },
+      sources: { activity: null, videos: [] },
       sync: {
-        videoOffsetSeconds: 0,
-        videoTimezoneMode: null,
-        manual: { landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: { videoId: null, landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
       },
       laps: { disabled: [] },
+      activityTrim: null,
+      transitionDefaults: { ...DEFAULT_TRANSITION_SETTINGS },
       render: {
         ...DEFAULT_RENDER_SETTINGS,
-        batchVideoFolder: null,
         batchOutputFolder: null,
         exportMode: 'transparent',
-        range: { ...DEFAULT_RENDER_SETTINGS.range },
       },
       timeline: { playheadSecond: 0, viewStart: 0, viewEnd: 73 },
     }
     useStore.setState({ importedBackgroundImagePath: 'C:\\Current\\background.png' })
     boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
     boundaries.openSinglePath.mockResolvedValue(projectPath)
-    boundaries.readProjectFile.mockResolvedValue({ project, resolvedSources: { activityPath: null, videoPath: null }, rasterLoadResults: {} })
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: [] },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
+    })
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath: vi.fn(),
-        prepareVideoPath: vi.fn(),
       }),
     )
 
     await act(() => result.current.handleOpenProject())
 
-    expect(boundaries.clearPreviewVideo).toHaveBeenCalledOnce()
+    expect(boundaries.clearPreviewVideos).toHaveBeenCalledOnce()
     expect(useStore.getState().importedBackgroundImagePath).toBeNull()
   })
 
@@ -616,9 +644,8 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     )
     const { result } = renderHook(() =>
       useProjectLifecycle({
-        clearImportedVideo: vi.fn(),
+        clearImportedVideos: vi.fn(),
         prepareActivityPath: vi.fn(),
-        prepareVideoPath: vi.fn(),
       }),
     )
 
@@ -640,5 +667,165 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(result.current.loadingProject).toBe(false)
     expect(boundaries.getDefaultProjectDirectory).toHaveBeenCalledOnce()
     expect(boundaries.saveSinglePath).not.toHaveBeenCalled()
+  })
+
+  function multiVideoProject() {
+    const initialState = useStore.getState()
+    return {
+      format: 'ovrley-project',
+      version: 6,
+      savedAt: '2026-08-27T12:00:00.000Z',
+      editor: createDurableEditorState({ config: initialState.config, globalDefaults: initialState.globalDefaults }),
+      sources: {
+        activity: null,
+        videos: [
+          projectVideo('clip-a', 'a.mp4', -5),
+          projectVideo('clip-missing', 'missing.mp4', 50),
+          {
+            ...projectVideo('clip-c', 'c.mp4', 100),
+            cuts: [{ id: 'cut-1', frame: 150 }],
+            segments: {
+              start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false },
+              'cut-1': { excluded: true, transitionIn: null, skipOverlay: false },
+            },
+            placementAnchor: { videoId: 'clip-missing', side: 'after' },
+          },
+        ],
+      },
+      sync: {
+        manual: { videoId: 'clip-c', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+      },
+      laps: { disabled: [] },
+      activityTrim: null,
+      transitionDefaults: { type: 'none', durationSeconds: 2, splitGapThresholdSeconds: 3 },
+      render: { ...DEFAULT_RENDER_SETTINGS, batchOutputFolder: null },
+      timeline: { playheadSecond: 0, viewStart: -5, viewEnd: 140 },
+    }
+  }
+
+  const multiVideoPaths = ['C:\\Events\\a.mp4', 'C:\\Events\\missing.mp4', 'C:\\Events\\c.mp4']
+
+  test('opens a multi-video project without asking about a missing video, which keeps its place and edits, then releases the previous previews', async () => {
+    const project = multiVideoProject()
+    useStore.setState(videoStoreState([createTestVideo({ id: 'previous', path: 'C:\\Previous\\a.mp4' })]))
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue('C:\\Events\\Session.oly')
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: multiVideoPaths },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
+    })
+    boundaries.selectedPathIsFile.mockImplementation(async (path) => path !== 'C:\\Events\\missing.mp4')
+    boundaries.registerPreviewVideo.mockImplementation(async (path) => ({ importId: `import:${path}`, previewUrl: `http://preview/${path}` }))
+    const { result } = renderHook(() =>
+      useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn(), onSetBackgroundMode: vi.fn() }),
+    )
+
+    await act(() => result.current.handleOpenProject())
+
+    expect(result.current.missingSourceDialog.open).toBe(false)
+    expect(boundaries.preparePreviewVideo.mock.calls.map(([path]) => path)).toEqual(['C:\\Events\\a.mp4', 'C:\\Events\\c.mp4'])
+    expect(boundaries.registerPreviewVideo.mock.calls.map(([path]) => path)).toEqual(['C:\\Events\\a.mp4', 'C:\\Events\\c.mp4'])
+    const state = useStore.getState()
+    expect(
+      state.importedVideos.map((video) => [
+        video.id,
+        video.importOrder,
+        video.path,
+        video.missing,
+        video.thumbnailUrl,
+        video.preview?.importId ?? null,
+      ]),
+    ).toEqual([
+      ['clip-a', 0, 'C:\\Events\\a.mp4', false, 'thumbnail:C:\\Events\\a.mp4', 'import:C:\\Events\\a.mp4'],
+      ['clip-missing', 1, 'C:\\Events\\missing.mp4', true, null, null],
+      ['clip-c', 2, 'C:\\Events\\c.mp4', false, 'thumbnail:C:\\Events\\c.mp4', 'import:C:\\Events\\c.mp4'],
+    ])
+    expect(state.importedVideos[1].durationSeconds).toBe(40)
+    expect(state.videoEdits['clip-missing']).toMatchObject({ offsetSeconds: 50 })
+    expect(state.videoEdits['clip-c']).toEqual({
+      offsetSeconds: 100,
+      offsetSource: 'auto',
+      cuts: [{ id: 'cut-1', frame: 150 }],
+      segments: {
+        start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false },
+        'cut-1': { excluded: true, transitionIn: null, skipOverlay: false },
+      },
+      placementAnchor: { videoId: 'clip-missing', side: 'after' },
+      timezoneMode: null,
+    })
+    expect(state.manualVideoSync.videoId).toBe('clip-c')
+    expect(state.transitionDefaults).toEqual(project.transitionDefaults)
+    expect(boundaries.removePreviewVideo).toHaveBeenCalledExactlyOnceWith('import-previous')
+    expect(result.current.status).toBe('Saved')
+  })
+
+  test('a found file shorter than its saved edits loads with the cuts inside it, and the project is modified', async () => {
+    const project = multiVideoProject()
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue('C:\\Events\\Session.oly')
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: multiVideoPaths },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: null,
+    })
+    boundaries.selectedPathIsFile.mockResolvedValue(true)
+    // The file found for clip-c ends before its cut (at 5 s).
+    boundaries.preparePreviewVideo.mockImplementation(async (path) => preparedVideo(path, path.endsWith('c.mp4') ? 3 : 40))
+    const { result } = renderHook(() =>
+      useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn(), onSetBackgroundMode: vi.fn() }),
+    )
+
+    await act(() => result.current.handleOpenProject())
+
+    expect(useStore.getState().videoEdits['clip-c']).toMatchObject({
+      cuts: [],
+      segments: { start: { excluded: false, transitionIn: { type: 'fade', durationSeconds: 1 }, skipOverlay: false } },
+    })
+    expect(result.current.status).toBe('Modified')
+  })
+
+  test('tells the user that the video folder of a version 3 batch project is no longer imported', async () => {
+    const project = multiVideoProject()
+    project.sources.videos = []
+    project.sync.manual.videoId = null
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.openSinglePath.mockResolvedValue('C:\\Events\\Batch.oly')
+    boundaries.readProjectFile.mockResolvedValue({
+      project,
+      resolvedSources: { activityPath: null, videoPaths: [] },
+      rasterLoadResults: {},
+      legacyBatchVideoFolder: 'C:\\Events\\videos',
+    })
+    const { result } = renderHook(() => useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn() }))
+
+    await act(() => result.current.handleOpenProject())
+
+    expect(result.current.loadedProjectPath).toBe('C:\\Events\\Batch.oly')
+    expect(result.current.noticeDialog).toMatchObject({ open: true, title: 'Batch video folder not imported', detail: 'C:\\Events\\videos' })
+    expect(boundaries.preparePreviewVideo).not.toHaveBeenCalled()
+    act(() => result.current.noticeDialog.onClose())
+    expect(result.current.noticeDialog.open).toBe(false)
+  })
+
+  test('tells the user once when a save replaced an older-format project', async () => {
+    boundaries.getDefaultProjectDirectory.mockResolvedValue('C:\\Projects')
+    boundaries.saveSinglePath.mockResolvedValue('C:\\Projects\\Legacy.oly')
+    boundaries.writeProjectFile.mockResolvedValueOnce({ path: 'C:\\Projects\\Legacy.oly', backupPath: 'C:\\Projects\\Legacy.oly.v3.bak' })
+    boundaries.writeProjectFile.mockResolvedValueOnce({ path: 'C:\\Projects\\Legacy.oly', backupPath: null })
+    const { result } = renderHook(() => useProjectLifecycle({ clearImportedVideos: vi.fn(), prepareActivityPath: vi.fn() }))
+    expect(result.current.noticeDialog.open).toBe(false)
+
+    await act(() => result.current.handleSaveProjectAs())
+
+    expect(boundaries.writeProjectFile).toHaveBeenCalledWith('C:\\Projects\\Legacy.oly', expect.stringContaining('"version": 6'), expect.any(Object))
+    expect(result.current.noticeDialog).toMatchObject({ open: true, detail: 'C:\\Projects\\Legacy.oly.v3.bak' })
+    act(() => result.current.noticeDialog.onClose())
+    expect(result.current.noticeDialog.open).toBe(false)
+
+    await act(() => result.current.handleSaveProject())
+    expect(result.current.noticeDialog.open).toBe(false)
   })
 })

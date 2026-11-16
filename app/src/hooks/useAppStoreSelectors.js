@@ -6,11 +6,7 @@ import { clamp } from '@/lib/utils'
 
 function selectOverlayPreview(state) {
   return {
-    exportRange: state.renderSettings.range,
-    importedVideoPath: state.importedVideoPath,
-    importedVideoDuration: state.importedVideoDuration,
-    videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
-    parsedActivity: state.parsedActivity,
+    activityTrim: state.activityTrim,
     disabledLaps: state.disabledLaps,
     importedBackgroundImagePath: state.importedBackgroundImagePath,
     fallbackDurationSeconds: state.fallbackDurationSeconds,
@@ -70,7 +66,7 @@ export function useAppShellStore() {
       isProcessing: state.isProcessing,
       globalDefaults: state.globalDefaults,
       importingVideo: state.importingVideo,
-      importedVideoPath: state.importedVideoPath,
+      hasVideos: state.importedVideos.length > 0,
       setConfig: state.setConfig,
       setErrorMessage: state.setErrorMessage,
     })),
@@ -94,7 +90,7 @@ export function useActivityStore() {
       activitySource: state.activitySource,
       clearActivityFile: state.clearActivityFile,
       disabledLaps: state.disabledLaps,
-      parsedActivitySource: state.parsedActivitySource,
+      hasExternalActivity: state.parsedActivity !== null,
       setLapEnabled: state.setLapEnabled,
       setErrorMessage: state.setErrorMessage,
       setProcessing: state.setProcessing,
@@ -127,6 +123,7 @@ export function useRenderStore() {
   return useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
+      hasVideoTelemetry: state.importedVideos.some((video) => video.telemetry.status === 'ready'),
       activeRenderId: state.activeRenderId,
       activeBatchId: state.batchSnapshot?.rendererBusy ? state.batchSnapshot.batchId : null,
       config: state.config,
@@ -138,21 +135,14 @@ export function useRenderStore() {
   )
 }
 
-/** @returns {object|null} External activity used to initialize an editable export range. */
-export function useRenderRangeActivity() {
-  return useStore((state) => state.parsedActivity)
-}
-
 /** @returns {object} Renderer availability and inputs for dialog presentation. */
 export function useRenderDialogInputs() {
   return useStore(
     useShallow((state) => ({
       availableCodecs: state.availableCodecs,
       config: state.config,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoDuration: state.importedVideoDuration,
-      importedVideoFps: state.importedVideoFps,
-      importedVideoResolution: state.importedVideoResolution,
+      importedVideos: state.importedVideos,
+      videoEdits: state.videoEdits,
       platformOs: state.platformOs,
       rendererBusy: isRendererBusy(state),
       renderingVideo: state.renderingVideo,
@@ -161,46 +151,35 @@ export function useRenderDialogInputs() {
       renderProgress: state.renderProgress,
       batchSnapshot: state.batchSnapshot,
       renderSettings: state.renderSettings,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
+      parsedActivity: state.parsedActivity,
+      activityTrim: state.activityTrim,
     })),
   )
 }
 
-/** @returns {object} Batch inspection inputs and queue choices, without native frame progress. */
+/** @returns {object} Batch output choices, without native frame progress. */
 export function useBatchRenderStore() {
   return useStore(
     useShallow((state) => ({
-      batchAutoSync: state.batchAutoSync,
-      setBatchAutoSync: state.setBatchAutoSync,
-      batchVideoFolder: state.batchVideoFolder,
       batchOutputFolder: state.batchOutputFolder,
-      batchQueue: state.batchQueue,
       hasBatchResults: state.batchSnapshot !== null,
       batchRunning: state.batchSnapshot?.rendererBusy ?? false,
       batchSubmissionPending: state.renderSubmissionTarget === 'batch',
-      setBatchVideoFolder: state.setBatchVideoFolder,
       setBatchOutputFolder: state.setBatchOutputFolder,
-      setBatchQueueFromPaths: state.setBatchQueueFromPaths,
-      removeBatchQueueItem: state.removeBatchQueueItem,
-      clearBatchQueue: state.clearBatchQueue,
-      setBatchItemSkipOverlay: state.setBatchItemSkipOverlay,
       setErrorMessage: state.setErrorMessage,
     })),
   )
 }
 
-/** @returns {object} Inputs that invalidate reviewed batch synchronization. */
+/** @returns {object} Inputs that invalidate a reviewed batch: the videos, their offsets, and the activity. */
 export function useBatchSyncInputs() {
   return useStore(
     useShallow((state) => ({
       activitySummary: state.activitySummary,
       parsedActivity: state.parsedActivity,
-      parsedActivitySource: state.parsedActivitySource,
-      importedVideoPath: state.importedVideoPath,
-      importedVideoCreationTime: state.importedVideoCreationTime,
-      importedVideoTimeSource: state.importedVideoTimeSource,
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
-      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
+      importedVideos: state.importedVideos,
+      videoEdits: state.videoEdits,
+      transitionDefaults: state.transitionDefaults,
       availableCodecs: state.availableCodecs,
     })),
   )

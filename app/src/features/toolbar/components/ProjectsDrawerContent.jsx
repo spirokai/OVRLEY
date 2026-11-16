@@ -1,7 +1,9 @@
 import { Activity, FilePlus2, Film, FolderOpen, Save } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
+import { filenameFromSelectedPath } from '@/lib/file-dialog'
 import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 function ProjectSource({ icon: Icon, label, filename, path }) {
   if (!path) return null
@@ -12,15 +14,13 @@ function ProjectSource({ icon: Icon, label, filename, path }) {
         icon={Icon}
         title={label}
         trailing={
-          <p className="max-w-32 truncate text-xs font-medium text-foreground/90" title={filename}>
-            {filename}
-          </p>
+          <SimpleTooltip content={filename} className="max-w-32" align="end" wrapText>
+            <p className="min-w-0 truncate text-xs font-medium text-foreground/90">{filename}</p>
+          </SimpleTooltip>
         }
         variant="drawer"
       />
-      <p className="min-w-0 break-all text-xs text-muted-foreground" title={path}>
-        {path}
-      </p>
+      <p className="min-w-0 break-all text-xs text-muted-foreground">{path}</p>
     </section>
   )
 }
@@ -30,8 +30,7 @@ export function ProjectsDrawerContent({
   projectPath,
   activityFilename,
   activityPath,
-  videoFilename,
-  videoPath,
+  videoClips,
   status,
   busy,
   onNew,
@@ -69,13 +68,21 @@ export function ProjectsDrawerContent({
       {projectPath ? (
         <div className="mt-10 min-w-0 space-y-6 border-t border-border/80 pt-2">
           <div className="min-w-0 pb-2 pl-1 pt-4 text-sm font-extrabold text-foreground">
-            <span className="block min-w-0 truncate" title={projectName}>
-              {projectName}
-            </span>
+            <SimpleTooltip content={projectName} className="flex min-w-0" align="start" wrapText>
+              <span className="min-w-0 truncate">{projectName}</span>
+            </SimpleTooltip>
           </div>
           <div className="min-w-0 space-y-8">
             <ProjectSource icon={Activity} label={t('toolbar.activity', 'Activity')} filename={activityFilename} path={activityPath} />
-            <ProjectSource icon={Film} label={t('toolbar.video', 'Video')} filename={videoFilename} path={videoPath} />
+            {videoClips.map((video) => (
+              <ProjectSource
+                key={video.id}
+                icon={Film}
+                label={t('toolbar.video', 'Video')}
+                filename={filenameFromSelectedPath(video.path)}
+                path={video.path}
+              />
+            ))}
           </div>
         </div>
       ) : null}

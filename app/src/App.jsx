@@ -16,12 +16,15 @@ import {
   ToolbarDrawerLayout,
   useToolbarDrawer,
   VideoDrawerContent,
+  VideoPanel,
   useVideoSyncControls,
 } from '@/features/toolbar'
 import { VideoSyncDrawerContent, useVideoSyncWorkspace } from '@/features/video-sync'
 import { ACTIVITY_TOOL, PROJECTS_TOOL, VIDEO_SYNC_TOOL, VIDEO_TOOL, WIDGETS_TOOL } from '@/store/slices/createLayoutSlice'
-import { MissingSourceDialog, StartupProjectsDialog } from '@/features/projects'
+import { MissingSourceDialog, ProjectNoticeDialog, StartupProjectsDialog } from '@/features/projects'
+import { VideoImportDialog } from '@/features/video-preview'
 import { UpdatePromptDialog } from '@/features/app-update'
+import { CutRemovalDialog, useCutRemovalDialog } from '@/features/player'
 import {
   AppHeader,
   ControlPanel,
@@ -32,6 +35,7 @@ import {
   useAppShellComposition,
 } from '@/features/app-shell'
 import * as backend from './api/backend'
+import { hasTextSelection } from '@/lib/keyboard-shortcuts'
 import { useTranslation } from 'react-i18next'
 import { changeLanguagePreference } from '@/i18n/language-preference'
 
@@ -43,6 +47,8 @@ function useRightClickDevtools() {
     }
 
     const handleContextMenu = (event) => {
+      // Selected text keeps the native menu, which offers Copy.
+      if (hasTextSelection()) return
       event.preventDefault()
       import('@tauri-apps/api/core')
         .then(({ invoke }) => invoke('plugin:webview|internal_toggle_devtools'))
@@ -84,11 +90,8 @@ function App() {
   } = useAppShellComposition()
   const toolbarDrawer = useToolbarDrawer(layout)
   const videoSync = useVideoSyncControls()
-  const videoSyncWorkspace = useVideoSyncWorkspace({
-    toolbarDrawer,
-    videoSummary: videoControls.videoSummary,
-    videoSync,
-  })
+  const videoSyncWorkspace = useVideoSyncWorkspace({ toolbarDrawer, videoSync })
+  const cutRemovalDialog = useCutRemovalDialog()
   const { config, globalDefaults, importingVideo, isProcessing, setConfig } = appShell
   let drawerContent = null
 
@@ -100,8 +103,7 @@ function App() {
           projectPath={projectLifecycle.loadedProjectPath}
           activityFilename={activityImport.activityFilename}
           activityPath={activityImport.activityPath}
-          videoFilename={videoControls.videoSummary.filename}
-          videoPath={videoControls.videoSummary.path}
+          videoClips={videoControls.clips}
           status={projectLifecycle.status}
           busy={projectLifecycle.busy}
           onNew={projectLifecycle.handleNewProject}
@@ -125,11 +127,11 @@ function App() {
     } else if (toolbarDrawer.activeTool === VIDEO_TOOL) {
       drawerContent = (
         <VideoDrawerContent
-          videoSummary={videoControls.videoSummary}
+          hasVideos={videoControls.hasVideos}
           onBrowseVideo={videoControls.handleImportVideo}
-          onDeleteVideo={videoControls.clearImportedVideo}
+          onRemoveVideo={videoControls.removeVideo}
+          onLocateVideo={videoControls.locateVideo}
           onDropVideoFiles={videoControls.handleVideoFilesDrop}
-          videoSync={videoSync}
         />
       )
     } else if (toolbarDrawer.activeTool === VIDEO_SYNC_TOOL) {
@@ -169,6 +171,10 @@ function App() {
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
+        <ProjectNoticeDialog {...projectLifecycle.noticeDialog} />
+        <ProjectNoticeDialog {...renderWorkflow.missingVideosDialog} />
+        <CutRemovalDialog {...cutRemovalDialog} />
+        <VideoImportDialog {...videoControls.importDialog} />
         <SettingsDialog
           open={editorShell.settingsOpen}
           section={editorShell.settingsSection}
@@ -220,7 +226,7 @@ function App() {
                   gridVisible={editorShell.editorGridVisible}
                   snapToGrid={editorShell.editorSnapToGrid}
                   importedBackgroundImageFilename={videoControls.importedBackgroundImageFilename}
-                  importedVideoFilename={videoControls.importedVideoFilename}
+                  importedVideoLabel={videoControls.importedVideoLabel}
                   editorShell={editorShell}
                   undoRedoControls={undoRedoControls}
                   showProjectStatus={projectLifecycle.hasUnsavedChanges}
@@ -234,12 +240,15 @@ function App() {
                 activeKeyboardWorkspace={editorShell.activeKeyboardWorkspace}
                 backgroundMode={editorShell.editorBackgroundMode}
                 onActivateKeyboardWorkspace={() => editorShell.setActiveKeyboardWorkspace('player')}
+                onRemoveVideo={videoControls.removeVideo}
                 videoSyncMode={videoSyncWorkspace.videoSyncMode}
               />
             </>
           }
           controlPanel={
-            videoSyncWorkspace.videoSyncMode ? null : (
+            videoSyncWorkspace.videoSyncMode ? null : toolbarDrawer.visible && toolbarDrawer.activeTool === VIDEO_TOOL ? (
+              <VideoPanel onDeleteVideo={videoControls.clearImportedVideos} onRemoveVideo={videoControls.removeVideo} />
+            ) : (
               <div
                 className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto bg-card/60"
                 onFocusCapture={() => editorShell.setActiveKeyboardWorkspace('editor')}

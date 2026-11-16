@@ -11,6 +11,7 @@ mod activity_extraction_tests;
 mod activity_tests;
 mod arc_gauge_tests;
 mod backdrop_contract_tests;
+mod batch_join_pipeline_tests;
 mod batch_render_tests;
 mod cancellation_tests;
 mod codec_detect_tests;

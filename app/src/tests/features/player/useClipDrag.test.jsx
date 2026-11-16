@@ -1,6 +1,8 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, test, vi } from 'vite-plus/test'
 import useClipDrag from '@/features/player/hooks/useClipDrag'
+import { joinVideoEdits } from '@/lib/video-program/video-collection'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 function createTarget() {
   return {
@@ -20,8 +22,26 @@ function createEvent(clientX, currentTarget = createTarget()) {
   }
 }
 
-function renderDrag(setVideoSyncOffset = vi.fn(), setVideoSyncOffsetPreview = vi.fn()) {
-  const hook = renderHook(() => useClipDrag({ setVideoSyncOffset, setVideoSyncOffsetPreview }))
+function createClips(videos, offsets) {
+  const { importedVideos, videoEdits } = videoStoreState(videos, offsets)
+  return joinVideoEdits(importedVideos, videoEdits)
+}
+
+const SINGLE_CLIP = createClips([createTestVideo({ durationSeconds: 20 })], { 'video-1': 5 })
+
+const TWO_CLIPS = createClips(
+  [
+    createTestVideo({ id: 'first', durationSeconds: 20 }),
+    createTestVideo({ id: 'second', path: '/videos/second.mp4', durationSeconds: 10, importOrder: 1 }),
+  ],
+  { first: 5.03, second: 40 },
+)
+
+function renderDrag({ clips = SINGLE_CLIP } = {}) {
+  const setVideoDragPreview = vi.fn()
+  const setVideoOffset = vi.fn()
+  const shiftVideoOffsets = vi.fn()
+  const hook = renderHook(() => useClipDrag({ setVideoDragPreview, setVideoOffset, shiftVideoOffsets }))
   const containerElement = {
     getBoundingClientRect: () => ({ width: 250 }),
   }
@@ -29,19 +49,27 @@ function renderDrag(setVideoSyncOffset = vi.fn(), setVideoSyncOffsetPreview = vi
   act(() => {
     hook.result.current.updateMetrics({
       activityDurationSeconds: 100,
+      clips,
       containerElement,
-      hasVideo: true,
-      importedVideoDuration: 20,
+      hasActivityData: true,
       timelineMinimum: 0,
       totalDuration: 100,
-      videoSyncOffsetSeconds: 5,
       viewEnd: 100,
       viewStart: 0,
       widthPx: 500,
     })
   })
 
-  return { ...hook, setVideoSyncOffset, setVideoSyncOffsetPreview }
+  return { ...hook, setVideoDragPreview, setVideoOffset, shiftVideoOffsets }
+}
+
+function mockAnimationFrames() {
+  const animationFrames = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    animationFrames.push(callback)
+    return animationFrames.length
+  })
+  return animationFrames
 }
 
 describe('useClipDrag', () => {
@@ -50,100 +78,121 @@ describe('useClipDrag', () => {
   })
 
   test('keeps fractional movement live and rounds the committed offset on pointer up', () => {
-    const setVideoSyncOffset = vi.fn()
-    const setVideoSyncOffsetPreview = vi.fn()
-    const { result } = renderDrag(setVideoSyncOffset, setVideoSyncOffsetPreview)
+    const animationFrames = mockAnimationFrames()
+    const { result, setVideoDragPreview, setVideoOffset, shiftVideoOffsets } = renderDrag()
     const target = createTarget()
 
     act(() => {
-      result.current.getLaneDragProps('video').onPointerDown(createEvent(100, target))
+      result.current.getLaneDragProps('video:video-1').onPointerDown(createEvent(100, target))
     })
 
-    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(5)
+    expect(setVideoDragPreview).toHaveBeenLastCalledWith({ videoId: 'video-1', deltaSeconds: 0 })
+    expect(result.current.isDragging).toBe(true)
 
     act(() => {
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(103, target))
+      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(103, target))
+      animationFrames[0](16)
     })
+
+    expect(setVideoDragPreview.mock.lastCall[0].videoId).toBe('video-1')
+    expect(setVideoDragPreview.mock.lastCall[0].deltaSeconds).toBeCloseTo(1.2)
 
     act(() => {
-      result.current.getLaneDragProps('video').onPointerUp(createEvent(103, target))
+      result.current.getLaneDragProps('video:video-1').onPointerUp(createEvent(103, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(6.2)
-    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
+    expect(setVideoOffset).toHaveBeenLastCalledWith('video-1', 6.2)
+    expect(shiftVideoOffsets).not.toHaveBeenCalled()
+    expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
     expect(target.releasePointerCapture).toHaveBeenCalledWith(1)
+    expect(result.current.isDragging).toBe(false)
   })
 
   test('snaps a clip edge to an alignment guideline within the pixel threshold', () => {
-    const setVideoSyncOffset = vi.fn()
-    const setVideoSyncOffsetPreview = vi.fn()
-    const { result } = renderDrag(setVideoSyncOffset, setVideoSyncOffsetPreview)
+    const { result, setVideoDragPreview, setVideoOffset } = renderDrag()
     const target = createTarget()
 
     act(() => {
-      result.current.getLaneDragProps('video').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(88, target))
+      result.current.getLaneDragProps('video:video-1').onPointerDown(createEvent(100, target))
+      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(88, target))
     })
+
+    expect(result.current.snapGuidelineSecond).toBe(0)
 
     act(() => {
-      result.current.getLaneDragProps('video').onPointerUp(createEvent(88, target))
+      result.current.getLaneDragProps('video:video-1').onPointerUp(createEvent(88, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(0)
-    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
+    expect(setVideoOffset).toHaveBeenLastCalledWith('video-1', 0)
+    expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
+    expect(result.current.snapGuidelineSecond).toBeNull()
   })
 
-  test('restores the initial offset when the pointer drag is cancelled', () => {
-    const setVideoSyncOffset = vi.fn()
-    const setVideoSyncOffsetPreview = vi.fn()
-    const { result } = renderDrag(setVideoSyncOffset, setVideoSyncOffsetPreview)
+  test('snaps a dragged video clip to another clip edge', () => {
+    const { result, setVideoOffset } = renderDrag({ clips: TWO_CLIPS })
     const target = createTarget()
 
     act(() => {
-      result.current.getLaneDragProps('video').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(103, target))
-      result.current.getLaneDragProps('video').onPointerCancel(createEvent(103, target))
+      result.current.getLaneDragProps('video:second').onPointerDown(createEvent(100, target))
+      result.current.getLaneDragProps('video:second').onPointerMove(createEvent(63, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(5)
-    expect(setVideoSyncOffsetPreview).toHaveBeenLastCalledWith(null)
+    expect(result.current.snapGuidelineSecond).toBeCloseTo(25.03)
+
+    act(() => {
+      result.current.getLaneDragProps('video:second').onPointerUp(createEvent(63, target))
+    })
+
+    expect(setVideoOffset).toHaveBeenCalledTimes(1)
+    expect(setVideoOffset.mock.calls[0][0]).toBe('second')
+    // The snapped edge commits exactly, so the clips touch.
+    expect(setVideoOffset.mock.calls[0][1]).toBe(5.03 + 20)
   })
 
   test('commits a negative offset while the video still overlaps the activity', () => {
-    const setVideoSyncOffset = vi.fn()
-    const { result } = renderDrag(setVideoSyncOffset)
+    const { result, setVideoOffset } = renderDrag()
     const target = createTarget()
 
     act(() => {
       result.current.updateMetrics({ timelineMinimum: -10, viewEnd: 90, viewStart: -10 })
-      result.current.getLaneDragProps('video').onPointerDown(createEvent(100, target))
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(80, target))
-      result.current.getLaneDragProps('video').onPointerUp(createEvent(80, target))
+      result.current.getLaneDragProps('video:video-1').onPointerDown(createEvent(100, target))
+      // 25 px at 0.4 s per px: from 5 s to -5 s, beyond snapping distance of the activity start.
+      result.current.getLaneDragProps('video:video-1').onPointerMove(createEvent(75, target))
+      result.current.getLaneDragProps('video:video-1').onPointerUp(createEvent(75, target))
     })
 
-    expect(setVideoSyncOffset).toHaveBeenLastCalledWith(-3)
+    expect(setVideoOffset).toHaveBeenLastCalledWith('video-1', -5)
   })
 
-  test('reduces autoscroll edge penetration when the timeline is zoomed in', () => {
-    const animationFrames = []
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      animationFrames.push(callback)
-      return animationFrames.length
-    })
-    const followSecond = vi.fn(() => null)
-    const { result } = renderDrag()
-    const target = createTarget()
+  test('accumulates keyboard nudges per lane and commits them as one edit', () => {
+    const { result, setVideoDragPreview, setVideoOffset, shiftVideoOffsets } = renderDrag({ clips: TWO_CLIPS })
 
     act(() => {
-      result.current.updateMetrics({ followSecond, viewStart: 40, viewEnd: 60 })
-      result.current.getLaneDragProps('video').onPointerDown(createEvent(125, target))
-      result.current.getLaneDragProps('video').onPointerMove(createEvent(25, target))
-      animationFrames[1](16)
+      result.current.nudgeLane('video:first', -0.1)
+      result.current.nudgeLane('video:first', -0.1)
     })
 
-    const targetSecond = followSecond.mock.calls[0][0]
-    expect(targetSecond).toBeGreaterThan(42)
-    expect(targetSecond).toBeLessThan(43)
-    expect(followSecond).toHaveBeenCalledWith(targetSecond, -3)
+    expect(setVideoDragPreview.mock.lastCall[0].videoId).toBe('first')
+    expect(setVideoDragPreview.mock.lastCall[0].deltaSeconds).toBeCloseTo(-0.2)
+
+    act(() => {
+      result.current.commitNudge()
+    })
+
+    expect(setVideoOffset).toHaveBeenLastCalledWith('first', 145 / 30)
+    expect(setVideoDragPreview).toHaveBeenLastCalledWith(null)
+
+    act(() => {
+      result.current.nudgeLane('activity', 0.1)
+    })
+
+    expect(setVideoDragPreview).toHaveBeenLastCalledWith({ videoId: null, deltaSeconds: -0.1 })
+
+    act(() => {
+      result.current.commitNudge()
+    })
+
+    expect(shiftVideoOffsets).toHaveBeenCalledTimes(1)
+    expect(5.03 + shiftVideoOffsets.mock.calls[0][0]).toBeCloseTo(148 / 30)
   })
 })
