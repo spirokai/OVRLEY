@@ -61,9 +61,11 @@ mod tests {
 
     #[test]
     fn hydration_resets_the_playhead_to_the_scene_start() {
-        let mut editor = EditorSlice::default();
-        editor.selected_second = 40.0;
-        editor.config = Rc::new(with_scene(json!({"start": 5, "end": 90})));
+        let mut editor = EditorSlice {
+            selected_second: 40.0,
+            config: Rc::new(with_scene(json!({"start": 5, "end": 90}))),
+            ..EditorSlice::default()
+        };
         sync_scene_timing_from_config(&mut editor, None, true);
         assert_eq!((editor.start_second, editor.end_second, editor.selected_second), (5.0, 90.0, 5.0));
     }

@@ -150,8 +150,7 @@ mod tests {
     use serde_json::json;
 
     fn store() -> Store {
-        let mut store = Store::default();
-        store.theme = Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() });
+        let mut store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() }), ..Store::default() };
         store.editor.set_config(OverlayConfig::from_value(&json!({"scene": {"width": 1920, "height": 1080}, "labels": [{"id": "a", "text": "A", "x": 10, "y": 20}, {"id": "b", "text": "B", "x": 0, "y": 0}]})).unwrap());
         store.editor.set_selected_widget_id(Some("a"));
         store

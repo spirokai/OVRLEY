@@ -135,8 +135,7 @@ mod tests {
     #[test]
     fn hydration_keeps_the_aspect_ratio_and_moves_the_playhead_to_the_scene_start() {
         let mut editor = EditorSlice::default();
-        let mut template = TemplateSlice::default();
-        template.aspect_ratio = "custom".into();
+        let mut template = TemplateSlice { aspect_ratio: "custom".into(), ..TemplateSlice::default() };
         let config = OverlayConfig::from_value(&json!({"scene": {"start": 4, "end": 20}})).unwrap();
         hydrate_template_state(&mut editor, &mut template, config, Map::new(), Some(TemplateSource::Bundled { template_id: "a.json".into() }));
         assert_eq!(template.aspect_ratio, "custom");

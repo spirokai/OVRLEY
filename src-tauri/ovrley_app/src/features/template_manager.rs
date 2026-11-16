@@ -15,7 +15,7 @@ use crate::store::services::{DialogFilter, Services};
 use crate::store::slices::template::{
     create_new_template, hydrate_template_state, TemplateDescriptor, TemplateKind, TemplateSource,
 };
-use crate::store::Store;
+use crate::store::{Action, Store};
 use ovrley_core::normalize::template::{
     create_durable_template_state, load_template_document, template_file_payload,
     DurableTemplateState,
@@ -76,7 +76,7 @@ pub struct TemplateManagerState {
     /// Increments when `template.select` asks the select to open; the select owns its open state.
     pub selector_open_serial: i32,
     /// Callers waiting for the running template list fetch; concurrent fetches share it.
-    fetch_waiters: Option<Vec<Box<dyn FnOnce(&mut Store, &mut Services)>>>,
+    fetch_waiters: Option<Vec<Action>>,
     /// Continuations of running workers, by job.
     continuations: HashMap<u64, OnDone>,
     next_job: u64,
@@ -305,7 +305,7 @@ pub fn template_groups(templates: &[TemplateDescriptor], unknown: &str) -> Vec<T
 pub fn fetch_templates(
     store: &mut Store,
     services: &mut Services,
-    then: Option<Box<dyn FnOnce(&mut Store, &mut Services)>>,
+    then: Option<Action>,
 ) {
     if let Some(waiters) = &mut store.template_manager.fetch_waiters {
         waiters.extend(then);
@@ -753,7 +753,7 @@ pub fn save_template(store: &mut Store, services: &mut Services, path: String, t
 pub fn restore_last_loaded_template(
     store: &mut Store,
     services: &mut Services,
-    done: Box<dyn FnOnce(&mut Store, &mut Services)>,
+    done: Action,
 ) {
     let saved = services.preferences.get(LAST_TEMPLATE_KEY).cloned();
     let source = saved

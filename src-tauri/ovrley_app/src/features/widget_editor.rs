@@ -584,8 +584,7 @@ mod tests {
     /// A dispatcher over `values`, with the preview's frames run until its fonts are ready.
     fn editor(values: Vec<Value>) -> (Dispatcher, Fakes) {
         let (parts, fakes) = fake_services(json!({}));
-        let mut store = Store::default();
-        store.theme = Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() });
+        let store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() }), ..Store::default() };
         let dispatcher = Dispatcher::new(store, parts);
         dispatcher.dispatch(move |store, _| {
             store.history.set_mode(HistoryMode::Reset);

@@ -804,8 +804,7 @@ mod tests {
 
     fn dispatcher() -> (Dispatcher, Fakes) {
         let (parts, fakes) = fake_services(json!({}));
-        let mut store = Store::default();
-        store.theme = Some(theme());
+        let store = Store { theme: Some(theme()), ..Store::default() };
         (Dispatcher::new(store, parts), fakes)
     }
 

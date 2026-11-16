@@ -2953,7 +2953,8 @@ mod tests {
 
     #[test]
     fn rejects_malformed_v4_video_collection_contracts() {
-        let cases: [(&str, fn(&mut Value)); 40] = [
+        type Case = (&'static str, fn(&mut Value));
+        let cases: [Case; 40] = [
             ("missing timezoneMode", |project| {
                 project["sources"]["videos"][0]
                     .as_object_mut()

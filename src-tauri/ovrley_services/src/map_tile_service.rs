@@ -40,7 +40,7 @@ pub struct TileCacheUsage {
 /// Accepts a user-configured cache limit only on a step inside the supported bounds.
 pub fn validate_tile_cache_limit(limit: u64) -> Result<u64, String> {
     if !(MIN_TILE_CACHE_LIMIT..=MAX_TILE_CACHE_LIMIT).contains(&limit)
-        || limit % TILE_CACHE_LIMIT_STEP != 0
+        || !limit.is_multiple_of(TILE_CACHE_LIMIT_STEP)
     {
         return Err(format!(
             "Map tile cache limit {limit} must be a multiple of {TILE_CACHE_LIMIT_STEP} between {MIN_TILE_CACHE_LIMIT} and {MAX_TILE_CACHE_LIMIT} bytes"

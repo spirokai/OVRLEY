@@ -436,7 +436,7 @@ pub fn pointer_down(store: &mut Store, point: (f64, f64), modifiers: PointerModi
     }
     if selected.len() != 1 || store.editor.selected_widget_id.as_deref() != Some(widget_id.as_str())
     {
-        commit_selection(store, &[widget_id.clone()], Some(&widget_id));
+        commit_selection(store, std::slice::from_ref(&widget_id), Some(&widget_id));
     }
     begin_gesture(store, vec![widget_id], GestureKind::Drag, scene_point);
 }
@@ -930,7 +930,6 @@ pub fn pointer_up(store: &mut Store, point: (f64, f64), modifiers: PointerModifi
                 .as_ref()
                 .clone()
                 .update_widgets(&updates)
-                .map(|()| ())
             {
                 store.preview.error = Some(error);
                 return;
@@ -1137,11 +1136,13 @@ mod tests {
     /// A 1000×500 scene shown at scale 1 with its top-left corner at the stage's (16, 16).
     fn editor(widgets: Vec<Value>) -> (Dispatcher, Fakes) {
         let (parts, fakes) = fake_services(json!({}));
-        let mut store = Store::default();
-        store.theme = Some(ThemeColors {
-            ice: "#86aaaa".into(),
-            aqua: "#40e0d0".into(),
-        });
+        let store = Store {
+            theme: Some(ThemeColors {
+                ice: "#86aaaa".into(),
+                aqua: "#40e0d0".into(),
+            }),
+            ..Store::default()
+        };
         let dispatcher = Dispatcher::new(store, parts);
         dispatcher.dispatch(move |store, _| {
             store
