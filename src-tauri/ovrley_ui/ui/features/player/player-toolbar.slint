@@ -1,10 +1,18 @@
 import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Icons } from "../../components/icons.slint";
-import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import {
+    Button,
+    ButtonVariant,
+    ButtonSize,
+} from "../../components/button.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
-import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import {
+    TabsList,
+    TabsListVariant,
+    TabsTriggerVariant,
+} from "../../components/tabs.slint";
 import { Choice, PlacementSide } from "../../components/logic.slint";
 import { Player } from "index.slint";
 
@@ -13,7 +21,7 @@ export component PlayerToolButton {
     height: 1.75rem;
     width: 1.75rem;
     in property <string> icon;
-    in property <length> icon-size: 1rem;
+    in property <length> icon-size: 1.1rem;
     in property <string> label;
     in property <ButtonVariant> variant: ButtonVariant.toolbar;
     in property <bool> disabled;
@@ -98,6 +106,7 @@ export component PlayerToolbar {
                 Player.zoom-out();
             }
         }
+
         PlayerToolButton {
             icon: Icons.zoom-in;
             label: @tr("player.zoomIn" => "Zoom in");
@@ -106,15 +115,16 @@ export component PlayerToolbar {
                 Player.zoom-in();
             }
         }
+
         PlayerToolButton {
             icon: Icons.rotate-ccw;
-            icon-size: 0.75rem;
             label: @tr("player.resetView" => "Reset view");
             disabled: Player.reset-view-disabled;
             clicked => {
                 Player.reset-view();
             }
         }
+
         HorizontalLayout {
             padding-left: 0.25rem;
             VerticalLayout {
@@ -143,6 +153,7 @@ export component PlayerToolbar {
                     Player.trim(true);
                 }
             }
+
             PlayerTextButton {
                 text: "]";
                 label: Player.trim-targets-video ? @tr("player.trimVideoAfterPlayhead" => "Trim the video after the playhead") : @tr("player.trimActivityAfterPlayhead" => "Trim the activity after the playhead");
@@ -158,7 +169,6 @@ export component PlayerToolbar {
             spacing: 0.25rem;
             PlayerToolButton {
                 icon: Icons.scissors;
-                icon-size: 0.875rem;
                 variant: ButtonVariant.ghost;
                 label: @tr("player.cutAtPlayhead" => "Cut the video at the playhead");
                 disabled: !Player.can-cut;
@@ -166,9 +176,9 @@ export component PlayerToolbar {
                     Player.cut();
                 }
             }
+
             PlayerToolButton {
                 icon: Player.excluded ? Icons.eye-off : Icons.eye;
-                icon-size: 0.875rem;
                 variant: ButtonVariant.ghost;
                 label: Player.excluded ? @tr("player.includeAtPlayhead" => "Include this part in export") : @tr("player.excludeAtPlayhead" => "Exclude this part from export");
                 disabled: Player.exclude-disabled;
@@ -191,34 +201,36 @@ export component PlayerToolbar {
                 size: ShadowSize.sm;
                 radius: Theme.radius-xs * 1rem;
             }
+
             Rectangle {
                 border-radius: Theme.radius-xs * 1rem;
                 border-width: 1px;
                 border-color: Theme.border.transparentize(0.7);
             }
+
             HorizontalLayout {
                 padding: 0.125rem;
                 spacing: 0.25rem;
                 PlayerToolButton {
                     tooltip: false;
                     icon: Icons.rewind;
-                    icon-size: 0.875rem;
                     label: @tr("player.rewindToStart" => "Rewind to start");
                     disabled: Player.transport-disabled;
                     clicked => {
                         Player.reset-to-start();
                     }
                 }
+
                 PlayerToolButton {
                     tooltip: false;
                     icon: Icons.step-back;
-                    icon-size: 0.875rem;
                     label: @tr("player.stepBack" => "Step back");
                     disabled: Player.transport-disabled;
                     clicked => {
                         Player.step(-1);
                     }
                 }
+
                 PlayerToolButton {
                     tooltip: false;
                     icon: Player.playing ? Icons.pause : Icons.play;
@@ -233,20 +245,20 @@ export component PlayerToolbar {
                         }
                     }
                 }
+
                 PlayerToolButton {
                     tooltip: false;
                     icon: Icons.step-forward;
-                    icon-size: 0.875rem;
                     label: @tr("player.stepForward" => "Step forward");
                     disabled: Player.transport-disabled;
                     clicked => {
                         Player.step(1);
                     }
                 }
+
                 PlayerToolButton {
                     tooltip: false;
                     icon: Icons.rewind;
-                    icon-size: 0.875rem;
                     label: @tr("player.rewindToEnd" => "Rewind to end");
                     disabled: Player.transport-disabled;
                     transform-rotation: 180deg;

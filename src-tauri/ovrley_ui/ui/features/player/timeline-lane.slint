@@ -3,11 +3,28 @@ import { AppText } from "../../components/app-text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Popover } from "../../components/popover.slint";
-import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import {
+    Button,
+    ButtonVariant,
+    ButtonSize,
+} from "../../components/button.slint";
 import { PlacementSide } from "../../components/logic.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
-import { BandView, ClipTooltipView, ClipView, JoinMarkerView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TileView } from "index.slint";
-import { JoinTransitionPanel } from "../transitions/join-transition-panel.slint";
+import {
+    BandView,
+    ClipTooltipView,
+    ClipView,
+    JoinMarkerView,
+    MarkerAlign,
+    MarkerView,
+    Player,
+    PointerPhase,
+    SegmentView,
+    TileView,
+} from "index.slint";
+import {
+    JoinTransitionPanel,
+} from "../transitions/join-transition-panel.slint";
 
 // Pointer events of a lane element with the x of `area` in timeline coordinates.
 global LanePointer {
@@ -65,6 +82,7 @@ component ClipBadge {
             size: ShadowSize.sm;
             radius: Theme.radius-xs * 1rem;
         }
+
         row := HorizontalLayout {
             padding-left: 0.4375rem;
             padding-right: 0.4375rem;
@@ -77,19 +95,21 @@ component ClipBadge {
                 stroke: 3;
                 horizontal-stretch: 0;
             }
+
             AppText {
                 content: root.view.label;
                 font-size: 0.75rem;
-                font-weight: Theme.font-weight-bold;
+                font-weight: Theme.font-weight-extrabold;
                 line-height: 1;
                 overflow: elide;
                 horizontal-stretch: 1;
                 min-width: 0px;
             }
+
             AppText {
                 content: root.view.duration-label;
                 font-size: 0.75rem;
-                font-weight: Theme.font-weight-bold;
+                font-weight: Theme.font-weight-extrabold;
                 line-height: 1;
                 color: Theme.muted-foreground;
                 horizontal-stretch: 0;
@@ -119,22 +139,24 @@ component ActivityText inherits HorizontalLayout {
             color: Theme.accent-foreground;
         }
     }
+
     AppText {
         content: root.view.label;
         font-size: 0.7rem;
-        font-weight: Theme.font-weight-bold;
+        font-weight: Theme.font-weight-extrabold;
         line-height: 1;
         overflow: elide;
         horizontal-stretch: 1;
         min-width: 0px;
         color: Theme.accent-foreground;
     }
+
     HorizontalLayout {
         padding-left: 0.25rem;
         AppText {
             content: root.view.duration-label;
             font-size: 0.7rem;
-            font-weight: Theme.font-weight-bold;
+            font-weight: Theme.font-weight-black;
             line-height: 1;
             color: Theme.accent-foreground;
         }
@@ -218,6 +240,7 @@ component LaneMarker {
                         font-weight: Theme.font-weight-semibold;
                         wrap: word-wrap;
                     }
+
                     Button {
                         variant: ButtonVariant.secondary;
                         height: 1.75rem;
@@ -271,12 +294,14 @@ export component ClipTooltip {
         size: ShadowSize.xxl;
         radius: Theme.rounded * 1rem;
     }
+
     Rectangle {
         border-radius: Theme.rounded * 1rem;
         border-width: 1px;
         border-color: Theme.border.transparentize(0.3);
         background: Theme.surface-tooltip;
     }
+
     Path {
         x: (root.width - 8px) / 2;
         y: root.height - 1px;
@@ -287,11 +312,13 @@ export component ClipTooltip {
         commands: "M0 0 L2 0 L1 1 Z";
         fill: Theme.surface-tooltip;
     }
+
     metrics-measure := AppText {
         visible: false;
         content: root.tooltip.metrics;
         font-size: 0.6rem;
     }
+
     title := AppText {
         x: root.pad-x + 1px;
         y: root.pad-y + 1px;
@@ -302,6 +329,7 @@ export component ClipTooltip {
         font-weight: Theme.font-weight-semibold;
         wrap: word-wrap;
     }
+
     Rectangle {
         x: root.pad-x + 1px;
         y: title.y + title.height + root.rule-gap;
@@ -309,6 +337,7 @@ export component ClipTooltip {
         height: 1px;
         background: Theme.border.transparentize(0.6);
     }
+
     duration-row := HorizontalLayout {
         x: root.pad-x + 1px;
         y: root.duration-y;
@@ -322,11 +351,13 @@ export component ClipTooltip {
             color: Theme.muted-foreground;
             horizontal-stretch: 1;
         }
+
         AppText {
             content: root.tooltip.duration-label;
             font-size: 0.65rem;
         }
     }
+
     if root.tooltip.metrics != "": Rectangle {
         x: root.pad-x + 1px;
         y: duration-row.y + duration-row.height + root.rule-gap;
@@ -345,6 +376,7 @@ export component ClipTooltip {
         font-weight: Theme.font-weight-medium;
         wrap: word-wrap;
     }
+
     if root.tooltip.warnings.length > 0: Rectangle {
         x: root.pad-x + 1px;
         y: metrics.y + metrics.height + root.rule-gap;
@@ -389,6 +421,7 @@ component JoinMarker {
                 border-color: root.marker.invalid ? Theme.destructive : Theme.foreground.transparentize(root.marker.has-transition ? 0.3 : 0.4);
                 background: root.marker.invalid ? Theme.destructive : root.marker.has-transition ? Theme.primary : Theme.background;
             }
+
             Popover {
                 open: Player.join-panel-key == root.marker.key;
                 side: PlacementSide.top;
@@ -401,6 +434,7 @@ component JoinMarker {
                 }
                 JoinTransitionPanel { }
             }
+
             TouchArea {
                 mouse-cursor: MouseCursor.pointer;
                 clicked => {
@@ -438,9 +472,7 @@ component SkippedJoinMarker {
                     y: side == 2 ? root.size - 1px : 0px;
                     width: side == 1 || side == 3 ? 1px : root.size;
                     height: side == 1 || side == 3 ? root.size : 1px;
-                    background: @linear-gradient(side == 1 || side == 3 ? 180deg : 90deg,
-                        Theme.foreground.transparentize(0.2) 0%, Theme.foreground.transparentize(0.2) 25%, transparent 25%, transparent 50%,
-                        Theme.foreground.transparentize(0.2) 50%, Theme.foreground.transparentize(0.2) 75%, transparent 75%);
+                    background: @linear-gradient(side == 1 || side == 3 ? 180deg : 90deg, Theme.foreground.transparentize(0.2) 0%, Theme.foreground.transparentize(0.2) 25%, transparent 25%, transparent 50%, Theme.foreground.transparentize(0.2) 50%, Theme.foreground.transparentize(0.2) 75%, transparent 75%);
                 }
             }
         }
@@ -558,6 +590,7 @@ export component TimelineLane {
                 view: Player.activity-clip;
                 is-video: false;
             }
+
             for trim in Player.trim-masks: Stripes {
                 x: trim.x;
                 width: trim.width;
