@@ -32,12 +32,15 @@ type TickStrip = (TickPlacement, f64, f64, Vec<MajorTickView>, Vec<f32>);
 pub struct Projection {
     dispatch: DispatchHandle,
     timer: Rc<slint::Timer>,
+    /// Steps the auto-scroll while a clip drag sits in an edge zone (D9), standing in for React's
+    /// animation-frame loop.
+    scroll_timer: slint::Timer,
     strip: RefCell<Option<TickStrip>>,
 }
 
 impl Projection {
     pub fn new(dispatch: DispatchHandle) -> Self {
-        Self { dispatch, timer: Rc::new(slint::Timer::default()), strip: RefCell::new(None) }
+        Self { dispatch, timer: Rc::new(slint::Timer::default()), scroll_timer: slint::Timer::default(), strip: RefCell::new(None) }
     }
 
     /// Runs the playback timer while the timeline clock plays.
@@ -59,6 +62,22 @@ impl Projection {
                     playback::playback_tick(store, now);
                 });
             }
+        });
+    }
+
+    fn drive_auto_scroll(&self, store: &Store) {
+        if !ovrley_app::features::player::gestures::clip_drag_in_edge_zone(store) {
+            self.scroll_timer.stop();
+            return;
+        }
+        if self.scroll_timer.running() {
+            return;
+        }
+        let dispatch = self.dispatch.clone();
+        self.scroll_timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
+            dispatch.dispatch(|store, _| {
+                ovrley_app::features::player::gestures::clip_drag_auto_scroll(store, Instant::now());
+            });
         });
     }
 
@@ -99,7 +118,13 @@ impl Projection {
         let playhead = metrics.snap_to_screen_pixel(px(timing.clamped_playhead) - 6.5);
         set_if_changed(player.get_playhead_x(), playhead as f32, |value| player.set_playhead_x(value));
         project_lanes(&player, store);
+        let guideline = store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second);
+        set_if_changed(player.get_guideline_visible(), guideline.is_some(), |value| player.set_guideline_visible(value));
+        if let Some(second) = guideline {
+            set_if_changed(player.get_guideline_x(), metrics.round_to_device_pixel(px(second)) as f32, |value| player.set_guideline_x(value));
+        }
         self.drive_playback(store);
+        self.drive_auto_scroll(store);
     }
 
     fn project_ticks(&self, player: &Player<'_>, store: &Store) {
@@ -285,8 +310,8 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         let x = f64::from(x);
         clip.dispatch(move |store, _| match phase {
             PointerPhase::Down => ovrley_app::features::player::gestures::clip_down(store, lane, x),
-            PointerPhase::Move => surface_move(store, x),
-            PointerPhase::Up => surface_up(store, x),
+            PointerPhase::Move => ovrley_app::features::player::gestures::clip_move(store, x),
+            PointerPhase::Up => ovrley_app::features::player::gestures::clip_up(store, x),
             PointerPhase::Cancel => surface_cancel(store),
         });
     });

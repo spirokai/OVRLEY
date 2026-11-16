@@ -110,6 +110,18 @@ fn select_workspace(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<f64>
         Some((area(shell.get_editor_area()), area(shell.get_control_panel_area()), player))
     });
     let Some((editor, control_panel, player)) = areas else { return };
+    // A press outside the player clears the clip selection (D10); the player's own popovers and
+    // dialogs keep it.
+    if !player.is_some_and(|player| player.contains(point)) {
+        let keeps = APP_WINDOW.with(|slot| slot.borrow().as_ref().and_then(|window| window.upgrade()).is_some_and(|window| window.global::<Player>().get_keeps_clip_selection()));
+        if !keeps {
+            dispatch_ui(|store, _| {
+                if store.video_import.selected_clip.is_some() {
+                    store.video_import.selected_clip = None;
+                }
+            });
+        }
+    }
     if let Some(workspace) = app_shell::workspace_at(point, editor, control_panel, player) {
         dispatch_ui(move |store, _| {
             if store.editor_shell.active_keyboard_workspace != workspace {

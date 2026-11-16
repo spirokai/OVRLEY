@@ -71,6 +71,7 @@ component ClipBadge {
                 glyph: root.view.missing ? Icons.triangle-alert : Icons.video;
                 size: 0.875rem;
                 stroke: 3;
+                horizontal-stretch: 0;
             }
             AppText {
                 content: root.view.label;
@@ -87,6 +88,8 @@ component ClipBadge {
                 font-weight: Theme.font-weight-bold;
                 line-height: 1;
                 color: Theme.muted-foreground;
+                horizontal-stretch: 0;
+                min-width: self.preferred-width;
             }
         }
     }

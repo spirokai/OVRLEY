@@ -135,6 +135,7 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
 pub fn handle_window_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
     handle_app_key(store, services, input)
         || crate::features::overlay_editor::keyboard::handle_history_key(store, input)
+        || crate::features::player::handle_timeline_clip_key(store, input)
         || crate::features::overlay_editor::keyboard::handle_editor_key(store, input)
         || crate::features::player::handle_player_key(store, input, std::time::Instant::now())
 }
@@ -142,6 +143,45 @@ pub fn handle_window_key(store: &mut Store, services: &mut Services, input: &Key
 /// The capture phase (D14): the drawer's Escape rule, then an active gesture's cancel.
 pub fn handle_window_capture_key(store: &mut Store, input: &KeyInput) -> bool {
     crate::features::toolbar::handle_drawer_capture_key(store, input) || crate::features::overlay_editor::keyboard::handle_capture_key(store, input)
+}
+
+/// The debug video loader (phase 4 D18): `OVRLEY_DEV_VIDEOS` lists video paths separated by `;`.
+/// Each is probed on a worker, becomes an entity with default edits, and is placed end to end in
+/// import order, the first at 0, outside the history. There is no review dialog and no telemetry.
+/// Debug builds only, until Phase 6 brings the import; Phase 6 deletes it.
+pub const DEV_VIDEOS_VARIABLE: &str = "OVRLEY_DEV_VIDEOS";
+
+pub fn load_dev_videos(store: &mut Store, services: &mut Services, paths: Vec<String>) {
+    use crate::lib::video_program::{create_imported_video, new_id, VideoEdits};
+    let _ = store;
+    let app_paths = std::sync::Arc::clone(&services.paths);
+    services.workers.spawn("dev-videos", move || {
+        let probed: Result<Vec<_>, String> = paths
+            .iter()
+            .enumerate()
+            .map(|(order, path)| {
+                let metadata = ovrley_core::media::prepared_video::probe_video_metadata(&app_paths, path).map_err(|error| format!("{path}: {error}"))?;
+                create_imported_video(&metadata, new_id(), order as u32, Vec::new()).map_err(|error| format!("{path}: {error}"))
+            })
+            .collect();
+        Box::new(move |store: &mut Store, _: &mut Services| match probed {
+            Err(error) => store.media.set_error_message(format!("{DEV_VIDEOS_VARIABLE}: {error}")),
+            Ok(videos) => {
+                let mut edits = crate::lib::video_program::VideoEditsMap::new();
+                let mut offset = 0.0;
+                for video in &videos {
+                    edits.insert(video.id.clone(), VideoEdits { offset_seconds: offset, ..VideoEdits::default() });
+                    offset += video.duration_seconds;
+                }
+                crate::features::undo_redo::change_video_collection(store, &[], |store| {
+                    store.video_import.imported_videos = std::rc::Rc::new(videos);
+                    store.video_import.video_edits = std::rc::Rc::new(edits);
+                    store.video_import.selected_clip = None;
+                    crate::store::slices::video_import::clamp_playhead_to_videos(store, 0.0);
+                });
+            }
+        })
+    });
 }
 
 /// A rectangle in window coordinates, in logical pixels.

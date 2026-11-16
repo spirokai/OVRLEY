@@ -33,6 +33,32 @@ pub struct ActivityTrimSetArguments {
     pub end_second: Option<f64>,
 }
 
+/// A video clip.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+}
+
+/// Where to put a clip.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoMoveArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// The clip's new start on the timeline, in seconds; it is snapped to the clip's nearest frame.
+    pub offset_seconds: f64,
+}
+
+/// How far to shift every clip.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideosShiftArguments {
+    /// Seconds to move every clip by; negative moves them earlier.
+    pub delta_seconds: f64,
+}
+
 pub fn tools() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
@@ -69,6 +95,39 @@ pub fn tools() -> Vec<ToolDefinition> {
             read_only: false,
         },
         ToolDefinition {
+            name: "video_get",
+            title: "Read a video clip",
+            description: "Describes one video clip on the timeline: its file, start (offset), frame rate and frame count, its cuts, its \
+                          segments (frames, seconds, excluded from export), the joins into its segments with their transitions, and its \
+                          warnings. Segment keys and cut ids are what the cut and segment tools take.",
+            input_schema: input_schema::<VideoArguments>(),
+            read_only: true,
+        },
+        ToolDefinition {
+            name: "video_move",
+            title: "Move a video clip",
+            description: "Sets a clip's start on the timeline, as dragging the clip does: the offset is snapped to the clip's nearest \
+                          frame. One undo step.",
+            input_schema: input_schema::<VideoMoveArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "videos_shift",
+            title: "Shift every video clip",
+            description: "Moves every clip by the same number of seconds, keeping their relative placement, as dragging the activity \
+                          lane or the [ and ] keys do. One undo step.",
+            input_schema: input_schema::<VideosShiftArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_remove",
+            title: "Remove a video clip",
+            description: "Removes a clip and its edits from the timeline, as Delete on the selected clip does. Playback pauses. This is \
+                          not an undo step: undo never brings the clip back.",
+            input_schema: input_schema::<VideoArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
             name: "activity_trim_reset",
             title: "Reset the activity trim",
             description: "Removes the activity trim, so the whole activity renders, as Mod+X does. One undo step.",
@@ -81,6 +140,116 @@ pub fn tools() -> Vec<ToolDefinition> {
 fn arguments<T: DeserializeOwned>(value: Value) -> Result<T, ToolOutcome> {
     let value = if value.is_null() { json!({}) } else { value };
     serde_json::from_value(value).map_err(|error| ToolOutcome::InvalidParams(format!("Invalid arguments: {error}")))
+}
+
+fn find_clip<'a>(store: &'a Store, video_id: &str) -> Result<&'a ovrley_app::lib::video_program::Clip, ToolOutcome> {
+    store
+        .player
+        .timeline
+        .timeline()
+        .committed
+        .clips
+        .iter()
+        .find(|clip| clip.id() == video_id)
+        .ok_or_else(|| ToolOutcome::Failed(format!("There is no video {video_id}.")))
+}
+
+fn file_name(path: &str) -> &str {
+    ovrley_app::lib::file_dialog::filename_from_selected_path(path).unwrap_or(path)
+}
+
+fn transition_json(transition: ovrley_app::lib::video_program::Transition) -> Value {
+    json!({ "type": transition.kind().name(), "durationSeconds": transition.duration_seconds() })
+}
+
+/// The videos part of `ovrley_summary`, in timeline order.
+pub fn describe_videos(store: &Store) -> Value {
+    let timeline = store.player.timeline.timeline();
+    let clips = ovrley_app::lib::video_program::collection::sort_clips_by_timeline(&timeline.committed.clips);
+    Value::Array(
+        clips
+            .iter()
+            .map(|clip| {
+                json!({
+                    "id": clip.id(),
+                    "fileName": file_name(&clip.video.path),
+                    "offsetSeconds": clip.offset_seconds(),
+                    "durationSeconds": clip.duration_seconds(),
+                    "missing": clip.video.missing,
+                    "warningCount": timeline.warnings.get(clip.id()).map_or(0, Vec::len),
+                })
+            })
+            .collect(),
+    )
+}
+
+/// `video_get`.
+pub fn describe_video(store: &Store, video_id: &str) -> Result<Value, ToolOutcome> {
+    use ovrley_app::lib::video_program::program::JoinSide;
+    use ovrley_app::lib::video_program::segments::list_video_segments;
+    let clip = find_clip(store, video_id)?;
+    let timeline = store.player.timeline.timeline();
+    let fps = clip.fps();
+    let (num, den) = fps.components();
+    let segments: Vec<Value> = list_video_segments(clip)
+        .into_iter()
+        .map(|segment| {
+            json!({
+                "key": segment.key,
+                "startFrame": segment.start_frame,
+                "endFrame": segment.end_frame,
+                "startSecond": fps.frames_to_seconds(segment.start_frame),
+                "endSecond": fps.frames_to_seconds(segment.end_frame),
+                "excluded": segment.edits.excluded,
+                "skipOverlay": segment.edits.skip_overlay,
+                "transitionOverride": segment.edits.transition_in.map(transition_json),
+            })
+        })
+        .collect();
+    let joins: Vec<Value> = timeline
+        .committed
+        .program
+        .joins
+        .iter()
+        .filter(|join| join.video_id == video_id)
+        .map(|join| {
+            json!({
+                "segmentKey": join.segment_key,
+                "transition": transition_json(join.transition),
+                "isDefault": join.is_default,
+                "skippedDefault": join.skipped_default.map(|skipped| json!({
+                    "side": if skipped.side == JoinSide::Previous { "previous" } else { "next" },
+                    "durationSeconds": skipped.duration_seconds,
+                    "roomSeconds": skipped.room_seconds,
+                })),
+            })
+        })
+        .collect();
+    let warnings: Vec<String> = timeline
+        .warnings
+        .get(video_id)
+        .map(|warnings| warnings.iter().map(|warning| ovrley_app::lib::video_program::warnings::format_video_warning(warning, ovrley_app::i18n::DEFAULT_LOCALE)).collect())
+        .unwrap_or_default();
+    Ok(json!({
+        "id": clip.id(),
+        "path": clip.video.path,
+        "fileName": file_name(&clip.video.path),
+        "offsetSeconds": clip.offset_seconds(),
+        "durationSeconds": clip.duration_seconds(),
+        "frameRate": format!("{num}/{den}"),
+        "frameCount": clip.frame_count(),
+        "missing": clip.video.missing,
+        "cuts": clip.cuts().iter().map(|cut| json!({ "id": cut.id, "frame": cut.frame, "second": fps.frames_to_seconds(cut.frame) })).collect::<Vec<_>>(),
+        "segments": segments,
+        "joins": joins,
+        "warnings": warnings,
+    }))
+}
+
+/// Answers with a clip after an edit; the timeline cache is refreshed first, as after a dispatch.
+fn answer_video(store: &mut Store, video_id: &str) -> Result<Answer, ToolOutcome> {
+    ovrley_app::features::player::reconcile_player(store);
+    Ok(Answer::Now(ToolOutcome::Ok(describe_video(store, video_id)?)))
 }
 
 /// The activity trim part of `ovrley_summary`: `null` for the whole activity.
@@ -156,6 +325,30 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &m
             store.media.set_activity_trim(trim);
             now(json!({ "activityTrim": describe_activity_trim(store) }))
         }),
+        "video_get" => arguments::<VideoArguments>(arguments_value).and_then(|arguments| now(describe_video(store, &arguments.video_id)?)),
+        "video_move" => arguments::<VideoMoveArguments>(arguments_value).and_then(|arguments| {
+            let fps = find_clip(store, &arguments.video_id)?.fps();
+            if !arguments.offset_seconds.is_finite() {
+                return Err(ToolOutcome::InvalidParams("offsetSeconds must be a finite number".into()));
+            }
+            let offset = fps.frames_to_seconds(fps.seconds_to_frames(arguments.offset_seconds));
+            ovrley_app::store::slices::video_import::set_video_offset(store, &arguments.video_id, offset, false).map_err(ToolOutcome::Failed)?;
+            answer_video(store, &arguments.video_id)
+        }),
+        "videos_shift" => arguments::<VideosShiftArguments>(arguments_value).and_then(|arguments| {
+            if !arguments.delta_seconds.is_finite() {
+                return Err(ToolOutcome::InvalidParams("deltaSeconds must be a finite number".into()));
+            }
+            ovrley_app::store::slices::video_import::shift_video_offsets(store, arguments.delta_seconds, false).map_err(ToolOutcome::Failed)?;
+            ovrley_app::features::player::reconcile_player(store);
+            now(json!({ "videos": describe_videos(store) }))
+        }),
+        "video_remove" => arguments::<VideoArguments>(arguments_value).and_then(|arguments| {
+            find_clip(store, &arguments.video_id)?;
+            ovrley_app::features::player::remove_video(store, &arguments.video_id).map_err(ToolOutcome::Failed)?;
+            ovrley_app::features::player::reconcile_player(store);
+            now(json!({ "videos": describe_videos(store) }))
+        }),
         "activity_trim_reset" => arguments::<NoArguments>(arguments_value).and_then(|_| {
             store.media.set_activity_trim(None);
             now(json!({ "activityTrim": describe_activity_trim(store) }))
@@ -200,6 +393,50 @@ pub(crate) mod tests {
             ToolOutcome::Ok(value) => value,
             other => panic!("expected a result, got {other:?}"),
         }
+    }
+
+    pub(crate) fn with_videos(offsets: &[(&'static str, f64, f64)]) -> Store {
+        use ovrley_app::lib::video_program::{create_imported_video, VideoEdits};
+        use std::rc::Rc;
+        let mut store = with_activity(600.0);
+        let videos: Vec<_> = offsets
+            .iter()
+            .enumerate()
+            .map(|(order, (id, _, duration))| {
+                let metadata = ovrley_core::media::SourceVideoMetadata {
+                    path: format!("/videos/{id}.mp4"),
+                    duration: Some(*duration),
+                    fps_num: Some(30),
+                    fps_den: Some(1),
+                    resolution: Some(ovrley_core::media::Resolution { width: 1920, height: 1080 }),
+                    has_audio: true,
+                    ..Default::default()
+                };
+                create_imported_video(&metadata, id.to_string(), order as u32, Vec::new()).unwrap()
+            })
+            .collect();
+        store.video_import.video_edits = Rc::new(offsets.iter().map(|(id, offset, _)| (id.to_string(), VideoEdits { offset_seconds: *offset, ..Default::default() })).collect());
+        store.video_import.imported_videos = Rc::new(videos);
+        store
+    }
+
+    #[test]
+    fn video_tools_read_move_shift_and_remove_clips() {
+        let dispatcher = dispatcher_with(with_videos(&[("a", 0.0, 10.0), ("b", 20.0, 10.0)]));
+        let summary = ok(run(&dispatcher, "ovrley_summary", json!({})));
+        assert_eq!(summary["videos"].as_array().unwrap().len(), 2);
+        let video = ok(run(&dispatcher, "video_get", json!({ "videoId": "b" })));
+        assert_eq!((video["frameRate"].clone(), video["frameCount"].clone()), (json!("30/1"), json!(300)));
+        assert_eq!(video["segments"][0]["key"], "start");
+        let moved = ok(run(&dispatcher, "video_move", json!({ "videoId": "b", "offsetSeconds": 12.345 })));
+        assert!((moved["offsetSeconds"].as_f64().unwrap() - 370.0 / 30.0).abs() < 1e-9, "snapped to the clip's frames");
+        let shifted = ok(run(&dispatcher, "videos_shift", json!({ "deltaSeconds": -2 })));
+        assert_eq!(shifted["videos"][0]["offsetSeconds"], -2.0);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2);
+        let removed = ok(run(&dispatcher, "video_remove", json!({ "videoId": "a" })));
+        assert_eq!(removed["videos"].as_array().unwrap().len(), 1);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2, "removal is no undo step");
+        assert!(matches!(run(&dispatcher, "video_get", json!({ "videoId": "a" })), ToolOutcome::Failed(_)));
     }
 
     #[test]

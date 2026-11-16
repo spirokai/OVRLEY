@@ -68,6 +68,8 @@ export global AppShell {
     // as the window's root focus scope receives them. They answer whether the key was consumed.
     callback app-key(text: string, alt: bool, control: bool, shift: bool, meta: bool, repeat: bool) -> bool;
     callback capture-key(text: string, alt: bool, control: bool, shift: bool, meta: bool, repeat: bool) -> bool;
+    // A key release (a clip nudge commits on it).
+    callback app-key-released(text: string, alt: bool, control: bool, shift: bool, meta: bool) -> bool;
 
     // The window buttons: minimise and maximise change no app state; close goes through the guard.
     callback minimize-window();

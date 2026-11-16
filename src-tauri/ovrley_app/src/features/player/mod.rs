@@ -75,6 +75,10 @@ pub struct PlayerState {
     pub surface_gesture: Option<gestures::TimelineGesture>,
     /// A dragged activity trim handle (`useActivityTrim`, D14).
     pub trim_drag: Option<gestures::TrimDrag>,
+    /// A dragged clip (`useClipDrag`, D9).
+    pub clip_drag: Option<gestures::ClipDrag>,
+    /// A keyboard nudge of a clip, waiting for its key release (D11).
+    pub clip_nudge: Option<gestures::ClipNudge>,
     /// The lane whose clip the pointer is over; its tooltip shows.
     pub hovered_lane: Option<crate::store::slices::video_import::ClipLane>,
 }
@@ -82,17 +86,70 @@ pub struct PlayerState {
 impl PlayerState {
     /// A pointer interaction runs on the timeline; it suspends the viewport's clamp and follow.
     pub fn is_dragging(&self) -> bool {
-        self.surface_gesture.is_some()
+        self.surface_gesture.is_some() || self.clip_drag.is_some()
     }
 }
 
 /// The `player` reconcile step: the timeline derivations, then the playback effects (D6) and the
 /// viewport rules (D7), in React's effect order.
 pub fn reconcile_player(store: &mut Store) {
+    // A nudge commits when its clip loses the keyboard (React: the clip's blur).
+    if let Some(nudge) = &store.player.clip_nudge {
+        if focused_clip(store).as_ref() != Some(&nudge.lane) {
+            gestures::commit_nudge(store);
+        }
+    }
     timeline::reconcile_timeline(store);
     playback::reconcile_playback(store);
     let dragging = store.player.is_dragging();
     viewport::reconcile_viewport(store, dragging);
+}
+
+/// Removes a video clip (D17): playback pauses first, and the removal runs outside the history,
+/// which is rebased. Phase 6 adds releasing the video's decoders.
+pub fn remove_video(store: &mut Store, video_id: &str) -> Result<(), String> {
+    playback::pause(store);
+    crate::features::undo_redo::change_video_collection(store, &[], |store| crate::store::slices::video_import::remove_imported_video(store, video_id))
+}
+
+/// The selected clip takes the timeline-clip keys while the player has the keyboard (React: while
+/// the clip has focus, which a press gives it).
+fn focused_clip(store: &Store) -> Option<crate::store::slices::video_import::ClipLane> {
+    if store.editor_shell.active_keyboard_workspace != KeyboardWorkspace::Player {
+        return None;
+    }
+    store.video_import.selected_clip.as_ref().map(|selection| selection.lane.clone())
+}
+
+/// The timeline-clip scope (D11): arrows nudge the focused clip (0.1 s, Shift 1 s), Delete and
+/// Backspace remove a video clip. Returns whether the key was used.
+pub fn handle_timeline_clip_key(store: &mut Store, input: &KeyInput) -> bool {
+    let Some(lane) = focused_clip(store) else { return false };
+    if overlay_open(store) || !store.video_import.has_videos() {
+        return false;
+    }
+    let Some(found) = match_keyboard_shortcut(input, Scope::TimelineClip) else { return false };
+    match found.command.id.as_str() {
+        "timelineClip.remove" => match lane.video_id() {
+            Some(video_id) => remove_video(store, &video_id.to_string()).is_ok(),
+            None => false,
+        },
+        "timelineClip.nudge" => {
+            gestures::nudge_lane(store, lane, found.binding.seconds.unwrap_or(0.1));
+            true
+        }
+        _ => false,
+    }
+}
+
+/// A key release: the end of a nudge commits it.
+pub fn handle_key_release(store: &mut Store, input: &KeyInput) -> bool {
+    let is_nudge = match_keyboard_shortcut(input, Scope::TimelineClip).is_some_and(|found| found.command.id == "timelineClip.nudge");
+    if !is_nudge || store.player.clip_nudge.is_none() {
+        return false;
+    }
+    gestures::commit_nudge(store);
+    true
 }
 
 /// `useOverlayPlayer`'s window keys (the player scope, D11). Repeats are ignored, open overlays
@@ -128,6 +185,9 @@ pub fn handle_player_key(store: &mut Store, input: &KeyInput, now: Instant) -> b
             let window = resolve_activity_window(duration, store.media.activity_trim);
             let second = if found.command.id == "activityTrim.goToStart" { window.start_second } else { window.end_second };
             playback::commit_scrub(store, second);
+        }
+        "sync.globalNudge" if has_video && has_activity_data => {
+            let _ = crate::store::slices::video_import::shift_video_offsets(store, found.binding.seconds.unwrap_or(0.0), false);
         }
         "timeline.fitAll" if timing.has_activity || has_video => viewport::reset_view(store),
         "timeline.fitMedia" => return viewport::fit_target(store, viewport::FitTargetId::All),
@@ -188,6 +248,30 @@ mod tests {
         assert!(handle_player_key(&mut store, &reset, Instant::now()));
         assert_eq!(store.media.activity_trim, None);
         assert!(!handle_player_key(&mut store, &reset, Instant::now()), "nothing to reset");
+    }
+
+    #[test]
+    fn a_focused_clip_nudges_on_arrows_commits_on_release_and_delete_removes_it() {
+        use crate::lib::video_program::fixtures::simple;
+        use crate::store::slices::video_import::{select_clip, tests::store_with, ClipLane, SelectedClip};
+        let mut store = store_with(vec![simple("ride", 10.0, 0)], &[]);
+        store.media.activity_summary = Some(ActivitySummary { duration_seconds: 30.0, ..ActivitySummary::of(&ParsedActivity::default()) });
+        reconcile_player(&mut store);
+        store.editor_shell.set_active_keyboard_workspace(KeyboardWorkspace::Player);
+        select_clip(&mut store, Some(SelectedClip { lane: ClipLane::Video("ride".into()), segment_key: None })).unwrap();
+        assert!(handle_timeline_clip_key(&mut store, &KeyInput { shift: true, ..key("arrowright") }));
+        assert_eq!(store.video_import.video_drag_preview.as_ref().map(|preview| preview.delta_seconds), Some(1.0));
+        assert!(handle_key_release(&mut store, &KeyInput { shift: true, ..key("arrowright") }));
+        assert_eq!(store.video_import.video_edits["ride"].offset_seconds, 1.0);
+        reconcile_player(&mut store);
+        assert!(handle_timeline_clip_key(&mut store, &key("arrowleft")));
+        store.editor_shell.set_active_keyboard_workspace(KeyboardWorkspace::Editor);
+        reconcile_player(&mut store);
+        assert!((store.video_import.video_edits["ride"].offset_seconds - 0.9).abs() < 1e-9, "focus loss commits the nudge");
+        store.editor_shell.set_active_keyboard_workspace(KeyboardWorkspace::Player);
+        assert!(handle_timeline_clip_key(&mut store, &key("delete")));
+        assert!(store.video_import.imported_videos.is_empty());
+        assert_eq!(store.video_import.selected_clip, None);
     }
 
     #[test]

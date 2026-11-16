@@ -132,6 +132,13 @@ pub fn run(store: Store, paths: ovrley_core::paths::AppPaths, preferences: Prefe
             ovrley_app::features::template_manager::fetch_templates(store, services, None);
             ovrley_app::features::widget_editor::load_font_catalog(store, services);
             ovrley_app::features::template_manager::restore_last_loaded_template(store, services, Box::new(|store, _| store.bootstrap.set_startup_ready()));
+            // Debug builds: the videos of `OVRLEY_DEV_VIDEOS`, after the template restore (D18).
+            if cfg!(debug_assertions) {
+                if let Some(paths) = std::env::var(ovrley_app::features::app_shell::DEV_VIDEOS_VARIABLE).ok().filter(|paths| !paths.is_empty()) {
+                    let paths = paths.split(';').map(str::to_string).filter(|path| !path.is_empty()).collect();
+                    ovrley_app::features::app_shell::load_dev_videos(store, services, paths);
+                }
+            }
         });
     });
 
