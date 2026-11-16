@@ -1,7 +1,8 @@
 //! The one home of UI formatting (D20), and the only user of ICU4X. Later phases add their
 //! formatters here instead of writing their own.
 //!
-//! - Durations: `formatClockDuration` (`lib/time-format.js`).
+//! - Durations: `formatClockDuration` and `formatSecondsClock` (`lib/time-format.js`).
+//!   `timeToSeconds` has no caller outside its tests and is not ported.
 //! - Dates: `formatZonedDateTime`, in the app language.
 //! - Numbers: every `toLocaleString()` call, in the system locale, as the webview formats them.
 //! - Text order: `localeCompare`, in the system locale.
@@ -26,6 +27,23 @@ pub fn format_clock_duration(seconds: f64) -> String {
         format!("{sign}{hours}:{minutes:02}:{rest:02}")
     } else {
         format!("{sign}{minutes:02}:{rest:02}")
+    }
+}
+
+/// `formatSecondsClock`: `mm:ss`, or `hh:mm:ss` from one hour on, with up to three decimals
+/// when the value has a fraction (`330.5` → `05:30.5`).
+pub fn format_seconds_clock(seconds: f64) -> String {
+    let rounded = crate::js::to_fixed(seconds.abs(), 3);
+    let sign = if seconds < 0.0 && rounded > 0.0 { "-" } else { "" };
+    let whole = rounded.floor();
+    let fraction = crate::js::number_to_string(crate::js::to_fixed(rounded - whole, 3));
+    let fraction = fraction.strip_prefix('0').unwrap_or("");
+    let whole = whole as u64;
+    let (hours, minutes, rest) = (whole / 3600, whole % 3600 / 60, whole % 60);
+    if hours > 0 {
+        format!("{sign}{hours:02}:{minutes:02}:{rest:02}{fraction}")
+    } else {
+        format!("{sign}{minutes:02}:{rest:02}{fraction}")
     }
 }
 
@@ -92,6 +110,17 @@ pub fn compare_text(left: &str, right: &str, _language: Locale) -> std::cmp::Ord
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn seconds_clocks_show_up_to_three_decimals() {
+        assert_eq!(format_seconds_clock(330.5), "05:30.5");
+        assert_eq!(format_seconds_clock(3700.0), "01:01:40");
+        assert_eq!(format_seconds_clock(1.5), "00:01.5");
+        assert_eq!(format_seconds_clock(-330.0), "-05:30");
+        assert_eq!(format_seconds_clock(-0.0001), "00:00", "a value that rounds to zero has no sign");
+        assert_eq!(format_seconds_clock(59.9996), "01:00");
+        assert_eq!(format_seconds_clock(1.0333333), "00:01.033");
+    }
 
     #[test]
     fn clock_durations_switch_format_at_one_hour() {

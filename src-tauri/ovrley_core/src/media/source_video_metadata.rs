@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 /// source video with activity telemetry. `creation_time` is retained as a
 /// transition field for existing frontend code and as provenance for ffprobe
 /// fallback timestamps.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceVideoMetadata {
     pub path: String,

@@ -9,7 +9,8 @@ use std::time::Duration;
 
 const FRAME_BOUNDARY_TOLERANCE_DENOMINATOR: u128 = 10_000;
 
-/// Exact rational frames-per-second value used for FFmpeg arguments and timing.
+/// Exact rational frames-per-second value used for FFmpeg arguments and timing. It is always
+/// reduced, so `==` compares rates exactly (`fpsEquals`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Fps {
     num: u32,
@@ -88,6 +89,24 @@ impl Fps {
     /// Returns the timestamp of a frame index in seconds.
     pub fn seconds_at_frame(&self, frame_index: u64) -> f64 {
         frame_index as f64 * self.den as f64 / self.num as f64
+    }
+
+    /// The nearest frame index of a time on this frame grid; halves round up, as JavaScript's
+    /// `Math.round` does, so the editor and the React app agree on every frame.
+    pub fn seconds_to_frames(&self, seconds: f64) -> i64 {
+        (seconds * self.num as f64 / self.den as f64 + 0.5).floor() as i64
+    }
+
+    /// The time of a frame index (or a frame count) on this frame grid; negative indices are
+    /// times before frame zero.
+    pub fn frames_to_seconds(&self, frames: i64) -> f64 {
+        frames as f64 * self.den as f64 / self.num as f64
+    }
+
+    /// Snaps a positive duration to the nearest whole number of frames, at least one, the way
+    /// exported transitions are counted.
+    pub fn snap_duration_to_frames(&self, seconds: f64) -> f64 {
+        self.frames_to_seconds(self.seconds_to_frames(seconds).max(1))
     }
 
     /// Builds the canonical half-open frame timeline for a duration.

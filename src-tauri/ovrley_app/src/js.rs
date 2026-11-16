@@ -47,6 +47,11 @@ pub fn parse_float_prefix(text: &str) -> Option<f64> {
         .or_else(|| format!("0{prefix}").parse().ok())
 }
 
+/// `Number(value.toFixed(digits))`: the value rounded to `digits` decimals.
+pub fn to_fixed(value: f64, digits: usize) -> f64 {
+    format!("{value:.digits$}").parse().expect("a formatted number parses")
+}
+
 /// `String(number)` for the finite values the components display.
 pub fn number_to_string(value: f64) -> String {
     if value.is_nan() {

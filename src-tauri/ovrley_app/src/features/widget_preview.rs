@@ -18,6 +18,7 @@ use crate::features::overlay_editor::{raster_scale, scene_size};
 use crate::lib::activity::ActivityTrim;
 use crate::lib::template::{effective_widget_data, ThemeColors};
 use crate::lib::utils::clamp;
+use crate::lib::video_program::SecondsRange;
 use crate::lib::widget::build_config_widgets;
 use crate::store::services::Services;
 use crate::store::Store;
@@ -175,13 +176,6 @@ fn activity_duration(activity: Option<&ovrley_core::activity::schema::ParsedActi
     }
 }
 
-/// A timeline interval, in seconds.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SecondsRange {
-    pub start_second: f64,
-    pub end_second: f64,
-}
-
 /// `resolvePreviewWindow`'s result: the activity window widgets read in the preview.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PreviewWindow {
@@ -208,7 +202,7 @@ pub fn resolve_preview_window(
     let Some(range) = range else { return whole(0.0) };
     let start_second = clamp(range.start_second, 0.0, activity_duration_seconds);
     let end_second = clamp(range.end_second, 0.0, activity_duration_seconds);
-    if !(end_second > start_second) {
+    if end_second <= start_second {
         return whole(range.start_second);
     }
     PreviewWindow { export_start_second: range.start_second, start_second, end_second, is_scoped: true }

@@ -22,12 +22,24 @@ pub struct TransitionDefaults {
     pub split_gap_threshold_seconds: f64,
 }
 
+/// The grid of `assets/transition-previews.webp`: a cell per `xfade` transition, in catalogue
+/// order, row by row.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct TransitionPreviewGrid {
+    pub columns: u32,
+    /// One cell's size in pixels.
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TransitionCatalogue {
     /// Built-in FFmpeg `xfade` transitions (FFmpeg 8.1, `transition=custom` excluded).
     xfade: Vec<String>,
     defaults: TransitionDefaults,
+    preview: TransitionPreviewGrid,
 }
 
 static TRANSITION_CATALOGUE: OnceLock<TransitionCatalogue> = OnceLock::new();
@@ -48,6 +60,16 @@ pub fn is_xfade_transition(name: &str) -> bool {
         .xfade
         .iter()
         .any(|transition| transition == name)
+}
+
+/// The built-in `xfade` transitions in catalogue order.
+pub fn xfade_transitions() -> &'static [String] {
+    &catalogue().xfade
+}
+
+/// The cell grid of the transition preview sprite sheet.
+pub fn transition_preview_grid() -> TransitionPreviewGrid {
+    catalogue().preview
 }
 
 /// Transition defaults of new and migrated projects.

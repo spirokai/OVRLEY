@@ -150,3 +150,23 @@ fn timeline_uses_the_same_boundary_count_as_the_source_video_plan() {
         610
     );
 }
+
+#[test]
+fn seconds_and_frames_convert_on_the_exact_grid() {
+    let ntsc = Fps::new(60000, 2002).unwrap();
+    assert_eq!(ntsc, Fps::new(30000, 1001).unwrap(), "rates compare reduced");
+    assert_eq!(ntsc.seconds_to_frames(1.0), 30);
+    assert_eq!(ntsc.seconds_to_frames(ntsc.frames_to_seconds(1753)), 1753);
+    assert!((ntsc.frames_to_seconds(30) - 1.001).abs() < 1e-12);
+    let thirty = Fps::new(30, 1).unwrap();
+    assert_eq!(thirty.seconds_to_frames(0.5 / 30.0), 1, "halves round up");
+    assert_eq!(thirty.seconds_to_frames(-0.5 / 30.0), 0, "as JavaScript's Math.round");
+    assert_eq!(thirty.seconds_to_frames(-2.0), -60);
+}
+
+#[test]
+fn snapped_durations_keep_at_least_one_frame() {
+    let fps = Fps::new(25, 1).unwrap();
+    assert_eq!(fps.snap_duration_to_frames(1.01), 1.0);
+    assert_eq!(fps.snap_duration_to_frames(0.001), 0.04);
+}
