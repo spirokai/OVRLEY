@@ -5,8 +5,9 @@ import { SimpleTooltip } from "simple-tooltip.slint";
 import { PlacementAlign, PlacementSide } from "logic.slint";
 
 // help-tooltip.jsx: a 0.875rem info icon in a round button with 0.125rem padding, muted and
-// `foreground` on hover, with the help cursor and an accessible label. Its tooltip has no delay,
-// sits at the bottom start, is 20rem wide, and honours newlines.
+// `foreground` on hover, with the help cursor and an accessible label. Its tooltip (Radix's) has no
+// delay, sits 6px off at the bottom start and flips without room, is 20rem wide, honours newlines,
+// and opens on hover and on keyboard focus.
 export component HelpTooltip {
     in property <string> content;
     // The button's accessible name; defaults to the content.
@@ -24,6 +25,8 @@ export component HelpTooltip {
         side: root.side;
         align: root.align;
         delay: 0ms;
+        gap: 6px;
+        keep-shown: focus.focus-visible;
         content-width: root.content-width;
         mouse-cursor: MouseCursor.help;
 
@@ -45,9 +48,15 @@ export component HelpTooltip {
                 focus-on-click: false;
                 focus-gained(reason) => {
                     self.focus-visible = reason == FocusReason.tab-navigation;
+                    if self.focus-visible {
+                        tip.show();
+                    }
                 }
                 focus-lost => {
                     self.focus-visible = false;
+                    if !tip.has-hover {
+                        tip.hide();
+                    }
                 }
             }
             // `focus-visible:outline-2 outline-ring`.

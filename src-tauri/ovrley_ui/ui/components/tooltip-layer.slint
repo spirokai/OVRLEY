@@ -17,34 +17,48 @@ export global TooltipLayer {
     in-out property <PlacementAlign> align: PlacementAlign.center;
     // The bubble's wrapping width; 0 keeps it on one line.
     in-out property <length> content-width;
+    // `wrapText`: long content such as a file path wraps at 20rem, breaking anywhere.
+    in-out property <bool> wrap-text;
+    // Space between the trigger and the bubble; each SimpleTooltip sets it when it shows.
+    in-out property <length> gap;
 }
 
 // The bubble: 0.25rem radius, `border` at 70%, `surface-tooltip`, 0.625rem × 0.375rem padding,
-// `text-xs`, `foreground`, `shadow-2xl`, a 4px arrow pointing at the trigger, 0.5rem from it. It
-// fades in over 100 ms with ease-out and hides at once.
+// `text-xs`, `foreground`, `shadow-2xl`, a 4px arrow pointing at the trigger, 0.5rem from it. The
+// arrow keeps pointing at the trigger after a shift, at least 0.5rem from a bubble corner. It fades
+// in over 100 ms with ease-out and hides at once; resizing the window hides it, as a placed bubble
+// would drift from its trigger.
 export component TooltipLayerView {
     property <length> pad-x: 0.625rem;
     property <length> pad-y: 0.375rem;
     property <length> arrow: 4px;
     property <length> bubble-width: measure.width + 2 * root.pad-x + 2px;
     property <length> bubble-height: measure.preferred-height + 2 * root.pad-y + 2px;
-    property <Placement> placed: PlacementLogic.place(TooltipLayer.anchor, root.bubble-width, root.bubble-height, WindowMetrics.width, WindowMetrics.height, TooltipLayer.side, TooltipLayer.align, 0.5rem);
+    property <Placement> placed: PlacementLogic.place(TooltipLayer.anchor, root.bubble-width, root.bubble-height, WindowMetrics.width, WindowMetrics.height, TooltipLayer.side, TooltipLayer.align, TooltipLayer.gap);
     property <bool> vertical-side: root.placed.side == PlacementSide.top || root.placed.side == PlacementSide.bottom;
 
     width: 100%;
     height: 100%;
+
+    changed width => {
+        TooltipLayer.shown = false;
+    }
+    changed height => {
+        TooltipLayer.shown = false;
+    }
 
     // Measures the text; never shown.
     measure := AppText {
         visible: false;
         x: 0px;
         y: 0px;
-        width: TooltipLayer.content-width > 0px ? TooltipLayer.content-width - 2 * root.pad-x - 2px : self.preferred-width;
+        width: TooltipLayer.content-width > 0px ? TooltipLayer.content-width - 2 * root.pad-x - 2px
+            : TooltipLayer.wrap-text ? min(self.preferred-width, 20rem - 2 * root.pad-x - 2px) : self.preferred-width;
         content: TooltipLayer.content;
         uppercase: true;
         font-size: Theme.text-xs * 1rem;
         line-height: Theme.text-xs-line-height;
-        wrap: TooltipLayer.content-width > 0px ? TextWrap.word-wrap : TextWrap.no-wrap;
+        wrap: TooltipLayer.wrap-text ? TextWrap.char-wrap : TooltipLayer.content-width > 0px ? TextWrap.word-wrap : TextWrap.no-wrap;
     }
 
     bubble := Rectangle {
@@ -77,12 +91,15 @@ export component TooltipLayerView {
             line-height: Theme.text-xs-line-height;
             wrap: measure.wrap;
         }
-        // A 4px CSS border triangle overlapping the bubble's border by 1px; along the edge it sits
-        // 0.5rem in (start), centred, or 0.5rem from the end.
+        // A 4px CSS border triangle overlapping the bubble's border by 1px. It points at the
+        // trigger's start (0.5rem in), centre or end (0.5rem from it), kept 0.5rem from the corners.
         Path {
             property <length> edge: root.vertical-side ? root.bubble-width : root.bubble-height;
-            property <length> along: TooltipLayer.align == PlacementAlign.start ? 0.5rem
-                : TooltipLayer.align == PlacementAlign.end ? self.edge - 0.5rem : self.edge / 2;
+            property <length> anchor-start: root.vertical-side ? TooltipLayer.anchor.x : TooltipLayer.anchor.y;
+            property <length> anchor-size: root.vertical-side ? TooltipLayer.anchor.width : TooltipLayer.anchor.height;
+            property <length> target: self.anchor-start + (TooltipLayer.align == PlacementAlign.start ? 0.5rem
+                : TooltipLayer.align == PlacementAlign.end ? self.anchor-size - 0.5rem : self.anchor-size / 2);
+            property <length> along: max(0.5rem, min(self.target - (root.vertical-side ? root.placed.x : root.placed.y), self.edge - 0.5rem));
             x: root.vertical-side ? self.along - root.arrow : root.placed.side == PlacementSide.left ? root.bubble-width - 1px : 1px - root.arrow;
             y: root.vertical-side ? (root.placed.side == PlacementSide.top ? root.bubble-height - 1px : 1px - root.arrow) : self.along - root.arrow;
             width: root.vertical-side ? 2 * root.arrow : root.arrow;
