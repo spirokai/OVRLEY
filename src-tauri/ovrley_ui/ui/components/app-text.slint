@@ -1,11 +1,12 @@
 import { Theme } from "../theme/theme.slint";
 
 // The shared text element. Defaults are the React root's: Figtree, 1rem, line height 1.5,
-// tracking 0.03em, weight 400, `foreground`. Set `content`, not `text`: Slint has no
-// `text-transform`, so `uppercase` uppercases the displayed string.
+// tracking 0.03em, weight 400, `foreground`, uppercase. Set `content`, not `text`: Slint has no
+// `text-transform`, so `uppercase` uppercases the displayed string. Text the browser does not
+// transform (buttons, inputs) or React marks `normal-case` sets `uppercase: false`.
 export component AppText inherits Text {
     in property <string> content;
-    in property <bool> uppercase;
+    in property <bool> uppercase: true;
     in property <bool> mono;
     // CSS line-height factor.
     in property <float> line-height: Theme.leading-root;

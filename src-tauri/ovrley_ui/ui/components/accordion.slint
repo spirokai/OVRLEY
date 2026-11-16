@@ -62,6 +62,7 @@ export component AccordionTrigger {
             alignment: start;
             if root.text != "": label := AppText {
                 content: root.text;
+                uppercase: false;
                 font-size: Theme.text-sm * 1rem;
                 font-weight: Theme.font-weight-medium;
                 color: root.current-text;

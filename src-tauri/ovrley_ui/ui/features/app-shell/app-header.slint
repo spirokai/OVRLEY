@@ -160,6 +160,7 @@ export component AppHeader inherits Rectangle {
                     padding-left: 0.75rem;
                     AppText {
                         content: root.version;
+                        uppercase: false;
                         font-size: 0.8rem;
                         font-weight: Theme.font-weight-semibold;
                         color: Theme.muted-foreground.transparentize(0.3);
@@ -217,6 +218,8 @@ export component AppHeader inherits Rectangle {
                         Badge {
                             variant: BadgeVariant.outline;
                             radius: 0px;
+                            padding-x: 0.75rem;
+                            padding-y: 0.375rem;
                             text: @tr("app-shell.agentConnected" => "Agent connected");
                             text-color: Theme.primary;
                             border-color: Theme.primary.transparentize(0.4);

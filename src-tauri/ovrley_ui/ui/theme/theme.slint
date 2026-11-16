@@ -106,11 +106,13 @@ export global Theme {
     out property <float> leading-root: 1.5;
     out property <float> leading-none: 1;
     out property <float> leading-relaxed: 1.625;
-    out property <int> font-weight-normal: 400;
-    out property <int> font-weight-medium: 500;
-    out property <int> font-weight-semibold: 600;
-    out property <int> font-weight-bold: 700;
-    out property <int> font-weight-extrabold: 800;
+    // Each weight is its CSS weight minus 100. Slint's Skia renderer leaves font hinting on, and
+    // macOS then draws glyphs about one weight heavier than the browser's `antialiased` smoothing.
+    out property <int> font-weight-normal: 300;
+    out property <int> font-weight-medium: 400;
+    out property <int> font-weight-semibold: 500;
+    out property <int> font-weight-bold: 600;
+    out property <int> font-weight-extrabold: 700;
     // Tracking, in em.
     out property <float> tracking-root: 0.03;
     out property <float> tracking-tight: -0.025;
