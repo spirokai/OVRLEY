@@ -19,7 +19,9 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     crate::features::widget_editor::reconcile_open_widget(store);
     // 4. The durable template state behind the save status, cached by pointers.
     crate::features::template_manager::reconcile_durable_state(store);
-    // 5. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame (D9).
+    // 5. The player: the cached timeline, the playback effects and the viewport rules (phase 4).
+    crate::features::player::reconcile_player(store);
+    // 6. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame (D9).
     crate::features::widget_preview::reconcile_widget_preview(store);
     // The plan's language step is not needed: `change_language_preference` validates, applies and
     // persists `lng` itself, as React's does, and every path (Settings, MCP) goes through it.

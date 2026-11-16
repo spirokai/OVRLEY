@@ -120,6 +120,10 @@ impl Projection {
         let mut views: Vec<(u8, usize, WidgetView)> = Vec::new();
         for (order, id) in store.editor.config.widget_ids().iter().enumerate() {
             let Some(widget) = presented.get(id) else { continue };
+            // Without activity at the playhead only rasters show; the others stay editable.
+            if !store.preview.activity_coverage && widget.kind != "raster" {
+                continue;
+            }
             let geometry = &widget.geometry.widget;
             let fresh = images.get(id).is_some_and(|(revision, handle, _)| *revision == widget.pixels_revision && *handle == widget.handle);
             if !fresh {

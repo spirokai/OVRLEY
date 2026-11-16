@@ -15,7 +15,8 @@
 //!   repeat across documents.
 
 use crate::features::overlay_editor::{raster_scale, scene_size};
-use crate::lib::activity::ActivityTrim;
+use crate::lib::activity::{has_activity_coverage, resolve_activity_clip_id, resolve_activity_context, ActivityContext, ActivityTrim};
+use crate::store::slices::media::ImportedActivity;
 use crate::lib::template::{effective_widget_data, ThemeColors};
 use crate::lib::utils::clamp;
 use crate::lib::video_program::SecondsRange;
@@ -208,10 +209,53 @@ pub fn resolve_preview_window(
     PreviewWindow { export_start_second: range.start_second, start_second, end_second, is_scoped: true }
 }
 
-/// The preview window of the store. Video bounds and embedded telemetry join with the video model.
-pub fn store_preview_window(store: &Store) -> PreviewWindow {
-    let activity = store.media.parsed_activity.as_ref().map(|imported| imported.activity.as_ref());
-    resolve_preview_window(activity_duration(activity), store.media.activity_trim, None, None)
+/// What drives the preview's widgets at the playhead (`useActivityContext` and
+/// `usePlayheadActivityCoverage` over the displayed timeline).
+#[derive(Clone, Debug, PartialEq)]
+pub struct PreviewActivity {
+    pub context: Option<ActivityContext>,
+    /// The duration of the clip supplying embedded telemetry; `None` with an external activity.
+    pub clip_duration_seconds: Option<f64>,
+    /// Embedded telemetry carries no lap selection, as in the export.
+    pub disabled_laps: Vec<usize>,
+    /// Frames without activity coverage show raster widgets only, as in the export.
+    pub coverage: bool,
+}
+
+impl PreviewActivity {
+    pub fn activity(&self) -> Option<&ImportedActivity> {
+        self.context.as_ref().and_then(|context| context.activity.as_ref())
+    }
+
+    /// The timeline second of activity second 0.
+    pub fn origin_second(&self) -> f64 {
+        self.context.as_ref().map_or(0.0, |context| context.origin_second)
+    }
+}
+
+pub fn preview_activity(store: &Store) -> PreviewActivity {
+    let displayed = &store.player.timeline.timeline().displayed;
+    let second = store.editor.selected_second;
+    let parsed = store.media.parsed_activity.as_ref();
+    let clip = if parsed.is_none() {
+        resolve_activity_clip_id(&displayed.program, second).and_then(|id| displayed.clips.iter().find(|clip| clip.id() == id))
+    } else {
+        None
+    };
+    let context = resolve_activity_context(parsed, store.media.activity_summary.as_ref(), clip);
+    let from_clip = context.as_ref().is_some_and(|context| context.video_id.is_some());
+    PreviewActivity {
+        clip_duration_seconds: clip.filter(|_| from_clip).map(|clip| clip.duration_seconds()),
+        disabled_laps: if from_clip { Vec::new() } else { store.media.disabled_laps.clone() },
+        coverage: has_activity_coverage(parsed, store.media.activity_summary.as_ref(), &displayed.program, &displayed.clips, second),
+        context,
+    }
+}
+
+/// The preview window of the store: the telemetry clip, else the committed videos, else the trim.
+pub fn store_preview_window(store: &Store, activity: &PreviewActivity) -> PreviewWindow {
+    let duration = activity_duration(activity.activity().map(|imported| imported.activity.as_ref()));
+    resolve_preview_window(duration, store.media.activity_trim, activity.clip_duration_seconds, store.player.timeline.timeline().committed.bounds)
 }
 
 /// `buildWasmScene`: the preview scene from the global defaults, the scene size, the preview
@@ -331,6 +375,8 @@ pub struct PreviewHost {
     presented: BTreeMap<String, Presented>,
     /// The canvas error: a resource or render failure.
     pub error: Option<String>,
+    /// Whether activity covers the playhead; without it only rasters show (phase 4 D14).
+    pub activity_coverage: bool,
     dirty: bool,
     seen: Option<FrameInputs>,
 }
@@ -350,6 +396,7 @@ impl Default for PreviewHost {
             disabled_laps: Vec::new(),
             presented: BTreeMap::new(),
             error: None,
+            activity_coverage: true,
             dirty: true,
             seen: None,
         }
@@ -427,23 +474,21 @@ impl PreviewHost {
 
 /// Reconcile step: marks the host dirty when an input of the frame changed (D9).
 pub fn reconcile_widget_preview(store: &mut Store) {
+    let activity = preview_activity(store);
     let inputs = FrameInputs {
         config: Some(Rc::as_ptr(&store.editor.config)),
         global_defaults: Some(Rc::as_ptr(&store.template.global_defaults)),
         drafts_revision: store.drafts.revision(),
         language: store.i18n.language,
         raster_scale: raster_scale(store),
-        activity: store
-            .media
-            .parsed_activity
-            .as_ref()
-            .map(|imported| Arc::as_ptr(&imported.preview_bytes)),
-        disabled_laps: store.media.disabled_laps.clone(),
-        second: store.editor.selected_second,
+        activity: activity.activity().map(|imported| Arc::as_ptr(&imported.preview_bytes)),
+        disabled_laps: activity.disabled_laps.clone(),
+        second: store.editor.selected_second - activity.origin_second(),
         document_revision: store.editor.editor_document_revision,
         fallback_duration: store.editor.fallback_duration_seconds,
-        window: store_preview_window(store),
+        window: store_preview_window(store, &activity),
     };
+    store.preview.activity_coverage = activity.coverage;
     if store.preview.seen.as_ref() != Some(&inputs) {
         store.preview.seen = Some(inputs);
         store.preview.dirty = true;
@@ -512,8 +557,8 @@ fn load_image(store: &mut Store, services: &mut Services, id: &str) {
     store.preview.images.insert(id.to_string(), state);
 }
 
-fn load_split_tables(store: &mut Store, services: &mut Services, widgets: &[PreviewWidget]) {
-    let Some(imported) = store.media.parsed_activity.clone() else {
+fn load_split_tables(store: &mut Store, services: &mut Services, widgets: &[PreviewWidget], activity: &PreviewActivity) {
+    let Some(imported) = activity.activity().cloned() else {
         return;
     };
     for widget in widgets.iter().filter(|widget| widget.kind == "splits_run") {
@@ -606,11 +651,8 @@ fn sync(
         store.preview.new_session();
     }
     // The activity: its bytes replace the session's; time-dependent widgets present again.
-    let activity = store
-        .media
-        .parsed_activity
-        .as_ref()
-        .map(|imported| Arc::clone(&imported.preview_bytes));
+    let preview_activity = preview_activity(store);
+    let activity = preview_activity.activity().map(|imported| Arc::clone(&imported.preview_bytes));
     let activity_changed = match (&store.preview.activity, &activity) {
         (Some(current), Some(next)) => !Arc::ptr_eq(current, next),
         (None, None) => false,
@@ -634,8 +676,8 @@ fn sync(
             instance.revision = None;
         }
     }
-    if store.preview.disabled_laps != store.media.disabled_laps {
-        store.preview.disabled_laps = store.media.disabled_laps.clone();
+    if store.preview.disabled_laps != preview_activity.disabled_laps {
+        store.preview.disabled_laps = preview_activity.disabled_laps.clone();
         store
             .preview
             .session
@@ -650,7 +692,7 @@ fn sync(
             instance.revision = None;
         }
     }
-    load_split_tables(store, services, widgets);
+    load_split_tables(store, services, widgets, &preview_activity);
 
     let globals = normalize_global_defaults(Some(&store.template.global_defaults));
     let default_font = FontKey::plain(globals.get("font_values").unwrap_or(&Value::Null));
@@ -696,8 +738,8 @@ fn sync(
         store.preview.applied_raster_scale = Some(scale);
     }
 
-    let scene = preview_scene(&globals, scene_size(store), store_preview_window(store), store.editor.fallback_duration_seconds);
-    let activity_ready = store.preview.activity.is_some() || store.media.parsed_activity.is_none();
+    let scene = preview_scene(&globals, scene_size(store), store_preview_window(store, &preview_activity), store.editor.fallback_duration_seconds);
+    let activity_ready = store.preview.activity.is_some() || preview_activity.activity().is_none();
     for widget in widgets {
         // A raster waits for its image and hides meanwhile.
         if widget.kind == "raster" {
@@ -765,7 +807,7 @@ fn sync(
         store
             .preview
             .session
-            .render(store.editor.selected_second)
+            .render(store.editor.selected_second - preview_activity.origin_second())
             .map_err(|error| error.to_string())?;
     }
 

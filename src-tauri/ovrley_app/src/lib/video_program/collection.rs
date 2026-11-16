@@ -67,7 +67,7 @@ pub fn apply_video_drag_preview(mut clips: Vec<Clip>, preview: Option<&VideoDrag
 }
 
 /// The clips, program and covered interval shown on the timeline (`buildTimelineProgram`).
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TimelineProgram {
     pub clips: Vec<Clip>,
     pub program: Program,

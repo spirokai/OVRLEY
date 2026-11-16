@@ -5819,6 +5819,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sys-locale",
+ "uuid",
 ]
 
 [[package]]

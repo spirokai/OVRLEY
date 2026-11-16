@@ -335,6 +335,7 @@ pub fn activate_parsed_activity(store: &mut Store, source: ActivitySource, impor
     let activity = std::sync::Arc::clone(&imported.activity);
     store.media.set_activity_source(Some(source));
     store.media.activate_activity_file(imported);
+    clear_activity_lane_selection(store);
     let duration = activity.metadata.get("duration_seconds").and_then(serde_json::Value::as_f64).unwrap_or_default();
     if !(duration.is_finite() && duration > 0.0) {
         return;
@@ -365,7 +366,17 @@ pub fn delete_activity(store: &mut Store) -> Result<(), String> {
         return Err("No activity file is loaded.".into());
     }
     store.media.clear_activity_file(true);
+    clear_activity_lane_selection(store);
     Ok(())
+}
+
+/// `activateActivityFile` and `clearActivityFile`: the activity lane's selection belongs to the
+/// replaced activity. Placing the videos again (`computeVideoSync`) arrives with Phase 6.
+fn clear_activity_lane_selection(store: &mut Store) {
+    use crate::store::slices::video_import::ClipLane;
+    if store.video_import.selected_clip.as_ref().is_some_and(|selection| selection.lane == ClipLane::Activity) {
+        store.video_import.selected_clip = None;
+    }
 }
 
 /// The preference that lets an agent drive the window over MCP (D13); off when absent.

@@ -26,7 +26,9 @@ use services::{ServiceParts, Services};
 use slices::editor::EditorSlice;
 use slices::layout::LayoutSlice;
 use slices::media::MediaSlice;
+use slices::render_settings::RenderSettings;
 use slices::template::TemplateSlice;
+use slices::video_import::VideoImportSlice;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
@@ -38,6 +40,11 @@ pub struct Store {
     pub media: MediaSlice,
     pub editor: EditorSlice,
     pub template: TemplateSlice,
+    pub video_import: VideoImportSlice,
+    /// `createRenderSettingsSlice`'s state (phase 4 D15).
+    pub render_settings: RenderSettings,
+    /// The player's hook state and cached timeline (phase 4 D3, D5).
+    pub player: crate::features::player::PlayerState,
     /// The editor history (D6).
     pub history: EditorHistory,
     /// `useUnsavedChangesConfirm` (D15).

@@ -2,4 +2,6 @@
 pub mod editor;
 pub mod layout;
 pub mod media;
+pub mod render_settings;
 pub mod template;
+pub mod video_import;

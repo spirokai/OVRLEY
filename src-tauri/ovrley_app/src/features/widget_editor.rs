@@ -282,7 +282,9 @@ fn metric_editor_view(store: &Store, widget: &ConfigWidget) -> Option<MetricEdit
     }
     let locale = store.i18n.language;
     let display_type = text(&widget.data, "display_type");
-    let activity = store.media.parsed_activity.as_ref().map(|imported| imported.activity.as_ref());
+    // The activity driving widgets at the playhead (`useActivityContext`).
+    let preview_activity = crate::features::widget_preview::preview_activity(store);
+    let activity = preview_activity.activity().map(|imported| imported.activity.as_ref());
     Some(MetricEditorView {
         display_types: definition
             .display_types

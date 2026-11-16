@@ -1,10 +1,20 @@
-//! Port of `store/slices/createEditorSlice.js`, Phase 3 part: the document, selection and unit
-//! system. Playback and the timeline viewport arrive with Phase 4, render state
-//! with Phase 7, the map view mode with Phase 5.
+//! Port of `store/slices/createEditorSlice.js`: the document, selection and unit system (Phase 3),
+//! and playback, the timeline viewport and mute (Phase 4). Render state arrives with Phase 7, the
+//! map view mode with Phase 5.
 
+use crate::lib::video_program::program::PlaybackSource;
 use ovrley_core::normalize::template::template_manifest;
 use ovrley_widgets::model::document::{convert_config_units, normalize_selection_ids, primary_selection_id, OverlayConfig, UnitSystem};
 use std::rc::Rc;
+
+/// `normalizePreviewSecond`: a non-finite second becomes 0.
+fn normalize_preview_second(second: f64) -> f64 {
+    if second.is_finite() {
+        second
+    } else {
+        0.0
+    }
+}
 
 /// `DEFAULT_CONFIG`: the default scene and empty collections.
 pub fn default_config() -> OverlayConfig {
@@ -12,6 +22,22 @@ pub fn default_config() -> OverlayConfig {
         scene: template_manifest().scene.clone(),
         ..OverlayConfig::default()
     }
+}
+
+/// `previewPlaybackState`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PreviewPlaybackState {
+    #[default]
+    Paused,
+    Playing,
+    Scrubbing,
+}
+
+/// The visible window of the timeline, `view_start < view_end`, both finite.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TimelineViewport {
+    pub view_start: f64,
+    pub view_end: f64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -26,6 +52,13 @@ pub struct EditorSlice {
     pub is_marquee_selecting: bool,
     pub fallback_duration_seconds: f64,
     pub selected_second: f64,
+    pub timeline_viewport: TimelineViewport,
+    /// Set by project hydration (Phase 6) so the next media change keeps the restored viewport.
+    pub skip_next_timeline_viewport_reset: bool,
+    pub preview_playback_state: PreviewPlaybackState,
+    /// The clock that owns playback.
+    pub preview_playback_source: PlaybackSource,
+    pub is_video_muted: bool,
     /// The system new widgets start in; not part of the document or its history.
     pub unit_system: UnitSystem,
 }
@@ -40,6 +73,11 @@ impl Default for EditorSlice {
             is_marquee_selecting: false,
             fallback_duration_seconds: 73.0,
             selected_second: 0.0,
+            timeline_viewport: TimelineViewport { view_start: 0.0, view_end: 73.0 },
+            skip_next_timeline_viewport_reset: false,
+            preview_playback_state: PreviewPlaybackState::Paused,
+            preview_playback_source: PlaybackSource::Timeline,
+            is_video_muted: false,
             unit_system: UnitSystem::Metric,
         }
     }
@@ -103,9 +141,57 @@ impl EditorSlice {
         self.fallback_duration_seconds = duration;
     }
 
-    /// `setSelectedSecond`; a non-finite second becomes 0.
+    /// `setSelectedSecond`; a non-finite second becomes 0 (`normalizePreviewSecond`).
     pub fn set_selected_second(&mut self, second: f64) {
-        self.selected_second = if second.is_finite() { second } else { 0.0 };
+        self.selected_second = normalize_preview_second(second);
+    }
+
+    /// `setTimelineViewport`: requires finite `view_start < view_end`.
+    pub fn set_timeline_viewport(&mut self, viewport: TimelineViewport) -> Result<(), String> {
+        if !(viewport.view_start.is_finite() && viewport.view_end.is_finite() && viewport.view_start < viewport.view_end) {
+            return Err("Timeline viewport requires finite viewStart < viewEnd".into());
+        }
+        self.timeline_viewport = viewport;
+        Ok(())
+    }
+
+    /// `startPreviewPlayback`.
+    pub fn start_preview_playback(&mut self, source: PlaybackSource, second: f64) {
+        self.preview_playback_state = PreviewPlaybackState::Playing;
+        self.preview_playback_source = source;
+        self.selected_second = normalize_preview_second(second);
+    }
+
+    /// `pausePreviewPlayback`.
+    pub fn pause_preview_playback(&mut self, second: f64) {
+        self.preview_playback_state = PreviewPlaybackState::Paused;
+        self.selected_second = normalize_preview_second(second);
+    }
+
+    /// `toggleVideoMute`.
+    pub fn toggle_video_mute(&mut self) {
+        self.is_video_muted = !self.is_video_muted;
+    }
+
+    /// `beginPreviewScrub` and `updatePreviewScrub` (the same rule): scrubbing at the second; an
+    /// unchanged scrub sets nothing.
+    pub fn update_preview_scrub(&mut self, second: f64) {
+        let second = normalize_preview_second(second);
+        if self.preview_playback_state == PreviewPlaybackState::Scrubbing && self.selected_second == second {
+            return;
+        }
+        self.preview_playback_state = PreviewPlaybackState::Scrubbing;
+        self.selected_second = second;
+    }
+
+    /// `commitPreviewScrub`: paused at the second; an unchanged pause sets nothing.
+    pub fn commit_preview_scrub(&mut self, second: f64) {
+        let second = normalize_preview_second(second);
+        if self.preview_playback_state == PreviewPlaybackState::Paused && self.selected_second == second {
+            return;
+        }
+        self.preview_playback_state = PreviewPlaybackState::Paused;
+        self.selected_second = second;
     }
 
     /// `setWidgetSelection`: the requested ids that exist, in document order, with the preferred
@@ -182,6 +268,31 @@ mod tests {
         editor.set_unit_system(UnitSystem::Imperial);
         assert_eq!(editor.config.values[0]["display_unit"], "mph");
         assert_eq!(editor.unit_system, UnitSystem::Imperial);
+    }
+
+    #[test]
+    fn scrubs_and_commits_set_only_what_changed() {
+        let mut editor = EditorSlice::default();
+        editor.update_preview_scrub(4.0);
+        assert_eq!((editor.preview_playback_state, editor.selected_second), (PreviewPlaybackState::Scrubbing, 4.0));
+        let before = editor.clone();
+        editor.update_preview_scrub(4.0);
+        assert_eq!(editor, before, "an unchanged scrub sets nothing");
+        editor.commit_preview_scrub(f64::NAN);
+        assert_eq!((editor.preview_playback_state, editor.selected_second), (PreviewPlaybackState::Paused, 0.0));
+        editor.start_preview_playback(PlaybackSource::Video, 7.0);
+        assert_eq!((editor.preview_playback_state, editor.preview_playback_source, editor.selected_second), (PreviewPlaybackState::Playing, PlaybackSource::Video, 7.0));
+        editor.pause_preview_playback(9.0);
+        assert_eq!((editor.preview_playback_state, editor.selected_second), (PreviewPlaybackState::Paused, 9.0));
+    }
+
+    #[test]
+    fn the_viewport_must_be_a_finite_ordered_range() {
+        let mut editor = EditorSlice::default();
+        assert!(editor.set_timeline_viewport(TimelineViewport { view_start: 5.0, view_end: 5.0 }).is_err());
+        assert!(editor.set_timeline_viewport(TimelineViewport { view_start: 0.0, view_end: f64::INFINITY }).is_err());
+        editor.set_timeline_viewport(TimelineViewport { view_start: -2.0, view_end: 10.0 }).unwrap();
+        assert_eq!(editor.timeline_viewport.view_start, -2.0);
     }
 
     #[test]

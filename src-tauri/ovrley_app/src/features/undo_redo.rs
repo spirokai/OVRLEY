@@ -5,6 +5,8 @@
 //! action and its reconcile steps: pointers first (D1), then values.
 
 use crate::lib::activity::ActivityTrim;
+use crate::lib::video_program::VideoEditsMap;
+use crate::store::slices::render_settings::RenderSettings;
 use crate::store::Store;
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};
@@ -19,6 +21,8 @@ pub struct UndoableState {
     pub config: Rc<OverlayConfig>,
     pub global_defaults: Rc<Map<String, Value>>,
     pub aspect_ratio: String,
+    pub render_settings: RenderSettings,
+    pub video_edits: Rc<VideoEditsMap>,
     pub activity_trim: Option<ActivityTrim>,
 }
 
@@ -28,6 +32,8 @@ impl UndoableState {
             config: Rc::clone(&store.editor.config),
             global_defaults: Rc::clone(&store.template.global_defaults),
             aspect_ratio: store.template.aspect_ratio.clone(),
+            render_settings: store.render_settings.clone(),
+            video_edits: Rc::clone(&store.video_import.video_edits),
             activity_trim: store.media.activity_trim,
         }
     }
@@ -37,12 +43,16 @@ impl UndoableState {
         (Rc::ptr_eq(&self.config, &other.config) || self.config == other.config)
             && (Rc::ptr_eq(&self.global_defaults, &other.global_defaults) || self.global_defaults == other.global_defaults)
             && self.aspect_ratio == other.aspect_ratio
+            && self.render_settings == other.render_settings
+            && (Rc::ptr_eq(&self.video_edits, &other.video_edits) || self.video_edits == other.video_edits)
             && self.activity_trim == other.activity_trim
     }
 
     fn restore(self, store: &mut Store) {
         store.template.global_defaults = self.global_defaults;
         store.template.aspect_ratio = self.aspect_ratio;
+        store.render_settings = self.render_settings;
+        store.video_import.video_edits = self.video_edits;
         store.media.activity_trim = self.activity_trim;
         // zundo writes the fields back without `setConfig`. The selection is trimmed to widgets that
         // still exist, so it never names a removed widget (React leaves it stale).
@@ -114,6 +124,29 @@ pub(crate) fn record(store: &mut Store, before: UndoableState) {
             store.history.future.clear();
         }
     }
+}
+
+/// `changeVideoCollection` (D17): changes the imported-video collection outside the history, then
+/// rebases every past and future snapshot: edits of videos that are gone are dropped, and videos
+/// that are new (or `replaced`, a relinked file) take their current edits, so undo never brings
+/// back a removed clip or edits that do not fit a file.
+pub fn change_video_collection<R>(store: &mut Store, replaced_video_ids: &[&str], operation: impl FnOnce(&mut Store) -> R) -> R {
+    let result = operation(store);
+    store.history.set_mode(HistoryMode::Skip);
+    let current = Rc::clone(&store.video_import.video_edits);
+    let rebase = |snapshot: &mut UndoableState| {
+        let rebased: VideoEditsMap = current
+            .iter()
+            .map(|(video_id, edits)| {
+                let kept = (!replaced_video_ids.contains(&video_id.as_str())).then(|| snapshot.video_edits.get(video_id)).flatten();
+                (video_id.clone(), kept.unwrap_or(edits).clone())
+            })
+            .collect();
+        snapshot.video_edits = Rc::new(rebased);
+    };
+    store.history.past.iter_mut().for_each(rebase);
+    store.history.future.iter_mut().for_each(rebase);
+    result
 }
 
 /// Whether history commands are available: not while a confirmation dialog is open
@@ -219,6 +252,30 @@ mod tests {
         });
         dispatcher.dispatch(|store, _| store.editor.set_config(label_config("after")));
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 1, "the mode resets after each dispatch");
+    }
+
+    #[test]
+    fn removing_a_video_rebases_the_history_so_undo_never_resurrects_it() {
+        use crate::lib::video_program::fixtures::simple;
+        use crate::store::slices::video_import::{remove_imported_video, set_video_offset, tests::store_with};
+        let (parts, _) = fake_services(json!({}));
+        let dispatcher = Dispatcher::new(store_with(vec![simple("kept", 60.0, 0), simple("removed", 60.0, 1)], &[]), parts);
+        dispatcher.dispatch(|store, _| set_video_offset(store, "kept", 5.0, false).unwrap());
+        dispatcher.dispatch(|store, _| set_video_offset(store, "removed", 50.0, false).unwrap());
+        dispatcher.dispatch(|store, _| {
+            change_video_collection(store, &[], |store| {
+                remove_imported_video(store, "removed").unwrap();
+                set_video_offset(store, "kept", 7.0, false).unwrap();
+            })
+        });
+        let offsets = |dispatcher: &Dispatcher| dispatcher.with_store(|store| store.video_import.video_edits.iter().map(|(id, edits)| (id.clone(), edits.offset_seconds)).collect::<Vec<_>>());
+        assert_eq!(offsets(&dispatcher), [("kept".to_string(), 7.0)]);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2, "the collection change is no step");
+        dispatcher.dispatch(|store, _| assert!(undo(store)));
+        assert_eq!(offsets(&dispatcher), [("kept".to_string(), 5.0)], "the removed clip stays removed");
+        dispatcher.dispatch(|store, _| assert!(undo(store)));
+        assert_eq!(offsets(&dispatcher), [("kept".to_string(), 0.0)]);
+        dispatcher.dispatch(|store, _| assert!(!undo(store)));
     }
 
     #[test]
