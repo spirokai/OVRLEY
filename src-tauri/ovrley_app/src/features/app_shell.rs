@@ -130,16 +130,43 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
     }
 }
 
-/// A key no focused control used, through the window's scopes in turn: app, history, editor.
+/// A key no focused control used, through the window's scopes in turn: app, history, editor,
+/// player.
 pub fn handle_window_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
     handle_app_key(store, services, input)
         || crate::features::overlay_editor::keyboard::handle_history_key(store, input)
         || crate::features::overlay_editor::keyboard::handle_editor_key(store, input)
+        || crate::features::player::handle_player_key(store, input, std::time::Instant::now())
 }
 
 /// The capture phase (D14): the drawer's Escape rule, then an active gesture's cancel.
 pub fn handle_window_capture_key(store: &mut Store, input: &KeyInput) -> bool {
     crate::features::toolbar::handle_drawer_capture_key(store, input) || crate::features::overlay_editor::keyboard::handle_capture_key(store, input)
+}
+
+/// A rectangle in window coordinates, in logical pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Area {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl Area {
+    pub fn contains(&self, point: (f64, f64)) -> bool {
+        point.0 >= self.x && point.0 < self.x + self.width && point.1 >= self.y && point.1 < self.y + self.height
+    }
+}
+
+/// The keyboard workspace a press selects (phase 4 D11), replacing React's
+/// `onPointerDownCapture`: the player while it shows, else the editor or the control panel. Other
+/// presses (the header, the drawer) keep the workspace.
+pub fn workspace_at(point: (f64, f64), editor: Area, control_panel: Area, player: Option<Area>) -> Option<KeyboardWorkspace> {
+    if player.is_some_and(|player| player.contains(point)) {
+        return Some(KeyboardWorkspace::Player);
+    }
+    (editor.contains(point) || control_panel.contains(point)).then_some(KeyboardWorkspace::Editor)
 }
 
 /// What a dropped file is, by extension, using the lists the file dialogs use.
@@ -701,6 +728,18 @@ mod tests {
     use crate::store::services::fakes::{fake_services, WindowCall};
     use crate::store::Dispatcher;
     use serde_json::json;
+
+    #[test]
+    fn presses_select_the_player_or_the_editor_workspace() {
+        let editor = Area { x: 0.0, y: 40.0, width: 800.0, height: 400.0 };
+        let panel = Area { x: 800.0, y: 40.0, width: 300.0, height: 600.0 };
+        let player = Area { x: 0.0, y: 440.0, width: 800.0, height: 200.0 };
+        assert_eq!(workspace_at((10.0, 500.0), editor, panel, Some(player)), Some(KeyboardWorkspace::Player));
+        assert_eq!(workspace_at((10.0, 100.0), editor, panel, Some(player)), Some(KeyboardWorkspace::Editor));
+        assert_eq!(workspace_at((900.0, 100.0), editor, panel, Some(player)), Some(KeyboardWorkspace::Editor));
+        assert_eq!(workspace_at((10.0, 10.0), editor, panel, Some(player)), None, "the header keeps the workspace");
+        assert_eq!(workspace_at((10.0, 500.0), editor, panel, None), None, "a hidden player takes no press");
+    }
 
     #[test]
     fn a_close_request_closes_the_window_once() {

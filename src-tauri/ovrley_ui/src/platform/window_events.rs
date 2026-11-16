@@ -11,9 +11,11 @@
 //!   `wayland_drop` does the same from its own listener.
 //! - **Press-away blur:** a left press more than 8px outside the focused text field's rectangle
 //!   asks the field to give up its focus, before Slint routes the press.
+//! - **Keyboard workspace** (phase 4 D11): a press in the player selects the `player` workspace,
+//!   a press in the editor or the control panel `editor`, as React's `onPointerDownCapture` does.
 
 use super::{dispatch_ui, APP_WINDOW, UI_DISPATCH};
-use crate::FocusedField;
+use crate::{AppShell, FocusedField, Player};
 use ovrley_app::features::app_shell::{self, DroppedPath};
 use slint::winit_030::{winit, CustomApplicationHandler, EventResult};
 use slint::ComponentHandle;
@@ -98,6 +100,25 @@ fn blur_if_pressed_away(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<
     });
 }
 
+fn select_workspace(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<f64>) {
+    let point = (cursor.x / f64::from(scale_factor), cursor.y / f64::from(scale_factor));
+    let areas = APP_WINDOW.with(|slot| {
+        let window = slot.borrow().as_ref().and_then(|window| window.upgrade())?;
+        let shell = window.global::<AppShell>();
+        let area = |rect: crate::PlacementRect| app_shell::Area { x: rect.x.into(), y: rect.y.into(), width: rect.width.into(), height: rect.height.into() };
+        let player = window.global::<Player>().get_visible().then(|| area(shell.get_player_area()));
+        Some((area(shell.get_editor_area()), area(shell.get_control_panel_area()), player))
+    });
+    let Some((editor, control_panel, player)) = areas else { return };
+    if let Some(workspace) = app_shell::workspace_at(point, editor, control_panel, player) {
+        dispatch_ui(move |store, _| {
+            if store.editor_shell.active_keyboard_workspace != workspace {
+                store.editor_shell.set_active_keyboard_workspace(workspace);
+            }
+        });
+    }
+}
+
 impl CustomApplicationHandler for AppEvents {
     fn window_event(
         &mut self,
@@ -115,6 +136,7 @@ impl CustomApplicationHandler for AppEvents {
             // Losing the window's focus cancels a running transform, as React's window blur does.
             WindowEvent::Focused(false) => super::dispatch_ui(|store, _| {
                 ovrley_app::features::overlay_editor::interaction::cancel_gesture(store);
+                ovrley_app::features::player::gestures::surface_cancel(store);
             }),
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
@@ -123,6 +145,7 @@ impl CustomApplicationHandler for AppEvents {
             } => {
                 if let (Some(window), Some(cursor)) = (slint_window, self.cursor) {
                     blur_if_pressed_away(window.scale_factor(), cursor);
+                    select_workspace(window.scale_factor(), cursor);
                 }
             }
             _ => {}

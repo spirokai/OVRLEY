@@ -17,6 +17,7 @@ const ICONS: &[(&str, &str)] = &[
     ("align-left", iconify::svg!("lucide:align-left")),
     ("align-right", iconify::svg!("lucide:align-right")),
     ("arrow-up-down", iconify::svg!("lucide:arrow-up-down")),
+    ("ban", iconify::svg!("lucide:ban")),
     ("bell", iconify::svg!("lucide:bell")),
     ("blocks", iconify::svg!("lucide:blocks")),
     ("calendar-days", iconify::svg!("lucide:calendar-days")),
@@ -41,6 +42,8 @@ const ICONS: &[(&str, &str)] = &[
     ("database", iconify::svg!("lucide:database")),
     ("download", iconify::svg!("lucide:download")),
     ("external-link", iconify::svg!("lucide:external-link")),
+    ("eye", iconify::svg!("lucide:eye")),
+    ("eye-off", iconify::svg!("lucide:eye-off")),
     ("file-box", iconify::svg!("lucide:file-box")),
     ("file-plus-2", iconify::svg!("lucide:file-plus-2")),
     ("file-up", iconify::svg!("lucide:file-up")),
@@ -87,6 +90,7 @@ const ICONS: &[(&str, &str)] = &[
     ("rows-3", iconify::svg!("lucide:rows-3")),
     ("ruler", iconify::svg!("lucide:ruler")),
     ("save", iconify::svg!("lucide:save")),
+    ("scissors", iconify::svg!("lucide:scissors")),
     ("settings-2", iconify::svg!("lucide:settings-2")),
     ("settings", iconify::svg!("lucide:settings")),
     ("shapes", iconify::svg!("lucide:shapes")),
@@ -259,6 +263,8 @@ fn main() {
              in property <string> glyph;\n    \
              in property <length> size: 1rem;\n    \
              in property <color> color: Theme.foreground;\n    \
+             // lucide's stroke width on the 24 grid.\n    \
+             in property <float> stroke: 2;\n    \
              width: root.size;\n    \
              min-height: root.size;\n    \
              preferred-height: root.size;\n    \
@@ -273,7 +279,7 @@ fn main() {
                  commands: root.glyph;\n        \
                  fill: transparent;\n        \
                  stroke: root.color;\n        \
-                 stroke-width: root.size * 2 / 24;\n        \
+                 stroke-width: root.size * root.stroke / 24;\n        \
                  stroke-line-cap: round;\n        \
                  stroke-line-join: round;\n    \
              }\n\

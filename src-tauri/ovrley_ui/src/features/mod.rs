@@ -2,6 +2,7 @@
 //! callbacks bound to dispatches (D4, D5).
 pub mod app_shell;
 pub mod overlay_editor;
+pub mod player;
 pub mod template_manager;
 pub mod toolbar;
 pub mod undo_redo;

@@ -1,0 +1,210 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { Shadow, ShadowSize } from "../../components/shadow.slint";
+import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import { Choice, PlacementSide } from "../../components/logic.slint";
+import { Player } from "index.slint";
+
+// A `toolbar-icon` button with its tooltip above (`SimpleTooltip side="top"`).
+export component PlayerToolButton {
+    height: 1.75rem;
+    width: 1.75rem;
+    in property <string> icon;
+    in property <length> icon-size: 1rem;
+    in property <string> label;
+    in property <ButtonVariant> variant: ButtonVariant.toolbar;
+    in property <bool> disabled;
+    in property <bool> pressed;
+    in property <bool> tooltip: true;
+    callback clicked();
+
+    SimpleTooltip {
+        content: root.tooltip ? root.label : "";
+        side: PlacementSide.top;
+        Button {
+            variant: root.variant;
+            size: ButtonSize.toolbar-icon;
+            icon: root.icon;
+            icon-size: root.icon-size;
+            disabled: root.disabled;
+            pressed: root.pressed;
+            accessible-label: root.label;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+}
+
+// `PlayerToolbar` (steps 5 and 6): a `1fr | auto | 1fr` grid with `gap-4`. Left: zoom out, zoom
+// in, reset view and the fit tabs. Centre: the transport in a `rounded-xs` group with a `border`
+// at 30%, `p-0.5` and `shadow-sm`; Play is `default`, Pause `secondary`, and the end button is
+// Rewind turned 180°. Right (`w-48`, right-aligned, `gap-4`): mute (with a video) and the time
+// label (`text-xs`, medium, tabular, muted). "Play", "Pause", "Mute video" and "Unmute video" stay
+// English, as React leaves them untranslated.
+export component PlayerToolbar {
+    property <length> transport-width: transport.preferred-width;
+    property <length> side-width: max(0px, (root.width - root.transport-width - 2 * 1rem) / 2);
+    // The transport group: 1.75rem buttons, `p-0.5` and a 1px border.
+    property <length> row-height: 1.75rem + 0.25rem + 2px;
+
+    height: root.row-height;
+
+    left := HorizontalLayout {
+        x: 0px;
+        y: 0px;
+        height: root.row-height;
+        width: root.side-width;
+        spacing: 0.25rem;
+        alignment: start;
+        PlayerToolButton {
+            icon: Icons.zoom-out;
+            label: @tr("player.zoomOut" => "Zoom out");
+            disabled: !Player.can-zoom-out;
+            clicked => {
+                Player.zoom-out();
+            }
+        }
+        PlayerToolButton {
+            icon: Icons.zoom-in;
+            label: @tr("player.zoomIn" => "Zoom in");
+            disabled: !Player.can-zoom-in;
+            clicked => {
+                Player.zoom-in();
+            }
+        }
+        PlayerToolButton {
+            icon: Icons.rotate-ccw;
+            icon-size: 0.75rem;
+            label: @tr("player.resetView" => "Reset view");
+            disabled: Player.reset-view-disabled;
+            clicked => {
+                Player.reset-view();
+            }
+        }
+        HorizontalLayout {
+            padding-left: 0.25rem;
+            VerticalLayout {
+                alignment: center;
+                TabsList {
+                    items: Player.fit-targets;
+                    value: Player.fit-target;
+                    variant: TabsListVariant.toolbar;
+                    trigger-variant: TabsTriggerVariant.toolbar;
+                    value-changed(id) => {
+                        Player.fit-target-selected(id);
+                    }
+                }
+            }
+        }
+    }
+
+    transport := HorizontalLayout {
+        x: root.side-width + 1rem;
+        y: 0px;
+        height: root.row-height;
+        width: root.transport-width;
+        alignment: center;
+        Rectangle {
+            Shadow {
+                size: ShadowSize.sm;
+                radius: Theme.radius-xs * 1rem;
+            }
+            Rectangle {
+                border-radius: Theme.radius-xs * 1rem;
+                border-width: 1px;
+                border-color: Theme.border.transparentize(0.7);
+            }
+            HorizontalLayout {
+                padding: 0.125rem;
+                spacing: 0.25rem;
+                PlayerToolButton {
+                    tooltip: false;
+                    icon: Icons.rewind;
+                    icon-size: 0.875rem;
+                    label: @tr("player.rewindToStart" => "Rewind to start");
+                    disabled: Player.transport-disabled;
+                    clicked => {
+                        Player.reset-to-start();
+                    }
+                }
+                PlayerToolButton {
+                    tooltip: false;
+                    icon: Icons.step-back;
+                    icon-size: 0.875rem;
+                    label: @tr("player.stepBack" => "Step back");
+                    disabled: Player.transport-disabled;
+                    clicked => {
+                        Player.step(-1);
+                    }
+                }
+                PlayerToolButton {
+                    tooltip: false;
+                    icon: Player.playing ? Icons.pause : Icons.play;
+                    label: Player.playing ? "Pause" : "Play";
+                    variant: Player.playing ? ButtonVariant.secondary : ButtonVariant.default;
+                    disabled: Player.transport-disabled;
+                    clicked => {
+                        if Player.playing {
+                            Player.pause();
+                        } else {
+                            Player.play();
+                        }
+                    }
+                }
+                PlayerToolButton {
+                    tooltip: false;
+                    icon: Icons.step-forward;
+                    icon-size: 0.875rem;
+                    label: @tr("player.stepForward" => "Step forward");
+                    disabled: Player.transport-disabled;
+                    clicked => {
+                        Player.step(1);
+                    }
+                }
+                PlayerToolButton {
+                    tooltip: false;
+                    icon: Icons.rewind;
+                    icon-size: 0.875rem;
+                    label: @tr("player.rewindToEnd" => "Rewind to end");
+                    disabled: Player.transport-disabled;
+                    transform-rotation: 180deg;
+                    clicked => {
+                        Player.jump-to-end();
+                    }
+                }
+            }
+        }
+    }
+
+    HorizontalLayout {
+        x: root.width - self.width;
+        y: 0px;
+        height: root.row-height;
+        width: min(12rem, root.side-width);
+        spacing: 1rem;
+        alignment: end;
+        if Player.has-video: PlayerToolButton {
+            tooltip: false;
+            icon: Player.muted ? Icons.volume-x : Icons.volume-2;
+            label: Player.muted ? "Unmute video" : "Mute video";
+            variant: ButtonVariant.ghost;
+            pressed: Player.muted;
+            clicked => {
+                Player.toggle-mute();
+            }
+        }
+        VerticalLayout {
+            alignment: center;
+            AppText {
+                content: Player.time-label;
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-medium;
+                color: Theme.muted-foreground;
+            }
+        }
+    }
+}

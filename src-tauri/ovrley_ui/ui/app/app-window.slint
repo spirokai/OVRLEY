@@ -1,12 +1,14 @@
 import { FluidWindow } from "../theme/fluid-window.slint";
 import { Theme } from "../theme/theme.slint";
-import { AppShell } from "../features/app-shell/index.slint";
+import { AppShell, AreaReport } from "../features/app-shell/index.slint";
 import { AppHeader } from "../features/app-shell/app-header.slint";
 import { ControlPanel, FileDropOverlay, LoadingOverlay, StartupError } from "../features/app-shell/shell-panels.slint";
 import { FocusedField } from "../components/focused-field.slint";
 import { SettingsDialog, UnsavedChangesDialog } from "../features/app-shell/dialogs.slint";
 import { TemplateManager, UnsavedAnswer } from "../features/template-manager/index.slint";
 import { OverlayEditorView } from "../features/overlay-editor/overlay-editor.slint";
+import { OverlayPlayer } from "../features/player/overlay-player.slint";
+import { Player } from "../features/player/index.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 
@@ -94,18 +96,39 @@ export component AppWindow inherits FluidWindow {
                 AppShell.open-settings();
             }
 
-            // The workspace: the editor (later in Phase 3) and the player (Phase 4). The loading
-            // overlay covers it while an import or a template load runs.
+            // The workspace: the editor and, below it, the player (D20). The loading overlay covers
+            // it while an import or a template load runs.
             Rectangle {
                 horizontal-stretch: 1;
                 background: Theme.surface-darken;
-                OverlayEditorView { }
+                VerticalLayout {
+                    OverlayEditorView {
+                        vertical-stretch: 1;
+                        AreaReport {
+                            report(area) => {
+                                AppShell.editor-area = area;
+                            }
+                        }
+                    }
+                    if Player.visible: OverlayPlayer {
+                        AreaReport {
+                            report(area) => {
+                                AppShell.player-area = area;
+                            }
+                        }
+                    }
+                }
                 if AppShell.processing: LoadingOverlay { }
             }
             Rectangle {
                 width: root.control-panel-width;
                 background: Theme.card.transparentize(0.4);
                 ControlPanel { }
+                AreaReport {
+                    report(area) => {
+                        AppShell.control-panel-area = area;
+                    }
+                }
             }
         }
     }

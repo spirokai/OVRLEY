@@ -1,4 +1,4 @@
-import { Choice } from "../../components/logic.slint";
+import { Choice, PlacementRect } from "../../components/logic.slint";
 
 // The settings dialog's sections, in the navigation's order.
 export enum SettingsSection { settings, shortcuts }
@@ -44,6 +44,13 @@ export global AppShell {
     in property <string> unit-system: "metric";
     in property <[ShortcutGroupView]> shortcut-groups;
 
+    // The areas whose presses switch the keyboard workspace (phase 4 D11), in window coordinates:
+    // the editor and the control panel select `editor`, the player selects `player`. The window's
+    // raw press handler reads them.
+    in-out property <PlacementRect> editor-area;
+    in-out property <PlacementRect> control-panel-area;
+    in-out property <PlacementRect> player-area;
+
     // MCP (D13): the user allows agent edits; an agent is connected and allowed (the badge).
     in property <bool> allow-agent-edits;
     in property <bool> agent-connected;
@@ -66,4 +73,26 @@ export global AppShell {
     callback minimize-window();
     callback toggle-maximize-window();
     callback close-window();
+}
+
+// Fills its parent and reports the parent's rectangle in window coordinates when it changes.
+export component AreaReport {
+    callback report(area: PlacementRect);
+    function send() {
+        root.report({ x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height });
+    }
+    width: 100%;
+    height: 100%;
+    init => {
+        root.send();
+    }
+    changed width => {
+        root.send();
+    }
+    changed height => {
+        root.send();
+    }
+    changed absolute-position => {
+        root.send();
+    }
 }

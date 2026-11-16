@@ -137,6 +137,17 @@ impl DispatchHandle {
             Dispatcher(shared).flush_preferences();
         }
     }
+
+    /// Reads the store, if the dispatcher still exists and no action runs (a timer outside the
+    /// dispatch loop checking whether it has work).
+    pub fn with_store<R>(&self, read: impl FnOnce(&Store) -> R) -> Option<R> {
+        let shared = self.0.upgrade()?;
+        if shared.running.get() {
+            return None;
+        }
+        let state = shared.state.try_borrow().ok()?;
+        Some(read(&state.store))
+    }
 }
 
 impl Dispatcher {

@@ -1,0 +1,64 @@
+import { Choice } from "../../components/logic.slint";
+
+// A pointer event a timeline element reports to Rust (D9), with its x in timeline coordinates.
+export enum PointerPhase { down, move, up, cancel }
+
+// The timeline surface a scrub or pan starts on.
+export enum TimelineSurfaceKind { axis, playhead, lanes }
+
+// A major tick: its line's x (on the device pixel grid) and its label's centre, from the strip's
+// anchor.
+export struct MajorTickView {
+    line-x: length,
+    label-x: length,
+    label: string,
+}
+
+// The player feature's global (D5), written by `src/features/player.rs`.
+export global Player {
+    // `hasActivity || hasVideo`: the player shows.
+    in property <bool> visible;
+
+    // The transport.
+    in property <bool> transport-disabled;
+    in property <bool> playing;
+    // `current / total`.
+    in property <string> time-label;
+    in property <bool> has-video;
+    in property <bool> muted;
+
+    // The viewport's toolbar controls.
+    in property <bool> can-zoom-in;
+    in property <bool> can-zoom-out;
+    in property <bool> reset-view-disabled;
+    in property <[Choice]> fit-targets;
+    // The fit target the viewport matches; empty for none.
+    in property <string> fit-target;
+
+    // The axis: the tick strip moves by `strip-offset` while panning within one step.
+    in property <length> strip-offset;
+    in property <[MajorTickView]> major-ticks;
+    in property <[length]> minor-ticks;
+    // The playhead's origin, snapped to a screen pixel.
+    in property <length> playhead-x;
+    // The snap guideline while a drag snapped, on the device pixel grid.
+    in property <bool> guideline-visible;
+    in property <length> guideline-x;
+
+    callback play();
+    callback pause();
+    callback reset-to-start();
+    callback step(seconds: float);
+    callback jump-to-end();
+    callback toggle-mute();
+    callback zoom-in();
+    callback zoom-out();
+    callback reset-view();
+    callback fit-target-selected(id: string);
+
+    // Pointer events of the axis, the playhead and the lane background.
+    callback surface-pointer(surface: TimelineSurfaceKind, phase: PointerPhase, x: length);
+    callback wheel(delta-y: length, x: length, ctrl: bool);
+    // The timeline's width and absolute x (D8), when they change.
+    callback timeline-metrics(width: length, x: length, rem: length);
+}

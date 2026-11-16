@@ -20,6 +20,7 @@ use std::sync::Arc;
 struct Projections {
     window: slint::Weak<AppWindow>,
     overlay: features::overlay_editor::Projection,
+    player: features::player::Projection,
     widget_editor: features::widget_editor::Projection,
     language: Cell<Locale>,
     /// The first run writes what depends on the language even though it has not changed.
@@ -38,6 +39,7 @@ impl Projections {
         features::template_manager::project(&window, store);
         features::undo_redo::project(&window, store);
         self.overlay.project(&window, store);
+        self.player.project(&window, store);
         self.widget_editor.project(&window, store);
     }
 }
@@ -54,6 +56,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     let projections = Projections {
         window: window.as_weak(),
         overlay: features::overlay_editor::Projection::new(dispatcher.handle()),
+        player: features::player::Projection::new(dispatcher.handle()),
         widget_editor: features::widget_editor::Projection::default(),
         language: Cell::new(language),
         first: Cell::new(true),
@@ -63,6 +66,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::toolbar::bind(window, &dispatcher);
     features::template_manager::bind(window, &dispatcher);
     features::overlay_editor::bind(window, &dispatcher);
+    features::player::bind(window, &dispatcher);
     features::undo_redo::bind(window, &dispatcher);
     features::widget_editor::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
