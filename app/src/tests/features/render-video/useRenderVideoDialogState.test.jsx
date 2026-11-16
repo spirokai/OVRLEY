@@ -10,9 +10,9 @@ import { act, renderHook, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useRenderVideoDialogState from '@/features/render-video/hooks/useRenderVideoDialogState'
-import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 describe('useRenderVideoDialogState', () => {
   beforeEach(() => {
@@ -39,7 +39,7 @@ describe('useRenderVideoDialogState', () => {
     const onClose = vi.fn()
     const onConfirm = vi.fn()
     const initialSettings = {
-      renderTarget: 'current',
+      outputMode: 'combined',
       exportMode: 'transparent',
       fps: 30,
       widgetUpdateRate: 1,
@@ -47,7 +47,6 @@ describe('useRenderVideoDialogState', () => {
       qualityType: 'quality',
       qualityValue: 18,
       exportAcceleration: 'cpu',
-      range: { ...DEFAULT_EXPORT_RANGE },
     }
 
     const { result, rerender } = renderHook(
@@ -74,31 +73,17 @@ describe('useRenderVideoDialogState', () => {
 
     expect(result.current.fpsMode).toBe('custom')
 
-    rerender({
-      settings: {
-        ...initialSettings,
-        range: {
-          ...initialSettings.range,
-          type: 'custom',
-        },
-      },
-    })
+    rerender({ settings: { ...initialSettings, widgetUpdateRate: 2 } })
 
     expect(result.current.fpsMode).toBe('custom')
   })
 
-  test('switches imported-video dialogs between composite and transparent defaults while preserving later range edits', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
-    })
+  test('switches imported-video dialogs between composite and transparent defaults', async () => {
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
 
     const { result } = renderHook(() => {
       const [settings, setSettings] = useState({
-        renderTarget: 'current',
+        outputMode: 'combined',
         exportMode: 'composite',
         fps: 30,
         widgetUpdateRate: 1,
@@ -106,7 +91,6 @@ describe('useRenderVideoDialogState', () => {
         qualityType: 'quality',
         qualityValue: 18,
         exportAcceleration: 'cpu',
-        range: { ...DEFAULT_EXPORT_RANGE },
       })
 
       return useRenderVideoDialogState({
@@ -137,55 +121,45 @@ describe('useRenderVideoDialogState', () => {
       expect(result.current.settings.codec).toBe('prores_ks')
     })
     expect(result.current.exportMode).toBe('transparent')
-    expect(result.current.settings.range).toEqual({
-      ...DEFAULT_EXPORT_RANGE,
-      type: 'custom',
-      from: 5,
-      to: 17,
-    })
+  })
 
-    act(() => {
-      result.current.onSettingsChange({
-        range: {
-          ...result.current.settings.range,
-          from: 6.25,
-          to: 15.75,
-        },
+  test('renders the whole activity in one transparent render only when asked, and turns it off for composite export', async () => {
+    useStore.setState({
+      ...videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }),
+      parsedActivity: { metadata: {} },
+    })
+    const onConfirm = vi.fn()
+    const { result } = renderHook(() => {
+      const [settings, setSettings] = useState({
+        outputMode: 'combined',
+        exportMode: 'transparent',
+        fps: 30,
+        widgetUpdateRate: 1,
+        codec: 'prores_ks',
+        qualityType: 'quality',
+        qualityValue: 18,
+        exportAcceleration: 'cpu',
+        renderFullActivity: false,
+        outputPath: 'C:\\renders\\overlay.mov',
+      })
+      return useRenderVideoDialogState({
+        phase: 'confirm',
+        settings,
+        onSettingsChange: (updates) => setSettings((current) => ({ ...current, ...updates })),
+        onClose: vi.fn(),
+        onConfirm,
       })
     })
 
-    act(() => {
-      result.current.handleExportModeChange('composite')
-    })
+    expect(result.current.showRenderFullActivity).toBe(true)
+    expect(result.current.renderFullActivity).toBe(false)
+    act(() => result.current.handleRenderFullActivityChange(true))
+    expect(result.current.renderFullActivity).toBe(true)
+    await act(async () => result.current.onConfirm())
+    expect(onConfirm).toHaveBeenCalledWith(null)
 
-    await waitFor(() => {
-      expect(result.current.settings.codec).toBe('libx264')
-    })
-    expect(result.current.exportMode).toBe('composite')
-
-    act(() => {
-      result.current.handleExportModeChange('transparent')
-    })
-
-    await waitFor(() => {
-      expect(result.current.settings.codec).toBe('prores_ks')
-    })
-    expect(result.current.settings.range).toEqual({
-      ...DEFAULT_EXPORT_RANGE,
-      type: 'custom',
-      from: 6.25,
-      to: 15.75,
-    })
-
-    act(() => {
-      result.current.handleApplyImportedVideoRange()
-    })
-
-    expect(result.current.settings.range).toEqual({
-      ...DEFAULT_EXPORT_RANGE,
-      type: 'custom',
-      from: 5,
-      to: 17,
-    })
+    act(() => result.current.handleExportModeChange('composite'))
+    expect(result.current.renderFullActivity).toBe(false)
+    expect(result.current.showRenderFullActivity).toBe(false)
   })
 })

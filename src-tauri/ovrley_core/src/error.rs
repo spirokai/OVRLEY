@@ -71,14 +71,6 @@ pub enum RenderPathError {
     OutputPathInvalid { path: String },
     #[error("Could not create or write the output file at {path}: {detail}")]
     OutputWriteFailed { path: String, detail: String },
-    #[error("Choose a complete video directory path: {path}")]
-    VideoDirectoryInvalid { path: String },
-    #[error("The video directory does not exist: {path}")]
-    VideoDirectoryMissing { path: String },
-    #[error("You do not have permission to read the video directory: {path}")]
-    VideoDirectoryPermissionDenied { path: String },
-    #[error("Could not read the video directory at {path}: {detail}")]
-    VideoDirectoryReadFailed { path: String, detail: String },
 }
 
 impl RenderPathError {
@@ -94,21 +86,6 @@ impl RenderPathError {
                 path: path.display().to_string(),
             },
             _ => Self::OutputWriteFailed {
-                path: path.display().to_string(),
-                detail: source.to_string(),
-            },
-        }
-    }
-
-    pub fn video_directory_io(path: &std::path::Path, source: std::io::Error) -> Self {
-        match source.kind() {
-            std::io::ErrorKind::NotFound => Self::VideoDirectoryMissing {
-                path: path.display().to_string(),
-            },
-            std::io::ErrorKind::PermissionDenied => Self::VideoDirectoryPermissionDenied {
-                path: path.display().to_string(),
-            },
-            _ => Self::VideoDirectoryReadFailed {
                 path: path.display().to_string(),
                 detail: source.to_string(),
             },
@@ -164,4 +141,16 @@ pub enum CoreError {
 
     #[error(transparent)]
     Serialization(#[from] serde_json::Error),
+}
+
+impl CoreError {
+    /// The text of this error for building a new [`CoreError::Encode`]: an encoding
+    /// error gives its bare message, so the new error shows one "Encoding error:"
+    /// prefix; any other error keeps the prefix that names its kind.
+    pub fn encode_message(&self) -> String {
+        match self {
+            Self::Encode(message) => message.clone(),
+            other => other.to_string(),
+        }
+    }
 }

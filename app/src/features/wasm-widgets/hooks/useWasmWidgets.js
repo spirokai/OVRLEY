@@ -6,35 +6,38 @@ import { createPreviewSession, loadWidgetModule } from '../utils/previewSession'
 /**
  * One preview session per editor document: widget ids are only unique within a document, so a replaced document
  * starts a fresh session instead of updating the previous document's handles.
- * @param {object} props Effective scene/widgets and the raster density for the screen size they are shown at. The canonical
- * playhead is read from the store outside React so playback frames reach the session without re-rendering the editor.
+ * @param {object} props Effective scene/widgets, the raster density for the screen size they are shown at, and the timeline
+ * second of activity second 0. The canonical playhead is read from the store outside React so playback frames reach the
+ * session without re-rendering the editor.
  * @returns {object} Canvas binding, the document revision that canvases are keyed by, and visible resource/render error.
  */
-export function useWasmWidgets({ widgets, scene, rasterScale, activity, disabledLaps, defaultFont }) {
+export function useWasmWidgets({ widgets, scene, rasterScale, activity, activityOriginSecond, disabledLaps, defaultFont }) {
   const documentRevision = useStore((state) => state.editorDocumentRevision)
   const session = useRef(null)
   const canvases = useRef(new Map())
   const mapLayers = useRef(new Map())
   const latest = useRef(null)
+  const originSecond = useRef(activityOriginSecond)
   const [error, setError] = useState(null)
   useEffect(() => {
+    originSecond.current = activityOriginSecond
     latest.current = {
       widgets,
       scene,
       rasterScale,
       activityId: activity === null ? null : activity.preview_activity_id,
       disabledLaps,
-      second: useStore.getState().selectedSecond,
+      second: useStore.getState().selectedSecond - activityOriginSecond,
       defaultFont,
     }
     session.current?.setSnapshot(latest.current)
-  }, [activity, disabledLaps, widgets, scene, rasterScale, defaultFont])
+  }, [activity, activityOriginSecond, disabledLaps, widgets, scene, rasterScale, defaultFont])
   useEffect(
     () =>
       useStore.subscribe((state, previous) => {
         if (state.selectedSecond === previous.selectedSecond) return
         incrementPreviewPerfCounter(previewPerfCounterName('React preview updates'))
-        latest.current = { ...latest.current, second: state.selectedSecond }
+        latest.current = { ...latest.current, second: state.selectedSecond - originSecond.current }
         session.current?.setSnapshot(latest.current)
       }),
     [],

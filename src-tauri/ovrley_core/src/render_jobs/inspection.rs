@@ -43,15 +43,12 @@ pub struct InspectionSession {
     pub inspection_id: String,
 }
 
-/// Also used by submission to select the queue and an optional out-of-folder
-/// calibration source. Effective editor timestamp overrides remain calibration
-/// inputs: they must never replace this descriptor's actual file metadata/stamp.
+/// Also used by submission to select the queue.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct InspectionSourceSelection {
     pub inspection_id: String,
     pub source_ids: Vec<String>,
-    pub calibration_source_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, PartialEq, Eq)]
@@ -83,16 +80,11 @@ pub struct InspectionRejection {
 /// needed after acceptance; freshness is checked again before each source runs.
 pub struct AcceptedInspectionSources {
     sources: Vec<Arc<InspectedVideoSource>>,
-    calibration_source: Option<Arc<InspectedVideoSource>>,
 }
 
 impl AcceptedInspectionSources {
     pub fn sources(&self) -> &[Arc<InspectedVideoSource>] {
         &self.sources
-    }
-
-    pub fn calibration_source(&self) -> Option<&InspectedVideoSource> {
-        self.calibration_source.as_deref()
     }
 }
 
@@ -218,11 +210,7 @@ impl VideoInspectionService {
         let session = sessions.get(&selection.inspection_id);
         let mut issues = Vec::new();
         let mut owned = Vec::new();
-        for source_id in selection
-            .source_ids
-            .iter()
-            .chain(selection.calibration_source_id.iter())
-        {
+        for source_id in &selection.source_ids {
             let stored = session.and_then(|sources| sources.get(source_id));
             let reason = match (session, stored) {
                 (None, _) => Some(ReinspectionReason::ClosedSession),
@@ -250,15 +238,7 @@ impl VideoInspectionService {
                 issues,
             });
         }
-        let calibration_source = selection.calibration_source_id.as_ref().map(|_| {
-            owned
-                .pop()
-                .expect("validated calibration descriptor is owned")
-        });
-        InspectionValidation::Valid(AcceptedInspectionSources {
-            sources: owned,
-            calibration_source,
-        })
+        InspectionValidation::Valid(AcceptedInspectionSources { sources: owned })
     }
 
     fn require_session(&self, inspection_id: &str) -> CoreResult<()> {
@@ -303,12 +283,14 @@ impl CompositeSourceMetadata {
     }
 }
 
+/// Probes the source of a single composite render and checks that its display
+/// resolution matches the scene.
 pub(crate) fn verify_composite_source_resolution(
     paths: &AppPaths,
     composite_video_path: &Path,
     scene_width: u32,
     scene_height: u32,
-) -> CoreResult<CompositeSourceMetadata> {
+) -> CoreResult<crate::media::SourceVideoMetadata> {
     if !composite_video_path.is_file() {
         return Err(CoreError::Config(format!(
             "Composite video does not exist: {}",
@@ -351,5 +333,5 @@ pub(crate) fn verify_composite_source_resolution(
         )));
     }
 
-    Ok(CompositeSourceMetadata::from_source(&metadata))
+    Ok(metadata)
 }

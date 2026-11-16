@@ -1,9 +1,40 @@
 import { createDurableEditorState } from '@/lib/template/template-state'
+import { createVideoMetadataSnapshot } from '@/lib/video-program/imported-video'
+import { cloneVideoSegments } from '@/lib/video-program/video-segments'
 import { createPathLocator } from './projectPaths'
 
 export const PROJECT_FORMAT = 'ovrley-project'
-export const PROJECT_VERSION = 5
+export const PROJECT_VERSION = 6
 export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
+
+/** A source locator relative to the project, or absolute for a never-saved project. */
+function locatePath(path, projectPath) {
+  return projectPath ? createPathLocator(path, projectPath) : { kind: 'absolute', value: path }
+}
+
+/**
+ * Projects the video collection in import order: identity, source locator, user
+ * edits, and the metadata that keeps a video on the timeline when its file cannot
+ * be found. A segment whose `transitionIn` is `null` follows the project transition defaults.
+ */
+function projectVideos(state, projectPath) {
+  return [...state.importedVideos]
+    .sort((left, right) => left.importOrder - right.importOrder)
+    .map((video) => {
+      const edits = state.videoEdits[video.id]
+      return {
+        id: video.id,
+        path: locatePath(video.path, projectPath),
+        offsetSeconds: edits.offsetSeconds,
+        offsetSource: edits.offsetSource,
+        cuts: edits.cuts.map((cut) => ({ id: cut.id, frame: cut.frame })),
+        segments: cloneVideoSegments(edits.segments),
+        placementAnchor: edits.placementAnchor === null ? null : { ...edits.placementAnchor },
+        timezoneMode: edits.timezoneMode,
+        metadata: createVideoMetadataSnapshot(video),
+      }
+    })
+}
 
 /**
  * Builds the project content that participates in dirty-state comparison.
@@ -12,8 +43,8 @@ export const LAST_PROJECT_DIRECTORY_KEY = 'last-project-dir'
  * @returns {object} Persisted project content excluding timeline state.
  */
 export function createProjectContentSnapshot(state, projectPath) {
-  const locate = (path) => (projectPath ? createPathLocator(path, projectPath) : { kind: 'absolute', value: path })
-  const source = (path) => (path ? { path: locate(path) } : null)
+  const source = (path) => (path ? { path: locatePath(path, projectPath) } : null)
+  const { videoId, landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees } = state.manualVideoSync
   const editor = createDurableEditorState({ config: state.config, globalDefaults: state.globalDefaults })
   editor.config.scene.fps = state.renderSettings.fps
   editor.config.scene.updateRate = state.renderSettings.widgetUpdateRate
@@ -22,27 +53,25 @@ export function createProjectContentSnapshot(state, projectPath) {
     editor,
     sources: {
       activity: source(state.activitySource?.path),
-      video: source(state.importedVideoPath),
+      videos: projectVideos(state, projectPath),
     },
     sync: {
-      videoOffsetSeconds: state.videoSyncOffsetSeconds,
-      videoTimezoneMode: state.videoSyncTimezoneMode,
-      manual: state.manualVideoSync,
+      manual: { videoId, landmarks, detectedLocationSecond, speedThresholdKmh, turnThresholdDegrees },
     },
     laps: {
       disabled: state.disabledLaps,
     },
+    activityTrim: state.activityTrim === null ? null : { ...state.activityTrim },
+    transitionDefaults: { ...state.transitionDefaults },
     render: {
-      renderTarget: state.renderSettings.renderTarget,
-      batchVideoFolder: state.batchVideoFolder,
+      outputMode: state.renderSettings.outputMode,
       batchOutputFolder: state.batchOutputFolder,
       fps: state.renderSettings.fps,
       widgetUpdateRate: state.renderSettings.widgetUpdateRate,
-      exportMode: state.renderSettings.renderTarget === 'batch' || state.importedVideoPath ? state.renderSettings.exportMode : 'transparent',
+      exportMode: state.renderSettings.outputMode === 'separate' || state.importedVideos.length > 0 ? state.renderSettings.exportMode : 'transparent',
       codec: state.renderSettings.codec,
       qualityType: state.renderSettings.qualityType,
       qualityValue: state.renderSettings.qualityValue,
-      range: { ...state.renderSettings.range },
     },
   }
 }
@@ -51,7 +80,7 @@ export function createProjectContentSnapshot(state, projectPath) {
  * Explicitly projects only project-owned durable state.
  * @param {object} state Complete application state.
  * @param {string|null} projectPath Absolute destination project path, or null for a never-saved project.
- * @returns {object} Canonical version 5 payload.
+ * @returns {object} Canonical version 6 payload.
  */
 export function createProjectSnapshot(state, projectPath) {
   return {
@@ -80,6 +109,8 @@ export function createProjectDirtyState(project) {
       sources: project.sources,
       sync: project.sync,
       laps: project.laps,
+      activityTrim: project.activityTrim,
+      transitionDefaults: project.transitionDefaults,
       render: project.render,
     },
     timeline: project.timeline,

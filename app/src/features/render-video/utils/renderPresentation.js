@@ -1,25 +1,9 @@
 import { DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
 import i18next from 'i18next'
-import { resolveBatchVideoTiming } from '@/lib/video-sync'
 import { formatClockDuration } from '@/lib/time-format'
+import { isVideoExcluded } from '@/lib/video-program/video-segments'
 import { formatVideoCreationTime } from '@/features/scene-settings/utils/sceneSettingsUtils'
 import { captureBatchSync } from './renderRequest'
-
-/** @param {number} durationSeconds Imported video duration. @param {number} offsetSeconds Committed activity offset. @returns {object} Activity-timeline export range. */
-export function getImportedVideoExportRange(durationSeconds, offsetSeconds) {
-  return { type: 'custom', from: offsetSeconds, to: offsetSeconds + durationSeconds }
-}
-
-/** @param {string} value Editable range time. @returns {string} Whole-second input preserving its optional negative sign. */
-export function sanitizeRangeTimeInput(value) {
-  const input = value.trim()
-  const sign = input.startsWith('-') ? '-' : ''
-  const sanitized = input
-    .split(':')
-    .map((part) => part.split(/[.,]/)[0].replace(/\D/g, ''))
-    .join(':')
-  return `${sign}${sanitized}`
-}
 
 /** @param {'transparent'|'composite'} exportMode Render mode. @returns {string} Native container extension. */
 export function getRenderOutputExtension(exportMode) {
@@ -108,53 +92,68 @@ export function formatRenderPathError(error, translate) {
   return error.reason === undefined ? error.message : translate(`render-video.pathErrors.${error.reason}`, error)
 }
 
-/** @param {object} inputs Editor synchronization inputs. @param {boolean} autoSync Whether sync and overlap are required. @returns {object} Reviewed synchronization inputs or an actionable error. */
-export function reviewBatchSync(inputs, autoSync) {
+/** @param {object} inputs Editor synchronization inputs. @returns {object} Review automatic synchronization inputs or an actionable error. */
+export function reviewBatchSync(inputs) {
   try {
-    return { ...captureBatchSync(inputs, autoSync), error: null }
+    return { ...captureBatchSync(inputs), error: null }
   } catch (error) {
     return { error }
   }
 }
 
-/** @param {object[]} choices User queue. @param {object|null} inspection Current descriptors. @param {object} sync Automatic synchronization context. @param {string} locale Display language. @returns {object[]} Reviewed rows. */
-export function reviewBatchQueue(choices, inspection, sync, locale) {
-  return choices.map((item) => {
+// Camera timestamps are external data; an unreadable one only hides the date.
+function formatCreationLabels(clip, sync, locale) {
+  try {
+    const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
+      clip.creationTime,
+      clip.timeSource,
+      sync.activitySummary?.timezone ?? null,
+      clip.timezoneMode,
+      locale,
+    ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
+    return { creationDateLabel: creationDateLabel.trimEnd(), creationTimeLabel }
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error
+    return { creationDateLabel: null, creationTimeLabel: null }
+  }
+}
+
+/**
+ * Reviews every imported video for separate-file export. A video renders at its
+ * committed timeline offset; frames outside the activity show raster widgets only.
+ * @param {object[]} clips Timeline clips in timeline order.
+ * @param {Map<string, Array<object>>} piecesByVideo Program pieces of each video.
+ * @param {object|null} inspection Current native descriptors keyed by path.
+ * @param {object} sync Activity summary.
+ * @param {string} locale Display language.
+ * @returns {object[]} Reviewed rows keyed by video ID.
+ */
+export function reviewBatchQueue(clips, piecesByVideo, inspection, sync, locale) {
+  return clips.map((clip) => {
+    const item = {
+      id: clip.id,
+      path: clip.path,
+      filename: clip.path.split(/[/\\]/).at(-1),
+      offsetSeconds: clip.offsetSeconds,
+      pieces: piecesByVideo.get(clip.id) ?? [],
+    }
+    if (item.pieces.length === 0 && isVideoExcluded(clip))
+      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.excludedFromExport', 'Excluded from export') }
+    if (item.pieces.length === 0)
+      return { ...item, status: 'blocked', error: i18next.getFixedT(locale)('render-video.hiddenByOverlap', 'Hidden behind an overlapping video') }
     if (inspection?.error && inspection.error.message !== 'reinspectionRequired')
       return { ...item, status: 'blocked', error: formatRenderPathError(inspection.error, i18next.getFixedT(locale)) }
-    const result = inspection?.sources.get(item.path)
+    const result = inspection?.sources.get(clip.path)
     if (!result) return { ...item, status: 'checking', error: null }
     if (result.error || sync.error)
       return { ...item, status: 'blocked', error: formatRenderPathError(result.error ?? sync.error, i18next.getFixedT(locale)) }
-    const { metadata } = result.source
-    const inspectedItem = { ...item, source: result.source, durationLabel: formatClockDuration(metadata.duration) }
-    try {
-      try {
-        const [creationDateLabel, creationTimeLabel] = formatVideoCreationTime(
-          metadata.creationTime,
-          metadata.timeSource,
-          sync.activitySummary?.timezone ?? null,
-          sync.timezoneMode,
-          locale,
-        ).split(/(?=\d{2}:\d{2}:\d{2}$)/)
-        inspectedItem.creationDateLabel = creationDateLabel.trimEnd()
-        inspectedItem.creationTimeLabel = creationTimeLabel
-      } catch (error) {
-        if (sync.autoSync || !(error instanceof RangeError)) throw error
-      }
-      const { timing, hasPositiveOverlap } = resolveBatchVideoTiming(metadata, sync.activitySummary, sync.timezoneMode, sync.autoSync)
-      const blocked = sync.autoSync && hasPositiveOverlap === false
-      return {
-        ...inspectedItem,
-        timing,
-        hasPositiveOverlap,
-        skipOverlay: item.skipOverlay || hasPositiveOverlap === false,
-        status: blocked ? 'blocked' : 'pending',
-        error: blocked ? i18next.t('store.videoCouldNotBeSyncedWithActivity', 'Video could not be synced with activity') : null,
-      }
-    } catch (error) {
-      return { ...inspectedItem, status: 'blocked', error: error.message }
+    const inspectedItem = {
+      ...item,
+      source: result.source,
+      durationLabel: formatClockDuration(clip.durationSeconds),
+      ...formatCreationLabels(clip, sync, locale),
     }
+    return { ...inspectedItem, status: 'pending', error: null }
   })
 }
 
@@ -190,13 +189,14 @@ export function getRenderSummaryItems(ctx, t) {
   const accelerationLabel = ctx.selectedAccelerationOptions.find(
     (option) => option.value === ctx.selectedAccelerationValue && option.available && option.value !== 'cpu',
   )?.label
-  const durationSeconds = isCompositeExport
-    ? ctx.importedVideoDuration
-    : ctx.settings.range?.type === 'custom'
-      ? ctx.settings.range.to - ctx.settings.range.from
-      : ctx.config?.scene?.start !== undefined && ctx.config?.scene?.end !== undefined
-        ? ctx.config.scene.end - ctx.config.scene.start
-        : null
+  // Videos decide the length unless the whole activity renders regardless of them.
+  const durationSeconds = ctx.settings.renderFullActivity
+    ? ctx.activityDurationSeconds
+    : ctx.videoBounds !== null
+      ? ctx.videoBounds.endSecond - ctx.videoBounds.startSecond
+      : isCompositeExport
+        ? null
+        : ctx.trimmedActivityWindow.endSecond - ctx.trimmedActivityWindow.startSecond
   const renderSummaryItems = [
     ctx.config?.scene?.width && ctx.config?.scene?.height ? `${ctx.config.scene.width}x${ctx.config.scene.height}` : null,
     `${fps} fps`,

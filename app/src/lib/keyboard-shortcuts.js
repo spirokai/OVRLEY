@@ -97,6 +97,17 @@ export function isFormFieldShortcut(event) {
   return Boolean(textEditor && (event.ctrlKey || event.metaKey) && NATIVE_EDITING_KEYS.has(getEventKey(event)))
 }
 
+/**
+ * Reports whether the user selected text, which copying and the context menu then belong to.
+ *
+ * @returns {boolean} Whether text is selected.
+ */
+export function hasTextSelection() {
+  if (typeof window === 'undefined') return false
+
+  return window.getSelection()?.toString().length > 0
+}
+
 const KEYBOARD_OVERLAY_SELECTOR =
   '[data-slot="dialog-content"], [data-slot="select-content"], [data-slot="popover-content"], [data-slot="left-drawer-backdrop"]'
 

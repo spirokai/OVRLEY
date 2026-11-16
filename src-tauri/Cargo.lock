@@ -5895,6 +5895,7 @@ dependencies = [
  "dirs 6.0.0",
  "http",
  "http-cache-semantics",
+ "image",
  "log",
  "ovrley_core",
  "ovrley_map",

@@ -1,8 +1,5 @@
-import { resolveExportRangeWindow } from '@/lib/export-range'
-
-/** @param {object} options Scene inputs. @returns {object} Rust preview scene. */
-export function buildWasmScene({ globalDefaults, sceneSize, exportRange, activity, fallbackDurationSeconds }) {
-  const window = resolveExportRangeWindow(activity, exportRange)
+/** @param {object} options Scene inputs and the preview activity window. @returns {object} Rust preview scene. */
+export function buildWasmScene({ globalDefaults, sceneSize, window, fallbackDurationSeconds }) {
   return {
     ...sceneSize,
     border_color: globalDefaults.border_color,
@@ -13,10 +10,10 @@ export function buildWasmScene({ globalDefaults, sceneSize, exportRange, activit
     fixed_width_digits: globalDefaults.fixed_width_digits,
     scale: globalDefaults.scale,
     opacity: globalDefaults.opacity,
-    export_start_seconds: exportRange.from,
-    start: window.start,
-    end: window.end,
-    custom_export_range_active: window.active,
+    export_start_seconds: window.exportStartSecond,
+    start: window.startSecond,
+    end: window.endSecond,
+    custom_export_range_active: window.isScoped,
     preview_duration_seconds: fallbackDurationSeconds,
   }
 }

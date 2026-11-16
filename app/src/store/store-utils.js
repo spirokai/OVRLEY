@@ -9,6 +9,54 @@
  */
 
 import { DEFAULT_SCENE } from '@/lib/template/template-constants'
+import { releasePreviewActivity } from '@/api/backend'
+import { getCourseWidgetDimensions } from '@/lib/widget/widget-defaults'
+import { WIDGET_TYPE_DEFINITIONS } from '@/lib/widget/widget-catalog'
+
+/**
+ * Fits course plots to the aspect ratio of an activity route.
+ * @param {*} state - Current store draft state.
+ * @param {Array<[number, number]>|undefined} coursePoints - Activity route points, when the activity has a route.
+ */
+export function applyCoursePlotDimensions(state, coursePoints) {
+  if (!coursePoints || !state.config?.plots) return
+  const dimensions = getCourseWidgetDimensions(coursePoints, WIDGET_TYPE_DEFINITIONS.course.courseSizing)
+  if (!dimensions) return
+  for (const plot of state.config.plots) {
+    if (plot.value === 'course') {
+      plot.width = dimensions.width
+      plot.height = dimensions.height
+    }
+  }
+}
+
+function previewActivityIds(state) {
+  const ids = new Set()
+  const activities = [state.parsedActivity, ...state.importedVideos.map((video) => video.telemetry.activity)]
+  for (const activity of activities) {
+    // Browser-only activity data has no native snapshot to release.
+    if (activity !== null && activity.preview_activity_id !== undefined) ids.add(activity.preview_activity_id)
+  }
+  return ids
+}
+
+function reportPreviewActivityReleaseError(error) {
+  console.error('Unable to release preview activity', error)
+}
+
+/**
+ * Store listener releasing native preview activity snapshots once neither the
+ * external activity nor any video's embedded telemetry references them.
+ * @param {object} state Next store state.
+ * @param {object} previous Previous store state.
+ */
+export function releaseUnreferencedPreviewActivities(state, previous) {
+  if (state.parsedActivity === previous.parsedActivity && state.importedVideos === previous.importedVideos) return
+  const retainedIds = previewActivityIds(state)
+  for (const id of previewActivityIds(previous)) {
+    if (!retainedIds.has(id)) releasePreviewActivity(id).catch(reportPreviewActivityReleaseError)
+  }
+}
 
 export const DEFAULT_CONFIG = {
   scene: { ...DEFAULT_SCENE },
@@ -105,80 +153,4 @@ export function updateConfigPersistence(state) {
   }
 
   state.hasUnrenderedChanges = true
-}
-
-/**
- * Syncs scene timing from config into the preview timeline state.
- *
- * Config replacement and template hydration both flow through this helper.
- * Callers choose whether the playhead should snap back to the new scene start;
- * template hydration does, ordinary config replacement only does so when the
- * incoming scene start actually changes and the playhead is still anchored to
- * the previous start.
- *
- * @param {*} state - Current store draft state.
- * @param {*} nextConfig - Incoming config value that owns the scene timing.
- * @param {object} [options] - Synchronization options.
- * @param {*} [options.previousConfig] - Config value before the current replacement.
- * @param {boolean} [options.resetSelectedSecond=false] - Whether the playhead should adopt the incoming start second immediately.
- */
-export function syncSceneTimingFromConfig(state, nextConfig, options = {}) {
-  const { previousConfig, resetSelectedSecond = false } = options
-  const scene = nextConfig?.scene
-  if (!scene) return
-
-  const previousScene = previousConfig?.scene
-  const previousStartSecond = state.startSecond
-  const previousEndSecond = state.endSecond
-  const previousSelectedSecond = state.selectedSecond
-  const timelineIsUntouched = previousStartSecond === 0 && previousEndSecond === state.fallbackDurationSeconds && previousSelectedSecond === 0
-
-  const sceneStartChangedInConfig = scene.start !== previousScene?.start
-  const sceneEndChangedInConfig = scene.end !== previousScene?.end
-
-  if (scene.start !== undefined && (resetSelectedSecond || sceneStartChangedInConfig)) {
-    state.startSecond = scene.start
-
-    const playheadIsAnchoredToPreviousStart = previousSelectedSecond === previousStartSecond
-
-    if (resetSelectedSecond || (sceneStartChangedInConfig && (timelineIsUntouched || playheadIsAnchoredToPreviousStart))) {
-      state.selectedSecond = scene.start
-    }
-  }
-
-  if (scene.end !== undefined && (resetSelectedSecond || sceneEndChangedInConfig)) {
-    state.endSecond = scene.end
-  }
-}
-
-/**
- * Syncs timeline edits back into config scene timing.
- *
- * Timeline edits are the source of truth for this path. The helper writes the
- * changed bounds into config and refreshes dirty-state tracking if any config
- * field actually changed.
- *
- * @param {*} state - Current store draft state.
- * @param {object} timing - Timeline timing values to persist into config.
- * @param {number} [timing.startSecond] - Updated timeline start second.
- * @param {number} [timing.endSecond] - Updated timeline end second.
- */
-export function syncSceneTimingToConfig(state, timing) {
-  if (!state.config?.scene) return
-
-  let sceneChanged = false
-
-  if (timing.startSecond !== undefined && state.config.scene.start !== timing.startSecond) {
-    state.config.scene.start = timing.startSecond
-    sceneChanged = true
-  }
-
-  if (timing.endSecond !== undefined && state.config.scene.end !== timing.endSecond) {
-    state.config.scene.end = timing.endSecond
-    sceneChanged = true
-  }
-
-  if (sceneChanged) {
-    updateConfigPersistence(state)
-  }
 }

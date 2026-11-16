@@ -24,11 +24,6 @@
   },
   "fileFormat": "ovrley-template",
   "fileVersion": 3,
-  "exportRange": {
-    "type": "all",
-    "from": 0,
-    "to": 0
-  },
   "scenePresentationKeys": [
     "width",
     "height",

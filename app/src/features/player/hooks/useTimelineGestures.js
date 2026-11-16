@@ -14,18 +14,15 @@ function isDragType(dragRef, dragType) {
 }
 
 /**
- * Owns timeline pointer interactions for scrub, pan, playhead, and export marker drags.
+ * Owns timeline pointer interactions for scrub, pan, and playhead drags.
  *
  * @param {object} options Gesture command inputs.
  * @param {function} options.scrubTo Preview-scrub command that accepts a timeline second.
  * @param {function} options.commitScrub Final scrub command that accepts a timeline second.
  * @param {function} options.cancelScrub Scrub cancellation command for pending preview work.
- * @param {function} options.previewMarker Export-marker preview command.
- * @param {function} options.commitMarker Export-marker commit command.
- * @param {function} options.cancelMarkerPreview Export-marker cancellation command.
  * @returns {object} Drag state, event props, and metric sync command.
  */
-export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub, previewMarker, commitMarker, cancelMarkerPreview }) {
+export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub }) {
   // Drag state - one flag suspends viewport auto-follow during any timeline pointer interaction.
   const [isTimelineDragging, setIsTimelineDragging] = useState(false)
 
@@ -120,9 +117,11 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
   }
 
   // Pan handlers - lane background drag converts pixel deltas into seconds before moving the viewport.
+  // React bubbles events from portalled popovers through the lanes, so presses outside the surface's DOM are ignored.
   const panSurfaceProps = {
     onPointerDown: useCallback(
       (event) => {
+        if (!event.currentTarget.contains(event.target)) return
         startCapturedDrag(event, { lastClientX: event.clientX, type: 'pan' })
       },
       [startCapturedDrag],
@@ -196,39 +195,9 @@ export default function useTimelineGestures({ scrubTo, commitScrub, cancelScrub,
     ),
   }
 
-  // Export marker handlers - generated per marker so each drag carries its own from/to identity.
-  const getExportMarkerProps = useCallback(
-    (marker) => ({
-      onPointerDown: (event) => {
-        event.stopPropagation()
-        if (!startCapturedDrag(event, { marker, type: 'export-marker' })) return
-        previewMarker(marker, readSecond(event))
-      },
-      onPointerMove: (event) => {
-        if (dragRef.current?.type !== 'export-marker' || dragRef.current.marker !== marker) return
-        event.stopPropagation()
-        previewMarker(marker, readSecond(event))
-      },
-      onPointerUp: (event) => {
-        if (dragRef.current?.type !== 'export-marker' || dragRef.current.marker !== marker) return
-        event.stopPropagation()
-        commitMarker(marker, readSecond(event))
-        releaseCapturedDrag(event)
-      },
-      onPointerCancel: (event) => {
-        if (dragRef.current?.type !== 'export-marker' || dragRef.current.marker !== marker) return
-        event.stopPropagation()
-        cancelMarkerPreview()
-        releaseCapturedDrag(event)
-      },
-    }),
-    [cancelMarkerPreview, commitMarker, previewMarker, readSecond, releaseCapturedDrag, startCapturedDrag],
-  )
-
   // Gesture API - presentational surface spreads these props without knowing interaction rules.
   return {
     axisProps,
-    getExportMarkerProps,
     isTimelineDragging,
     panSurfaceProps,
     playheadProps,

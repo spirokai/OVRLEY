@@ -3,9 +3,9 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import RenderVideoDialog from '@/features/render-video/components/RenderVideoDialog'
-import { DEFAULT_EXPORT_RANGE } from '@/features/template-manager'
 import useStore from '@/store/useStore'
 import { DEFAULT_CONFIG, DEFAULT_RENDER_PROGRESS } from '@/store/store-utils'
+import { createTestVideo, videoStoreState } from '@/tests/helpers/videoFixtures'
 
 globalThis.ResizeObserver ??= class ResizeObserver {
   observe() {}
@@ -49,20 +49,14 @@ describe('RenderVideoDialog', () => {
   })
 
   test('shows composite export title and lets imported-video users switch to transparent export', async () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
-    })
+    useStore.setState(videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }))
 
     const user = userEvent.setup()
 
     render(
       <RenderVideoDialogHarness
         initialSettings={{
-          renderTarget: 'current',
+          outputMode: 'combined',
           fps: 30,
           widgetUpdateRate: 1,
           exportMode: 'composite',
@@ -70,7 +64,6 @@ describe('RenderVideoDialog', () => {
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          range: { ...DEFAULT_EXPORT_RANGE },
         }}
       />,
     )
@@ -91,27 +84,21 @@ describe('RenderVideoDialog', () => {
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
 
     expect(screen.getByText('Export Settings')).toBeInTheDocument()
-    expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /use video range/i })).toBeInTheDocument()
-    expect(screen.getByDisplayValue('00:00:05')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('00:00:17')).toBeInTheDocument()
+    // With videos the export follows their parts: no whole-activity render without an external activity.
+    expect(screen.queryByRole('switch', { name: 'Render full activity' })).not.toBeInTheDocument()
   })
 
-  test('preserves export markers when switching an imported-video dialog to transparent export', async () => {
+  test('offers the whole-activity render, off by default, for a transparent video export with an external activity', async () => {
     useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 1920, height: 1080 },
-      videoSyncOffsetSeconds: 5,
+      ...videoStoreState([createTestVideo({ id: 'clip', path: 'C:\\video.mp4', durationSeconds: 12 })], { clip: 5 }),
+      parsedActivity: { metadata: {} },
     })
-
     const user = userEvent.setup()
 
     render(
       <RenderVideoDialogHarness
         initialSettings={{
-          renderTarget: 'current',
+          outputMode: 'combined',
           fps: 30,
           widgetUpdateRate: 1,
           exportMode: 'composite',
@@ -119,22 +106,17 @@ describe('RenderVideoDialog', () => {
           exportAcceleration: 'cpu',
           qualityType: 'quality',
           qualityValue: 18,
-          range: {
-            ...DEFAULT_EXPORT_RANGE,
-            type: 'custom',
-            from: 2,
-            to: 8,
-          },
+          renderFullActivity: false,
         }}
       />,
     )
 
+    expect(screen.queryByRole('switch', { name: 'Render full activity' })).not.toBeInTheDocument()
     await user.click(screen.getByRole('tab', { name: 'Transparent' }))
-
-    expect(screen.getByDisplayValue('00:00:02')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('00:00:08')).toBeInTheDocument()
-    expect(screen.queryByDisplayValue('00:00:05')).not.toBeInTheDocument()
-    expect(screen.queryByDisplayValue('00:00:17')).not.toBeInTheDocument()
+    const fullActivity = screen.getByRole('switch', { name: 'Render full activity' })
+    expect(fullActivity).not.toBeChecked()
+    await user.click(fullActivity)
+    expect(fullActivity).toBeChecked()
   })
 
   test('commits the edited output path instead of the previous draft value', async () => {
@@ -143,13 +125,12 @@ describe('RenderVideoDialog', () => {
     render(
       <RenderVideoDialogHarness
         initialSettings={{
-          renderTarget: 'current',
+          outputMode: 'combined',
           fps: 30,
           widgetUpdateRate: 1,
           exportMode: 'transparent',
           codec: 'prores_ks',
           exportAcceleration: 'cpu',
-          range: { ...DEFAULT_EXPORT_RANGE },
           outputPath: 'C:\\renders\\previous.mov',
         }}
       />,
@@ -163,48 +144,18 @@ describe('RenderVideoDialog', () => {
     expect(outputPathInput).toHaveValue('C:\\missing\\nested\\output.mov')
   })
 
-  test('switches to batch mode with folder pickers in place of the single output file', async () => {
-    const user = userEvent.setup()
+  test('blocks separate files on a video resolution mismatch without offering an output mode switch', () => {
+    useStore.setState(
+      videoStoreState([
+        createTestVideo({ id: 'ride', path: 'C:\\ride.mp4', width: 640, height: 360 }),
+        createTestVideo({ id: 'climb', path: 'C:\\climb.mp4', width: 640, height: 360, importOrder: 1 }),
+      ]),
+    )
 
-    render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
-
-    expect(screen.queryByRole('tab', { name: 'Full Video' })).not.toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: 'Batch' }))
-
-    expect(screen.getByText('Video folder')).toBeInTheDocument()
-    expect(screen.getByText('Output folder')).toBeInTheDocument()
-    expect(screen.queryByRole('textbox', { name: 'Output path' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Custom Export Range')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start batch render/i })).toBeDisabled()
-
-    await user.click(screen.getByRole('tab', { name: 'Full Video' }))
-
-    expect(screen.getByText("Locked to each video's FPS")).toBeInTheDocument()
-  })
-
-  test('blocks batch mode on the current video resolution mismatch without offering a target switch', () => {
-    useStore.setState({
-      importedVideoPath: 'C:\\video.mp4',
-      importedVideoFps: 30,
-      importedVideoDuration: 12,
-      importedVideoResolution: { width: 640, height: 360 },
-    })
-
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), outputMode: 'separate' }} />)
 
     expect(screen.getByText(/must match imported video/i)).toBeInTheDocument()
-    expect(screen.queryByRole('tab', { name: 'Batch' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Video folder')).not.toBeInTheDocument()
-  })
-
-  test('keeps batch start disabled until queued sources have fresh native inspection', () => {
-    useStore.getState().setBatchQueueFromPaths(['C:\\videos\\ride.mp4'])
-    useStore.getState().setBatchOutputFolder('C:\\renders')
-
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
-
-    expect(screen.getByText('ride.mp4')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /start batch render/i })).toBeDisabled()
+    expect(screen.queryAllByRole('tab')).toHaveLength(0)
   })
 
   test('keeps fractional bar progress, rounds percentage labels and ETA, and preserves completion presentation', () => {
@@ -234,8 +185,13 @@ describe('RenderVideoDialog', () => {
       outputs: [],
       resultCounts: { succeeded: 0, failed: 0, cancelled: 0, unstarted: 0 },
     }
-    useStore.setState({ batchSnapshot: snapshot })
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
+    useStore.setState({
+      batchSnapshot: snapshot,
+      ...videoStoreState([createTestVideo({ id: 'ride', path: id }), createTestVideo({ id: 'climb', path: 'C:/videos/climb.mp4', importOrder: 1 })], {
+        climb: 120,
+      }),
+    })
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), outputMode: 'separate' }} />)
 
     expect(screen.getByText('11% Complete')).toBeInTheDocument()
     expect(screen.getByText('11%')).toBeInTheDocument()
@@ -272,41 +228,16 @@ describe('RenderVideoDialog', () => {
     expect(screen.queryByText('Est. Remaining')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Close' })).toBeEnabled()
   })
-
-  test('lets the user clear a restored video folder while its empty queue is being loaded', async () => {
-    useStore.getState().setBatchVideoFolder('C:\\videos')
-    const user = userEvent.setup()
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
-    const clearButton = screen.getByRole('button', { name: 'Clear' })
-    expect(clearButton).toBeEnabled()
-    await user.click(clearButton)
-    expect(useStore.getState().batchVideoFolder).toBeNull()
-    expect(clearButton).toBeDisabled()
-  })
-
-  test('falls back to transparent export when returning to the current video without an import', async () => {
-    const user = userEvent.setup()
-
-    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
-
-    await user.click(screen.getByRole('tab', { name: 'Full Video' }))
-    await user.click(screen.getByRole('tab', { name: 'Current video' }))
-
-    expect(screen.queryByRole('tab', { name: 'Full Video' })).not.toBeInTheDocument()
-    expect(screen.getByText('Custom Export Range')).toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Output path' })).toBeInTheDocument()
-  })
 })
 
 function transparentSettings() {
   return {
-    renderTarget: 'current',
+    outputMode: 'combined',
     fps: 30,
     widgetUpdateRate: 1,
     exportMode: 'transparent',
     codec: 'prores_ks',
     exportAcceleration: 'cpu',
-    range: { ...DEFAULT_EXPORT_RANGE },
     outputPath: 'C:\\renders\\overlay.mov',
   }
 }

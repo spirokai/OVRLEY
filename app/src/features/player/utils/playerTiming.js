@@ -2,6 +2,8 @@
  * Pure playback and timeline timing helpers for the player feature.
  */
 
+import { resolvePlaybackStart } from '@/lib/video-program/playback-target'
+
 /**
  * Snaps a timeline timestamp to the nearest source-video frame.
  *
@@ -15,53 +17,43 @@ export function snapTimelineSecondToFrame(second, fps, originSecond = 0) {
 }
 
 /**
- * Resolves whether preview playback should be driven by the timeline or video element.
+ * Resolves where preview playback starts and whether the timeline or the video
+ * element drives it. Without video playback the timeline clock plays from the
+ * requested second.
  *
- * @param {{ shouldUseVideoPlayback: boolean, playheadSecond: number, videoSyncOffsetSeconds: number, importedVideoDuration: number }} options
- * @returns {'timeline'|'video'} Playback source for the current playhead.
+ * @param {{ shouldUseVideoPlayback: boolean, playheadSecond: number, program: object }} options
+ * @returns {{source: 'timeline'|'video', second: number}} Playback start.
  */
-export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, videoSyncOffsetSeconds, importedVideoDuration }) {
+export function resolvePlaybackSource({ shouldUseVideoPlayback, playheadSecond, program }) {
   if (!shouldUseVideoPlayback) {
-    return 'timeline'
+    return { source: 'timeline', second: playheadSecond }
   }
 
-  const videoEndSecond = videoSyncOffsetSeconds + importedVideoDuration
-
-  if (playheadSecond < videoSyncOffsetSeconds || playheadSecond >= videoEndSecond) {
-    return 'timeline'
-  }
-
-  return 'video'
+  return resolvePlaybackStart(program, playheadSecond)
 }
 
 /**
- * Resolves the first timeline second occupied by imported video.
+ * Resolves the first timeline second occupied by media.
  *
- * @param {{ hasVideo: boolean, videoSyncOffsetSeconds: number }} options
+ * @param {{ videoBounds: {startSecond: number, endSecond: number}|null }} options
  * @returns {number} Timeline minimum for the active media.
  */
-export function getTimelineMinimum({ hasVideo, videoSyncOffsetSeconds }) {
-  return hasVideo ? Math.min(0, videoSyncOffsetSeconds) : 0
+export function getTimelineMinimum({ videoBounds }) {
+  return videoBounds === null ? 0 : Math.min(0, videoBounds.startSecond)
 }
 
 /**
  * Computes the largest playable duration across activity, template fallback,
  * and imported-video timing.
  *
- * @param {{ activityDurationSeconds: number, fallbackDurationSeconds: number, importedVideoDuration: number, importedVideoPath: string|null, videoSyncOffsetSeconds: number }} options
+ * @param {{ activityDurationSeconds: number|undefined, fallbackDurationSeconds: number, videoBounds: {startSecond: number, endSecond: number}|null }} options
  * @returns {number} Total playable duration in seconds.
  */
-export function getTotalPlaybackDuration({
-  activityDurationSeconds,
-  fallbackDurationSeconds,
-  importedVideoDuration,
-  importedVideoPath,
-  videoSyncOffsetSeconds,
-}) {
+export function getTotalPlaybackDuration({ activityDurationSeconds, fallbackDurationSeconds, videoBounds }) {
   const activityDuration = activityDurationSeconds ?? 0
-  const videoEnd = importedVideoPath ? videoSyncOffsetSeconds + importedVideoDuration : 0
+  const videoEnd = videoBounds === null ? 0 : videoBounds.endSecond
 
-  const contentDuration = activityDuration > 0 ? activityDuration : importedVideoPath ? 0 : fallbackDurationSeconds
+  const contentDuration = activityDuration > 0 ? activityDuration : videoBounds !== null ? 0 : fallbackDurationSeconds
   return Math.max(contentDuration, videoEnd, 0)
 }
 

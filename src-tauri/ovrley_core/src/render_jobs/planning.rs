@@ -7,8 +7,11 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use super::contracts::{BatchEncodingSettings, BatchExportMode};
-use super::inspection::CompositeSourceMetadata;
+use super::contracts::{
+    BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
+    BatchRenderOutput, BatchRenderPiece, BatchTransition,
+};
+use super::inspection::{verify_composite_source_resolution, CompositeSourceMetadata};
 use super::inspection::{
     InspectionRejection, InspectionSourceSelection, InspectionValidation, VideoInspectionService,
 };
@@ -16,10 +19,14 @@ use crate::activity::{
     build_dense_activity_report_for_timeline,
     schema::{DenseActivityReport, ParsedActivity},
 };
+use crate::encode::ffmpeg::assemble::{
+    AssemblyAudio, AssemblyKind, AssemblySegment, AudioPiece, OutputAssembly, TransitionEncoding,
+};
 use crate::encode::ffmpeg::catalog::{
     CodecSelection, CompositeCodecId, CompositeFilterStackKind, TransparentCodecId,
 };
 use crate::encode::ffmpeg::settings::build_ffmpeg_settings;
+use crate::encode::ffmpeg::transitions::{is_xfade_transition, NO_TRANSITION};
 use crate::encode::fps::Fps;
 use crate::encode::plan::CompositeRenderPlan;
 use crate::encode::plan::FrameProductionPlan;
@@ -33,7 +40,8 @@ use crate::normalize::{
     validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
     RenderConfig, ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig,
 };
-use crate::output::{plan_batch_output_targets, RenderOutputKind};
+use crate::output::{plan_batch_output_targets, plan_file_output_target, RenderOutputKind};
+use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
 use ovrley_map::MapSource;
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
@@ -97,42 +105,114 @@ pub(crate) fn validate_batch_encoding(
     })
 }
 
-/// Output review and job preparation use the same exact frame-count rules.
-fn video_output_work(
+/// The source window of one piece on its source's exact frame grid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct PieceWindow {
+    /// Source frames `[start_frame, end_frame)`.
+    pub start_frame: u64,
+    pub end_frame: u64,
+    /// Start on the video's own clock (its first frame at zero), which widget timing uses.
+    pub trim_start: f64,
+    /// Start on the file's clock, which FFmpeg's seeks and trims of the source's
+    /// video and audio use (see `SourceVideoMetadata::file_seconds`).
+    pub file_start: f64,
+    pub duration: f64,
+}
+
+fn source_fps(source: &InspectedVideoSource) -> CoreResult<Fps> {
+    Fps::new(
+        source.metadata.fps_num.expect("inspected FPS numerator"),
+        source.metadata.fps_den.expect("inspected FPS denominator"),
+    )
+}
+
+/// Validates a frame range against its source and derives its window. The source
+/// frame count uses the same rule as the frontend program and the renderer.
+fn frame_window(
     source: &InspectedVideoSource,
-    codec: CodecSelection,
-    layout_fps: Fps,
-    update_rate: NonZeroU32,
-) -> CoreResult<(u32, Fps)> {
-    let duration = source.metadata.duration.expect("inspected source duration");
-    let (frames, fps) = match codec {
-        CodecSelection::Composite(_) => {
-            let fps = Fps::new(
-                source.metadata.fps_num.expect("inspected FPS numerator"),
-                source.metadata.fps_den.expect("inspected FPS denominator"),
-            )?;
-            (fps.frame_count_for_duration(duration)?, fps)
-        }
-        CodecSelection::Transparent(_) => {
-            let layout = layout_fps.frame_count_for_duration(duration)?;
-            (
-                u64::from(FrameProductionPlan::decimated(layout, update_rate)?.count()),
-                layout_fps.divided_by(update_rate)?,
-            )
-        }
+    start_frame: u64,
+    end_frame: u64,
+) -> CoreResult<PieceWindow> {
+    let fps = source_fps(source)?;
+    let total =
+        fps.frame_count_for_duration(source.metadata.duration.expect("inspected source duration"))?;
+    if start_frame >= end_frame || end_frame > total {
+        return Err(CoreError::Config(format!(
+            "Piece frames [{start_frame}, {end_frame}) must lie within the {total} frames of {}",
+            source.metadata.path
+        )));
+    }
+    let trim_start = fps.seconds_at_frame(start_frame);
+    // A piece reaching the last frame ends where the source ends: that frame may be
+    // shown only partly, and a whole-source piece renders exactly like the file.
+    let end = if end_frame == total {
+        source.metadata.duration.expect("inspected source duration")
+    } else {
+        fps.seconds_at_frame(end_frame)
     };
-    let frames = u32::try_from(frames)
-        .map_err(|_| CoreError::Encode("Batch output frame count exceeds u32".into()))?;
-    Ok((frames, fps))
+    Ok(PieceWindow {
+        start_frame,
+        end_frame,
+        trim_start,
+        file_start: source.metadata.file_seconds(trim_start),
+        duration: end - trim_start,
+    })
+}
+
+/// Validates the outputs against their destination before any source is touched:
+/// every output holds pieces; a file destination takes exactly one output; a
+/// source-named output holds pieces of one source.
+pub(crate) fn validate_batch_outputs(
+    outputs: &[BatchRenderOutput],
+    destination: &BatchDestination,
+) -> CoreResult<()> {
+    if let Some(output) = outputs.iter().find(|output| output.pieces.is_empty()) {
+        return Err(CoreError::Config(format!(
+            "Batch output {} must contain at least one piece",
+            output.id
+        )));
+    }
+    match destination {
+        BatchDestination::File { .. } if outputs.len() != 1 => Err(CoreError::Config(
+            "A combined batch destination takes exactly one output".into(),
+        )),
+        BatchDestination::SourceNamed { .. } => match outputs.iter().find(|output| {
+            output
+                .pieces
+                .iter()
+                .any(|piece| piece.source_id != output.pieces[0].source_id)
+        }) {
+            Some(output) => Err(CoreError::Config(format!(
+                "Separate batch output {} must contain pieces of one source",
+                output.id
+            ))),
+            None => Ok(()),
+        },
+        BatchDestination::File { .. } => Ok(()),
+    }
+}
+
+/// Distinct sources referenced by the outputs, in first-use order.
+pub(crate) fn referenced_source_ids(outputs: &[BatchRenderOutput]) -> Vec<String> {
+    let mut ids: Vec<String> = Vec::new();
+    for piece in outputs.iter().flat_map(|output| &output.pieces) {
+        if !ids.contains(&piece.source_id) {
+            ids.push(piece.source_id.clone());
+        }
+    }
+    ids
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BatchVideoOutputPlan {
-    pub source_id: String,
+    pub output_id: String,
     pub output_path: PathBuf,
     pub output_duration_seconds: f64,
+    /// Frames rendered for the output (its progress work).
     pub planned_frames: u64,
+    /// Frames of the finished output: the pieces minus their transitions.
+    pub output_frames: u64,
     pub container_fps_num: u32,
     pub container_fps_den: u32,
 }
@@ -147,29 +227,33 @@ pub enum BatchPlanningResponse {
 /// Public configuration seam: plans only fresh, session-owned descriptors.
 pub fn plan_batch_configuration(
     inspection: &VideoInspectionService,
-    selection: &InspectionSourceSelection,
+    selection: &BatchOutputSelection,
     encoding: &BatchEncodingSettings,
-    output_directory: &Path,
 ) -> CoreResult<BatchPlanningResponse> {
+    validate_batch_outputs(&selection.outputs, &selection.destination)?;
     let encoding = validate_batch_encoding(encoding)?;
-    let sources = match inspection.validate_sources(selection) {
+    let sources = match inspection.validate_sources(&InspectionSourceSelection {
+        inspection_id: selection.inspection_id.clone(),
+        source_ids: referenced_source_ids(&selection.outputs),
+    }) {
         InspectionValidation::Valid(sources) => sources,
         InspectionValidation::Rejected(rejection) => {
             return Ok(BatchPlanningResponse::Rejected(rejection))
         }
     };
-    let outputs = encoding.plan_outputs(&sources, output_directory)?;
-    let plans = sources
-        .sources()
+    let planned = encoding.plan_outputs(&selection.outputs, &sources, &selection.destination)?;
+    let plans = selection
+        .outputs
         .iter()
-        .zip(outputs)
-        .map(|(source, output)| {
-            let (container_fps_num, container_fps_den) = output.container_fps.components();
+        .zip(planned)
+        .map(|(output, planned)| {
+            let (container_fps_num, container_fps_den) = planned.container_fps.components();
             BatchVideoOutputPlan {
-                source_id: source.source_id.clone(),
-                output_path: output.target.path().to_path_buf(),
-                output_duration_seconds: source.metadata.duration.expect("inspected duration"),
-                planned_frames: u64::from(output.frames),
+                output_id: output.id.clone(),
+                output_path: planned.target.path().to_path_buf(),
+                output_duration_seconds: planned.duration,
+                planned_frames: u64::from(planned.frames),
+                output_frames: u64::from(planned.output_frames),
                 container_fps_num,
                 container_fps_den,
             }
@@ -185,49 +269,458 @@ pub(crate) struct ValidatedBatchTemplate {
     map_source: Option<MapSource>,
 }
 
+/// One piece of a planned output: a window of one source.
+pub(crate) struct PlannedPiece {
+    pub source: std::sync::Arc<InspectedVideoSource>,
+    pub window: PieceWindow,
+    /// Output frames of this piece.
+    pub frames: u32,
+    pub skip_overlay: bool,
+}
+
+/// An `xfade` transition between two consecutive pieces of a composite output.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PlannedTransition {
+    pub name: String,
+    /// Output frames the transition spans (on the output frame grid).
+    pub frames: u32,
+}
+
+/// Which part of its piece a rendered segment covers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SegmentRole {
+    /// The first frames of a piece, blended into the incoming transition.
+    Head,
+    /// What a piece shows on its own: the whole piece between hard cuts.
+    Body,
+    /// The last frames of a piece, blended into the outgoing transition.
+    Tail,
+}
+
+/// A separately rendered window of one piece.
+pub(crate) struct PlannedSegment {
+    pub piece: usize,
+    pub role: SegmentRole,
+    pub window: PieceWindow,
+    pub frames: u32,
+}
+
 /// Reviewed and accepted jobs share the same output contract.
 pub(crate) struct PlannedBatchOutput {
     pub target: crate::output::RenderOutputTarget,
+    pub pieces: Vec<PlannedPiece>,
+    /// One per join between consecutive pieces; None for a hard cut.
+    pub transitions: Vec<Option<PlannedTransition>>,
+    /// Rendered windows in order: per piece its head, body and tail.
+    pub segments: Vec<PlannedSegment>,
+    /// Frames rendered for every segment: the item's progress work.
     pub frames: u32,
+    /// Frames of the joined output: every piece minus every transition.
+    pub output_frames: u32,
+    /// Duration of the joined output.
+    pub duration: f64,
     pub container_fps: Fps,
 }
 
+impl PlannedBatchOutput {
+    fn segment_index(&self, piece: usize, role: SegmentRole) -> usize {
+        self.segments
+            .iter()
+            .position(|segment| segment.piece == piece && segment.role == role)
+            .expect("planned segment")
+    }
+}
+
+fn sum_frames(frames: impl Iterator<Item = u32>) -> CoreResult<u32> {
+    frames
+        .map(u64::from)
+        .sum::<u64>()
+        .try_into()
+        .map_err(|_| CoreError::Encode("Batch output frame count exceeds u32".into()))
+}
+
 impl ValidatedBatchEncoding {
+    /// Output frames of a window of its source. Output review and job preparation
+    /// use the same exact frame-count rules.
+    fn window_output_frames(&self, window: PieceWindow) -> CoreResult<u32> {
+        let frames = match self.codec {
+            CodecSelection::Composite(_) => window.end_frame - window.start_frame,
+            CodecSelection::Transparent(_) => {
+                let layout = self.layout_fps.frame_count_for_duration(window.duration)?;
+                u64::from(FrameProductionPlan::decimated(layout, self.update_rate)?.count())
+            }
+        };
+        u32::try_from(frames)
+            .map_err(|_| CoreError::Encode("Batch output frame count exceeds u32".into()))
+    }
+
+    /// The frame rate of an output whose pieces join by stream copy.
+    fn container_fps(&self, first_source: &InspectedVideoSource) -> CoreResult<Fps> {
+        match self.codec {
+            CodecSelection::Composite(_) => source_fps(first_source),
+            CodecSelection::Transparent(_) => self.layout_fps.divided_by(self.update_rate),
+        }
+    }
+
+    /// Plans every requested output at its destination. The pieces of an output
+    /// must join by stream copy: one display resolution, and for composite output
+    /// one source FPS (and one rotation where the encoder keeps the display matrix).
+    /// Pieces next to a transition render as head, body and tail segments.
     pub(crate) fn plan_outputs(
         &self,
+        outputs: &[BatchRenderOutput],
         sources: &super::inspection::AcceptedInspectionSources,
-        directory: &Path,
+        destination: &BatchDestination,
     ) -> CoreResult<Vec<PlannedBatchOutput>> {
-        let paths = sources
-            .sources()
-            .iter()
-            .map(|source| PathBuf::from(&source.metadata.path))
-            .collect::<Vec<_>>();
-        let targets = plan_batch_output_targets(
-            directory,
-            match self.codec {
-                CodecSelection::Composite(_) => RenderOutputKind::Composite,
-                CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
-            },
-            &paths,
+        let source_of = |piece: &BatchRenderPiece| {
             sources
-                .calibration_source()
-                .map(|source| Path::new(&source.metadata.path)),
-        )?;
-        sources
-            .sources()
+                .sources()
+                .iter()
+                .find(|source| source.source_id == piece.source_id)
+                .cloned()
+                .expect("validated sources cover every piece")
+        };
+        let kind = self.output_kind();
+        let targets = match destination {
+            BatchDestination::SourceNamed { directory } => plan_batch_output_targets(
+                Path::new(directory),
+                kind,
+                &outputs
+                    .iter()
+                    .map(|output| PathBuf::from(&source_of(&output.pieces[0]).metadata.path))
+                    .collect::<Vec<_>>(),
+            )?,
+            BatchDestination::File { path, overwrite } => vec![plan_file_output_target(
+                path,
+                kind,
+                *overwrite,
+                &sources
+                    .sources()
+                    .iter()
+                    .map(|source| PathBuf::from(&source.metadata.path))
+                    .collect::<Vec<_>>(),
+            )?],
+        };
+        outputs
             .iter()
             .zip(targets)
-            .map(|(source, target)| {
-                let (frames, container_fps) =
-                    video_output_work(source, self.codec, self.layout_fps, self.update_rate)?;
+            .map(|(output, target)| {
+                let pieces = output
+                    .pieces
+                    .iter()
+                    .map(|piece| {
+                        let source = source_of(piece);
+                        let window = frame_window(&source, piece.start_frame, piece.end_frame)?;
+                        Ok(PlannedPiece {
+                            source,
+                            window,
+                            frames: self.window_output_frames(window)?,
+                            skip_overlay: piece.skip_overlay,
+                        })
+                    })
+                    .collect::<CoreResult<Vec<_>>>()?;
+                self.check_joinable(&output.id, &pieces)?;
+                let container_fps = self.container_fps(&pieces[0].source)?;
+                let transitions = self.plan_transitions(output, &pieces, container_fps)?;
+                let segments = self.plan_segments(&pieces, &transitions)?;
+                let transition_frames = sum_frames(
+                    transitions
+                        .iter()
+                        .flatten()
+                        .map(|transition| transition.frames),
+                )?;
+                let frames = sum_frames(segments.iter().map(|segment| segment.frames))?;
+                let (num, den) = container_fps.components();
                 Ok(PlannedBatchOutput {
                     target,
+                    duration: pieces
+                        .iter()
+                        .map(|piece| piece.window.duration)
+                        .sum::<f64>()
+                        - f64::from(transition_frames) * f64::from(den) / f64::from(num),
+                    output_frames: sum_frames(pieces.iter().map(|piece| piece.frames))?
+                        - transition_frames,
+                    pieces,
+                    transitions,
+                    segments,
                     frames,
                     container_fps,
                 })
             })
             .collect()
+    }
+
+    /// Validates the joins of an output: one per pair of pieces, a hard cut or a
+    /// catalogue `xfade` of at least one output frame that leaves every piece at
+    /// least one frame of its own. Transparent outputs take hard cuts only.
+    fn plan_transitions(
+        &self,
+        output: &BatchRenderOutput,
+        pieces: &[PlannedPiece],
+        container_fps: Fps,
+    ) -> CoreResult<Vec<Option<PlannedTransition>>> {
+        if output.transitions.len() + 1 != pieces.len() {
+            return Err(CoreError::Config(format!(
+                "Batch output {} must hold one transition per join of its {} pieces",
+                output.id,
+                pieces.len()
+            )));
+        }
+        let invalid =
+            |reason: String| CoreError::Config(format!("Batch output {}: {reason}", output.id));
+        let transitions = output
+            .transitions
+            .iter()
+            .map(|transition| {
+                let BatchTransition {
+                    transition_type,
+                    duration_seconds,
+                } = transition;
+                if transition_type == NO_TRANSITION {
+                    return if *duration_seconds == 0.0 {
+                        Ok(None)
+                    } else {
+                        Err(invalid("a hard cut has a duration of 0 seconds".into()))
+                    };
+                }
+                if !is_xfade_transition(transition_type) {
+                    return Err(invalid(format!("unknown transition {transition_type}")));
+                }
+                if matches!(self.codec, CodecSelection::Transparent(_)) {
+                    return Err(invalid(
+                        "transparent outputs join pieces with hard cuts only".into(),
+                    ));
+                }
+                if !duration_seconds.is_finite() || *duration_seconds <= 0.0 {
+                    return Err(invalid("transition durations must be positive".into()));
+                }
+                let (num, den) = container_fps.components();
+                let frames = (duration_seconds * f64::from(num) / f64::from(den)).round();
+                if frames < 1.0 {
+                    return Err(invalid(format!(
+                        "the {transition_type} transition is shorter than one frame"
+                    )));
+                }
+                Ok(Some(PlannedTransition {
+                    name: transition_type.clone(),
+                    frames: frames as u32,
+                }))
+            })
+            .collect::<CoreResult<Vec<_>>>()?;
+        let frames_of = |transition: Option<&Option<PlannedTransition>>| {
+            transition
+                .and_then(Option::as_ref)
+                .map_or(0, |transition| transition.frames)
+        };
+        for (index, piece) in pieces.iter().enumerate() {
+            let incoming = if index == 0 {
+                0
+            } else {
+                frames_of(transitions.get(index - 1))
+            };
+            if u64::from(piece.frames)
+                < u64::from(incoming) + u64::from(frames_of(transitions.get(index))) + 1
+            {
+                return Err(invalid(format!(
+                    "the transitions around piece {} leave none of its {} frames untouched",
+                    index + 1,
+                    piece.frames
+                )));
+            }
+        }
+        Ok(transitions)
+    }
+
+    /// Splits pieces next to transitions into head, body and tail windows on
+    /// their source frame grid (transitions exist only on composite outputs,
+    /// whose output frames are source frames).
+    fn plan_segments(
+        &self,
+        pieces: &[PlannedPiece],
+        transitions: &[Option<PlannedTransition>],
+    ) -> CoreResult<Vec<PlannedSegment>> {
+        let frames_of = |index: Option<usize>| {
+            index
+                .and_then(|index| transitions.get(index))
+                .and_then(Option::as_ref)
+                .map_or(0, |transition| u64::from(transition.frames))
+        };
+        let mut segments = Vec::new();
+        for (index, piece) in pieces.iter().enumerate() {
+            let incoming = frames_of(index.checked_sub(1));
+            let outgoing = frames_of(Some(index));
+            if incoming == 0 && outgoing == 0 {
+                segments.push(PlannedSegment {
+                    piece: index,
+                    role: SegmentRole::Body,
+                    window: piece.window,
+                    frames: piece.frames,
+                });
+                continue;
+            }
+            let (first, last) = (piece.window.start_frame, piece.window.end_frame);
+            let body_start = first + incoming;
+            let body_end = last - outgoing;
+            for (role, start_frame, end_frame) in [
+                (SegmentRole::Head, first, body_start),
+                (SegmentRole::Body, body_start, body_end),
+                (SegmentRole::Tail, body_end, last),
+            ] {
+                if start_frame == end_frame {
+                    continue;
+                }
+                let window = frame_window(&piece.source, start_frame, end_frame)?;
+                segments.push(PlannedSegment {
+                    piece: index,
+                    role,
+                    window,
+                    frames: self.window_output_frames(window)?,
+                });
+            }
+        }
+        Ok(segments)
+    }
+
+    fn output_kind(&self) -> RenderOutputKind {
+        match self.codec {
+            CodecSelection::Composite(_) => RenderOutputKind::Composite,
+            CodecSelection::Transparent(_) => RenderOutputKind::Transparent,
+        }
+    }
+
+    fn check_joinable(&self, output_id: &str, pieces: &[PlannedPiece]) -> CoreResult<()> {
+        let first = &pieces[0].source;
+        let keeps_display_matrix = matches!(self.codec, CodecSelection::Composite(id)
+            if id.metadata().filter_stack_kind == CompositeFilterStackKind::QsvFullOverlay);
+        for piece in &pieces[1..] {
+            let source = &piece.source;
+            let reason = if source.display_resolution != first.display_resolution {
+                Some("display resolution")
+            } else if matches!(self.codec, CodecSelection::Composite(_))
+                && source_fps(source)? != source_fps(first)?
+            {
+                Some("frame rate")
+            } else if keeps_display_matrix
+                && source
+                    .metadata
+                    .rotation_degrees
+                    .unwrap_or(0)
+                    .rem_euclid(360)
+                    != first.metadata.rotation_degrees.unwrap_or(0).rem_euclid(360)
+            {
+                Some("rotation")
+            } else {
+                None
+            };
+            if let Some(reason) = reason {
+                return Err(CoreError::Config(format!(
+                    "Batch output {output_id} joins sources with a different {reason}: {} and {}",
+                    first.metadata.path, source.metadata.path
+                )));
+            }
+        }
+        Ok(())
+    }
+}
+
+impl ValidatedBatchTemplate {
+    pub(crate) fn output_kind(&self) -> RenderOutputKind {
+        self.encoding.output_kind()
+    }
+
+    /// How the rendered segments of a multi-piece output join into its target:
+    /// each body in order, with an `xfade` of the outgoing tail and the incoming
+    /// head at every transition. `segment_paths` follow `output.segments`.
+    pub(crate) fn plan_assembly(
+        &self,
+        output: &PlannedBatchOutput,
+        parts_directory: PathBuf,
+        segment_paths: Vec<PathBuf>,
+    ) -> OutputAssembly {
+        let (num, den) = output.container_fps.components();
+        let seconds = |frames: u32| f64::from(frames) * f64::from(den) / f64::from(num);
+        let mut segments = Vec::new();
+        for (index, transition) in output
+            .transitions
+            .iter()
+            .map(Some)
+            .chain([None])
+            .enumerate()
+        {
+            segments.push(AssemblySegment::Part(
+                segment_paths[output.segment_index(index, SegmentRole::Body)].clone(),
+            ));
+            if let Some(Some(transition)) = transition {
+                segments.push(AssemblySegment::Transition {
+                    outgoing: segment_paths[output.segment_index(index, SegmentRole::Tail)].clone(),
+                    incoming: segment_paths[output.segment_index(index + 1, SegmentRole::Head)]
+                        .clone(),
+                    name: transition.name.clone(),
+                    duration: seconds(transition.frames),
+                    output: parts_directory.join(format!("transition-{index:04}.mp4")),
+                });
+            }
+        }
+        let kind = match self.encoding.codec {
+            CodecSelection::Composite(id) => {
+                let has_audio = output
+                    .pieces
+                    .iter()
+                    .any(|piece| piece.source.metadata.has_audio);
+                AssemblyKind::Composite {
+                    hevc: id.metadata().encoder_id.is_hevc(),
+                    // Joinable pieces share one rotation for this encoder.
+                    display_rotation: (id.metadata().filter_stack_kind
+                        == CompositeFilterStackKind::QsvFullOverlay)
+                        .then(|| {
+                            output.pieces[0]
+                                .source
+                                .metadata
+                                .rotation_degrees
+                                .map(|degrees| degrees.rem_euclid(360))
+                        })
+                        .flatten()
+                        .filter(|degrees| *degrees != 0),
+                    transition_encoding: TransitionEncoding::for_codec(
+                        id,
+                        self.encoding.quality,
+                        output.container_fps,
+                    ),
+                    audio: has_audio.then(|| AssemblyAudio {
+                        pieces: output
+                            .pieces
+                            .iter()
+                            .map(|piece| AudioPiece {
+                                source: piece
+                                    .source
+                                    .metadata
+                                    .has_audio
+                                    .then(|| PathBuf::from(&piece.source.metadata.path)),
+                                trim_start: piece.window.file_start,
+                                duration: seconds(piece.frames),
+                            })
+                            .collect(),
+                        crossfades: output
+                            .transitions
+                            .iter()
+                            .map(|transition| {
+                                transition
+                                    .as_ref()
+                                    .map_or(0.0, |transition| seconds(transition.frames))
+                            })
+                            .collect(),
+                    }),
+                }
+            }
+            CodecSelection::Transparent(_) => AssemblyKind::Transparent,
+        };
+        OutputAssembly {
+            target: output.target.path().to_path_buf(),
+            parts_directory,
+            segments,
+            frames: u64::from(output.output_frames),
+            kind,
+        }
     }
 }
 
@@ -324,22 +817,44 @@ impl PlannedVideoRender {
             VideoRenderModePlan::Transparent(plan) => plan.output_frame_count,
         }
     }
+    /// Drops the source audio of a composite piece: a joined output encodes its
+    /// audio once from the sources.
+    pub(crate) fn without_audio(mut self) -> Self {
+        if let VideoRenderModePlan::Composite {
+            source_metadata: Some(metadata),
+            ..
+        } = &mut self.mode
+        {
+            metadata.has_audio = false;
+        }
+        self
+    }
     pub fn prepare_activity(&self, activity: &ParsedActivity) -> CoreResult<DenseActivityReport> {
         let coverage = match &self.mode {
             VideoRenderModePlan::Composite { render: plan, .. } => &plan.coverage,
             VideoRenderModePlan::Transparent(plan) => &plan.coverage,
         };
-        // A permitted disjoint window or absent embedded telemetry has no
-        // activity samples. Static rasters are rendered by the padding layer.
-        if coverage.frame_count == 0 && coverage.end <= coverage.start {
-            return Ok(DenseActivityReport::default());
-        }
         build_dense_activity_report_for_timeline(
             activity,
             &self.config,
             coverage.frame_timeline(self.sampling_fps, self.activity_offset),
         )
     }
+}
+
+/// Completes a single composite render on the worker, where its source is probed:
+/// checks the source against the scene and, as `frame_window` does for batch
+/// pieces, moves the trim onto the file's clock.
+pub(crate) fn resolve_single_composite_source(
+    paths: &AppPaths,
+    render: &mut CompositeRenderPlan,
+    scene_width: u32,
+    scene_height: u32,
+) -> CoreResult<CompositeSourceMetadata> {
+    let metadata =
+        verify_composite_source_resolution(paths, &render.video_path, scene_width, scene_height)?;
+    render.trim_start = metadata.file_seconds(render.trim_start);
+    Ok(CompositeSourceMetadata::from_source(&metadata))
 }
 
 /// Derives a single custom-range plan from validated submission inputs.
@@ -398,18 +913,25 @@ pub fn plan_single_render(
 }
 
 /// Consumes timing and activity bounds validated by acceptance/job preparation.
+///
+/// The piece renders as a video of its window's duration that starts at activity
+/// second `offset + window.trim_start` (`offset` is where source frame 0 sits).
+/// Without an activity (`activity_end` is None) no frame is covered and only
+/// rasters are kept.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn plan_batch_item(
     template: &ValidatedBatchTemplate,
     source: &InspectedVideoSource,
+    window: PieceWindow,
     offset: f64,
     skip_overlay: bool,
     activity_end: Option<f64>,
     disabled_laps: &[usize],
-    auto_sync: bool,
     output_frame_count: u32,
     container_fps: Fps,
 ) -> CoreResult<PlannedVideoRender> {
-    let duration = source.metadata.duration.expect("inspected source duration");
+    let duration = window.duration;
+    let piece_offset = offset + window.trim_start;
     let encoding = &template.encoding;
     let update_rate = encoding.update_rate;
     let sampling_fps = match encoding.codec {
@@ -418,16 +940,14 @@ pub(crate) fn plan_batch_item(
     };
     let layout_frame_count = sampling_fps.frame_count_for_duration(duration)?;
     let coverage = match activity_end {
-        Some(end) if auto_sync => {
-            ActivityCoverage::for_video(duration, offset, end, sampling_fps, layout_frame_count)?
-        }
-        end => ActivityCoverage::for_video_or_blank(
+        Some(activity_end) => ActivityCoverage::for_video(
             duration,
-            offset,
-            end.unwrap_or(0.0),
+            piece_offset,
+            activity_end,
             sampling_fps,
             layout_frame_count,
         )?,
+        None => ActivityCoverage::without_activity(duration, layout_frame_count),
     };
     let scene = ValidatedSceneConfig {
         presentation: template.config.scene.clone(),
@@ -439,12 +959,15 @@ pub(crate) fn plan_batch_item(
         } else {
             update_rate
         },
-        export_start_seconds: offset,
-        export_window: Some(ovrley_widgets::widgets::route::sampling::RouteWindow { start: coverage.start, end: coverage.end }),
+        export_start_seconds: piece_offset,
+        export_window: Some(ovrley_widgets::widgets::route::sampling::RouteWindow {
+            start: coverage.start,
+            end: coverage.end,
+        }),
         disabled_laps: disabled_laps.to_vec(),
     };
     let mut config = template.config.clone().with_scene(scene);
-    if skip_overlay || coverage.end <= coverage.start {
+    if skip_overlay || activity_end.is_none() {
         config.backdrops.clear();
         config.labels.clear();
         config.values.clear();
@@ -459,8 +982,8 @@ pub(crate) fn plan_batch_item(
             render: CompositeRenderPlan {
                 video_path: PathBuf::from(&source.metadata.path),
                 quality: encoding.quality,
-                sync_offset: offset,
-                trim_start: 0.0,
+                sync_offset: piece_offset,
+                trim_start: window.file_start,
                 render_duration: duration,
                 update_rate,
                 source_fps: container_fps,
@@ -490,7 +1013,7 @@ pub(crate) fn plan_batch_item(
         mode,
         map_source: template.map_source.clone(),
         sampling_fps,
-        activity_offset: offset,
+        activity_offset: piece_offset,
     })
 }
 
@@ -561,11 +1084,6 @@ pub fn derive_composite_render_plan(
     }
 
     let sync_offset = scene.export_start_seconds;
-    if sync_offset <= -video_duration {
-        return Err(CoreError::Config(format!(
-            "scene.composite_sync_offset ({sync_offset}) must leave a positive overlap with scene.composite_video_duration ({video_duration})"
-        )));
-    }
     let trim_start = raw.composite_video_trim_start.ok_or_else(|| {
         CoreError::Config("scene.composite_video_trim_start required for composite render".into())
     })?;
@@ -604,15 +1122,9 @@ pub fn derive_composite_render_plan(
                 "Composite activity end must be finite and zero or greater: {activity_end}"
             )));
         }
-        let video_end = sync_offset + render_duration;
-        if sync_offset >= activity_end || video_end <= 0.0 {
-            return Err(CoreError::Config(format!(
-                "Composite video range [{sync_offset}, {video_end}] does not overlap activity range [0, {activity_end}]"
-            )));
-        }
         let max_render_duration = activity_end - sync_offset;
         let overrun = render_duration - max_render_duration;
-        if sync_offset >= 0.0 {
+        if sync_offset >= 0.0 && max_render_duration > 0.0 {
             let ends_just_after_activity =
                 overrun > 0.0 && overrun <= COMPOSITE_ACTIVITY_DURATION_SLACK_SECONDS;
             if ends_just_after_activity {
@@ -621,9 +1133,14 @@ pub fn derive_composite_render_plan(
         }
         let overlap_start = sync_offset.max(0.0);
         let overlap_end = activity_end.min(sync_offset + render_duration);
-
-        scene.start = overlap_start;
-        scene.end = overlap_end;
+        // A video outside the activity samples none of it and renders rasters only.
+        if overlap_end > overlap_start {
+            scene.start = overlap_start;
+            scene.end = overlap_end;
+        } else {
+            scene.start = 0.0;
+            scene.end = activity_end;
+        }
     } else {
         scene.start = sync_offset.max(0.0);
         scene.end = scene.start + render_duration;

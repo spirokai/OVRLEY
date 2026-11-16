@@ -3,11 +3,11 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { useTranslation } from 'react-i18next'
 
-function ProjectCard({ kind, name, title, thumbnailDataUrl, disabled, onClick }) {
+function ProjectCard({ kind, name, thumbnailDataUrl, disabled, onClick }) {
   const isNewProject = kind === 'new'
 
   return (
-    <button type="button" className="group min-w-0 cursor-pointer text-center" disabled={disabled} onClick={onClick} title={title}>
+    <button type="button" className="group min-w-0 cursor-pointer text-center" disabled={disabled} onClick={onClick}>
       <span
         className={cn(
           'flex aspect-video w-full items-center justify-center overflow-hidden rounded-xs border border-foreground/80 bg-surface text-muted-foreground transition-colors group-hover:border-primary group-hover:bg-surface-elevated group-hover:text-primary group-focus-visible:border-primary group-focus-visible:outline-none group-disabled:opacity-50',
@@ -47,7 +47,6 @@ export default function StartupProjectsDialog({ open, projects, openingPath, onD
               key={project.path}
               kind="existing"
               name={project.name}
-              title={project.path}
               thumbnailDataUrl={project.thumbnailDataUrl}
               disabled={openingPath !== null}
               onClick={() => onOpenProject(project.path)}

@@ -60,6 +60,26 @@ describe('useEditorKeyboard', () => {
     })
   })
 
+  test('leaves Mod+C to the browser while text is selected, so an error message can be copied', () => {
+    const { clipboardRef } = renderEditorKeyboard()
+    const press = () => {
+      const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ctrlKey: true, key: 'c' })
+      act(() => {
+        window.dispatchEvent(event)
+      })
+      return event
+    }
+    const selection = vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'Encoding error' })
+    const before = clipboardRef.current
+    expect(press().defaultPrevented).toBe(false)
+    expect(clipboardRef.current).toBe(before)
+
+    selection.mockReturnValue({ toString: () => '' })
+    expect(press().defaultPrevented).toBe(true)
+    expect(clipboardRef.current.widgets).toHaveLength(1)
+    selection.mockRestore()
+  })
+
   test('keeps Mod+V as widget paste', () => {
     const { clipboardRef, config, onConfigChange } = renderEditorKeyboard()
     clipboardRef.current = {

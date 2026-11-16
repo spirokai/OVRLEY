@@ -289,39 +289,53 @@
           "bindings": [{ "key": "m", "modifiers": [] }]
         },
         {
-          "id": "export.setIn",
+          "id": "trim.start",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportSetIn",
+          "descriptionKey": "keyboard-shortcuts.trimBeforePlayhead",
           "bindings": [{ "key": "i", "modifiers": [] }]
         },
         {
-          "id": "export.setOut",
+          "id": "trim.end",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportSetOut",
+          "descriptionKey": "keyboard-shortcuts.trimAfterPlayhead",
           "bindings": [{ "key": "o", "modifiers": [] }]
         },
         {
-          "id": "export.clear",
+          "id": "activityTrim.reset",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportClear",
+          "descriptionKey": "keyboard-shortcuts.activityTrimReset",
           "bindings": [{ "key": "x", "modifiers": ["mod"] }]
         },
         {
-          "id": "export.goToIn",
+          "id": "activityTrim.goToStart",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportGoToIn",
+          "descriptionKey": "keyboard-shortcuts.activityTrimGoToStart",
           "bindings": [{ "key": "i", "modifiers": ["alt"] }]
         },
         {
-          "id": "export.goToOut",
+          "id": "activityTrim.goToEnd",
           "display": true,
           "scope": "player",
-          "descriptionKey": "keyboard-shortcuts.exportGoToOut",
+          "descriptionKey": "keyboard-shortcuts.activityTrimGoToEnd",
           "bindings": [{ "key": "o", "modifiers": ["alt"] }]
+        },
+        {
+          "id": "videoEdit.cut",
+          "display": true,
+          "scope": "player",
+          "descriptionKey": "keyboard-shortcuts.videoEditCut",
+          "bindings": [{ "key": "c", "modifiers": [] }]
+        },
+        {
+          "id": "videoEdit.toggleExcluded",
+          "display": true,
+          "scope": "player",
+          "descriptionKey": "keyboard-shortcuts.videoEditToggleExcluded",
+          "bindings": [{ "key": "x", "modifiers": [] }]
         }
       ]
     },
@@ -417,6 +431,45 @@
               "seconds": 1,
               "descriptionKey": "keyboard-shortcuts.timelineClipNudgeSecond"
             }
+          ]
+        },
+        {
+          "id": "timelineClip.remove",
+          "display": true,
+          "scope": "timeline-clip",
+          "descriptionKey": "keyboard-shortcuts.timelineClipRemove",
+          "bindings": [
+            { "key": "delete", "modifiers": [] },
+            { "key": "backspace", "modifiers": [] }
+          ]
+        },
+        {
+          "id": "videoCard.remove",
+          "display": false,
+          "scope": "video-card",
+          "descriptionKey": "keyboard-shortcuts.timelineClipRemove",
+          "bindings": [
+            { "key": "delete", "modifiers": [] },
+            { "key": "backspace", "modifiers": [] }
+          ]
+        }
+      ]
+    },
+    {
+      "nameKey": "keyboard-shortcuts.timeFields",
+      "commands": [
+        {
+          "id": "secondsInput.step",
+          "display": true,
+          "scope": "seconds-input",
+          "descriptionKey": "keyboard-shortcuts.secondsInputStep",
+          "bindings": [
+            { "key": "arrowup", "modifiers": [], "seconds": 1, "descriptionKey": "keyboard-shortcuts.secondsInputStepSecond" },
+            { "key": "arrowdown", "modifiers": [], "seconds": -1, "descriptionKey": "keyboard-shortcuts.secondsInputStepSecond" },
+            { "key": "arrowup", "modifiers": ["shift"], "seconds": 10, "descriptionKey": "keyboard-shortcuts.secondsInputStepTenSeconds" },
+            { "key": "arrowdown", "modifiers": ["shift"], "seconds": -10, "descriptionKey": "keyboard-shortcuts.secondsInputStepTenSeconds" },
+            { "key": "arrowup", "modifiers": ["alt"], "frames": 1, "descriptionKey": "keyboard-shortcuts.secondsInputStepFrame" },
+            { "key": "arrowdown", "modifiers": ["alt"], "frames": -1, "descriptionKey": "keyboard-shortcuts.secondsInputStepFrame" }
           ]
         }
       ]

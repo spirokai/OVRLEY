@@ -1,22 +1,13 @@
 import { memo } from 'react'
-import { CalendarDays, Clock, Loader2, Trash2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { CalendarDays, Clock, Loader2 } from 'lucide-react'
 import { Progress } from '@/components/ui/progress'
-import { Switch } from '@/components/ui/switch'
 import { formatFps, formatTime } from '../utils/codecUtils'
 import { formatProgressPercent } from '../utils/renderPresentation'
 import { useTranslation } from 'react-i18next'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
-/** @param {object} props Queue item, active progress, display mode, and queue actions. @returns {JSX.Element} One presentational queue row. */
-function BatchRenderQueueRow({
-  item,
-  isActive,
-  batchRunning,
-  showBatchProgress,
-  currentItemProgress,
-  setBatchItemSkipOverlay,
-  removeBatchQueueItem,
-}) {
+/** @param {object} props Queue item, active progress, and display mode. @returns {JSX.Element} One presentational queue row. */
+function BatchRenderQueueRow({ item, isActive, batchRunning, showBatchProgress, currentItemProgress }) {
   const { t } = useTranslation()
   const isBlocked = item.status === 'blocked'
   const isDone = item.status === 'succeeded'
@@ -27,13 +18,13 @@ function BatchRenderQueueRow({
   return (
     <div
       key={item.id}
-      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_4.5rem_1.75rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
+      className={`grid ${showBatchProgress ? 'grid-cols-1' : 'grid-cols-[minmax(0,1fr)_4.5rem]'} items-center gap-3 rounded-sm px-2 py-2 ${isBlocked ? (showBatchProgress ? 'opacity-50' : '[&>*:not(:last-child)]:opacity-50') : 'hover:bg-surface-elevated'}`}
     >
       <div className="min-w-0">
         <div className="flex items-center justify-between gap-3">
-          <p className="min-w-0 truncate text-xs font-medium text-foreground" title={item.outputPath ?? item.path}>
-            {item.filename}
-          </p>
+          <SimpleTooltip content={item.outputPath ?? item.path} className="min-w-0" wrapText>
+            <p className="min-w-0 truncate text-xs font-medium text-foreground">{item.filename}</p>
+          </SimpleTooltip>
           {hasProgress ? (
             <span
               className={`shrink-0 text-right text-[0.7rem] font-semibold tabular-nums ${isDone ? 'text-green-700' : 'text-muted-foreground/60'}`}
@@ -71,11 +62,17 @@ function BatchRenderQueueRow({
           </p>
         ) : null}
         {isBlocked ? (
-          <p className="mt-0.5 truncate text-[0.7rem] font-normal leading-tight text-muted-foreground/60" title={item.error}>
-            {item.error === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : item.error}
+          <SimpleTooltip content={item.error} className="mt-0.5 flex min-w-0" wrapText>
+            <p className="min-w-0 truncate text-[0.7rem] font-normal leading-tight text-muted-foreground/60">
+              {item.error === 'reinspectionRequired' ? t('render-video.reinspectionRequired') : item.error}
+            </p>
+          </SimpleTooltip>
+        ) : null}
+        {item.status === 'failed' && item.error ? (
+          <p className="mt-0.5 max-h-48 overflow-y-auto wrap-anywhere whitespace-pre-wrap text-[0.7rem] normal-case text-red-700 select-text">
+            {item.error}
           </p>
         ) : null}
-        {item.status === 'failed' && item.error ? <p className="truncate text-[0.7rem] text-red-700">{item.error}</p> : null}
         {item.status === 'preparing' ? <p className="text-[0.7rem] text-muted-foreground/60">{t('render-video.preparingBatch')}</p> : null}
         {item.status === 'cancelled' || item.status === 'unstarted' ? (
           <p className="text-[0.7rem] text-muted-foreground/60">{t(`render-video.${item.status}`)}</p>
@@ -107,25 +104,7 @@ function BatchRenderQueueRow({
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
               </span>
             )}
-            {item.status === 'pending' && (
-              <Switch
-                aria-label={`${t('render-video.activityOverlay', 'Activity overlay')}: ${item.filename}`}
-                checked={!item.skipOverlay}
-                onCheckedChange={(checked) => setBatchItemSkipOverlay(item.id, !checked)}
-                disabled={batchRunning || item.hasPositiveOverlap === false}
-              />
-            )}
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground enabled:hover:text-primary disabled:hover:bg-transparent"
-            onClick={() => removeBatchQueueItem(item.id)}
-            disabled={batchRunning}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
         </>
       )}
     </div>

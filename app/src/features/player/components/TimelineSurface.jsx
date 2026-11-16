@@ -1,6 +1,3 @@
-import { memo } from 'react'
-import { GripVertical } from 'lucide-react'
-import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 import VideoSyncTimelineGraph from '@/features/video-sync/components/VideoSyncTimelineGraph'
 import VideoSyncTimelineLandmarks from '@/features/video-sync/components/VideoSyncTimelineLandmarks'
 import TimelineLane from './TimelineLane'
@@ -10,39 +7,7 @@ import { PLAYHEAD_HEAD_HEIGHT, PLAYHEAD_HEAD_SHOULDER, PLAYHEAD_HIT_PADDING, PLA
 const PLAYHEAD_HEAD_POINTS = `0,0 ${PLAYHEAD_WIDTH},0 ${PLAYHEAD_WIDTH},${PLAYHEAD_HEAD_SHOULDER} ${PLAYHEAD_WIDTH / 2},${PLAYHEAD_HEAD_HEIGHT} 0,${PLAYHEAD_HEAD_SHOULDER}`
 
 /**
- * Export range marker handle and guide line; memoized so playhead frames skip its tooltip tree.
- *
- * @param {{ marker: object }} props Export marker view model.
- */
-const TimelineExportMarker = memo(function TimelineExportMarker({ marker }) {
-  return (
-    <div>
-      <div className="pointer-events-none absolute bottom-0 top-4 w-px -translate-x-1/2 bg-success" style={marker.lineStyle} />
-      <div className="pointer-events-auto absolute -top-1 z-20 -translate-x-1/2" style={marker.style}>
-        <SimpleTooltip side="top" content={marker.label}>
-          <button
-            type="button"
-            aria-label={marker.label}
-            className="relative flex h-6 w-5 cursor-ew-resize items-start justify-center bg-transparent p-0 text-success outline-none focus-visible:ring-2 focus-visible:ring-success/50 active:cursor-ew-resize"
-            {...marker.markerProps}
-          >
-            <svg width="14" height="20" viewBox="0 0 14 20" className="mt-1 fill-current" aria-hidden="true">
-              <rect x="2.5" y="2" width="9" height="16" rx="1.5" />
-            </svg>
-            <GripVertical
-              aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-4 h-3 w-3 -translate-x-1/2 -translate-y-1/2 text-background/80"
-              strokeWidth={2.5}
-            />
-          </button>
-        </SimpleTooltip>
-      </div>
-    </div>
-  )
-})
-
-/**
- * Presentational timeline surface containing the axis, lanes, playhead, and export markers.
+ * Presentational timeline surface containing the axis, lanes, and playhead.
  *
  * @param {{ timeline: object }} props Timeline view model.
  */
@@ -77,7 +42,7 @@ export default function TimelineSurface({ timeline }) {
 
       <div
         aria-label={t('player.timelineLaneBackground', 'Timeline lane background')}
-        className="relative w-full cursor-e-resize select-none bg-foreground/10 active:cursor-e-resize border border-border/40 space-y-0.5 py-1"
+        className="relative w-full cursor-e-resize select-none bg-foreground/3 active:cursor-e-resize border border-border/40 space-y-0.5 py-1"
         role="group"
         {...timeline.panSurfaceProps}
       >
@@ -115,10 +80,6 @@ export default function TimelineSurface({ timeline }) {
             {...timeline.playhead.handleProps}
           />
         </svg>
-
-        {timeline.exportMarkers.map((marker) => (
-          <TimelineExportMarker key={marker.marker} marker={marker} />
-        ))}
       </div>
     </div>
   )

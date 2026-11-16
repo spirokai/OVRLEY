@@ -63,14 +63,6 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(useStore.getState().renderSettings.widgetUpdateRate).toBe(5)
   })
 
-  test('setExportRange is pure — merges into exportRange', () => {
-    useStore.getState().setRenderRange({ from: 5.25, to: 60.75 })
-
-    expect(useStore.getState().renderSettings.range.type).toBe('all')
-    expect(useStore.getState().renderSettings.range.from).toBe(5.25)
-    expect(useStore.getState().renderSettings.range.to).toBe(60.75)
-  })
-
   test('setExportCodec is pure — updates exportCodec and normalizes', () => {
     useStore.getState().setRenderSettings({
       ...useStore.getState().renderSettings,
@@ -182,8 +174,6 @@ describe('createTemplateSlice — pure state actions', () => {
     expect(state.config.scene).not.toHaveProperty('font_size')
     expect(effectiveConfig.scene.font_text).toBe(DEFAULT_GLOBAL_DEFAULTS.font_text)
     expect(effectiveConfig.scene.color_text).toBe('#abcdef')
-    expect(state.startSecond).toBe(0)
-    expect(state.endSecond).toBe(73)
     expect(state.loadedTemplateSource).toEqual({ kind: 'file', path: 'C:\\templates\\imported.json' })
     expect(state.config).toBe(templateState.config)
     expect(fetchSpy).not.toHaveBeenCalled()

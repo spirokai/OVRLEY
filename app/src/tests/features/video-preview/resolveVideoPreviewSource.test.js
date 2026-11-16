@@ -2,13 +2,13 @@
  * Regression tests for preview-source resolution helpers.
  *
  * The preview hook should resolve one clear source of truth for the `<video>`
- * element and keep out-of-range detection independent from the DOM effect.
+ * element.
  */
 
 import { describe, expect, test, vi } from 'vite-plus/test'
-import { isVideoPreviewOutOfRange, resolveVideoPreviewSource } from '@/features/video-preview/utils/videoPreviewSource'
+import { resolveVideoPreviewSource } from '@/features/video-preview/utils/videoPreviewSource'
 
-describe('videoPreviewSource helpers', () => {
+describe('resolveVideoPreviewSource', () => {
   test('prefers the imported preview URL when local HTTP preview mode is enabled', () => {
     const convertFileSrc = vi.fn((path) => `converted:${path}`)
 
@@ -69,31 +69,5 @@ describe('videoPreviewSource helpers', () => {
     ).toBe('converted:C:\\clips\\ride.mp4')
 
     expect(convertFileSrc).toHaveBeenCalledWith('C:\\clips\\ride.mp4')
-  })
-
-  test('flags preview playback outside the imported video window', () => {
-    expect(
-      isVideoPreviewOutOfRange({
-        selectedSecond: 4.99,
-        videoDuration: 6,
-        videoSyncOffsetSeconds: 5,
-      }),
-    ).toBe(true)
-
-    expect(
-      isVideoPreviewOutOfRange({
-        selectedSecond: 11,
-        videoDuration: 6,
-        videoSyncOffsetSeconds: 5,
-      }),
-    ).toBe(true)
-
-    expect(
-      isVideoPreviewOutOfRange({
-        selectedSecond: 11.01,
-        videoDuration: 6,
-        videoSyncOffsetSeconds: 5,
-      }),
-    ).toBe(true)
   })
 })

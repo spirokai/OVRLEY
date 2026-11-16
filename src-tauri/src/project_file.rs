@@ -1,7 +1,7 @@
 //! Tauri command wrappers for `ovrley_services::project_file`.
 
 use crate::runtime_paths;
-use ovrley_services::project_file::{self, ProjectFileSummary, ReadProjectResult};
+use ovrley_services::project_file::{self, ProjectFileSummary, ReadProjectResult, WriteProjectResult};
 use ovrley_services::raster_resources::RasterResources;
 use std::collections::HashMap;
 
@@ -27,7 +27,7 @@ pub(crate) async fn write_project_file(
     path: String,
     project_json: String,
     raster_resource_ids: HashMap<String, String>,
-) -> Result<String, String> {
+) -> Result<WriteProjectResult, String> {
     let images = resources
         .owned_assets(raster_resource_ids)
         .map_err(|error| format!("[project_error:raster_unavailable] {error}"))?;

@@ -1,6 +1,7 @@
 import { CornerUpLeft, CornerUpRight, MapPin, OctagonMinus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { SimpleTooltip } from '@/components/ui/simple-tooltip'
 
 /**
  * Renders the four typed manual landmark controls over the video preview.
@@ -74,18 +75,19 @@ export function VideoSyncMarkControls({
     >
       {controls.map(({ Icon, colorClassName, disabled, disabledReason, label, onClick }) => (
         <div key={label} className="flex min-w-0 rounded-sm bg-surface shadow-md">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={`h-auto min-h-7 w-full uppercase justify-center border bg-surface px-2 py-1 text-[0.75rem] font-semibold ${colorClassName}`}
-            disabled={disabled}
-            title={disabledReason ?? label}
-            aria-label={label}
-            onClick={onClick}
-          >
-            <Icon className="size-3.5 shrink-0" />
-            <span className="min-w-0 whitespace-normal break-words">{label}</span>
-          </Button>
+          <SimpleTooltip content={disabledReason ?? label} className="w-full" contentClassName="w-max max-w-64 whitespace-normal">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`h-auto min-h-7 w-full uppercase justify-center border bg-surface px-2 py-1 text-[0.75rem] font-semibold ${colorClassName}`}
+              disabled={disabled}
+              aria-label={label}
+              onClick={onClick}
+            >
+              <Icon className="size-3.5 shrink-0" />
+              <span className="min-w-0 whitespace-normal break-words">{label}</span>
+            </Button>
+          </SimpleTooltip>
         </div>
       ))}
     </div>

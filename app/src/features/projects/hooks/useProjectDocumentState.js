@@ -14,18 +14,18 @@ export default function useProjectDocumentState() {
   const projectOwnedState = useStore(
     useShallow((state) => ({
       activitySource: state.activitySource,
-      batchVideoFolder: state.batchVideoFolder,
+      activityTrim: state.activityTrim,
       batchOutputFolder: state.batchOutputFolder,
       config: state.config,
       disabledLaps: state.disabledLaps,
       globalDefaults: state.globalDefaults,
-      importedVideoPath: state.importedVideoPath,
+      importedVideos: state.importedVideos,
       importingVideo: state.importingVideo,
       isProcessing: state.isProcessing,
       renderSettings: state.renderSettings,
       rendererBusy: isRendererBusy(state),
-      videoSyncOffsetSeconds: state.videoSyncOffsetSeconds,
-      videoSyncTimezoneMode: state.videoSyncTimezoneMode,
+      transitionDefaults: state.transitionDefaults,
+      videoEdits: state.videoEdits,
       manualVideoSync: state.manualVideoSync,
     })),
   )

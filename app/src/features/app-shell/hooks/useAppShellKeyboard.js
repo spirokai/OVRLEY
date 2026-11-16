@@ -20,7 +20,7 @@ export default function useAppShellKeyboard({
   layout,
 }) {
   const { handleActivityFileOpen } = activityImport
-  const { activitySummary, computeVideoSync, config, importedVideoPath } = appShell
+  const { activitySummary, computeVideoSync, config, hasVideos } = appShell
   const { leftDrawerPinned, leftDrawerVisible, selectLeftDrawerTool } = layout
   const { backendStatus } = backendState
   const { handleNewProject, handleOpenProject, handleSaveProject, handleSaveProjectAs } = projectLifecycle
@@ -85,9 +85,9 @@ export default function useAppShellKeyboard({
         handleOpenOutputDirectory()
         return
       case 'sync.auto':
-        if (!importedVideoPath || !activitySummary) return
+        if (!hasVideos || !activitySummary) return
         event.preventDefault()
-        computeVideoSync(activitySummary)
+        computeVideoSync()
         return
       case 'render.open':
         if (renderDisabled) return

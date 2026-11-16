@@ -15,7 +15,9 @@ pub enum Scope {
     Editor,
     History,
     Player,
+    SecondsInput,
     TimelineClip,
+    VideoCard,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
@@ -51,9 +53,12 @@ pub struct Binding {
     /// Editor nudge distance in pixels.
     #[serde(default)]
     pub step: Option<f64>,
-    /// Timeline clip nudge in seconds.
+    /// Timeline clip nudge, or seconds-input step, in seconds.
     #[serde(default)]
     pub seconds: Option<f64>,
+    /// Seconds-input step in frames of the video.
+    #[serde(default)]
+    pub frames: Option<i32>,
 }
 
 impl Binding {

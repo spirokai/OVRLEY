@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useMemo } from 'react'
+import { deriveCompatibility, getVideosTimelineBounds, joinVideoEdits } from '@/lib/video-program/video-collection'
 import { OUTPUT_FORMATS_BY_VALUE } from '../data/renderConstants'
 import {
   getAccelerationValueForSettings,
@@ -19,27 +20,10 @@ import {
 } from '../utils/codecUtils'
 import { getContainerFps, getUpdateRateOptions } from '@/lib/update-rate'
 import { getDefaultBitrate } from '../data/bitrateDefaults'
-import { useRenderDialogInputs, useRenderRangeActivity } from '@/hooks/useAppStoreSelectors'
-import { formatExportRangeTime } from '@/lib/time-format'
-import { getCustomExportRangeDefault, setExportRangeBoundaryFromTimeInput, resolveActivityDuration } from '@/lib/export-range'
-import { createBatchItemProgress, createBatchProgress, isBatchFinished, sanitizeRangeTimeInput } from '../utils/renderPresentation'
-
-/** @param {object} options Editable range and commit callback. @returns {object} Shared range control presentation and input handlers. */
-export function useExportRangeSettings({ range, onExportRangeChange }) {
-  const activity = useRenderRangeActivity()
-  return {
-    isCustom: range.type === 'custom',
-    fromTime: formatExportRangeTime(range.from),
-    toTime: formatExportRangeTime(range.to),
-    handleCustomChange: (checked) =>
-      onExportRangeChange(checked ? getCustomExportRangeDefault(range, resolveActivityDuration(activity)) : { ...range, type: 'all' }),
-    handleFromChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'from', sanitizeRangeTimeInput(event.target.value))),
-    handleToChange: (event) => onExportRangeChange(setExportRangeBoundaryFromTimeInput(range, 'to', sanitizeRangeTimeInput(event.target.value))),
-    preventDecimalInput: (event) => {
-      if (event.key === '.' || event.key === ',') event.preventDefault()
-    },
-  }
-}
+import { useRenderDialogInputs } from '@/hooks/useAppStoreSelectors'
+import { getActivityDurationSeconds } from '@/lib/activity/activity-summary'
+import { resolveActivityWindow } from '@/lib/activity/activity-trim'
+import { createBatchItemProgress, createBatchProgress, isBatchFinished } from '../utils/renderPresentation'
 
 export default function useRenderVideoDerivedState({ settings }) {
   const {
@@ -48,23 +32,34 @@ export default function useRenderVideoDerivedState({ settings }) {
     platformOs,
     availableCodecs,
     config,
-    importedVideoPath,
-    importedVideoDuration,
-    importedVideoFps,
-    importedVideoResolution,
-    videoSyncOffsetSeconds,
+    importedVideos,
+    videoEdits,
     renderProgress,
     batchSnapshot,
     renderSettings,
     renderSubmissionTarget,
     isCancelling,
+    parsedActivity,
+    activityTrim,
   } = useRenderDialogInputs()
   // A closed dialog has no draft; its hidden controls read committed settings.
   const displaySettings = settings === null ? renderSettings : settings
-  const hasImportedVideo = importedVideoPath !== null
-  const isBatchTarget = displaySettings.renderTarget === 'batch'
-  // Native jobs own their FPS; the current source only drives single rendering.
-  const lockedVideoFps = isBatchTarget || !hasImportedVideo ? null : importedVideoFps
+  const hasImportedVideo = importedVideos.length > 0
+  // Output modes and the video queue only matter when there is more than one video.
+  const hasMultipleVideos = importedVideos.length > 1
+  const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
+  const videoBounds = useMemo(() => getVideosTimelineBounds(joinVideoEdits(importedVideos, videoEdits)), [importedVideos, videoEdits])
+  // The trim decides the overlay only without videos; the full activity switch ignores it.
+  const activityDurationSeconds = getActivityDurationSeconds(parsedActivity)
+  const trimmedActivityWindow = useMemo(
+    () => resolveActivityWindow(activityDurationSeconds, hasImportedVideo ? null : activityTrim),
+    [activityDurationSeconds, activityTrim, hasImportedVideo],
+  )
+  const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
+  const importedVideoResolution = videoFormat?.resolution ?? null
+  const isSeparate = displaySettings.outputMode === 'separate'
+  // Separate files keep each video's FPS; a combined file has the videos' shared FPS.
+  const lockedVideoFps = isSeparate || !hasImportedVideo ? null : importedVideoFps
   const exportMode = displaySettings.exportMode
   const updateRateFps = useMemo(
     () => (exportMode === 'composite' && lockedVideoFps !== null ? Math.round(lockedVideoFps) : displaySettings.fps),
@@ -84,7 +79,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   )
   const selectedCodecIsMp4 = isMp4Codec(displaySettings.codec)
   const selectedExportCodecAvailable = selectedAccelerationOptions.some((option) => option.value === selectedAccelerationValue && option.available)
-  // The current video probes the batch folder too: its videos likely share its resolution.
+  // Every output renders at the scene size, separate files included, so the videos' resolution must match it.
   const resolutionMismatch = hasImportedVideo && resolutionsMismatch(config?.scene, importedVideoResolution)
   const renderStartDisabled =
     rendererBusy ||
@@ -104,6 +99,7 @@ export default function useRenderVideoDerivedState({ settings }) {
   )
 
   return {
+    activityDurationSeconds,
     availableCodecs,
     batchSnapshot,
     batchFinished: isBatchFinished(batchSnapshot),
@@ -115,17 +111,17 @@ export default function useRenderVideoDerivedState({ settings }) {
     defaultBitrateForCodec,
     exportMode,
     hasImportedVideo,
-    importedVideoDuration,
+    hasMultipleVideos,
     importedVideoFps,
     importedVideoResolution,
-    isBatchTarget,
+    isSeparate,
     isCancelling,
     lockedVideoFps,
     platformOs,
     renderProgress,
     renderStartDisabled,
     renderingVideo,
-    submissionPending: renderSubmissionTarget === 'current',
+    submissionPending: renderSubmissionTarget === 'single',
     resolutionMismatch,
     selectedAccelerationOptions,
     selectedAccelerationValue,
@@ -133,7 +129,8 @@ export default function useRenderVideoDerivedState({ settings }) {
     selectedExportCodecAvailable,
     selectedOutputFormatValue,
     updateRateFps,
+    trimmedActivityWindow,
     updateRateOptions,
-    videoSyncOffsetSeconds,
+    videoBounds,
   }
 }

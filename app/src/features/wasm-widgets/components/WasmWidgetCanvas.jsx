@@ -3,8 +3,8 @@ import { useWasmCanvas } from '../hooks/useWasmCanvas'
 /** Stacking matches export: backdrops, maps, rasters, profiles, then everything else. */
 const WIDGET_LAYERS = { backdrop: 'z-1', map: 'z-2', raster: 'z-3', course: 'z-4', elevation: 'z-4', diving_profile: 'z-4' }
 
-/** @param {object} props Standalone widget canvas registration, and whether drag pans a map's view. @returns {JSX.Element} Rust-positioned canvas. */
-export function WasmWidgetCanvas({ widget, attach, attachMapLayer, registerNode, isMapView, handleWidgetMouseDown }) {
+/** @param {object} props Standalone widget canvas registration, whether drag pans a map's view; hidden canvases stay editable. @returns {JSX.Element} Rust-positioned canvas. */
+export function WasmWidgetCanvas({ widget, attach, attachMapLayer, registerNode, isMapView, handleWidgetMouseDown, isHidden }) {
   const separateRaster = ['course', 'elevation', 'diving_profile', 'raster'].includes(widget.type)
   const { wrapperRef, canvasRef, mapLayerRef } = useWasmCanvas({ id: widget.id, attach, attachMapLayer, registerNode, separateRaster })
   const layer = WIDGET_LAYERS[widget.type] ?? 'z-10'
@@ -15,7 +15,7 @@ export function WasmWidgetCanvas({ widget, attach, attachMapLayer, registerNode,
       ref={canvasRef}
       data-wasm-widget-id={widget.id}
       aria-label={`${widget.type} preview`}
-      className={`pointer-events-none absolute ${separateRaster ? layer : ''}`}
+      className={`pointer-events-none absolute ${separateRaster ? layer : ''} ${isHidden ? 'invisible' : ''}`}
     />
   )
   return (
@@ -27,7 +27,7 @@ export function WasmWidgetCanvas({ widget, attach, attachMapLayer, registerNode,
         style={{ visibility: 'hidden' }}
         onMouseDown={(event) => handleWidgetMouseDown(event, widget.id)}
       >
-        {widget.type === 'map' ? <div ref={mapLayerRef} className="pointer-events-none absolute inset-0" /> : null}
+        {widget.type === 'map' ? <div ref={mapLayerRef} className={`pointer-events-none absolute inset-0 ${isHidden ? 'invisible' : ''}`} /> : null}
         {separateRaster ? null : canvas}
       </div>
       {separateRaster ? canvas : null}

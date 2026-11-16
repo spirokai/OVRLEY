@@ -28,6 +28,7 @@ import { buildConfigWidgets } from '@/lib/widget/widget-presentation'
 import { getWidgetInteraction } from '@/features/wasm-widgets/utils/widgetInteraction'
 import { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 import { scaleWidgetPositions } from '@/lib/widget/widget-config'
+import { deriveCompatibility } from '@/lib/video-program/video-collection'
 
 function getResolutionPresetId(scene) {
   if (!scene) return '1080p'
@@ -65,34 +66,31 @@ function getDefaultResolutionPreset(aspectRatio) {
 
 export default function useSceneSettingsState({ config, onConfigChange, widgetLiveEdits }) {
   const {
-    activitySummary,
     aspectRatio,
     globalDefaults: committedGlobalDefaults,
-    importedVideoFps,
-    importedVideoResolution,
+    importedVideos,
     setAspectRatioPreset,
     setCustomAspectRatio,
     renderSettings,
-    setRenderRange,
     setGlobalDefault,
     setRenderFpsAndUpdateRate,
     setRenderWidgetUpdateRate,
   } = useStore(
     useShallow((state) => ({
-      activitySummary: state.activitySummary,
       aspectRatio: state.aspectRatio,
       globalDefaults: state.globalDefaults,
-      importedVideoFps: state.importedVideoFps,
-      importedVideoResolution: state.importedVideoResolution,
+      importedVideos: state.importedVideos,
       setAspectRatioPreset: state.setAspectRatioPreset,
       setCustomAspectRatio: state.setCustomAspectRatio,
       renderSettings: state.renderSettings,
-      setRenderRange: state.setRenderRange,
       setGlobalDefault: state.setGlobalDefault,
       setRenderFpsAndUpdateRate: state.setRenderFpsAndUpdateRate,
       setRenderWidgetUpdateRate: state.setRenderWidgetUpdateRate,
     })),
   )
+  const videoFormat = useMemo(() => deriveCompatibility(importedVideos).reference, [importedVideos])
+  const importedVideoFps = videoFormat === null ? null : videoFormat.fps.num / videoFormat.fps.den
+  const importedVideoResolution = videoFormat?.resolution ?? null
 
   const { liveGlobalDefaults } = useWidgetDraftView(widgetLiveEdits)
   const globalDefaults = useMemo(() => ({ ...committedGlobalDefaults, ...liveGlobalDefaults }), [committedGlobalDefaults, liveGlobalDefaults])
@@ -202,9 +200,7 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
 
   return {
     overlaySettings: {
-      activitySummary,
       aspectRatio,
-      exportRange: renderSettings.range,
       fpsMode,
       importedVideoFps,
       importedVideoResolution,
@@ -224,7 +220,6 @@ export default function useSceneSettingsState({ config, onConfigChange, widgetLi
       availableFonts,
     },
     handlers,
-    setExportRange: setRenderRange,
     setUpdateRate: setRenderWidgetUpdateRate,
   }
 }

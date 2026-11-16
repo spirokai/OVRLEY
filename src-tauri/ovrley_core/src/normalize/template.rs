@@ -34,8 +34,6 @@ pub struct TemplateManifest {
     pub scene: Map<String, Value>,
     pub file_format: String,
     pub file_version: u32,
-    /// `DEFAULT_EXPORT_RANGE`.
-    pub export_range: Value,
     pub scene_presentation_keys: Vec<String>,
     pub render_time_only_keys: Vec<String>,
 }
