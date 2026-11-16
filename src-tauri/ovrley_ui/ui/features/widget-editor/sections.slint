@@ -127,12 +127,15 @@ component UnitsControlRow inherits VerticalLayout {
     SectionHeading {
         icon: Icons.ruler;
         title: root.text.units-supports-selection ? @tr("widget-editor.units" => "Units") : @tr("widget-editor.unit" => "Unit");
-        if root.text.units-show-toggle: Switch {
-            y: (parent.height - self.height) / 2 + 0.125rem;
-            checked: root.text.units-checked;
-            accessible-label: root.text.units-supports-selection ? @tr("widget-editor.units" => "Units") : @tr("widget-editor.unit" => "Unit");
-            checked-changed(checked) => {
-                root.set-flag("show_units", checked);
+        // Centred on the heading's line (`items-center`).
+        if root.text.units-show-toggle: VerticalLayout {
+            alignment: center;
+            Switch {
+                checked: root.text.units-checked;
+                accessible-label: root.text.units-supports-selection ? @tr("widget-editor.units" => "Units") : @tr("widget-editor.unit" => "Unit");
+                checked-changed(checked) => {
+                    root.set-flag("show_units", checked);
+                }
             }
         }
     }
@@ -173,12 +176,15 @@ component IconSection inherits VerticalLayout {
     SectionHeading {
         icon: Icons.palette;
         title: @tr("widget-editor.icon" => "Icon");
-        Switch {
-            y: (parent.height - self.height) / 2 + 0.125rem;
-            checked: root.text.show-icon;
-            accessible-label: @tr("widget-editor.icon" => "Icon");
-            checked-changed(checked) => {
-                root.set-flag("show_icon", checked);
+        // Centred on the heading's line (`items-center`).
+        VerticalLayout {
+            alignment: center;
+            Switch {
+                checked: root.text.show-icon;
+                accessible-label: @tr("widget-editor.icon" => "Icon");
+                checked-changed(checked) => {
+                    root.set-flag("show_icon", checked);
+                }
             }
         }
     }

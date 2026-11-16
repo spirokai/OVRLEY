@@ -6,7 +6,8 @@ import { Shadow, ShadowSize } from "shadow.slint";
 // A 0.375rem `primary`-at-20% track with a `primary` range; a 1rem round thumb with a `primary`
 // border, `highlight-foreground` fill, `shadow-sm`, and a 4px ring (`ring` at 50%) on hover and
 // focus. Vertical sliders (video sync) are at least 11rem tall. The slot draws inside the track
-// (`trackChildren`).
+// (`trackChildren`). As with Radix, whose thumb is positioned absolutely, a horizontal slider is
+// only as tall as its track: the thumb, and the area that takes presses, extend past it.
 //
 // Radix behaviour: pressing the track jumps there and starts a drag; values snap to the step;
 // arrows move one step, Shift+arrow, PageUp and PageDown ten, Home and End go to the ends.
@@ -57,7 +58,7 @@ export component Slider {
     }
 
     min-width: root.horizontal ? 0px : root.thumb-size;
-    min-height: root.horizontal ? root.thumb-size : 11rem;
+    min-height: root.horizontal ? root.track-thickness : 11rem;
     horizontal-stretch: root.horizontal ? 1 : 0;
     vertical-stretch: root.horizontal ? 0 : 1;
     opacity: root.disabled ? 0.5 : 1;
@@ -96,6 +97,8 @@ export component Slider {
     }
 
     touch := TouchArea {
+        y: root.horizontal ? min(0px, (root.height - root.thumb-size) / 2) : 0px;
+        height: root.horizontal ? max(root.height, root.thumb-size) : root.height;
         enabled: !root.disabled;
         pointer-event(event) => {
             if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {

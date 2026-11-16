@@ -157,7 +157,12 @@ export component SliderField inherits VerticalLayout {
     callback value-changed(value: float);
     callback value-committed(value: float);
 
-    spacing: 0.75rem;
+    // The track's centre lines up with a neighbouring field's control: label row 0.9375rem, gap
+    // 0.5rem, then the track in 0.5rem padding, as `FieldBlock`'s 0.75rem label, 0.25rem gap and
+    // 2.25rem control centre at 2.125rem. Packed to the top, so a taller neighbour in the row does
+    // not stretch the gap.
+    spacing: 0.5rem;
+    alignment: start;
     HorizontalLayout {
         height: 0.9375rem;
         spacing: 0.75rem;

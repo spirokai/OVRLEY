@@ -77,8 +77,19 @@ fn tour() -> Vec<Step> {
     tour.push((
         "widgets-tab-open",
         StepKind::Action(|store, _| {
-            let value = store.editor.config.values.iter().find(|data| data["value"] == "speed").map(|data| data["id"].as_str().unwrap_or_default().to_string());
-            store.editor.set_selected_widget_id(value.as_deref());
+            // A fixed document, so the capture does not depend on the template the shared
+            // preferences restore.
+            use ovrley_widgets::model::document::{create_widget_defaults, OverlayConfig, WidgetSelection};
+            let mut values = Vec::new();
+            for (id, kind) in [("speed", "speed"), ("distance", "distance")] {
+                let selection = WidgetSelection { kind: kind.into(), ..WidgetSelection::default() };
+                let mut data = create_widget_defaults(&selection, &store.template.global_defaults, &Default::default()).expect("catalog defaults");
+                data.insert("id".into(), id.into());
+                values.push(serde_json::Value::Object(data));
+            }
+            let config = OverlayConfig::from_value(&serde_json::json!({"scene": store.editor.config.scene, "values": values})).expect("a valid document");
+            store.editor.set_config(config);
+            store.editor.set_selected_widget_id(Some("speed"));
         }),
     ));
     tour.push((
