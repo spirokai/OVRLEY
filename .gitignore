@@ -69,3 +69,5 @@ tmp/
 INSTALL-macos.txt
 INSTALL-linux.txt
 INSTALL-debian.txt
+
+CLAUDE.md

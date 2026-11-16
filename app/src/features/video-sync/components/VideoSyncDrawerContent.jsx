@@ -1,4 +1,4 @@
-import { Activity, CornerUpLeft, CornerUpRight, MapPin, OctagonMinus } from 'lucide-react'
+import { Activity, CornerUpLeft, CornerUpRight, Link2, MapPin, OctagonMinus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { SectionHeading } from '@/components/ui/section-heading'
@@ -9,6 +9,35 @@ import { VideoSyncCandidateList } from './VideoSyncCandidateList'
 import { VideoSyncControls } from './VideoSyncControls'
 import { VideoSyncLandmarkList } from './VideoSyncLandmarkList'
 import { SimpleTooltip } from '@/components/ui/simple-tooltip'
+
+/**
+ * In place of the sync commands while the playhead is on a video other than the one
+ * whose landmarks hold the sync: clear those landmarks, or go to that video.
+ */
+function SyncHeldByOtherVideo({ filename, onClear, onShow }) {
+  const { t } = useTranslation()
+  return (
+    <div className="space-y-3 rounded-sm border border-border/60 bg-surface-darken p-3" role="status">
+      <div className="flex gap-2 text-xs text-muted-foreground">
+        <Link2 className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+        <p>
+          {t('videoSync.syncHeldByOtherVideo', {
+            defaultValue: '{{name}} holds the landmarks that sync every video. Its offset places this video too.',
+            name: filename,
+          })}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <Button type="button" variant="outline" className="h-9 text-xs" onClick={onClear}>
+          {t('videoSync.clearSyncLandmarks', 'Clear landmarks')}
+        </Button>
+        <Button type="button" className="h-9 text-xs" onClick={onShow}>
+          {t('videoSync.showSyncVideo', 'Go to that video')}
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 /**
  * Renders the dedicated manual video-sync drawer.
@@ -28,6 +57,7 @@ export function VideoSyncDrawerContent({
   onChangeLandmarkType,
   onClearLandmarks,
   onDeleteLandmark,
+  onShowSyncVideo,
   onSpeedThresholdChange,
   onSpeedThresholdCommit,
   onTabChange,
@@ -35,6 +65,7 @@ export function VideoSyncDrawerContent({
   onTurnThresholdCommit,
   speedThresholdDraftKmh,
   speedValueLabel,
+  syncHeldBy,
   turnThresholdDraftDegrees,
   turnValueLabel,
   hasVideos,
@@ -46,7 +77,7 @@ export function VideoSyncDrawerContent({
   const canCalculateLocation = calculation.eligibility.canCalculateLocation
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-card">
+    <div className="flex min-h-0 flex-1 flex-col bg-card" data-keeps-clip-selection>
       <Tabs value={activeTab} onValueChange={onTabChange} className="flex min-h-0 flex-1 flex-col">
         <div className="shrink-0">
           <TabsList variant="main" className="grid w-full grid-cols-2">
@@ -149,43 +180,49 @@ export function VideoSyncDrawerContent({
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Button
-                      type="button"
-                      className="w-full h-9"
-                      disabled={!canCalculate || isCalculating}
-                      onClick={() => calculation.calculate(VIDEO_SYNC_MATCH_SCOPES.ALL)}
-                    >
-                      {t('videoSync.syncLandmarks', 'Sync All Landmarks')}
-                    </Button>
-                    <Button
-                      type="button"
-                      className="w-full h-9"
-                      disabled={!canCalculateLocation || isCalculating}
-                      onClick={() => calculation.calculate(VIDEO_SYNC_MATCH_SCOPES.LOCATION)}
-                    >
-                      {t('videoSync.syncLocation', 'Match Locations Only')}
-                    </Button>
-                  </div>
-                  {!canCalculate && calculation.eligibility.allExplanation ? (
-                    <p className="text-[0.741rem] text-muted-foreground pt-2 pb-2">{calculation.eligibility.allExplanation}</p>
-                  ) : null}
+                  {syncHeldBy !== null ? (
+                    <SyncHeldByOtherVideo filename={syncHeldBy} onClear={onClearLandmarks} onShow={onShowSyncVideo} />
+                  ) : (
+                    <>
+                      <div className="space-y-2">
+                        <Button
+                          type="button"
+                          className="w-full h-9"
+                          disabled={!canCalculate || isCalculating}
+                          onClick={() => calculation.calculate(VIDEO_SYNC_MATCH_SCOPES.ALL)}
+                        >
+                          {t('videoSync.syncLandmarks', 'Sync All Landmarks')}
+                        </Button>
+                        <Button
+                          type="button"
+                          className="w-full h-9"
+                          disabled={!canCalculateLocation || isCalculating}
+                          onClick={() => calculation.calculate(VIDEO_SYNC_MATCH_SCOPES.LOCATION)}
+                        >
+                          {t('videoSync.syncLocation', 'Match Locations Only')}
+                        </Button>
+                      </div>
+                      {!canCalculate && calculation.eligibility.allExplanation ? (
+                        <p className="text-[0.741rem] text-muted-foreground pt-2 pb-2">{calculation.eligibility.allExplanation}</p>
+                      ) : null}
 
-                  <VideoSyncCandidateList
-                    appliedOffset={appliedOffset}
-                    result={results[VIDEO_SYNC_MATCH_SCOPES.LOCATION]}
-                    onApply={onApplyCandidate}
-                    scope={VIDEO_SYNC_MATCH_SCOPES.LOCATION}
-                    title={t('videoSync.locationSyncCandidates', 'LOCATION SYNC CANDIDATE')}
-                  />
+                      <VideoSyncCandidateList
+                        appliedOffset={appliedOffset}
+                        result={results[VIDEO_SYNC_MATCH_SCOPES.LOCATION]}
+                        onApply={onApplyCandidate}
+                        scope={VIDEO_SYNC_MATCH_SCOPES.LOCATION}
+                        title={t('videoSync.locationSyncCandidates', 'LOCATION SYNC CANDIDATE')}
+                      />
 
-                  <VideoSyncCandidateList
-                    appliedOffset={appliedOffset}
-                    result={results[VIDEO_SYNC_MATCH_SCOPES.ALL]}
-                    onApply={onApplyCandidate}
-                    scope={VIDEO_SYNC_MATCH_SCOPES.ALL}
-                    title={t('videoSync.syncCandidates', 'SYNC CANDIDATES')}
-                  />
+                      <VideoSyncCandidateList
+                        appliedOffset={appliedOffset}
+                        result={results[VIDEO_SYNC_MATCH_SCOPES.ALL]}
+                        onApply={onApplyCandidate}
+                        scope={VIDEO_SYNC_MATCH_SCOPES.ALL}
+                        title={t('videoSync.syncCandidates', 'SYNC CANDIDATES')}
+                      />
+                    </>
+                  )}
                 </div>
               </section>
             </div>

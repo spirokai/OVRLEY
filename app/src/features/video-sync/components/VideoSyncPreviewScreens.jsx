@@ -134,7 +134,13 @@ export default function VideoSyncPreviewScreens({
   })
 
   return (
-    <div ref={setSceneElement} data-testid="video-sync-preview-screens" className="grid shrink-0" style={screenLayout.pairStyle}>
+    <div
+      ref={setSceneElement}
+      data-testid="video-sync-preview-screens"
+      className="grid shrink-0"
+      data-keeps-clip-selection
+      style={screenLayout.pairStyle}
+    >
       <div
         data-testid="video-sync-video-screen"
         className="relative z-0 isolate shrink-0 overflow-hidden rounded-sm border border-border/50 bg-black shadow-[0_5px_20px_3px_rgba(0,0,0,0.2)] [container-type:size]"

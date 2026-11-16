@@ -9,7 +9,6 @@ describe('manual video sync store contract', () => {
   beforeEach(() => {
     useStore.setState(useStore.getInitialState(), true)
     useStore.setState(videoStoreState([target]))
-    useStore.getState().selectVideoSyncVideo(target.id)
     let nextId = 0
     vi.stubGlobal('crypto', {
       randomUUID: vi.fn(() => `landmark-${++nextId}`),
@@ -22,10 +21,10 @@ describe('manual video sync store contract', () => {
 
   test('creates typed landmarks and enforces total and location limits', () => {
     const state = useStore.getState()
-    const stopId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
-    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN, 8)
-    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 12)
-    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LOCATION, 16)
+    const stopId = state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN, 8)
+    state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 12)
+    state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.LOCATION, 16)
 
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([
       { id: stopId, type: 'stop', videoSecond: 4 },
@@ -33,14 +32,14 @@ describe('manual video sync store contract', () => {
       { id: 'landmark-3', type: 'rightTurn', videoSecond: 12 },
       { id: 'landmark-4', type: 'location', videoSecond: 16, activitySecond: null },
     ])
-    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.LOCATION, 20)).toThrow(/at most 1 location/)
-    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 20)
-    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 24)).toThrow(/at most 5 landmarks/)
+    expect(() => state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.LOCATION, 20)).toThrow(/at most 1 location/)
+    state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 20)
+    expect(() => state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 24)).toThrow(/at most 5 landmarks/)
   })
 
   test('moves, removes, and clears landmarks through domain actions', () => {
     const state = useStore.getState()
-    const id = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    const id = state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
 
     state.moveVideoSyncLandmark(id, 10)
     expect(useStore.getState().manualVideoSync.landmarks[0].videoSecond).toBe(10)
@@ -48,14 +47,13 @@ describe('manual video sync store contract', () => {
     state.removeVideoSyncLandmark(id)
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
 
-    const secondId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 20)
+    const secondId = state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 20)
     expect(secondId).toBe('landmark-2')
     state.clearVideoSyncLandmarks()
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([])
   })
 
   test('sets and overwrites the detected course location without a video or video landmark', () => {
-    useStore.getState().selectVideoSyncVideo(null)
     useStore.setState({ importedVideos: [], videoEdits: {} })
     const state = useStore.getState()
 
@@ -77,12 +75,18 @@ describe('manual video sync store contract', () => {
     expect(useStore.getState().manualVideoSyncDetection.location).toBeNull()
   })
 
-  test('restores a saved map location and keeps it when only the video is cleared', () => {
+  test('restores a saved map location and keeps it when only the landmarks are cleared', () => {
     const state = useStore.getState()
-    state.hydrateVideoSyncState({ videoId: target.id, landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 80 })
+    state.hydrateVideoSyncState({
+      videoId: target.id,
+      landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+      detectedLocationSecond: 30,
+      speedThresholdKmh: 5,
+      turnThresholdDegrees: 80,
+    })
 
     expect(useStore.getState().manualVideoSyncDetection.location).toEqual({ id: 'detected-course-location', type: 'location', time: 30 })
-    state.selectVideoSyncVideo(null)
+    state.clearVideoSyncLandmarks()
     expect(useStore.getState().manualVideoSync.detectedLocationSecond).toBe(30)
     expect(useStore.getState().manualVideoSyncDetection.location.time).toBe(30)
 
@@ -93,7 +97,7 @@ describe('manual video sync store contract', () => {
 
   test('changes landmark types while preserving canonical shapes and location limits', () => {
     const state = useStore.getState()
-    const landmarkId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    const landmarkId = state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
 
     state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.LEFT_TURN)
     expect(useStore.getState().manualVideoSync.landmarks[0]).toEqual({ id: landmarkId, type: 'leftTurn', videoSecond: 4 })
@@ -106,7 +110,7 @@ describe('manual video sync store contract', () => {
       activitySecond: null,
     })
 
-    const secondId = state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 8)
+    const secondId = state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.RIGHT_TURN, 8)
     expect(() => state.setVideoSyncLandmarkType(secondId, VIDEO_SYNC_LANDMARK_TYPES.LOCATION)).toThrow(/at most 1 location/)
 
     state.setVideoSyncLandmarkType(landmarkId, VIDEO_SYNC_LANDMARK_TYPES.STOP)
@@ -116,9 +120,9 @@ describe('manual video sync store contract', () => {
   test('rejects malformed action input at the store boundary', () => {
     const state = useStore.getState()
 
-    expect(() => state.addVideoSyncLandmark('turn', 4)).toThrow(/Unsupported manual video sync landmark type/)
-    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, Number.NaN)).toThrow(/finite number/)
-    expect(() => state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 61)).toThrow(/within the imported video duration/)
+    expect(() => state.addVideoSyncLandmark(target.id, 'turn', 4)).toThrow(/Unsupported manual video sync landmark type/)
+    expect(() => state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, Number.NaN)).toThrow(/finite number/)
+    expect(() => state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 61)).toThrow(/within the imported video duration/)
     expect(() => state.setVideoSyncSpeedThreshold(0)).toThrow(/between 1 and 10/)
     expect(() => state.setVideoSyncTurnThreshold(361)).toThrow(/between 70 and 180/)
     expect(() => state.moveVideoSyncLandmark('missing-id', 4)).toThrow(/was not found/)
@@ -128,7 +132,7 @@ describe('manual video sync store contract', () => {
   test('discards calculation results after the input revision changes', () => {
     const state = useStore.getState()
     const revision = state.beginVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL)
-    state.addVideoSyncLandmark(VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
 
     expect(state.completeVideoSyncCalculation(VIDEO_SYNC_MATCH_SCOPES.ALL, revision, { detection: {}, candidates: [] })).toBe(false)
     expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
@@ -178,7 +182,7 @@ describe('manual video sync store contract', () => {
     expect(afterActivityReset.manualVideoSyncResults.all).toMatchObject({ candidates: [], status: 'idle' })
     expect(afterActivityReset.manualVideoSyncResults.location).toMatchObject({ candidates: [], status: 'idle' })
 
-    afterActivityReset.selectVideoSyncVideo(null)
+    afterActivityReset.clearVideoSyncLandmarks()
 
     const afterVideoReset = useStore.getState()
     expect(afterVideoReset.manualVideoSync.videoId).toBeNull()
@@ -187,8 +191,23 @@ describe('manual video sync store contract', () => {
     expect(afterVideoReset.manualVideoSync.turnThresholdDegrees).toBe(120)
   })
 
-  test('rejects selecting a video that is not imported', () => {
-    expect(() => useStore.getState().selectVideoSyncVideo('missing')).toThrow(/Unknown manual video sync video/)
+  test('lets the first landmark choose the video that holds the sync, until the last one goes', () => {
+    useStore.setState(videoStoreState([target, createTestVideo({ id: 'other', durationSeconds: 20, importOrder: 1 })]))
+    const state = useStore.getState()
+    expect(() => state.addVideoSyncLandmark('missing', VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)).toThrow(/Unknown manual video sync video/)
+
+    const id = state.addVideoSyncLandmark(target.id, VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    expect(useStore.getState().manualVideoSync.videoId).toBe(target.id)
+    expect(() => state.addVideoSyncLandmark('other', VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)).toThrow(/belong to video target/)
+
+    useStore.setState((draft) => {
+      draft.manualVideoSyncResults.all = { candidates: [{ offset: 4 }], error: null, hasSearched: true, revision: 3, status: 'fresh' }
+    })
+    state.removeVideoSyncLandmark(id)
+    expect(useStore.getState().manualVideoSync.videoId).toBeNull()
+    expect(useStore.getState().manualVideoSyncResults.all).toMatchObject({ candidates: [], hasSearched: false, status: 'idle' })
+    state.addVideoSyncLandmark('other', VIDEO_SYNC_LANDMARK_TYPES.STOP, 4)
+    expect(useStore.getState().manualVideoSync.videoId).toBe('other')
   })
 
   test('blocks stale candidates and shifts every clip by the target correction atomically', () => {
@@ -197,6 +216,7 @@ describe('manual video sync store contract', () => {
       activitySummary: { durationSeconds: 100 },
       ...videoStoreState([createTestVideo({ id: 'target', durationSeconds: 20 }), other], { target: 0, other: 30 }),
       selectedSecond: 80,
+      manualVideoSync: { ...useStore.getState().manualVideoSync, videoId: 'target', landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }] },
       manualVideoSyncResults: {
         ...useStore.getState().manualVideoSyncResults,
         all: { candidates: [{ offset: 10 }], error: null, hasSearched: true, revision: 0, status: 'fresh' },

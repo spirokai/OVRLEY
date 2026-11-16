@@ -15,13 +15,21 @@ import useStore from '@/store/useStore'
  * Returns one card per clip in timeline order: its thumbnail (null when no frame
  * could be decoded), whether its file is missing, selection, and removal. A card
  * shares the clip selection of the timeline: selecting it selects the whole clip.
- * @param {{onRemoveVideo: (videoId: string) => void}} options Removes one clip from the project.
+ * In the video-sync workspace, which acts on the selected video, selecting a card
+ * also brings the playhead into its clip, and the card of the video whose
+ * landmarks hold the sync is marked.
+ * @param {{onRemoveVideo: (videoId: string) => void, syncMode: boolean}} options Removes one clip from the project;
+ *   whether the video-sync workspace is open.
  * @returns {Array<object>} Presentational cards.
  */
-export function useVideoCards({ onRemoveVideo }) {
+export function useVideoCards({ onRemoveVideo, syncMode }) {
   const { clips } = useVideoTimeline()
-  const { selectedLaneId, selectClip } = useStore(
-    useShallow((state) => ({ selectedLaneId: state.selectedClip?.laneId ?? null, selectClip: state.selectClip })),
+  const { selectedLaneId, selectClip, syncTargetId } = useStore(
+    useShallow((state) => ({
+      selectedLaneId: state.selectedClip?.laneId ?? null,
+      selectClip: state.selectClip,
+      syncTargetId: state.manualVideoSync.videoId,
+    })),
   )
   return useMemo(
     () =>
@@ -32,9 +40,10 @@ export function useVideoCards({ onRemoveVideo }) {
         thumbnailUrl: clip.thumbnailUrl,
         missing: clip.missing,
         isSelected: videoLaneId(clip.id) === selectedLaneId,
-        onSelect: () => selectClip({ laneId: videoLaneId(clip.id), segmentKey: null }),
+        holdsSync: syncMode && clip.id === syncTargetId,
+        onSelect: () => selectClip({ laneId: videoLaneId(clip.id), segmentKey: null }, { revealPlayhead: syncMode }),
         onRemove: () => onRemoveVideo(clip.id),
       })),
-    [clips, onRemoveVideo, selectClip, selectedLaneId],
+    [clips, onRemoveVideo, selectClip, selectedLaneId, syncMode, syncTargetId],
   )
 }

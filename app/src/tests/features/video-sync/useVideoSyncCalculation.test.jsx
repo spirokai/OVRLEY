@@ -139,9 +139,9 @@ describe('manual video-sync calculation orchestration', () => {
     expect(useStore.getState().videoEdits['video-2'].offsetSeconds).toBe(43)
   })
 
-  test('reports no video until a manual-sync target clip is selected', async () => {
+  test('reports no video without imported videos', async () => {
     resetStore()
-    useStore.setState((state) => ({ manualVideoSync: { ...state.manualVideoSync, videoId: null } }))
+    useStore.setState({ importedVideos: [], videoEdits: {} })
     const { result } = renderHook(() => useVideoSyncCalculation())
 
     await waitForDetection(result)

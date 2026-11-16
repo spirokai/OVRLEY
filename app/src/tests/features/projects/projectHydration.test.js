@@ -19,7 +19,13 @@ test('project restoration changes only project-owned settings', () => {
   })
   useStore.setState({ batchSnapshot: { batchId: 'old-batch', rendererBusy: false } })
 
-  const manual = { videoId: 'canonical-video', landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 }
+  const manual = {
+    videoId: 'canonical-video',
+    landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+    detectedLocationSecond: 30,
+    speedThresholdKmh: 5,
+    turnThresholdDegrees: 90,
+  }
   applyProjectOwnedState(
     useStore,
     {
@@ -29,7 +35,13 @@ test('project restoration changes only project-owned settings', () => {
       },
       sources: { activity: null, videos: [projectVideo('canonical-video', 20)] },
       sync: {
-        manual: { videoId: 'canonical-video', landmarks: [], detectedLocationSecond: 30, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: {
+          videoId: 'canonical-video',
+          landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+          detectedLocationSecond: 30,
+          speedThresholdKmh: 5,
+          turnThresholdDegrees: 90,
+        },
       },
       laps: { disabled: [] },
       activityTrim: { startSecond: 10, endSecond: 80 },
@@ -111,7 +123,7 @@ function createProject({ videos, manual = {}, timeline = { playheadSecond: 0, vi
     sources: { activity: null, videos },
     sync: {
       manual: {
-        videoId: videos[0]?.id ?? null,
+        videoId: null,
         landmarks: [],
         detectedLocationSecond: null,
         speedThresholdKmh: 5,
@@ -178,10 +190,10 @@ test('saved edits of every loaded video are restored and checked against the pro
   expect(createProjectVideoEdits([videos[1]], projectVideos)['clip-b']).toMatchObject({ offsetSeconds: 70, placementAnchor: null })
 })
 
-test('the landmarks of a skipped sync video are dropped', () => {
+test('the landmarks of a skipped sync video are dropped, and no video holds the sync', () => {
   const manual = { videoId: 'clip-skipped', landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 50 }], detectedLocationSecond: null }
   expect(createProjectManualVideoSync([createTestVideo({ id: 'clip-a', durationSeconds: 30 })], manual)).toMatchObject({
-    videoId: 'clip-a',
+    videoId: null,
     landmarks: [],
   })
   expect(createProjectManualVideoSync([], manual)).toMatchObject({ videoId: null, landmarks: [] })

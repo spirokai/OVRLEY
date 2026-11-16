@@ -422,7 +422,9 @@ struct ProjectSyncV1 {
     video_timezone_mode: Option<VideoTimezoneMode>,
 }
 
-/// Landmarks belong to the video whose manual sync workspace is selected.
+/// The video the landmarks were marked in holds the manual sync: candidates place it
+/// and every other video follows. Required with landmarks; earlier version 6 files
+/// also name it without landmarks, which loads as no video holding the sync.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectManualVideoSync {
@@ -1281,7 +1283,10 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         editor: project.editor,
         sync: ProjectSync {
             manual: ProjectManualVideoSync {
-                video_id: video.as_ref().map(|video| video.id.clone()),
+                video_id: video
+                    .as_ref()
+                    .filter(|_| !manual.landmarks.is_empty())
+                    .map(|video| video.id.clone()),
                 landmarks: manual.landmarks,
                 detected_location_second: manual.detected_location_second,
                 speed_threshold_kmh: manual.speed_threshold_kmh,

@@ -242,8 +242,12 @@ function App() {
             </>
           }
           controlPanel={
-            videoSyncWorkspace.videoSyncMode ? null : toolbarDrawer.visible && toolbarDrawer.activeTool === VIDEO_TOOL ? (
-              <VideoPanel onDeleteVideo={videoControls.clearImportedVideos} onRemoveVideo={videoControls.removeVideo} />
+            videoSyncWorkspace.videoSyncMode || (toolbarDrawer.visible && toolbarDrawer.activeTool === VIDEO_TOOL) ? (
+              <VideoPanel
+                onDeleteVideo={videoControls.clearImportedVideos}
+                onRemoveVideo={videoControls.removeVideo}
+                syncMode={videoSyncWorkspace.videoSyncMode}
+              />
             ) : (
               <div
                 className="w-106 min-w-106 max-w-106 shrink-0 overflow-y-auto bg-card/60"

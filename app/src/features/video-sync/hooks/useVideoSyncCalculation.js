@@ -48,7 +48,7 @@ export default function useVideoSyncCalculation() {
       completeVideoSyncDetection: state.completeVideoSyncDetection,
       failVideoSyncCalculation: state.failVideoSyncCalculation,
       failVideoSyncDetection: state.failVideoSyncDetection,
-      hasVideo: state.manualVideoSync.videoId !== null,
+      hasVideo: state.importedVideos.length > 0,
       isCalculating: Object.values(state.manualVideoSyncResults).some((result) => result.status === MANUAL_VIDEO_SYNC_CANDIDATE_STATUSES.CALCULATING),
       landmarks: state.manualVideoSync.landmarks,
       manualVideoSyncDetection: state.manualVideoSyncDetection,
