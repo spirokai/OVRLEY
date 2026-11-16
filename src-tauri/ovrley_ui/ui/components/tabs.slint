@@ -184,11 +184,13 @@ export component TabsList {
 export component TabsContent inherits VerticalLayout {
     in property <string> value;
     in property <string> active-value;
+    // `mt-2`; the call site's override (D5).
+    in property <length> inset-top: 0.5rem;
     property <bool> active: root.value == root.active-value;
 
     visible: root.active;
     max-height: root.active ? 100000px : 0px;
-    padding-top: root.active ? 0.5rem : 0px;
+    padding-top: root.active ? root.inset-top : 0px;
     accessible-role: AccessibleRole.tab-panel;
     @children
 }

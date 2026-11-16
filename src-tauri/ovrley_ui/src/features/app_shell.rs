@@ -8,7 +8,9 @@ use crate::{AlertLayer, AppShell, AppWindow, Choice, ChoiceKind, SettingsSection
 use ovrley_app::features::app_shell::{self, keyboard_shortcut_groups, AppBootstrapState, ShortcutGroup};
 use ovrley_app::i18n::{translate_backend_error, Locale, LOCALES};
 use ovrley_app::store::services::WindowControl;
+use ovrley_app::lib::widget::unit_system::change_unit_system_preference;
 use ovrley_app::store::{Dispatcher, Store};
+use ovrley_widgets::model::document::UnitSystem;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 fn to_slint_section(section: app_shell::SettingsSection) -> SettingsSection {
@@ -97,6 +99,7 @@ pub fn project(window: &AppWindow, store: &Store, language_changed: bool) {
     });
     let language = store.i18n.language;
     set_if_changed(shell.get_language(), language.code().into(), |value| shell.set_language(value));
+    set_if_changed(shell.get_unit_system(), store.editor.unit_system.name().into(), |value| shell.set_unit_system(value));
     if language_changed {
         shell.set_shortcut_groups(shortcut_groups_model(keyboard_shortcut_groups(language)));
     }
@@ -125,6 +128,13 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         // The select lists only `LOCALES`, so an unknown code is a bug, not user input.
         let locale = Locale::require(&serde_json::Value::String(code.to_string())).expect("the language select offers supported locales");
         dispatch.dispatch(move |store, services| ovrley_app::i18n::change_language_preference(store, services, locale));
+    });
+
+    let dispatch = dispatcher.handle();
+    shell.on_change_unit_system(move |system| {
+        // The select lists only the two systems, so another value is a bug, not user input.
+        let system = UnitSystem::require(&system).expect("the units select offers the unit systems");
+        dispatch.dispatch(move |store, services| change_unit_system_preference(store, services, system));
     });
 
     let dispatch = dispatcher.handle();

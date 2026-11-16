@@ -9,7 +9,7 @@ import { ScrollArea } from "../../components/scroll-area.slint";
 import { Kbd } from "../../components/kbd.slint";
 import { Switch } from "../../components/switch.slint";
 import { HelpTooltip } from "../../components/help-tooltip.slint";
-import { Choice, PlacementAlign } from "../../components/logic.slint";
+import { Choice, ChoiceKind, PlacementAlign } from "../../components/logic.slint";
 import { SettingsSection, ShortcutGroupView } from "index.slint";
 
 // A dialog panel: `rounded-sm`, `accent-border` at 80%, `card`, `shadow-2xl`.
@@ -129,13 +129,15 @@ component SettingsRow inherits HorizontalLayout {
     @children
 }
 
-// `GeneralSettingsPanel` (D15): the language select and whether agents may edit (D13). Units
-// arrive in Phase 3, the map tile cache in Phase 5.
+// `GeneralSettingsPanel` (D15): the language and unit system selects (D19), and whether agents may
+// edit (D13). The map tile cache arrives in Phase 5.
 component GeneralSettingsPanel {
     in property <string> language;
     in property <[Choice]> languages;
+    in property <string> unit-system;
     in property <bool> allow-agent-edits;
     callback change-language(string);
+    callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
 
     ScrollArea {
@@ -162,6 +164,25 @@ component GeneralSettingsPanel {
                     accessible-label: @tr("app-shell.language" => "Language");
                     value-changed(value) => {
                         root.change-language(value);
+                    }
+                }
+            }
+            SettingsRow {
+                label: @tr("app-shell.unitSystem" => "Units");
+                Select {
+                    width: 11rem;
+                    height: 2rem;
+                    items: [
+                        { kind: ChoiceKind.item, value: "metric", label: @tr("app-shell.unitSystems.metric" => "Metric") },
+                        { kind: ChoiceKind.item, value: "imperial", label: @tr("app-shell.unitSystems.imperial" => "Imperial") },
+                    ];
+                    value: root.unit-system;
+                    align: PlacementAlign.end;
+                    background: Theme.surface;
+                    font-size: Theme.text-xs * 1rem;
+                    accessible-label: @tr("app-shell.unitSystem" => "Units");
+                    value-changed(value) => {
+                        root.change-unit-system(value);
                     }
                 }
             }
@@ -311,11 +332,13 @@ export component SettingsDialog {
     in property <SettingsSection> section;
     in property <string> language;
     in property <[Choice]> languages;
+    in property <string> unit-system;
     in property <[ShortcutGroupView]> shortcut-groups;
     in property <bool> allow-agent-edits;
     callback close();
     callback select-section(SettingsSection);
     callback change-language(string);
+    callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
 
     property <string> section-title: root.section == SettingsSection.settings ? @tr("app-shell.settings" => "Settings") : @tr("app-shell.shortcuts" => "Shortcuts");
@@ -386,9 +409,13 @@ export component SettingsDialog {
                         vertical-stretch: 1;
                         language: root.language;
                         languages: root.languages;
+                        unit-system: root.unit-system;
                         allow-agent-edits: root.allow-agent-edits;
                         change-language(value) => {
                             root.change-language(value);
+                        }
+                        change-unit-system(value) => {
+                            root.change-unit-system(value);
                         }
                         set-allow-agent-edits(allowed) => {
                             root.set-allow-agent-edits(allowed);

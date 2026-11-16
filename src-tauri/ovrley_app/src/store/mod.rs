@@ -45,6 +45,8 @@ pub struct Store {
     pub unsaved_confirm: UnsavedChangesConfirmState,
     /// `useWidgetDraftState` (D7).
     pub drafts: WidgetDraftState,
+    /// `SidebarWidgetsTab`'s state and the font catalog (D16).
+    pub widget_editor: crate::features::widget_editor::WidgetEditorState,
     /// The theme colours widget fallbacks use; `ovrley_ui` reads them from the Slint theme before
     /// the first dispatch.
     pub theme: Option<crate::lib::template::ThemeColors>,
@@ -67,13 +69,14 @@ pub struct Store {
 
 impl Store {
     /// Reads the preferences the shell needs before its first frame, as `main.jsx` and the startup
-    /// hooks do: the language (`lng`, strict), whether agents may edit (strict), and the drawer
-    /// preference (normalized, Q5).
+    /// hooks do: the language (`lng`, strict), whether agents may edit (strict), the drawer
+    /// preference (normalized, Q5) and the unit system (strict, D19).
     pub fn hydrate(preferences: &PreferencesStore) -> Result<Self, String> {
         let mut store = Self::default();
         crate::i18n::hydrate_language_preference(&mut store, preferences)?;
         crate::features::app_shell::hydrate_agent_preference(&mut store, preferences)?;
         crate::features::toolbar::hydrate_drawer_preference(&mut store, preferences);
+        crate::lib::widget::unit_system::hydrate_unit_system_preference(&mut store, preferences)?;
         Ok(store)
     }
 }

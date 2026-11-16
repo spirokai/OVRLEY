@@ -1,10 +1,10 @@
 //! The toolbar feature: its projection into the `Toolbar` global and its callbacks.
 
-use crate::hooks::app_store_selectors::set_if_changed;
+use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
 use crate::{ActivityLapView, ActivityRowView, AppWindow, DrawerTool, Toolbar};
 use ovrley_app::features::app_shell;
 use ovrley_app::features::toolbar::activity_drawer_view;
-use slint::{Model, ModelRc, SharedString, VecModel};
+use slint::SharedString;
 use ovrley_app::store::slices::layout::LeftDrawerTool;
 use ovrley_app::store::{Dispatcher, Store};
 use slint::ComponentHandle;
@@ -36,20 +36,6 @@ pub fn project(window: &AppWindow, store: &Store) {
     set_if_changed(toolbar.get_visible(), layout.left_drawer_visible, |value| toolbar.set_visible(value));
     set_if_changed(toolbar.get_pinned(), layout.left_drawer_pinned, |value| toolbar.set_pinned(value));
     project_activity_drawer(&toolbar, store);
-}
-
-/// Writes `next` into the model. Rows of an unchanged length update in place, so the repeater
-/// keeps their elements and their animations play (a lap's switch slides instead of jumping).
-fn replace_if_changed<T: Clone + PartialEq + 'static>(current: ModelRc<T>, next: Vec<T>, set: impl FnOnce(ModelRc<T>)) {
-    if current.row_count() != next.len() {
-        set(ModelRc::new(VecModel::from(next)));
-        return;
-    }
-    for (row, value) in next.into_iter().enumerate() {
-        if current.row_data(row).as_ref() != Some(&value) {
-            current.set_row_data(row, value);
-        }
-    }
 }
 
 fn project_activity_drawer(toolbar: &Toolbar<'_>, store: &Store) {

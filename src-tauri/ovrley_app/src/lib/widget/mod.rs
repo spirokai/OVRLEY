@@ -10,6 +10,8 @@ use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
 use ovrley_widgets::model::document::{convert_altitude_value, js_round, widget_id, Collection, OverlayConfig, WidgetData};
 use serde_json::Value;
 
+pub mod unit_system;
+
 /// One widget of the document, as the editor lists it (`buildConfigWidgets`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConfigWidget {

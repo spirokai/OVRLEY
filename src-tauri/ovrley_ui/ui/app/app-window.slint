@@ -156,6 +156,7 @@ export component AppWindow inherits FluidWindow {
         section: AppShell.settings-section;
         language: AppShell.language;
         languages: AppShell.languages;
+        unit-system: AppShell.unit-system;
         shortcut-groups: AppShell.shortcut-groups;
         allow-agent-edits: AppShell.allow-agent-edits;
         close => {
@@ -166,6 +167,9 @@ export component AppWindow inherits FluidWindow {
         }
         change-language(code) => {
             AppShell.change-language(code);
+        }
+        change-unit-system(system) => {
+            AppShell.change-unit-system(system);
         }
         set-allow-agent-edits(allowed) => {
             AppShell.set-allow-agent-edits(allowed);

@@ -10,7 +10,7 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 ovrley_app = { path = "../ovrley_app", features = ["schema"] }
-ovrley_widgets = { path = "../ovrley_widgets" }
+ovrley_widgets = { path = "../ovrley_widgets", features = ["schema"] }
 interprocess = "2"
 log = "0.4"
 schemars = "1"

@@ -20,6 +20,7 @@ use std::sync::Arc;
 struct Projections {
     window: slint::Weak<AppWindow>,
     overlay: features::overlay_editor::Projection,
+    widget_editor: features::widget_editor::Projection,
     language: Cell<Locale>,
     /// The first run writes what depends on the language even though it has not changed.
     first: Cell<bool>,
@@ -37,6 +38,7 @@ impl Projections {
         features::template_manager::project(&window, store);
         features::undo_redo::project(&window, store);
         self.overlay.project(&window, store);
+        self.widget_editor.project(&window, store);
     }
 }
 
@@ -52,6 +54,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     let projections = Projections {
         window: window.as_weak(),
         overlay: features::overlay_editor::Projection::new(dispatcher.handle()),
+        widget_editor: features::widget_editor::Projection::default(),
         language: Cell::new(language),
         first: Cell::new(true),
     };
@@ -61,6 +64,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::template_manager::bind(window, &dispatcher);
     features::overlay_editor::bind(window, &dispatcher);
     features::undo_redo::bind(window, &dispatcher);
+    features::widget_editor::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher
@@ -118,10 +122,11 @@ pub fn run(store: Store, paths: ovrley_core::paths::AppPaths, preferences: Prefe
         if let Some(window) = shown.upgrade() {
             when_winit_window_exists(&window, startup.clone());
         }
-        // `useAppBootstrap`: the template list and the last template; the startup screen shows
-        // until the restore has finished.
+        // `useAppBootstrap`: the template list and the last template, with the font catalog
+        // loading in parallel (D16); the startup screen shows until the restore has finished.
         startup.dispatch(|store, services| {
             ovrley_app::features::template_manager::fetch_templates(store, services, None);
+            ovrley_app::features::widget_editor::load_font_catalog(store, services);
             ovrley_app::features::template_manager::restore_last_loaded_template(store, services, Box::new(|store, _| store.bootstrap.set_startup_ready()));
         });
     });

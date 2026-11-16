@@ -1,0 +1,446 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SectionHeading } from "../../components/section-heading.slint";
+import { Switch } from "../../components/switch.slint";
+import { FontSelectField } from "../../components/font-select-field.slint";
+import { SelectSize } from "../../components/select.slint";
+import { Icons } from "../../components/icons.slint";
+import { Choice, ChoiceKind } from "../../components/logic.slint";
+import { InspectorView, TextDisplayView } from "index.slint";
+import { ColorField, ContentAlignmentControl, NumberField, SelectField, SliderField } from "form-controls.slint";
+
+// widgetEditorSections.jsx, TextDisplaySection.jsx and MetricWidgetEditor.jsx, Phase 3 part. Each
+// section reads its part of the inspector view and reports edits through the same callbacks as the
+// `WidgetEditor` global, which the widgets tab wires.
+
+// `grid grid-cols-2 gap-4`: two equal columns, 1rem apart. A single child takes the left column.
+component TwoColumns inherits HorizontalLayout {
+    spacing: 1rem;
+    alignment: start;
+    @children
+}
+
+// The toggle rows of `TextDisplaySection`: a 0.741rem bold, uppercase, `tracking-wider` muted
+// label and a switch, `py-2`.
+component ToggleRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <bool> checked;
+    callback checked-changed(checked: bool);
+
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    spacing: 0.5rem;
+    AppText {
+        horizontal-stretch: 1;
+        content: root.label;
+        font-size: 0.741rem;
+        font-weight: Theme.font-weight-bold;
+        tracking: Theme.tracking-wider;
+        color: Theme.muted-foreground;
+    }
+    Switch {
+        checked: root.checked;
+        accessible-label: root.label;
+        checked-changed(checked) => {
+            root.checked-changed(checked);
+        }
+    }
+}
+
+// `PositionSection`, with the inspector's reset button in its heading.
+export component PositionSection inherits VerticalLayout {
+    in property <InspectorView> inspector;
+    callback set-number(key: string, raw: string);
+    callback draft(key: string, value: float);
+    callback commit-draft();
+    callback reset();
+
+    property <length> column: (self.width - 1rem) / 2;
+    spacing: 1rem;
+    SectionHeading {
+        icon: Icons.move;
+        title: @tr("widget-editor.general" => "General");
+        Button {
+            width: 1.5rem;
+            height: 1.5rem;
+            y: (parent.height - self.height) / 2;
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            icon: Icons.rotate-ccw;
+            icon-size: 0.75rem;
+            text-color: Theme.muted-foreground;
+            hover-text-color: Theme.foreground;
+            hover-background: Theme.foreground.transparentize(0.8);
+            clicked => {
+                root.reset();
+            }
+        }
+    }
+    TwoColumns {
+        padding-top: 0.5rem;
+        NumberField {
+            width: root.column;
+            label: root.inspector.horizontal-label;
+            value: root.inspector.x;
+            changed(raw) => {
+                root.set-number("x", raw);
+            }
+        }
+        NumberField {
+            width: root.column;
+            label: @tr("widget-editor.verticalPosition" => "Vertical Position");
+            value: root.inspector.y;
+            changed(raw) => {
+                root.set-number("y", raw);
+            }
+        }
+    }
+    SliderField {
+        label: @tr("widget-editor.transparency" => "Transparency");
+        value: root.inspector.opacity;
+        minimum: 0;
+        maximum: 100;
+        value-display: "\{round(root.inspector.opacity)}";
+        suffix: "%";
+        value-changed(value) => {
+            root.draft("opacity", value);
+        }
+        value-committed => {
+            root.commit-draft();
+        }
+    }
+}
+
+// `UnitsControlRow`: the units heading with its switch, then the unit colour and unit select,
+// disabled while the switch is off.
+component UnitsControlRow inherits VerticalLayout {
+    in property <TextDisplayView> text;
+    in property <length> column;
+    callback set-text(key: string, value: string);
+    callback set-flag(key: string, value: bool);
+    callback change-unit(value: string);
+
+    property <bool> controls-disabled: root.text.units-show-toggle && !root.text.units-checked;
+    spacing: 0.5rem;
+    padding-top: 0.5rem;
+    SectionHeading {
+        icon: Icons.ruler;
+        title: root.text.units-supports-selection ? @tr("widget-editor.units" => "Units") : @tr("widget-editor.unit" => "Unit");
+        if root.text.units-show-toggle: Switch {
+            y: (parent.height - self.height) / 2 + 0.125rem;
+            checked: root.text.units-checked;
+            accessible-label: root.text.units-supports-selection ? @tr("widget-editor.units" => "Units") : @tr("widget-editor.unit" => "Unit");
+            checked-changed(checked) => {
+                root.set-flag("show_units", checked);
+            }
+        }
+    }
+    if root.text.has-unit-color || root.text.units.length > 0: TwoColumns {
+        if root.text.has-unit-color: ColorField {
+            width: root.column;
+            value: root.text.unit-color;
+            disabled: root.controls-disabled;
+            changed(hex) => {
+                root.set-text("unit_color", hex);
+            }
+        }
+        if root.text.units.length > 0: SelectField {
+            width: root.column;
+            label: @tr("widget-editor.unit" => "Unit");
+            value: root.text.unit;
+            options: root.text.units;
+            disabled: root.controls-disabled;
+            value-changed(value) => {
+                root.change-unit(value);
+            }
+        }
+    }
+}
+
+// `IconSection` with the units row (`TextDisplaySection`'s `unitsField`).
+component IconSection inherits VerticalLayout {
+    in property <TextDisplayView> text;
+    in property <length> column;
+    callback set-number(key: string, raw: string);
+    callback draft(key: string, value: float);
+    callback commit-draft();
+    callback set-text(key: string, value: string);
+    callback set-flag(key: string, value: bool);
+    callback change-unit(value: string);
+
+    spacing: 1rem;
+    SectionHeading {
+        icon: Icons.palette;
+        title: @tr("widget-editor.icon" => "Icon");
+        Switch {
+            y: (parent.height - self.height) / 2 + 0.125rem;
+            checked: root.text.show-icon;
+            accessible-label: @tr("widget-editor.icon" => "Icon");
+            checked-changed(checked) => {
+                root.set-flag("show_icon", checked);
+            }
+        }
+    }
+    TwoColumns {
+        ColorField {
+            width: root.column;
+            value: root.text.icon-color;
+            disabled: !root.text.show-icon;
+            changed(hex) => {
+                root.set-text("icon_color", hex);
+            }
+        }
+        SliderField {
+            width: root.column;
+            label: @tr("widget-editor.size" => "Size");
+            value: root.text.icon-size;
+            minimum: 0;
+            maximum: 100;
+            disabled: !root.text.show-icon;
+            value-display: "\{round(root.text.icon-size)}";
+            suffix: "px";
+            value-changed(value) => {
+                root.draft("icon_size", value);
+            }
+            value-committed => {
+                root.commit-draft();
+            }
+        }
+    }
+    TwoColumns {
+        NumberField {
+            width: root.column;
+            label: @tr("widget-editor.horizontalOffset" => "Horizontal Offset");
+            value: root.text.icon-offset-x;
+            disabled: !root.text.show-icon;
+            changed(raw) => {
+                root.set-number("icon_offset_x", raw);
+            }
+        }
+        NumberField {
+            width: root.column;
+            label: @tr("widget-editor.verticalOffset" => "Vertical Offset");
+            value: root.text.icon-offset-y;
+            disabled: !root.text.show-icon;
+            changed(raw) => {
+                root.set-number("icon_offset_y", raw);
+            }
+        }
+    }
+    if root.text.has-units: UnitsControlRow {
+        text: root.text;
+        column: root.column;
+        set-text(key, value) => {
+            root.set-text(key, value);
+        }
+        set-flag(key, value) => {
+            root.set-flag(key, value);
+        }
+        change-unit(value) => {
+            root.change-unit(value);
+        }
+    }
+}
+
+// `MetricWidgetEditor`: the display type select, the text display's sections, and "Altitude at
+// start". The other displays' sections arrive in Phase 5. Its children are the inspector's
+// sections, so they keep the inspector's 1.5rem spacing.
+export component MetricWidgetEditor inherits VerticalLayout {
+    in property <InspectorView> inspector;
+    in property <[Choice]> recommended-fonts;
+    in property <[Choice]> system-fonts;
+    callback set-number(key: string, raw: string);
+    callback draft(key: string, value: float);
+    callback commit-draft();
+    callback set-text(key: string, value: string);
+    callback set-flag(key: string, value: bool);
+    callback clear-field(key: string);
+    callback change-font(id: string);
+    callback change-display-type(value: string);
+    callback change-unit(value: string);
+
+    property <TextDisplayView> text: root.inspector.text;
+    property <length> column: (self.width - 1rem) / 2;
+    spacing: 1.5rem;
+
+    if root.inspector.display-types.length > 1: SelectField {
+        label: @tr("widget-editor.displayType" => "Display Type");
+        value: root.inspector.display-type;
+        options: root.inspector.display-types;
+        value-changed(value) => {
+            root.change-display-type(value);
+        }
+    }
+
+    // `FontSection` with the content alignment control.
+    if root.inspector.has-text: VerticalLayout {
+        spacing: 1rem;
+        SectionHeading {
+            icon: Icons.type;
+            title: @tr("widget-editor.typography" => "Typography");
+            ContentAlignmentControl {
+                value: root.text.content-alignment;
+                group-label: root.text.alignment-label;
+                labels: root.text.alignments;
+                value-changed(value) => {
+                    root.set-text("content_alignment", value);
+                }
+            }
+        }
+        SliderField {
+            label: @tr("widget-editor.fontSize" => "Font Size");
+            value: root.text.font-size;
+            minimum: 20;
+            maximum: 200;
+            value-display: "\{round(root.text.font-size)}";
+            suffix: "px";
+            value-changed(value) => {
+                root.draft("font_size", value);
+            }
+            value-committed => {
+                root.commit-draft();
+            }
+        }
+        TwoColumns {
+            FontSelectField {
+                width: root.column;
+                label: @tr("widget-editor.fontFamily" => "Font Family");
+                value: root.text.font;
+                recommended-options: root.recommended-fonts;
+                system-options: root.system-fonts;
+                label-font-size: 0.667rem;
+                size: SelectSize.default;
+                background: Theme.surface;
+                value-changed(id) => {
+                    root.change-font(id);
+                }
+            }
+            ColorField {
+                width: root.column;
+                label: @tr("widget-editor.fontColor" => "Font Color");
+                value: root.text.color;
+                changed(hex) => {
+                    root.set-text("color", hex);
+                }
+            }
+        }
+    }
+
+    if root.inspector.has-text && root.text.has-decimals: TwoColumns {
+        SliderField {
+            width: root.column;
+            label: @tr("widget-editor.decimals" => "Decimals");
+            value: root.text.decimals;
+            minimum: 0;
+            maximum: root.text.max-decimals;
+            value-display: "\{root.text.decimals}";
+            value-changed(value) => {
+                root.draft("decimals", value);
+            }
+            value-committed => {
+                root.commit-draft();
+            }
+        }
+    }
+
+    if root.inspector.has-text && root.text.has-balance-format: SelectField {
+        label: @tr("widget-editor.balanceFormat" => "Balance Format");
+        value: root.text.balance-format;
+        options: [
+            { kind: ChoiceKind.item, value: "percent_label", label: "52%/48%" },
+            { kind: ChoiceKind.item, value: "plain", label: "52/48" },
+            { kind: ChoiceKind.item, value: "l_prefix", label: "L52/R48" },
+            { kind: ChoiceKind.item, value: "l_suffix", label: "52L/48R" },
+        ];
+        value-changed(value) => {
+            root.set-text("balance_format", value);
+        }
+    }
+
+    if root.inspector.has-text && root.text.has-full-distance: TwoColumns {
+        ToggleRow {
+            width: root.column;
+            label: @tr("widget-editor.showFullDistance" => "Show Full Distance");
+            checked: root.text.show-full-distance;
+            checked-changed(checked) => {
+                root.set-flag("show_full_distance", checked);
+            }
+        }
+    }
+
+    if root.inspector.has-text && root.text.has-coordinates: TwoColumns {
+        SelectField {
+            width: root.column;
+            label: @tr("widget-editor.format" => "Format");
+            value: root.text.coordinate-unit;
+            options: root.text.coordinate-units;
+            value-changed(value) => {
+                root.set-text("display_unit", value);
+            }
+        }
+        SelectField {
+            width: root.column;
+            label: @tr("widget-editor.coordinates" => "Coordinates");
+            value: root.text.coordinate-format;
+            options: [
+                { kind: ChoiceKind.item, value: "dms", label: @tr("widget-editor.coordinateFormatDms" => "Deg / Min / Sec") },
+                { kind: ChoiceKind.item, value: "ddm", label: @tr("widget-editor.coordinateFormatDdm" => "Deg / Dec Min") },
+            ];
+            value-changed(value) => {
+                root.set-text("coordinate_format", value);
+            }
+        }
+    }
+
+    if root.inspector.has-text && root.text.has-full-ascent: TwoColumns {
+        ToggleRow {
+            width: root.column;
+            label: @tr("widget-editor.showFullAscent" => "Show Full Ascent");
+            checked: root.text.show-full-ascent;
+            checked-changed(checked) => {
+                root.set-flag("show_full_ascent", checked);
+            }
+        }
+    }
+
+    if root.inspector.has-text: IconSection {
+        text: root.text;
+        column: root.column;
+        set-number(key, raw) => {
+            root.set-number(key, raw);
+        }
+        draft(key, value) => {
+            root.draft(key, value);
+        }
+        commit-draft => {
+            root.commit-draft();
+        }
+        set-text(key, value) => {
+            root.set-text(key, value);
+        }
+        set-flag(key, value) => {
+            root.set-flag(key, value);
+        }
+        change-unit(value) => {
+            root.change-unit(value);
+        }
+    }
+
+    if root.inspector.has-altitude: TwoColumns {
+        NumberField {
+            width: root.column;
+            label: @tr("widget-editor.altitudeAtStart" => "Altitude at start");
+            value: root.inspector.altitude;
+            placeholder: root.inspector.altitude-placeholder;
+            suffix: root.inspector.altitude-unit;
+            resettable: true;
+            changed(raw) => {
+                root.set-number("starting_altitude", raw);
+            }
+            reset => {
+                root.clear-field("starting_altitude");
+            }
+        }
+    }
+}

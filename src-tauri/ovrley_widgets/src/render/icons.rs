@@ -18,6 +18,12 @@ struct IconAsset {
 
 include!(concat!(env!("OUT_DIR"), "/icon_assets.rs"));
 
+/// A manifest icon's SVG markup, as bundled from `assets/widget-icons/`. The editor's widget list
+/// draws these same files (the React app's `WIDGET_ICONS`).
+pub fn icon_asset_markup(asset_file: &str) -> &'static str {
+    icon_asset(asset_file).markup
+}
+
 pub fn metric_icon_asset_file(kind: MetricKind) -> Option<&'static str> {
     if kind == MetricKind::Time {
         Some(time_icon_asset_file())

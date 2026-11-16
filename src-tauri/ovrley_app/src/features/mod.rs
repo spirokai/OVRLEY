@@ -4,4 +4,5 @@ pub mod overlay_editor;
 pub mod template_manager;
 pub mod toolbar;
 pub mod undo_redo;
+pub mod widget_editor;
 pub mod widget_preview;

@@ -10,10 +10,18 @@ use slint::ComponentHandle;
 use std::path::PathBuf;
 use std::time::Duration;
 
-/// One state of the tour: its name and the action that sets it up. A `None` action toggles native
-/// full screen instead (macOS: the header's inset follows AppKit's notifications).
-type Step = (&'static str, Option<StepAction>);
+/// One state of the tour: its name and what sets it up.
+type Step = (&'static str, StepKind);
 type StepAction = fn(&mut Store, &mut Services);
+
+#[derive(Clone, Copy)]
+enum StepKind {
+    Action(StepAction),
+    /// Toggles native full screen (macOS: the header's inset follows AppKit's notifications).
+    Fullscreen,
+    /// Clicks the control panel's Widgets tab, which is local state of the markup.
+    WidgetsTab,
+}
 
 fn tour() -> Vec<Step> {
     use ovrley_app::features::app_shell::SettingsSection;
@@ -64,10 +72,18 @@ fn tour() -> Vec<Step> {
             change_language_preference(store, services, Locale::En);
         }),
     ];
-    let mut tour: Vec<Step> = steps.into_iter().map(|(name, action)| (name, Some(action))).collect();
+    let mut tour: Vec<Step> = steps.into_iter().map(|(name, action)| (name, StepKind::Action(action))).collect();
+    tour.push(("widgets-tab", StepKind::WidgetsTab));
+    tour.push((
+        "widgets-tab-open",
+        StepKind::Action(|store, _| {
+            let value = store.editor.config.values.iter().find(|data| data["value"] == "speed").map(|data| data["id"].as_str().unwrap_or_default().to_string());
+            store.editor.set_selected_widget_id(value.as_deref());
+        }),
+    ));
     tour.push((
         "agent-connected",
-        Some(|store, _| {
+        StepKind::Action(|store, _| {
             store.agent_session.allow_agent_edits = true;
             store.agent_session.session_opened();
             store.editor_shell.set_settings_section(ovrley_app::features::app_shell::SettingsSection::Settings);
@@ -76,10 +92,10 @@ fn tour() -> Vec<Step> {
     ));
     tour.push((
         "agent-connected-closed",
-        Some(|store, _| store.editor_shell.close_settings()),
+        StepKind::Action(|store, _| store.editor_shell.close_settings()),
     ));
-    tour.push(("fullscreen", None));
-    tour.push(("fullscreen-left", None));
+    tour.push(("fullscreen", StepKind::Fullscreen));
+    tour.push(("fullscreen-left", StepKind::Fullscreen));
     tour
 }
 
@@ -105,11 +121,23 @@ fn take(window: slint::Weak<AppWindow>, dispatcher: Dispatcher, dir: PathBuf, st
         return;
     };
     let settle = match action {
-        Some(action) => {
+        StepKind::Action(action) => {
             dispatcher.dispatch(action);
             800
         }
-        None => {
+        StepKind::WidgetsTab => {
+            let app = window.upgrade().expect("the window is open");
+            let size = app.window().size().to_logical(app.window().scale_factor());
+            // The window's rem (`FluidWindow`), the control panel's 26.5rem and its tab row below the header.
+            let rem = (size.width * 0.00584 + 5.5).clamp(9.0, 14.6);
+            let position = slint::LogicalPosition::new(size.width - 26.5 * rem / 4.0, 4.75 * rem);
+            let button = slint::platform::PointerEventButton::Left;
+            app.window().dispatch_event(slint::platform::WindowEvent::PointerMoved { position });
+            app.window().dispatch_event(slint::platform::WindowEvent::PointerPressed { position, button });
+            app.window().dispatch_event(slint::platform::WindowEvent::PointerReleased { position, button });
+            800
+        }
+        StepKind::Fullscreen => {
             let app = window.upgrade().expect("the window is open");
             let fullscreen = !app.window().is_fullscreen();
             log::debug!("snapshot: set_fullscreen({fullscreen})");

@@ -1,0 +1,95 @@
+import { Choice } from "../../components/logic.slint";
+
+// One row of the widget list: its name and icon. A manifest icon is either a lucide glyph (an
+// `Icons` path in `glyph`) or a bundled SVG (`image`, tinted with the row's text colour).
+export struct WidgetRowView {
+    id: string,
+    name: string,
+    glyph: string,
+    image: image,
+}
+
+// `TextDisplaySection` of the open widget (`TextDisplayView`). Optional sections carry a `has-…`
+// flag; their other fields are then unused.
+export struct TextDisplayView {
+    content-alignment: string,
+    alignment-label: string,
+    alignments: [Choice],
+    font-size: float,
+    font: string,
+    color: string,
+    has-decimals: bool,
+    decimals: float,
+    max-decimals: float,
+    has-balance-format: bool,
+    balance-format: string,
+    has-full-distance: bool,
+    show-full-distance: bool,
+    has-coordinates: bool,
+    coordinate-unit: string,
+    coordinate-units: [Choice],
+    coordinate-format: string,
+    has-full-ascent: bool,
+    show-full-ascent: bool,
+    show-icon: bool,
+    icon-color: string,
+    icon-size: float,
+    icon-offset-x: string,
+    icon-offset-y: string,
+    has-units: bool,
+    units-supports-selection: bool,
+    units-show-toggle: bool,
+    units-checked: bool,
+    has-unit-color: bool,
+    unit-color: string,
+    unit: string,
+    units: [Choice],
+}
+
+// The open widget's inspector (`InspectorView`): `PositionSection`, then `MetricWidgetEditor` for
+// metric widgets.
+export struct InspectorView {
+    id: string,
+    horizontal-label: string,
+    x: string,
+    y: string,
+    opacity: float,
+    is-metric: bool,
+    display-types: [Choice],
+    display-type: string,
+    has-text: bool,
+    text: TextDisplayView,
+    has-altitude: bool,
+    altitude: string,
+    altitude-placeholder: string,
+    altitude-unit: string,
+}
+
+// The widget editor feature's global (D5), written by `src/features/widget_editor.rs`.
+export global WidgetEditor {
+    in property <[WidgetRowView]> rows;
+    in property <string> open-id;
+    in property <bool> has-inspector;
+    in property <InspectorView> inspector;
+    // The font select's two groups for the open widget (`getFontSelectOptions`).
+    in property <[Choice]> recommended-fonts;
+    in property <[Choice]> system-fonts;
+
+    // The accordion: opening an item selects its widget; closing it clears the selection.
+    callback toggle(id: string);
+    callback delete-widget(id: string);
+    callback reset-widget(id: string);
+    // `setNumericField` for the number inputs (`x`, `y`, `icon_offset_x`, `icon_offset_y`,
+    // `starting_altitude`), with the field's raw text.
+    callback set-number(key: string, raw: string);
+    // A slider's live value (`updateWidgetDraft`), and its release (`commitWidgetDraft`).
+    callback draft(key: string, value: float);
+    callback commit-draft();
+    // `updateWidgetData` with one text or flag field.
+    callback set-text(key: string, value: string);
+    callback set-flag(key: string, value: bool);
+    callback clear-field(key: string);
+    callback change-font(id: string);
+    callback change-display-type(value: string);
+    callback change-unit(value: string);
+}

@@ -40,6 +40,8 @@ export global AppShell {
     // The resolved language's code, and the 15 locales with their native labels.
     in property <string> language;
     in property <[Choice]> languages;
+    // `metric` or `imperial` (D19).
+    in property <string> unit-system: "metric";
     in property <[ShortcutGroupView]> shortcut-groups;
 
     // MCP (D13): the user allows agent edits; an agent is connected and allowed (the badge).
@@ -50,6 +52,7 @@ export global AppShell {
     callback close-settings();
     callback select-settings-section(SettingsSection);
     callback change-language(string);
+    callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
     // The File menu's "Import Activity".
     callback import-activity();

@@ -6,7 +6,8 @@
 //! in the locale files.
 
 use ovrley_app::features::widget_preview::present_pending_frame;
-use ovrley_app::features::{app_shell, template_manager};
+use ovrley_app::features::{app_shell, template_manager, widget_editor};
+use ovrley_app::lib::widget::unit_system::change_unit_system_preference;
 use ovrley_app::i18n::{change_language_preference, Locale};
 use ovrley_app::features::overlay_editor::interaction::{resize_widget, rotate_widget, ResizeTarget};
 use ovrley_app::store::agent::{describe_activity, describe_template, describe_widget, describe_widgets, AgentReply, AgentResult};
@@ -165,6 +166,25 @@ pub struct WidgetRotateArguments {
     pub rotation: f64,
 }
 
+/// A field patch for a widget.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct WidgetUpdateArguments {
+    /// A widget id from `ovrley_summary`'s widgets.
+    pub widget_id: String,
+    /// The fields to change and their new values, for example `{"decimals": 1, "show_units": false}`. `widget_get` lists the
+    /// widget's fields and current values. A display variant's fields go under `display_variants.<display type>`.
+    pub fields: serde_json::Map<String, Value>,
+}
+
+/// The unit system to switch to.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct UnitSystemSetArguments {
+    /// `metric` or `imperial`.
+    pub unit_system: ovrley_widgets::model::document::UnitSystem,
+}
+
 /// A tool's input schema: draft 2020-12, with every reference inlined, because not every client
 /// follows `$ref`.
 pub fn input_schema<T: JsonSchema>() -> Value {
@@ -187,8 +207,8 @@ pub fn tools() -> Vec<ToolDefinition> {
             name: "ovrley_summary",
             title: "OVRLEY summary",
             description: "Describes the open OVRLEY window: the app version, the language, the left drawer, the activity \
-                          (file, format, duration, laps and which are disabled), the template (source, name, save status) and \
-                          whether undo and redo are available. The project and video sections are empty until those features arrive.",
+                          (file, format, duration, laps and which are disabled), the template (source, name, save status), the \
+                          unit system, the widgets (id, type, name, position, selected) and whether undo and redo are available. The project and video sections are empty until those features arrive.",
             input_schema: input_schema::<NoArguments>(),
             read_only: true,
         },
@@ -253,6 +273,15 @@ pub fn tools() -> Vec<ToolDefinition> {
             read_only: false,
         },
         ToolDefinition {
+            name: "widget_update",
+            title: "Change widget settings",
+            description: "Changes a widget's settings, as its editor in the Widgets tab does: give the fields to change. The widget's \
+                          fields and current values come from widget_get. A patch with an unknown field or a value the widget cannot \
+                          show changes nothing and fails with the reason. One undo step.",
+            input_schema: input_schema::<WidgetUpdateArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
             name: "widget_delete",
             title: "Delete a widget",
             description: "Deletes a widget, as the Delete key and the sidebar's delete button do. One undo step.",
@@ -273,6 +302,14 @@ pub fn tools() -> Vec<ToolDefinition> {
             description: "Redoes the last undone edit, as Redo in the canvas toolbar does. Fails when there is nothing to redo or a \
                           confirmation dialog is open.",
             input_schema: input_schema::<NoArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "unit_system_set",
+            title: "Set the unit system",
+            description: "Switches OVRLEY between metric and imperial units and remembers it, as Settings > Units does. The open \
+                          overlay's widgets convert their units as one undo step.",
+            input_schema: input_schema::<UnitSystemSetArguments>(),
             read_only: false,
         },
         ToolDefinition {
@@ -364,6 +401,7 @@ fn summary(store: &Store) -> Value {
     json!({
         "appVersion": ovrley_app::lib::utils::app_version(),
         "language": store.i18n.language,
+        "unitSystem": store.editor.unit_system,
         "drawer": drawer_state(store),
         "project": null,
         "template": describe_template(store),
@@ -467,10 +505,19 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                 let mut patch = serde_json::Map::new();
                 patch.insert("x".into(), ovrley_widgets::model::document::number(arguments.x));
                 patch.insert("y".into(), ovrley_widgets::model::document::number(arguments.y));
-                store.editor.config.widget(&arguments.widget_id).map_err(ToolOutcome::Failed)?;
-                store.editor.edit_config(|config| config.update_widgets(&[(arguments.widget_id.clone(), patch)])).map_err(ToolOutcome::Failed)?;
+                widget_editor::update_widget_data(store, &arguments.widget_id, patch).map_err(ToolOutcome::Failed)?;
                 present_pending_frame(store, services);
                 now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+            }
+            "widget_update" => {
+                let arguments: WidgetUpdateArguments = arguments(arguments_value)?;
+                widget_editor::update_widget_fields(store, services, &arguments.widget_id, arguments.fields).map_err(ToolOutcome::Failed)?;
+                now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+            }
+            "unit_system_set" => {
+                let arguments: UnitSystemSetArguments = arguments(arguments_value)?;
+                change_unit_system_preference(store, services, arguments.unit_system);
+                now(json!({ "unitSystem": store.editor.unit_system, "widgets": describe_widgets(store) }))
             }
             "widget_resize" => {
                 let arguments: WidgetResizeArguments = arguments(arguments_value)?;
@@ -494,9 +541,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             }
             "widget_delete" => {
                 let arguments: WidgetArguments = arguments(arguments_value)?;
-                store.editor.config.widget(&arguments.widget_id).map_err(ToolOutcome::Failed)?;
-                let ids = vec![arguments.widget_id];
-                store.editor.edit_config(|config| config.delete_widgets(&ids));
+                widget_editor::delete_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?;
                 now(json!({ "widgets": describe_widgets(store) }))
             }
             "activity_import" => {
@@ -653,6 +698,29 @@ mod tests {
         let ToolOutcome::Ok(left) = run(&dispatcher, "widget_delete", json!({"widgetId": "a"})) else { panic!() };
         assert_eq!(left["widgets"], json!([]));
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2);
+    }
+
+    #[test]
+    fn widget_update_patches_fields_as_one_undo_step_and_refuses_unknown_ones() {
+        let (dispatcher, fakes) = dispatcher(true);
+        dispatcher.dispatch(|store, _| {
+            store.history.set_mode(ovrley_app::features::undo_redo::HistoryMode::Reset);
+            let value = json!({"id": "s", "value": "speed", "display_type": "text", "display_unit": "kmh", "decimals": 0, "x": 10, "y": 10});
+            store.editor.set_config(ovrley_widgets::model::document::OverlayConfig::from_value(&json!({"scene": {"width": 1920, "height": 1080}, "values": [value]})).unwrap());
+        });
+        let ToolOutcome::Ok(updated) = run(&dispatcher, "widget_update", json!({"widgetId": "s", "fields": {"decimals": 1, "show_units": false}})) else { panic!("update failed") };
+        assert_eq!((updated["data"]["decimals"].clone(), updated["data"]["show_units"].clone()), (json!(1), json!(false)));
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 1);
+        let ToolOutcome::Failed(message) = run(&dispatcher, "widget_update", json!({"widgetId": "s", "fields": {"radius": 3}})) else { panic!() };
+        assert!(message.contains("no field radius"), "{message}");
+        assert!(matches!(run(&dispatcher, "widget_update", json!({"widgetId": "s"})), ToolOutcome::InvalidParams(_)));
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 1, "refused patches leave no undo step");
+
+        let ToolOutcome::Ok(units) = run(&dispatcher, "unit_system_set", json!({"unitSystem": "imperial"})) else { panic!() };
+        assert_eq!(units["unitSystem"], "imperial");
+        assert_eq!(dispatcher.with_store(|store| store.editor.config.widget("s").unwrap()["display_unit"].clone()), json!("mph"));
+        assert_eq!(fakes.preferences.saves.borrow().last().unwrap()["unitSystem"], "imperial");
+        assert!(matches!(run(&dispatcher, "unit_system_set", json!({"unitSystem": "nautical"})), ToolOutcome::InvalidParams(_)));
     }
 
     #[test]

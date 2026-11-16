@@ -16,6 +16,10 @@ export component InlineNumberInput {
     // `aria-label`: the field's accessible name.
     in property <string> label;
     callback committed(value: float);
+    // Whether it is being edited, and whether its draft is invalid: `SliderField` shows its readout
+    // instead while neither holds.
+    out property <bool> has-focus: field.has-focus;
+    out property <bool> is-invalid: root.invalid;
 
     property <string> text;
     property <bool> invalid;

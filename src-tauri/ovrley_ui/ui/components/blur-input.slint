@@ -40,7 +40,7 @@ component StepButton inherits Rectangle {
 //   `accent-border` while dirty) are kept, but the input's border is 0, as in React.
 // - Number mode: 2.75rem right padding and a 1.25rem column of step buttons; the buttons and ↑/↓
 //   step the value as `stepUp()`/`stepDown()` do and commit at once.
-// `font-size`, `mono` and `height` are the call sites' overrides (D5).
+// `font-size`, `mono`, `height`, `background` and `inset-right` are the call sites' overrides (D5).
 export component BlurInput {
     in property <string> value;
     in property <bool> number;
@@ -49,6 +49,9 @@ export component BlurInput {
     in property <bool> disabled;
     in property <length> font-size: Theme.text-sm * 1rem;
     in property <bool> mono;
+    // The clean field's fill (`bg-surface` in the widget editor); a dirty draft shows its own.
+    in property <color> background: transparent;
+    in property <length> inset-right: root.number ? 2.75rem : 0.75rem;
     // `aria-label`: the field's accessible name.
     in property <string> label;
     callback changed(value: string);
@@ -95,9 +98,9 @@ export component BlurInput {
         disabled: root.disabled;
         font-size: root.font-size;
         mono: root.mono;
-        background: root.dirty ? Theme.surface-accent-soft : transparent;
+        background: root.dirty ? Theme.surface-accent-soft : root.background;
         border-color: root.dirty ? Theme.accent-border : Theme.border.transparentize(0.3);
-        inset-right: root.number ? 2.75rem : 0.75rem;
+        inset-right: root.inset-right;
         label: root.label;
 
         focus-changed(focused) => {

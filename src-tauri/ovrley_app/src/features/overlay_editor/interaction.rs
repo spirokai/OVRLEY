@@ -1442,6 +1442,26 @@ pub fn rotate_widget(store: &mut Store, widget_id: &str, rotation: f64) -> Resul
     store.editor.edit_config(|config| config.update_widgets(&[(widget_id.to_string(), patch)]))
 }
 
+/// The widget controller's `rotate(rotation)` for an inspector draft: the rotation patch about the
+/// presented content, as the canvas rotation computes it.
+pub fn rotation_draft_patch(store: &Store, widget_id: &str, rotation: f64) -> Result<Map<String, Value>, String> {
+    let origin = widget_origin(store, widget_id)?;
+    Ok(rotation_patch(&origin.kind, &origin.data, rotation, &origin.content))
+}
+
+/// The widget controller's `resize(geometry)` for an inspector draft: the Rust resize policy from
+/// the widget's own position, with the top-left corner fixed.
+pub fn resize_draft_patch(store: &mut Store, widget_id: &str, geometry: Map<String, Value>) -> Result<Map<String, Value>, String> {
+    let origin = widget_origin(store, widget_id)?;
+    let mut request = Map::new();
+    request.insert("fixed".into(), serde_json::json!([0, 0]));
+    request.insert("point".into(), serde_json::json!([number_of(&origin.data, "x"), number_of(&origin.data, "y")]));
+    request.extend(geometry);
+    let second = store.editor.selected_second;
+    let request = resize_request(&origin, request, second, false);
+    store.preview.resize_widget(widget_id, request)
+}
+
 /// A widget's presented content rectangle, in scene pixels.
 pub fn content_rect(store: &Store, widget_id: &str) -> Option<Rect> {
     store.preview.presented().get(widget_id).map(|widget| ContentBox::of(&widget.geometry).rect)
