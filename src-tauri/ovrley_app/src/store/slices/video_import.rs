@@ -36,6 +36,16 @@ impl ClipLane {
         }
     }
 
+    /// A lane id as Slint reports it: `activity`, or `video:<id>` (`videoIdFromLaneId`, which
+    /// strips only the first prefix).
+    pub fn from_id(id: &str) -> Self {
+        if id == ACTIVITY_LANE_ID {
+            Self::Activity
+        } else {
+            Self::Video(id.strip_prefix("video:").unwrap_or(id).to_string())
+        }
+    }
+
     /// `videoIdFromLaneId`.
     pub fn video_id(&self) -> Option<&str> {
         match self {
@@ -321,6 +331,14 @@ pub(crate) mod tests {
         dispatcher.dispatch(|store, _| assert!(undo(store)));
         assert!(edits(&dispatcher).cuts.is_empty());
         assert!(!edits(&dispatcher).segments.contains_key(&cut_id));
+    }
+
+    #[test]
+    fn lane_ids_name_the_activity_or_a_video() {
+        assert_eq!(ClipLane::from_id("activity"), ClipLane::Activity);
+        assert_eq!(ClipLane::from_id("video:clip-a").video_id(), Some("clip-a"));
+        assert_eq!(ClipLane::from_id("video:video:nested").video_id(), Some("video:nested"));
+        assert_eq!(ClipLane::Video("a".into()).id(), "video:a");
     }
 
     #[test]

@@ -14,6 +14,73 @@ export struct MajorTickView {
     label: string,
 }
 
+// Where a marker's hit area and line sit against its edge.
+export enum MarkerAlign { start, center, end }
+
+// A clip on a lane (D8), in timeline pixels; what sits inside it is relative to its box.
+export struct ClipView {
+    lane-id: string,
+    x: length,
+    width: length,
+    label: string,
+    duration-label: string,
+    format-label: string,
+    missing: bool,
+    show-text: bool,
+    text-x: length,
+    text-width: length,
+    badge-x: length,
+    badge-max-width: length,
+    selected: bool,
+    has-selected-segment: bool,
+    has-warnings: bool,
+}
+
+// A segment of a video clip, in timeline pixels, with the stripes of an excluded one.
+export struct SegmentView {
+    lane-id: string,
+    key: string,
+    x: length,
+    width: length,
+    excluded: bool,
+    missing: bool,
+    seam-before: bool,
+    seam-after: bool,
+    selected: bool,
+    stripes: string,
+}
+
+// A striped span: an overlap band or an activity trim mask.
+export struct BandView {
+    x: length,
+    width: length,
+    stripes: string,
+}
+
+// A cut marker (`cut-id` a cut, `edge-start` or `edge-end`) or an activity trim handle (lane
+// `activity`, `cut-id` `start` or `end`). `x` is its edge.
+export struct MarkerView {
+    lane-id: string,
+    cut-id: string,
+    x: length,
+    align: MarkerAlign,
+    line-inside: bool,
+    label: string,
+    dragging: bool,
+    removable: bool,
+}
+
+// The hovered clip's tooltip; its anchor in timeline pixels.
+export struct ClipTooltipView {
+    visible: bool,
+    lane-id: string,
+    anchor-x: length,
+    title: string,
+    duration-label: string,
+    metrics: string,
+    warnings: [string],
+}
+
 // The player feature's global (D5), written by `src/features/player.rs`.
 export global Player {
     // `hasActivity || hasVideo`: the player shows.
@@ -45,6 +112,22 @@ export global Player {
     in property <bool> guideline-visible;
     in property <length> guideline-x;
 
+    // The video lane.
+    in property <bool> video-lane-visible;
+    in property <[ClipView]> video-clips;
+    in property <[SegmentView]> segments;
+    in property <[BandView]> overlap-bands;
+    in property <[MarkerView]> cut-markers;
+    // The activity lane.
+    in property <bool> activity-lane-visible;
+    in property <bool> activity-clip-visible;
+    in property <ClipView> activity-clip;
+    in property <[BandView]> trim-masks;
+    in property <[MarkerView]> trim-markers;
+    in property <ClipTooltipView> tooltip;
+    // The tooltip's warnings, one per line.
+    in property <string> tooltip-warning-text;
+
     callback play();
     callback pause();
     callback reset-to-start();
@@ -59,6 +142,10 @@ export global Player {
     // Pointer events of the axis, the playhead and the lane background.
     callback surface-pointer(surface: TimelineSurfaceKind, phase: PointerPhase, x: length);
     callback wheel(delta-y: length, x: length, ctrl: bool);
+    // A clip's pointer events and hover; a marker's pointer events.
+    callback clip-pointer(lane-id: string, phase: PointerPhase, x: length);
+    callback clip-hover(lane-id: string, hovered: bool);
+    callback marker-pointer(lane-id: string, cut-id: string, phase: PointerPhase, x: length);
     // The timeline's width and absolute x (D8), when they change.
     callback timeline-metrics(width: length, x: length, rem: length);
 }

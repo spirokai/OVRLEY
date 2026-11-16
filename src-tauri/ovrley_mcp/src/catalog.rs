@@ -209,7 +209,7 @@ pub fn tools() -> Vec<ToolDefinition> {
             description: "Describes the open OVRLEY window: the app version, the language, the left drawer, the activity \
                           (file, format, duration, laps and which are disabled), the template (source, name, save status), the \
                           unit system, the widgets (id, type, name, position, selected), whether undo and redo are available, and \
-                          playback (state, playhead, timeline minimum and total duration). The project and video sections are empty \
+                          playback (state, playhead, timeline minimum and total duration) and the activity trim. The project and video sections are empty \
                           until those features arrive.",
             input_schema: input_schema::<NoArguments>(),
             read_only: true,
@@ -412,6 +412,7 @@ fn summary(store: &Store) -> Value {
         "activity": describe_activity(store),
         "video": null,
         "playback": crate::player::describe_playback(store),
+        "activityTrim": crate::player::describe_activity_trim(store),
         "widgets": describe_widgets(store),
         "history": { "canUndo": store.history.can_undo(), "canRedo": store.history.can_redo() },
     })

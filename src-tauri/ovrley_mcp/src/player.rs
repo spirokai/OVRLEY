@@ -21,6 +21,18 @@ pub struct PlayheadSeekArguments {
     pub second: f64,
 }
 
+/// New trim edges.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct ActivityTrimSetArguments {
+    /// The first activity second to keep. It stays inside the activity and at least 1 s before the end.
+    #[serde(default)]
+    pub start_second: Option<f64>,
+    /// The last activity second to keep. It stays inside the activity and at least 1 s after the start.
+    #[serde(default)]
+    pub end_second: Option<f64>,
+}
+
 pub fn tools() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
@@ -46,12 +58,37 @@ pub fn tools() -> Vec<ToolDefinition> {
             input_schema: input_schema::<PlayheadSeekArguments>(),
             read_only: false,
         },
+        ToolDefinition {
+            name: "activity_trim_set",
+            title: "Trim the activity",
+            description: "Trims the activity to the part an overlay export renders when no video decides it, as dragging the \
+                          activity lane's edge handles does: give start_second and/or end_second in activity seconds. Each edge stays \
+                          inside the activity and the edges at least 1 s apart; a trim covering the whole activity is no trim. One undo \
+                          step.",
+            input_schema: input_schema::<ActivityTrimSetArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "activity_trim_reset",
+            title: "Reset the activity trim",
+            description: "Removes the activity trim, so the whole activity renders, as Mod+X does. One undo step.",
+            input_schema: input_schema::<NoArguments>(),
+            read_only: false,
+        },
     ]
 }
 
 fn arguments<T: DeserializeOwned>(value: Value) -> Result<T, ToolOutcome> {
     let value = if value.is_null() { json!({}) } else { value };
     serde_json::from_value(value).map_err(|error| ToolOutcome::InvalidParams(format!("Invalid arguments: {error}")))
+}
+
+/// The activity trim part of `ovrley_summary`: `null` for the whole activity.
+pub fn describe_activity_trim(store: &Store) -> Value {
+    match store.media.activity_trim {
+        Some(trim) => json!({ "startSecond": trim.start_second, "endSecond": trim.end_second }),
+        None => Value::Null,
+    }
 }
 
 /// The playback part of `ovrley_summary`.
@@ -100,6 +137,29 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &m
             playback::commit_scrub(store, arguments.second);
             now(json!({ "playback": describe_playback(store) }))
         }),
+        "activity_trim_set" => arguments::<ActivityTrimSetArguments>(arguments_value).and_then(|arguments| {
+            use ovrley_app::lib::activity::{trim_activity_edge, TrimEdge};
+            let Some(duration) = store.media.activity_summary.as_ref().map(|summary| summary.duration_seconds) else {
+                return Err(ToolOutcome::Failed("No activity is loaded.".into()));
+            };
+            if arguments.start_second.is_none() && arguments.end_second.is_none() {
+                return Err(ToolOutcome::InvalidParams("Give start_second, end_second or both.".into()));
+            }
+            let mut trim = store.media.activity_trim;
+            for (edge, second) in [(TrimEdge::Start, arguments.start_second), (TrimEdge::End, arguments.end_second)] {
+                let Some(second) = second else { continue };
+                if !second.is_finite() {
+                    return Err(ToolOutcome::InvalidParams("Trim edges must be finite numbers".into()));
+                }
+                trim = trim_activity_edge(trim, duration, edge, second);
+            }
+            store.media.set_activity_trim(trim);
+            now(json!({ "activityTrim": describe_activity_trim(store) }))
+        }),
+        "activity_trim_reset" => arguments::<NoArguments>(arguments_value).and_then(|_| {
+            store.media.set_activity_trim(None);
+            now(json!({ "activityTrim": describe_activity_trim(store) }))
+        }),
         _ => return None,
     })
 }
@@ -140,6 +200,20 @@ pub(crate) mod tests {
             ToolOutcome::Ok(value) => value,
             other => panic!("expected a result, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn the_activity_trim_is_set_and_reset_in_one_undo_step_each() {
+        let dispatcher = dispatcher_with(with_activity(60.0));
+        let trimmed = ok(run(&dispatcher, "activity_trim_set", json!({ "startSecond": 10, "endSecond": 50 })));
+        assert_eq!(trimmed["activityTrim"], json!({ "startSecond": 10.0, "endSecond": 50.0 }));
+        let clamped = ok(run(&dispatcher, "activity_trim_set", json!({ "endSecond": 5 })));
+        assert_eq!(clamped["activityTrim"]["endSecond"], 11.0, "edges stay 1 s apart");
+        assert_eq!(ok(run(&dispatcher, "activity_trim_reset", json!({})))["activityTrim"], Value::Null);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 3);
+        assert_eq!(ok(run(&dispatcher, "ovrley_summary", json!({})))["activityTrim"], Value::Null);
+        assert!(matches!(run(&dispatcher, "activity_trim_set", json!({})), ToolOutcome::InvalidParams(_)));
+        assert!(matches!(run(&dispatcher_with(Store::default()), "activity_trim_set", json!({ "startSecond": 1 })), ToolOutcome::Failed(_)));
     }
 
     #[test]

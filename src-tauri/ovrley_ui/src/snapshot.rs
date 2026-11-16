@@ -38,6 +38,12 @@ fn tour() -> Vec<Step> {
             let ride = ovrley_services::runtime_paths::source_repo_root().join("src-tauri/ovrley_core/tests/fixtures/activity/test-ride.fit");
             ovrley_app::features::app_shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);
         }),
+        ("activity-trimmed", |store, _| {
+            let duration = store.media.activity_summary.as_ref().map_or(0.0, |summary| summary.duration_seconds);
+            store.media.set_activity_trim(Some(ovrley_app::lib::activity::ActivityTrim { start_second: duration * 0.1, end_second: duration * 0.8 }));
+            store.editor.set_selected_second(duration * 0.4);
+            store.player.hovered_lane = Some(ovrley_app::store::slices::video_import::ClipLane::Activity);
+        }),
         ("widget-selected", |store, _| {
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();

@@ -7,7 +7,10 @@
 //! paused.
 
 use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
-use crate::{AppWindow, Choice, ChoiceKind, MajorTickView, Player, PointerPhase, TimelineSurfaceKind};
+use crate::{AppWindow, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TimelineSurfaceKind};
+use ovrley_app::features::player::lanes::{self, MarkerTarget};
+use ovrley_app::lib::activity::TrimEdge;
+use ovrley_app::store::slices::video_import::ClipLane;
 use ovrley_app::features::player::gestures::{surface_cancel, surface_down, surface_move, surface_up, SurfaceGesture};
 use ovrley_app::features::player::playback::{self, player_timing};
 use ovrley_app::features::player::viewport::{self, compute_tick_strip, fit_targets, matching_fit_target, tick_placement, zoom_limits, FitTargetId, TickPlacement};
@@ -95,6 +98,7 @@ impl Projection {
         // The playhead's line centre (6.5 px into its 13 px) sits on the playhead.
         let playhead = metrics.snap_to_screen_pixel(px(timing.clamped_playhead) - 6.5);
         set_if_changed(player.get_playhead_x(), playhead as f32, |value| player.set_playhead_x(value));
+        project_lanes(&player, store);
         self.drive_playback(store);
     }
 
@@ -122,6 +126,113 @@ impl Projection {
         replace_if_changed(player.get_minor_ticks(), minor.clone(), |model| player.set_minor_ticks(model));
         let offset = metrics.round_to_device_pixel((placement.anchor_second - view.view_start) * placement.px_per_second);
         set_if_changed(player.get_strip_offset(), offset as f32, |value| player.set_strip_offset(value));
+    }
+}
+
+fn clip_view(clip: &lanes::ClipView) -> ClipView {
+    ClipView {
+        lane_id: clip.lane.id().into(),
+        x: clip.x as f32,
+        width: clip.width as f32,
+        label: clip.label.as_str().into(),
+        duration_label: clip.duration_label.as_str().into(),
+        format_label: clip.format_label.as_str().into(),
+        missing: clip.missing,
+        show_text: clip.show_text,
+        text_x: clip.text_x as f32,
+        text_width: clip.text_width as f32,
+        badge_x: clip.badge_x as f32,
+        badge_max_width: clip.badge_max_width as f32,
+        selected: clip.selected,
+        has_selected_segment: clip.has_selected_segment,
+        has_warnings: clip.has_warnings,
+    }
+}
+
+fn band_view(band: &lanes::BandView) -> BandView {
+    BandView { x: band.x as f32, width: band.width as f32, stripes: band.stripes.as_str().into() }
+}
+
+fn marker_view(marker: &lanes::MarkerView) -> MarkerView {
+    let (lane_id, cut_id) = match &marker.target {
+        MarkerTarget::Cut { video_id, cut_id } => (ClipLane::Video(video_id.clone()).id(), cut_id.clone()),
+        MarkerTarget::ActivityTrim(edge) => (ClipLane::Activity.id(), if *edge == TrimEdge::Start { "start".into() } else { "end".into() }),
+    };
+    MarkerView {
+        lane_id: lane_id.into(),
+        cut_id: cut_id.into(),
+        x: marker.x as f32,
+        align: match marker.align {
+            lanes::MarkerAlign::Start => MarkerAlign::Start,
+            lanes::MarkerAlign::Center => MarkerAlign::Center,
+            lanes::MarkerAlign::End => MarkerAlign::End,
+        },
+        line_inside: marker.line_inside,
+        label: marker.label.as_str().into(),
+        dragging: marker.dragging,
+        removable: marker.removable,
+    }
+}
+
+fn project_lanes(player: &Player<'_>, store: &Store) {
+    let (video, activity) = ovrley_app::features::player::lanes_view(store);
+    set_if_changed(player.get_video_lane_visible(), video.is_some(), |value| player.set_video_lane_visible(value));
+    set_if_changed(player.get_activity_lane_visible(), activity.is_some(), |value| player.set_activity_lane_visible(value));
+    let video = video.unwrap_or_default();
+    replace_if_changed(player.get_video_clips(), video.clips.iter().map(clip_view).collect(), |model| player.set_video_clips(model));
+    let segments = video
+        .segments
+        .iter()
+        .map(|segment| SegmentView {
+            lane_id: ClipLane::Video(segment.video_id.clone()).id().into(),
+            key: segment.key.as_str().into(),
+            x: segment.x as f32,
+            width: segment.width as f32,
+            excluded: segment.excluded,
+            missing: segment.missing,
+            seam_before: segment.seam_before,
+            seam_after: segment.seam_after,
+            selected: segment.selected,
+            stripes: segment.stripes.as_str().into(),
+        })
+        .collect();
+    replace_if_changed(player.get_segments(), segments, |model| player.set_segments(model));
+    replace_if_changed(player.get_overlap_bands(), video.bands.iter().map(band_view).collect(), |model| player.set_overlap_bands(model));
+    replace_if_changed(player.get_cut_markers(), video.cut_markers.iter().map(marker_view).collect(), |model| player.set_cut_markers(model));
+
+    let activity_clip = activity.as_ref().and_then(|lane| lane.clip.as_ref());
+    set_if_changed(player.get_activity_clip_visible(), activity_clip.is_some(), |value| player.set_activity_clip_visible(value));
+    if let Some(clip) = activity_clip {
+        set_if_changed(player.get_activity_clip(), clip_view(clip), |value| player.set_activity_clip(value));
+    }
+    let (masks, trim_markers) = activity.as_ref().map_or((Vec::new(), Vec::new()), |lane| (lane.masks.iter().map(band_view).collect(), lane.trim_markers.iter().map(marker_view).collect()));
+    replace_if_changed(player.get_trim_masks(), masks, |model| player.set_trim_masks(model));
+    replace_if_changed(player.get_trim_markers(), trim_markers, |model| player.set_trim_markers(model));
+
+    let tooltip = video.clips.iter().chain(activity_clip).find_map(|clip| clip.tooltip.as_ref().map(|tooltip| (clip.lane.id(), tooltip)));
+    let warning_text = tooltip.as_ref().map(|(_, tooltip)| tooltip.warnings.join("\n")).unwrap_or_default();
+    set_if_changed(player.get_tooltip_warning_text(), SharedString::from(warning_text), |value| player.set_tooltip_warning_text(value));
+    let view = match tooltip {
+        Some((lane_id, tooltip)) => ClipTooltipView {
+            visible: true,
+            lane_id: lane_id.into(),
+            anchor_x: tooltip.anchor_x as f32,
+            title: tooltip.title.as_str().into(),
+            duration_label: tooltip.duration_label.as_str().into(),
+            metrics: tooltip.metrics.as_str().into(),
+            warnings: slint::ModelRc::new(slint::VecModel::from(tooltip.warnings.iter().map(|warning| SharedString::from(warning.as_str())).collect::<Vec<_>>())),
+        },
+        None => ClipTooltipView::default(),
+    };
+    let current = player.get_tooltip();
+    let same = current.visible == view.visible
+        && current.lane_id == view.lane_id
+        && current.anchor_x == view.anchor_x
+        && current.title == view.title
+        && current.metrics == view.metrics
+        && slint::Model::iter(&current.warnings).eq(slint::Model::iter(&view.warnings));
+    if !same {
+        player.set_tooltip(view);
     }
 }
 
@@ -166,6 +277,47 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             PointerPhase::Move => surface_move(store, x),
             PointerPhase::Up => surface_up(store, x),
             PointerPhase::Cancel => surface_cancel(store),
+        });
+    });
+    let clip = dispatcher.clone();
+    player.on_clip_pointer(move |lane_id, phase, x| {
+        let lane = ClipLane::from_id(&lane_id);
+        let x = f64::from(x);
+        clip.dispatch(move |store, _| match phase {
+            PointerPhase::Down => ovrley_app::features::player::gestures::clip_down(store, lane, x),
+            PointerPhase::Move => surface_move(store, x),
+            PointerPhase::Up => surface_up(store, x),
+            PointerPhase::Cancel => surface_cancel(store),
+        });
+    });
+    let hover = dispatcher.clone();
+    player.on_clip_hover(move |lane_id, hovered| {
+        let lane = ClipLane::from_id(&lane_id);
+        hover.dispatch(move |store, _| {
+            if hovered {
+                store.player.hovered_lane = Some(lane);
+            } else if store.player.hovered_lane.as_ref() == Some(&lane) {
+                store.player.hovered_lane = None;
+            }
+        });
+    });
+    let marker = dispatcher.clone();
+    player.on_marker_pointer(move |lane_id, cut_id, phase, x| {
+        use ovrley_app::features::player::gestures::{trim_down, trim_move, trim_up};
+        let lane = ClipLane::from_id(&lane_id);
+        let x = f64::from(x);
+        let cut_id = cut_id.to_string();
+        marker.dispatch(move |store, _| {
+            if lane != ClipLane::Activity {
+                return;
+            }
+            let edge = if cut_id == "start" { TrimEdge::Start } else { TrimEdge::End };
+            match phase {
+                PointerPhase::Down => trim_down(store, edge, x),
+                PointerPhase::Move => trim_move(store, x),
+                PointerPhase::Up => trim_up(store),
+                PointerPhase::Cancel => surface_cancel(store),
+            }
         });
     });
     let wheel = dispatcher.clone();

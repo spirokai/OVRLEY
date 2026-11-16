@@ -1,6 +1,7 @@
 import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Player, PointerPhase, TimelineSurfaceKind } from "index.slint";
+import { ClipTooltip, TimelineLane } from "timeline-lane.slint";
 
 // `TimelineSurface`: the axis (`h-7`, `mt-4 mb-1`, crosshair) with its tick strip, the lane
 // background (`border` at 40%, `foreground` at 3%, `py-1`, `space-y-0.5`, `e-resize`) holding the
@@ -118,7 +119,12 @@ export component TimelineSurface {
                 padding-top: 0.25rem;
                 padding-bottom: 0.25rem;
                 spacing: 0.125rem;
-                @children
+                if Player.video-lane-visible: TimelineLane {
+                    is-video: true;
+                }
+                if Player.activity-lane-visible: TimelineLane {
+                    is-video: false;
+                }
             }
             // `bg-success` with a 6px glow.
             if Player.guideline-visible: Rectangle {
@@ -168,5 +174,12 @@ export component TimelineSurface {
                 Player.surface-pointer(TimelineSurfaceKind.playhead, PointerPhase.move, Player.playhead-x + self.x + self.mouse-x);
             }
         }
+    }
+
+    // The hovered clip's tooltip, above its lane and over the playhead (`z-1000`).
+    if Player.tooltip.visible: ClipTooltip {
+        property <length> lane-top: lanes.y + 1px + 0.25rem + (Player.tooltip.lane-id == "activity" && Player.video-lane-visible ? 3rem + 0.125rem : 0px);
+        y: self.lane-top - self.height - 0.5rem;
+        tooltip: Player.tooltip;
     }
 }
