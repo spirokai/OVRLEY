@@ -39,6 +39,11 @@ pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes:
     let dragged_edge = store.player.trim_drag.and_then(|drag| drag.draft.map(|_| drag.edge));
     let draft = store.player.cut_drag.as_ref().and_then(gestures::CutDrag::draft);
     let clips = gestures::apply_cut_draft(&displayed.clips, draft.as_ref());
+    let joins = if sync { Vec::new() } else { crate::features::transitions::join_models(displayed, store.i18n.language) };
+    let dragged_segment = draft.as_ref().and_then(|draft| {
+        let clip = displayed.clips.iter().find(|clip| clip.id() == draft.video_id)?;
+        crate::lib::video_program::edits::segment_before_cut(&clip.edits, &draft.cut_id).ok().map(|key| (draft.video_id.clone(), key))
+    });
     let selected = gestures::apply_cut_draft_to_selection(store.video_import.selected_clip.as_ref(), draft.as_ref());
     let inputs = lanes::LaneInputs {
         view: store.editor.timeline_viewport,
@@ -56,6 +61,8 @@ pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes:
         show_cut_markers: !sync,
         dragged_cut: draft.as_ref().map(|draft| (draft.video_id.as_str(), draft.cut_id.as_str())),
         filmstrips: &store.video_filmstrip,
+        joins: &joins,
+        dragged_segment: dragged_segment.as_ref().map(|(video, key)| (video.as_str(), key.as_str())),
     };
     (lanes::video_lane(&inputs), lanes::activity_lane(&inputs))
 }
@@ -112,6 +119,8 @@ pub struct PlayerState {
     pub cut_drag: Option<gestures::CutDrag>,
     /// The real cut whose "Remove cut" popover is open: `(video id, cut id)`.
     pub cut_popover: Option<(String, String)>,
+    /// The open join's transition panel (D13).
+    pub join_panel: Option<crate::features::transitions::JoinPanelState>,
     /// An agent waiting for the user's answer to the cut removal question (D19).
     pub cut_removal_reply: Option<crate::store::agent::AgentReply>,
     /// A keyboard nudge of a clip, waiting for its key release (D11).

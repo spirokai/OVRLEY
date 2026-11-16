@@ -1,0 +1,20 @@
+// The transitions feature's preview sprite sheet (D13): one animated frame every tile shares, each
+// tile clipping its transition's cell. Written by `src/features/transitions.rs`.
+export global TransitionPreviews {
+    in property <image> frame;
+    // The sheet's grid: cells of `cell-width` × `cell-height` pixels, `columns` per row.
+    in property <int> columns: 8;
+    in property <int> cell-width: 120;
+    in property <int> cell-height: 68;
+}
+
+export enum TransitionOptionKind { default, none, xfade }
+
+// One picker option: its value (`default`, `none` or an `xfade` name), its label, and for an
+// `xfade` its catalogue index (its cell in the sheet).
+export struct TransitionOption {
+    kind: TransitionOptionKind,
+    value: string,
+    label: string,
+    index: int,
+}

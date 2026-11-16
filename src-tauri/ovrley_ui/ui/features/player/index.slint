@@ -1,4 +1,5 @@
 import { Choice } from "../../components/logic.slint";
+import { TransitionOption } from "../transitions/index.slint";
 
 // A pointer event a timeline element reports to Rust (D9), with its x in timeline coordinates.
 export enum PointerPhase { down, move, up, cancel }
@@ -83,6 +84,21 @@ export struct MarkerView {
     removable: bool,
 }
 
+// A join's marker (D13): a diamond at the end of its outgoing piece, the transition window shaded.
+export struct JoinMarkerView {
+    key: string,
+    x: length,
+    visible: bool,
+    has-band: bool,
+    band-x: length,
+    band-width: length,
+    invalid: bool,
+    has-transition: bool,
+    // A default that did not fit: a dashed, disabled diamond with the reason in a tooltip.
+    disabled-reason: string,
+    label: string,
+}
+
 // The hovered clip's tooltip; its anchor in timeline pixels.
 export struct ClipTooltipView {
     visible: bool,
@@ -158,6 +174,29 @@ export global Player {
     in property <string> cut-popover-cut;
     // A removed cut waits for the user's choice (D19).
     in property <bool> cut-removal-open;
+
+    in property <[JoinMarkerView]> joins;
+    // The open join panel.
+    in property <string> join-panel-key;
+    in property <string> join-label;
+    in property <int> join-preview-index: -1;
+    in property <bool> join-duration-visible;
+    in property <string> join-duration-text;
+    in property <string> join-duration-preview;
+    in property <string> join-duration-error;
+    in property <string> join-error;
+    in property <[TransitionOption]> join-options;
+    in property <string> join-value;
+    in property <string> join-filter;
+
+    callback open-join(key: string);
+    callback close-join();
+    callback join-chosen(value: string);
+    callback join-filter-edited(text: string);
+    callback join-duration-edited(text: string);
+    callback join-duration-key(text: string, alt: bool, control: bool, shift: bool, meta: bool) -> bool;
+    callback join-duration-key-up(text: string) -> bool;
+    callback join-duration-blurred();
 
     callback trim(start: bool);
     callback cut();

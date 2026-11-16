@@ -27,7 +27,7 @@ ovrley_widgets = { path = "../ovrley_widgets" }
 ovrley_core = { path = "../ovrley_core" }
 ovrley_mcp = { path = "../ovrley_mcp" }
 arboard = { version = "3.7", default-features = false }
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
 log = "0.4"
 serde_json = "1.0"

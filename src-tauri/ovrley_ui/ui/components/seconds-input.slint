@@ -1,0 +1,72 @@
+import { Theme } from "../theme/theme.slint";
+import { AppText } from "app-text.slint";
+import { Input } from "input.slint";
+
+// seconds-input.jsx: the one input for times and durations, typed as a clock (`05:30`), as plain
+// seconds, or as a sum (`05:30+10`). Rust owns the field (`lib/seconds_input.rs`): it accepts or
+// refuses each edit, commits on Enter, blur and a step's key release, and discards on Escape. Below
+// the field: the error (0.65rem `destructive`) or the preview (0.65rem muted). With `show-unit` a
+// `SEC` unit sits inside the field's right edge. The step buttons and the placement slot arrive
+// with their first callers (scene settings, the video drawer).
+export component SecondsInput inherits VerticalLayout {
+    in property <string> text;
+    in property <string> preview;
+    in property <string> error;
+    in property <string> label;
+    in property <bool> show-unit;
+    in property <length> field-height: 2.25rem;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    callback edited(text: string);
+    // A key in the field; returns whether Rust used it.
+    callback key(text: string, alt: bool, control: bool, shift: bool, meta: bool) -> bool;
+    callback key-up(text: string) -> bool;
+    callback blurred();
+
+    spacing: 0.25rem;
+    Rectangle {
+        height: root.field-height;
+        field := Input {
+            text: root.text;
+            label: root.label;
+            invalid: root.error != "";
+            font-size: root.font-size;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            inset-right: root.show-unit ? 2.25rem : 0.75rem;
+            edited(text) => {
+                root.edited(text);
+            }
+            accepted => {
+                root.key("\n", false, false, false, false);
+            }
+            key-pressed(event) => {
+                root.key(event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta) ? accept : reject
+            }
+            key-released(event) => {
+                root.key-up(event.text) ? accept : reject
+            }
+            focus-changed(focused) => {
+                if !focused {
+                    root.blurred();
+                }
+            }
+        }
+        if root.show-unit: AppText {
+            x: parent.width - self.width - 0.5rem;
+            content: @tr("components.secondsUnit" => "SEC");
+            font-size: Theme.text-xs * 1rem;
+            color: Theme.muted-foreground;
+        }
+    }
+    if root.error != "": AppText {
+        content: root.error;
+        font-size: 0.65rem;
+        color: Theme.destructive;
+        wrap: word-wrap;
+    }
+    if root.error == "" && root.preview != "": AppText {
+        content: root.preview;
+        font-size: 0.65rem;
+        color: Theme.muted-foreground;
+    }
+}

@@ -44,6 +44,8 @@ export component Input {
     callback focus-changed(focused: bool);
     // Keys before the field handles them; return `accept` to consume a key.
     callback key-pressed(event: KeyEvent) -> EventResult;
+    // Key releases, for a step that commits when its key comes up (SecondsInput).
+    callback key-released(event: KeyEvent) -> EventResult;
 
     // `focus()` reaches the field through `forward-focus`.
     public function blur() {
@@ -133,6 +135,9 @@ export component Input {
             }
             accepted => {
                 root.accepted();
+            }
+            key-released(event) => {
+                root.key-released(event)
             }
             key-pressed(event) => {
                 root.key-pressed(event)

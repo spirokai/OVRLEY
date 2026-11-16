@@ -1,0 +1,88 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { SecondsInput } from "../../components/seconds-input.slint";
+import { TransitionPicker } from "transition-picker.slint";
+import { TransitionPreview } from "transition-preview.slint";
+import { Player } from "../player/index.slint";
+
+// `JoinTransitionPanel`: a `h-7` row with the effective transition's preview (1rem × 1.75rem, 2px
+// radius), its label (`text-xs`, medium, elided) and its duration in a `SecondsInput` (`h-7`,
+// `w-24`, frame-snapped, `SEC`); the error (0.65rem `destructive`); then the picker below a
+// `border` at 40%.
+export component JoinTransitionPanel inherits VerticalLayout {
+    spacing: 0.5rem;
+    HorizontalLayout {
+        spacing: 0.5rem;
+        height: 1.75rem;
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            spacing: 0.5rem;
+            if Player.join-preview-index >= 0: VerticalLayout {
+                alignment: center;
+                TransitionPreview {
+                    width: 1.75rem;
+                    height: 1rem;
+                    index: Player.join-preview-index;
+                }
+            }
+            AppText {
+                content: Player.join-label;
+                uppercase: false;
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-medium;
+                overflow: elide;
+                min-width: 0px;
+                horizontal-stretch: 1;
+            }
+        }
+        if Player.join-duration-visible: SecondsInput {
+            width: 6rem;
+            field-height: 1.75rem;
+            font-size: Theme.text-xs * 1rem;
+            show-unit: true;
+            label: @tr("transitions.duration" => "Transition duration");
+            text: Player.join-duration-text;
+            preview: Player.join-duration-preview;
+            error: Player.join-duration-error;
+            edited(text) => {
+                Player.join-duration-edited(text);
+            }
+            key(text, alt, control, shift, meta) => {
+                Player.join-duration-key(text, alt, control, shift, meta)
+            }
+            key-up(text) => {
+                Player.join-duration-key-up(text)
+            }
+            blurred => {
+                Player.join-duration-blurred();
+            }
+        }
+    }
+    if Player.join-error != "": AppText {
+        content: Player.join-error;
+        font-size: 0.65rem;
+        color: Theme.destructive;
+        wrap: word-wrap;
+    }
+    VerticalLayout {
+        padding-top: 0.5rem;
+        Rectangle {
+            height: 1px;
+            background: Theme.border.transparentize(0.6);
+        }
+        VerticalLayout {
+            padding-top: 0.5rem;
+            TransitionPicker {
+                options: Player.join-options;
+                value: Player.join-value;
+                filter: Player.join-filter;
+                filter-edited(text) => {
+                    Player.join-filter-edited(text);
+                }
+                chosen(value) => {
+                    Player.join-chosen(value);
+                }
+            }
+        }
+    }
+}

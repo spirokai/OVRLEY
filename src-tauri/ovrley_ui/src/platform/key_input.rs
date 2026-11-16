@@ -18,7 +18,8 @@ pub struct SlintModifiers {
 }
 
 fn named_key(text: &str) -> Option<&'static str> {
-    let named: [(Key, &str); 10] = [
+    let named: [(Key, &str); 11] = [
+        (Key::Return, "enter"),
         (Key::Escape, "escape"),
         (Key::LeftArrow, "arrowleft"),
         (Key::RightArrow, "arrowright"),
@@ -35,7 +36,8 @@ fn named_key(text: &str) -> Option<&'static str> {
 
 /// The matcher's input for a key press. `macos` selects the modifier swap.
 pub fn key_input(text: &str, modifiers: SlintModifiers, repeat: bool, macos: bool) -> KeyInput {
-    let key = named_key(text).map_or_else(|| text.to_lowercase(), str::to_string);
+    // A field's `accepted` reports Enter as a line feed.
+    let key = if text == "\n" { "enter".to_string() } else { named_key(text).map_or_else(|| text.to_lowercase(), str::to_string) };
     let (ctrl, meta) = if macos { (modifiers.meta, modifiers.control) } else { (modifiers.control, modifiers.meta) };
     KeyInput {
         key,

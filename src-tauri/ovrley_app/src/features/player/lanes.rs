@@ -209,8 +209,24 @@ pub struct MarkerView {
     pub removable: bool,
 }
 
+/// A join's marker: a diamond at the end of its outgoing piece, the transition window shaded.
+#[derive(Clone, Debug, PartialEq)]
+pub struct JoinMarkerView {
+    pub key: String,
+    pub x: f64,
+    /// The diamond shows (its second is in view); the window may show without it.
+    pub visible: bool,
+    pub band: Option<(f64, f64)>,
+    pub invalid: bool,
+    pub has_transition: bool,
+    /// A default that did not fit: the disabled marker's reason.
+    pub disabled_reason: Option<String>,
+    pub label: String,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VideoLaneView {
+    pub joins: Vec<JoinMarkerView>,
     pub clips: Vec<ClipView>,
     pub segments: Vec<SegmentView>,
     pub tiles: Vec<TileView>,
@@ -248,6 +264,10 @@ pub struct LaneInputs<'a> {
     /// The cut being dragged: `(video id, cut id)`.
     pub dragged_cut: Option<(&'a str, &'a str)>,
     pub filmstrips: &'a crate::store::slices::video_filmstrip::VideoFilmstripSlice,
+    /// The displayed joins' models, or none where joins are not edited (video sync).
+    pub joins: &'a [crate::features::transitions::JoinModel],
+    /// The segment before a dragged cut, whose join hides until the drop: `(video id, key)`.
+    pub dragged_segment: Option<(&'a str, &'a str)>,
 }
 
 fn text(locale: Locale, key: &str, default: &'static str) -> String {
@@ -494,6 +514,30 @@ pub fn video_lane(inputs: &LaneInputs<'_>) -> Option<VideoLaneView> {
     if inputs.show_cut_markers {
         lane.cut_markers = cut_markers(&sorted, inputs);
     }
+    let width_px = inputs.metrics.width_px;
+    lane.joins = inputs
+        .joins
+        .iter()
+        .filter(|join| inputs.dragged_segment != Some((join.from_video_id.as_str(), join.from_segment_key.as_str())))
+        .filter_map(|join| {
+            let window = join.duration_seconds.unwrap_or(0.0);
+            let band = (window > 0.0).then(|| clip_geometry(join.end_second - window, window, inputs.view, width_px)).flatten().map(|(x, width)| {
+                let (x, width, _) = visible_span(x, width, width_px);
+                (x, width)
+            });
+            let visible = join.end_second >= inputs.view.view_start && join.end_second <= inputs.view.view_end;
+            (visible || band.is_some()).then(|| JoinMarkerView {
+                key: join.key.clone(),
+                x: seconds_to_view_px(join.end_second, inputs.view, width_px),
+                visible,
+                band,
+                invalid: join.error.is_some(),
+                has_transition: window > 0.0,
+                disabled_reason: join.skipped_default.map(|skipped| crate::features::transitions::skipped_default_label(skipped, inputs.locale)),
+                label: interpolate(&text(inputs.locale, "player.joinTransition", "Join: {{transition}}"), &[("transition", &join.label)]),
+            })
+        })
+        .collect();
     Some(lane)
 }
 
@@ -629,6 +673,8 @@ mod tests {
             show_cut_markers: true,
             dragged_cut: None,
             filmstrips: &fixture.filmstrips,
+            joins: &[],
+            dragged_segment: None,
         }
     }
 

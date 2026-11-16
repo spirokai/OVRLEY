@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn lists_the_windows_over_a_stretch() {
-        let windows = |level, from, to| filmstrip_zoom_windows(level, from, to, 7200.0).into_iter().map(|window| window_key(window)).collect::<Vec<_>>();
+        let windows = |level, from, to| filmstrip_zoom_windows(level, from, to, 7200.0).into_iter().map(window_key).collect::<Vec<_>>();
         assert_eq!(windows(0, 200.0, 500.0), ["z0-0", "z0-1", "z0-2"]);
         assert_eq!(windows(0, 240.0, 480.0), ["z0-1"]);
         assert_eq!(windows(0, 7100.0, 9000.0), ["z0-29"]);
