@@ -135,6 +135,7 @@ export component ColorField inherits VerticalLayout {
     HexColorPicker {
         value: root.value;
         disabled: root.disabled;
+        field-background: Theme.surface;
         changed(hex) => {
             root.changed(hex);
         }

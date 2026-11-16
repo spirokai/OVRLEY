@@ -34,6 +34,8 @@ export component HexColorPicker {
     in property <bool> show-value: true;
     in property <bool> custom-trigger;
     in property <[string]> preset-colors: ["#ffffff", "#afeeee", "#40e0d0", "#005b5b", "#c65102", "#000000"];
+    // The hex field's fill, the call site's override (D5): the widget editor's fields sit on `surface`.
+    in property <color> field-background: transparent;
     out property <bool> is-open: popup.is-open;
     callback changed(hex: string);
 
@@ -154,6 +156,7 @@ export component HexColorPicker {
             disabled: root.disabled;
             mono: true;
             font-size: 0.815rem;
+            background: root.field-background;
             focus-changed(focused) => {
                 if focused {
                     root.hex-text = root.shown-value;

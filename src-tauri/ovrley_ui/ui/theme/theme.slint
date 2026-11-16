@@ -95,6 +95,9 @@ export global Theme {
     out property <float> text-xs-line-height: 1 / 0.75;
     out property <float> text-sm: 0.875;
     out property <float> text-sm-line-height: 1.25 / 0.875;
+    // Not in index.css: the text inside form fields (inputs and select triggers) draws 10% larger
+    // than the size its call site passes. Field heights are fixed, so this changes only the text.
+    out property <float> field-text-scale: 1.1;
     out property <float> text-base: 1;
     out property <float> text-base-line-height: 1.5;
     out property <float> text-lg: 1.125;

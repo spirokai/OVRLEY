@@ -62,6 +62,7 @@ export component Input {
     }
 
     property <bool> inline: root.variant == InputVariant.inline;
+    property <length> text-size: root.font-size * Theme.field-text-scale;
     property <length> radius: (root.inline ? Theme.radius-xs : Theme.radius-sm) * 1rem;
     // The last text a number input accepted: captured on focus and after each valid edit, and
     // restored when other characters are typed.
@@ -96,7 +97,7 @@ export component Input {
             content: root.placeholder;
             uppercase: false;
             mono: root.mono;
-            font-size: root.font-size;
+            font-size: root.text-size;
             color: Theme.muted-foreground;
             horizontal-alignment: root.horizontal-alignment;
             overflow: clip;
@@ -112,7 +113,7 @@ export component Input {
             read-only: root.read-only;
             single-line: true;
             font-family: root.mono ? Theme.font-mono : Theme.font-sans;
-            font-size: root.font-size;
+            font-size: root.text-size;
             letter-spacing: self.font-size * Theme.tracking-root;
             color: root.text-color;
             horizontal-alignment: root.horizontal-alignment;

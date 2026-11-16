@@ -149,7 +149,7 @@ export component Select {
             color: root.selected-index >= 0 ? Theme.foreground : Theme.muted-foreground;
             mono: root.mono;
             uppercase: root.uppercase;
-            font-size: root.font-size;
+            font-size: root.font-size * Theme.field-text-scale;
             line-height: Theme.text-sm-line-height;
             max-lines: 1;
             overflow: elide;
