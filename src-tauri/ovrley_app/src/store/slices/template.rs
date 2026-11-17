@@ -1,10 +1,9 @@
-//! Port of `store/slices/createTemplateSlice.js`, Phase 3 part. Global-default and aspect-ratio
-//! actions arrive with scene settings in Phase 5; their fields are here because the preview and
-//! the history need them.
+//! Port of `store/slices/createTemplateSlice.js`: the loaded template, the global defaults and the
+//! aspect ratio.
 
 use super::editor::{default_config, EditorSlice};
-use ovrley_core::normalize::template::{template_manifest, DurableTemplateState};
-use ovrley_widgets::model::document::OverlayConfig;
+use ovrley_core::normalize::template::{normalize_global_defaults, template_manifest, DurableTemplateState};
+use ovrley_widgets::model::document::{is_color_field_key, normalize_color_fields, LabelStyle, OverlayConfig};
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::rc::Rc;
@@ -98,6 +97,76 @@ pub fn hydrate_template_state(editor: &mut EditorSlice, template: &mut TemplateS
     template.loaded_template_source = source;
 }
 
+/// The scale a global-default map holds (`globalDefaults.scale`, validated at ingress).
+fn scale(defaults: &Map<String, Value>) -> f64 {
+    defaults.get("scale").and_then(Value::as_f64).expect("global defaults carry a scale")
+}
+
+/// `setGlobalDefault`: one global default, applied to the existing widgets. A scale change first
+/// moves every widget about `scale_origin` (the widgets' bounds). Applying `font_text` resolves the
+/// labels' styles in the new family through `label_style`.
+pub fn set_global_default(
+    editor: &mut EditorSlice,
+    template: &mut TemplateSlice,
+    key: &str,
+    value: Value,
+    label_style: LabelStyle,
+    scale_origin: Option<(f64, f64)>,
+) -> Result<(), String> {
+    if key == "scale" && !value.as_f64().is_some_and(|scale| scale.is_finite() && scale > 0.0) {
+        return Err("globalDefaults.scale must be a finite positive number".into());
+    }
+    let mut merged = (*template.global_defaults).clone();
+    let value = if is_color_field_key(key) {
+        let mut field = Map::new();
+        field.insert(key.into(), value);
+        normalize_color_fields(&field).remove(key).expect("normalized colours keep their key")
+    } else {
+        value
+    };
+    merged.insert(key.into(), value);
+    let next = normalize_global_defaults(Some(&merged));
+    let mut config = (*editor.config).clone();
+    if key == "scale" {
+        let factor = scale(&next) / scale(&template.global_defaults);
+        if factor != 1.0 {
+            config.scale_widget_positions(factor, scale_origin.ok_or("a scale change needs its origin")?);
+        }
+    }
+    let config = config.sync_global_defaults(&next, Some(&[key]), label_style)?;
+    template.global_defaults = Rc::new(next);
+    editor.set_config(config);
+    Ok(())
+}
+
+/// `resetGlobalDefaults`: the manifest's defaults, applied to every widget.
+pub fn reset_global_defaults(editor: &mut EditorSlice, template: &mut TemplateSlice, label_style: LabelStyle, scale_origin: Option<(f64, f64)>) -> Result<(), String> {
+    let next = template_manifest().globals.clone();
+    let mut config = (*editor.config).clone();
+    let factor = scale(&next) / scale(&template.global_defaults);
+    if factor != 1.0 {
+        config.scale_widget_positions(factor, scale_origin.ok_or("a scale change needs its origin")?);
+    }
+    let config = config.sync_global_defaults(&next, None, label_style)?;
+    template.global_defaults = Rc::new(next);
+    editor.set_config(config);
+    Ok(())
+}
+
+/// `setCustomAspectRatio`.
+pub fn set_custom_aspect_ratio(template: &mut TemplateSlice) {
+    template.aspect_ratio = "custom".into();
+}
+
+/// `setAspectRatioPreset`: the ratio and its resolution.
+pub fn set_aspect_ratio_preset(editor: &mut EditorSlice, template: &mut TemplateSlice, ratio: &str, width: u32, height: u32) {
+    template.aspect_ratio = ratio.into();
+    editor.edit_config(|config| {
+        config.scene.insert("width".into(), width.into());
+        config.scene.insert("height".into(), height.into());
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,6 +196,38 @@ mod tests {
         assert_eq!(template.loaded_template_source, None);
         assert_eq!(template.aspect_ratio, "16:9");
         assert_eq!(editor.selected_second, 30.0, "a new template keeps the playhead");
+    }
+
+    fn no_labels(_: bool, _: f64) -> Result<(bool, f64), String> {
+        panic!("no label is resolved")
+    }
+
+    #[test]
+    fn a_global_default_normalizes_and_applies_to_widgets() {
+        let mut editor = EditorSlice::default();
+        let mut template = TemplateSlice::default();
+        editor.set_config(OverlayConfig::from_value(&json!({"values": [{"id": "v", "value": "speed", "x": 100, "y": 50, "color": "#ffffff"}]})).unwrap());
+        set_global_default(&mut editor, &mut template, "color_values", json!("#FFAA00"), &no_labels, None).unwrap();
+        assert_eq!(template.global_defaults["color_values"], "#ffaa00");
+        assert_eq!(editor.config.values[0]["color"], "#ffaa00");
+        assert!(set_global_default(&mut editor, &mut template, "scale", json!(0), &no_labels, None).is_err());
+        // Scale moves widgets about the origin.
+        set_global_default(&mut editor, &mut template, "scale", json!(2), &no_labels, Some((0.0, 0.0))).unwrap();
+        assert_eq!((editor.config.values[0]["x"].clone(), editor.config.values[0]["y"].clone()), (json!(200), json!(100)));
+        reset_global_defaults(&mut editor, &mut template, &no_labels, Some((0.0, 0.0))).unwrap();
+        assert_eq!(editor.config.values[0]["x"], json!(100), "reset scales back");
+        assert_eq!(*template.global_defaults, template_manifest().globals);
+    }
+
+    #[test]
+    fn aspect_ratio_presets_set_the_scene_size() {
+        let mut editor = EditorSlice::default();
+        let mut template = TemplateSlice::default();
+        set_aspect_ratio_preset(&mut editor, &mut template, "9:16", 1080, 1920);
+        assert_eq!((template.aspect_ratio.as_str(), editor.config.scene["width"].clone(), editor.config.scene["height"].clone()), ("9:16", json!(1080), json!(1920)));
+        set_custom_aspect_ratio(&mut template);
+        assert_eq!(template.aspect_ratio, "custom");
+        assert_eq!(editor.config.scene["width"], json!(1080), "custom keeps the size");
     }
 
     #[test]

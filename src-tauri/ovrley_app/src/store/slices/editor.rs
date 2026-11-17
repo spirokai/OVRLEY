@@ -1,6 +1,6 @@
 //! Port of `store/slices/createEditorSlice.js`: the document, selection and unit system (Phase 3),
-//! and playback, the timeline viewport and mute (Phase 4). Render state arrives with Phase 7, the
-//! map view mode with Phase 5.
+//! playback, the timeline viewport and mute (Phase 4), and the map view mode and raster images
+//! (Phase 5). Render state arrives with Phase 7.
 
 use crate::lib::video_program::program::PlaybackSource;
 use ovrley_core::normalize::template::template_manifest;
@@ -61,6 +61,8 @@ pub struct EditorSlice {
     pub is_video_muted: bool,
     /// The system new widgets start in; not part of the document or its history.
     pub unit_system: UnitSystem,
+    /// The map in view mode (double-clicked to pan and zoom), if any.
+    pub map_view_widget_id: Option<String>,
 }
 
 impl Default for EditorSlice {
@@ -79,6 +81,7 @@ impl Default for EditorSlice {
             preview_playback_source: PlaybackSource::Timeline,
             is_video_muted: false,
             unit_system: UnitSystem::Metric,
+            map_view_widget_id: None,
         }
     }
 }
@@ -200,6 +203,8 @@ impl EditorSlice {
         let ids = normalize_selection_ids(widget_ids, &self.config.widget_ids());
         self.selected_widget_id = primary_selection_id(&ids, preferred);
         self.selected_widget_ids = ids;
+        // A click outside the map selects something else, which ends its view mode.
+        self.map_view_widget_id = None;
     }
 
     /// `setSelectedWidgetId`.
@@ -210,6 +215,24 @@ impl EditorSlice {
 
     pub fn set_marquee_selecting(&mut self, selecting: bool) {
         self.is_marquee_selecting = selecting;
+    }
+
+    /// `setMapViewWidgetId`.
+    pub fn set_map_view_widget_id(&mut self, widget_id: Option<&str>) {
+        self.map_view_widget_id = widget_id.map(str::to_string);
+    }
+
+    /// `setRasterImage`: the chosen image's path, size and resource, replacing a load error, as one
+    /// edit.
+    pub fn set_raster_image(&mut self, widget_id: &str, path: &str, width: u32, height: u32, resource_id: &str) -> Result<(), String> {
+        let raster = self.config.rasters.iter().find(|raster| raster.get("id").and_then(serde_json::Value::as_str) == Some(widget_id));
+        let mut raster = raster.ok_or_else(|| format!("Raster widget {widget_id} is unavailable"))?.clone();
+        raster.remove("resourceErrorCode");
+        raster.insert("path".into(), path.into());
+        raster.insert("width".into(), width.into());
+        raster.insert("height".into(), height.into());
+        raster.insert("resourceId".into(), resource_id.into());
+        self.edit_config(|config| config.replace_widget(widget_id, &raster))
     }
 }
 

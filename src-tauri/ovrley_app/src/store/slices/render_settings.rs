@@ -1,8 +1,7 @@
 //! Port of `store/slices/createRenderSettingsSlice.js`'s state, defaults and validation (plan D15).
 //! The player steps its clock at the render fps divided by the widget update rate, and the history
-//! records the settings. The setters arrive with scene settings (Phase 5) and the render dialog
-//! (Phase 7); until then the defaults apply, as in a fresh React session. Rate control reuses
-//! `ovrley_core`'s validated quality.
+//! records the settings. Scene settings set the frame rate and update rate (Phase 5); the render
+//! dialog's setters arrive in Phase 7. Rate control reuses `ovrley_core`'s validated quality.
 
 use ovrley_core::encode::quality::{validate_quality, EncodingQuality, QualityType};
 
@@ -66,6 +65,21 @@ impl RenderSettings {
     }
 }
 
+impl RenderSettings {
+    /// `setRenderFpsAndUpdateRate`: both, or neither when the result is invalid.
+    pub fn set_fps_and_update_rate(&mut self, fps: f64, widget_update_rate: u32) -> Result<(), String> {
+        let next = Self { fps, widget_update_rate, ..self.clone() };
+        next.validate()?;
+        *self = next;
+        Ok(())
+    }
+
+    /// `setRenderWidgetUpdateRate`.
+    pub fn set_widget_update_rate(&mut self, widget_update_rate: u32) -> Result<(), String> {
+        self.set_fps_and_update_rate(self.fps, widget_update_rate)
+    }
+}
+
 /// `validateRenderQuality`: rate control from the dialog's type and value.
 pub fn render_quality(quality_type: QualityType, value: f64) -> Result<EncodingQuality, String> {
     validate_quality(quality_type, value).map_err(|error| error.to_string())
@@ -83,5 +97,17 @@ mod tests {
         assert!(RenderSettings { codec: String::new(), ..RenderSettings::default() }.validate().is_err());
         assert!(render_quality(QualityType::Quality, 52.0).is_err());
         assert_eq!(render_quality(QualityType::Bitrate, 8.5), Ok(EncodingQuality::Bitrate(8.5)));
+    }
+
+    #[test]
+    fn setters_validate_before_they_change_anything() {
+        let mut settings = RenderSettings::default();
+        settings.set_fps_and_update_rate(60.0, 2).unwrap();
+        assert_eq!((settings.fps, settings.widget_update_rate), (60.0, 2));
+        assert!(settings.set_widget_update_rate(0).is_err());
+        assert!(settings.set_fps_and_update_rate(f64::NAN, 1).is_err());
+        assert_eq!((settings.fps, settings.widget_update_rate), (60.0, 2));
+        settings.set_widget_update_rate(6).unwrap();
+        assert_eq!(settings.widget_update_rate, 6);
     }
 }

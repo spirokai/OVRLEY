@@ -1,6 +1,6 @@
-//! Port of `useWidgetDraftState` (D7): live widget drafts from the inspector, and the patches of a
-//! canvas gesture. Both are hook state, outside the history; global-default drafts arrive with
-//! scene settings in Phase 5.
+//! Port of `useWidgetDraftState` (D7): live widget drafts from the inspector, the patches of a
+//! canvas gesture, and the global defaults scene settings' sliders drag (phase 5 D7). All are hook
+//! state, outside the history.
 //!
 //! React publishes drafts once per animation frame. Natively each draft is a dispatch, and the
 //! preview frame coalesces them (D9).
@@ -18,6 +18,10 @@ pub struct WidgetDraftState {
     /// The running canvas gesture's resolved patches by widget id; only the open inspector reads
     /// them (`useGestureWidget`).
     gesture_patches: BTreeMap<String, Map<String, Value>>,
+    /// Global defaults a scene settings slider is dragging (`setLiveGlobalDefault`).
+    global_defaults: Map<String, Value>,
+    /// The widgets' bounds a scale drag scales about, captured when it starts.
+    scale_origin: Option<(f64, f64)>,
     /// The document and selection the drafts were made against (the reconcile step's memory).
     seen_config: Option<Rc<OverlayConfig>>,
     seen_selection: Vec<String>,
@@ -74,6 +78,41 @@ impl WidgetDraftState {
         }
     }
 
+    /// `setLiveGlobalDefault`.
+    pub fn set_global_default_draft(&mut self, key: &str, value: Value) {
+        self.global_defaults.insert(key.into(), value);
+        self.touch();
+    }
+
+    /// `getGlobalDefaultDrafts`.
+    pub fn global_default_drafts(&self) -> &Map<String, Value> {
+        &self.global_defaults
+    }
+
+    /// `clearGlobalDefaultDrafts`, with the scale drag's origin.
+    pub fn clear_global_default_drafts(&mut self) {
+        self.scale_origin = None;
+        if !self.global_defaults.is_empty() {
+            self.global_defaults.clear();
+            self.touch();
+        }
+    }
+
+    pub fn scale_origin(&self) -> Option<(f64, f64)> {
+        self.scale_origin
+    }
+
+    pub fn set_scale_origin(&mut self, origin: Option<(f64, f64)>) {
+        self.scale_origin = origin;
+    }
+
+    /// The global defaults with the dragged ones over them.
+    pub fn apply_global_defaults(&self, committed: &Map<String, Value>) -> Map<String, Value> {
+        let mut merged = committed.clone();
+        merged.extend(self.global_defaults.clone());
+        merged
+    }
+
     /// `setGesturePatches`.
     pub fn set_gesture_patches(&mut self, patches: BTreeMap<String, Map<String, Value>>) {
         self.gesture_patches = patches;
@@ -110,14 +149,15 @@ impl WidgetDraftState {
     }
 }
 
-/// Reconcile step 2: a new document pointer clears the drafts (`useEffect(resetWidgetDrafts,
-/// [config])`); a new document or selection ends the gesture's patches. The gesture itself is
+/// Reconcile step 2: a new document pointer clears the drafts, the global-default ones included
+/// (`useEffect(resetWidgetDrafts, [config])`); a new document or selection ends the gesture's patches. The gesture itself is
 /// cancelled by the overlay editor (step 7). Returns whether the document or selection changed.
 pub fn reconcile_widget_drafts(store: &mut Store) -> bool {
     let config_changed = !store.drafts.seen_config.as_ref().is_some_and(|seen| Rc::ptr_eq(seen, &store.editor.config));
     let selection_changed = store.drafts.seen_selection != store.editor.selected_widget_ids;
     if config_changed {
         store.drafts.reset_widget_drafts();
+        store.drafts.clear_global_default_drafts();
         store.drafts.seen_config = Some(Rc::clone(&store.editor.config));
     }
     if config_changed || selection_changed {

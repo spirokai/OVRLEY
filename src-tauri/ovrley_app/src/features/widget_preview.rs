@@ -298,7 +298,7 @@ fn time_dependent(kind: &str) -> bool {
 
 /// The effective widgets the preview shows, in document order.
 pub fn preview_widgets(store: &Store, theme: &ThemeColors) -> Vec<PreviewWidget> {
-    let globals = normalize_global_defaults(Some(&store.template.global_defaults));
+    let globals = normalize_global_defaults(Some(&store.drafts.apply_global_defaults(&store.template.global_defaults)));
     let language = store.i18n.language;
     build_config_widgets(&store.editor.config)
         .into_iter()
@@ -694,7 +694,7 @@ fn sync(
     }
     load_split_tables(store, services, widgets, &preview_activity);
 
-    let globals = normalize_global_defaults(Some(&store.template.global_defaults));
+    let globals = normalize_global_defaults(Some(&store.drafts.apply_global_defaults(&store.template.global_defaults)));
     let default_font = FontKey::plain(globals.get("font_values").unwrap_or(&Value::Null));
     for widget in widgets {
         for font in widget_fonts(&widget.kind, &widget.data) {
