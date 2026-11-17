@@ -1,7 +1,5 @@
 [workspace]
 members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets", "ovrley_services", "ovrley_ui", "ovrley_app", "ovrley_mcp"]
-# A patched dependency (see `[patch.crates-io]`), not a member.
-exclude = ["vendor/i-slint-backend-winit"]
 
 [package]
 name = "app"
@@ -94,11 +92,3 @@ debug-assertions = false
 [profile.dev.package."*"]
 debug = false
 opt-level = 2
-
-# Slint's winit backend 1.18.1 with one fix in `frame_throttle.rs` (marked "OVRLEY patch"): on
-# Windows and X11 its timer requested a redraw on every tick before checking that one was
-# pending, so each change cost a second full-window repaint a frame later (30 fps playback drew
-# 45 times a second). Slint's master already has the fix; drop this with the next Slint release.
-# Slint is pinned to =1.18.1 in ovrley_ui.
-[patch.crates-io]
-i-slint-backend-winit = { path = "vendor/i-slint-backend-winit" }
