@@ -108,6 +108,11 @@ fn tour() -> Vec<Step> {
             store.editor.set_selected_widget_id(Some("speed"));
         }),
     ));
+    // One editor per capture (phase 5): the widget alone in the document, selected.
+    tour.push(("editor-arc", StepKind::Action(|store, _| show_editor(store, "speed", "arc", serde_json::json!({})))));
+    tour.push(("editor-linear-bars", StepKind::Action(|store, _| show_editor(store, "speed", "linear", serde_json::json!({"track_fill_style": "bars", "bar_count": 12, "bar_gap": 4})))));
+    tour.push(("editor-g-force", StepKind::Action(|store, _| show_editor(store, "g_force", "g_force", serde_json::json!({})))));
+    tour.push(("editor-heart-zones", StepKind::Action(|store, _| show_editor(store, "heartrate", "heart_zones", serde_json::json!({"zone_calculation": "manual"})))));
     tour.push((
         "agent-connected",
         StepKind::Action(|store, _| {
@@ -124,6 +129,22 @@ fn tour() -> Vec<Step> {
     tour.push(("fullscreen", StepKind::Fullscreen));
     tour.push(("fullscreen-left", StepKind::Fullscreen));
     tour
+}
+
+/// Replaces the document with one `kind` widget in `display`, its variant patched with `variant`,
+/// and selects it, so the capture shows its editor.
+fn show_editor(store: &mut Store, kind: &str, display: &str, variant: serde_json::Value) {
+    use ovrley_widgets::model::catalog::catalog;
+    use ovrley_widgets::model::document::{create_widget_defaults, merge_widget_data, OverlayConfig, WidgetSelection};
+    let mode = catalog().require_display(display).modes.first().map(|mode| mode.value.clone());
+    let selection = WidgetSelection { kind: kind.into(), display_type: Some(display.into()), mode, ..WidgetSelection::default() };
+    let data = create_widget_defaults(&selection, &store.template.global_defaults, &Default::default()).expect("catalog defaults");
+    let mut data = merge_widget_data(Some(&data), serde_json::json!({"display_variants": {display: variant}}).as_object().expect("a patch"));
+    data.insert("id".into(), "editor".into());
+    let collection = catalog().require_widget(kind).expect("a catalog widget").collection.clone();
+    let config = OverlayConfig::from_value(&serde_json::json!({"scene": store.editor.config.scene, collection: [data]})).expect("a valid document");
+    store.editor.set_config(config);
+    store.editor.set_selected_widget_id(Some("editor"));
 }
 
 /// Starts the tour when `OVRLEY_SNAPSHOT` is set.

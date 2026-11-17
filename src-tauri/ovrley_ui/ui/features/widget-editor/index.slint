@@ -33,11 +33,12 @@ export enum InspectorCellKind {
     locked,
     note,
     tabs,
+    empty,
 }
 
 // How a label-and-switch row is laid out; `ovrley_app`'s `SwitchRowStyle`. `none` is a heading
 // switch without a visible label.
-export enum SwitchRowStyle { none, toggle, inline, padded, padded-left, tall }
+export enum SwitchRowStyle { none, toggle, inline, padded, padded-left, inline-x, bottom, tall }
 
 // Where a row sits in an accent panel.
 export enum PanelPart { none, first, middle, last, only }
@@ -80,6 +81,15 @@ export struct InspectorCell {
     only: bool,
     busy: bool,
     outline: bool,
+    // A slider's inline input (`editable`).
+    editable: bool,
+    // `self-end`: the cell sits at the bottom of its row.
+    end: bool,
+    // A toggle group in a `FieldBlock` with its label; a multiple group (`options[].pressed`).
+    labelled: bool,
+    multiple: bool,
+    // A font select's 9px label.
+    small-label: bool,
     // An `Icons` path.
     icon: string,
     style: SwitchRowStyle,

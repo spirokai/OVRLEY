@@ -155,6 +155,8 @@ export component SliderField inherits VerticalLayout {
     in property <float> maximum;
     in property <float> step: 1;
     in property <float> scale: 1;
+    // `editable`: the readout turns into an inline number input on focus.
+    in property <bool> editable: true;
     in property <bool> disabled;
     in property <string> value-display;
     in property <string> suffix;
@@ -180,7 +182,7 @@ export component SliderField inherits VerticalLayout {
             horizontal-stretch: 0;
             readout := AppText {
                 x: parent.width - self.width;
-                visible: !input.has-focus && !input.is-invalid;
+                visible: !root.editable || (!input.has-focus && !input.is-invalid);
                 content: root.value-display + root.suffix;
                 uppercase: false;
                 font-size: 0.741rem;
@@ -190,6 +192,7 @@ export component SliderField inherits VerticalLayout {
                 vertical-alignment: center;
             }
             input := InlineNumberInput {
+                visible: root.editable;
                 width: parent.width;
                 height: 1.1875rem;
                 y: (parent.height - self.height) / 2;
@@ -261,7 +264,8 @@ export component ContentAlignmentControl inherits HorizontalLayout {
 // `TextDisplaySection`'s row (0.741rem bold `tracking-wider`, `py-2`); `inline` the map's layer
 // toggles (`flex items-center justify-between gap-2 pl-1`, a 0.667rem uppercase bold label);
 // `padded` Flat Track (`px-1 pt-2 pb-2`); `padded-left` Hundredths (`pl-1 pt-2 pb-2`, the label
-// `pt-1`); `tall` the chart's area gradient (`h-9 px-1`, a 9px label).
+// `pt-1`); `inline-x` `px-1`; `bottom` `px-1 pb-2`; `tall` the chart's area gradient (`h-9 px-1`,
+// a 9px label).
 export component SwitchRow inherits HorizontalLayout {
     in property <string> label;
     in property <bool> checked;
@@ -271,9 +275,9 @@ export component SwitchRow inherits HorizontalLayout {
 
     property <bool> vertical-padding: root.style == SwitchRowStyle.toggle || root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.padded-left;
     padding-top: root.vertical-padding ? 0.5rem : 0px;
-    padding-bottom: self.padding-top;
+    padding-bottom: root.vertical-padding || root.style == SwitchRowStyle.bottom ? 0.5rem : 0px;
     padding-left: root.style == SwitchRowStyle.toggle ? 0px : 0.25rem;
-    padding-right: root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.tall ? 0.25rem : 0px;
+    padding-right: root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.tall || root.style == SwitchRowStyle.inline-x || root.style == SwitchRowStyle.bottom ? 0.25rem : 0px;
     height: root.style == SwitchRowStyle.tall ? 2.25rem : self.preferred-height;
     spacing: 0.5rem;
     if root.style == SwitchRowStyle.toggle: AppText {

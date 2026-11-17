@@ -176,6 +176,8 @@ pub fn edit_field(store: &mut Store, widget_id: &str, field_id: &str, input: Inp
         Patch::Data(patch) => update_widget_data(store, widget_id, patch),
         Patch::Numeric { key, raw, options } => set_numeric_field(store, widget_id, &key, &raw, options),
         Patch::Reset => reset_widget(store, widget_id),
+        Patch::Draft(patch) => update_widget_draft(store, widget_id, patch),
+        Patch::Nothing => Ok(()),
     }
 }
 
@@ -271,14 +273,7 @@ impl Default for NumericFieldOptions {
     }
 }
 
-/// `Number(text)` for an editor input.
-fn js_number(text: &str) -> f64 {
-    let trimmed = text.trim();
-    if trimmed.is_empty() {
-        return 0.0;
-    }
-    trimmed.parse().unwrap_or(f64::NAN)
-}
+use rules::js_number;
 
 /// `parseInteger`.
 fn parse_integer(text: &str, fallback: f64) -> Result<f64, String> {
@@ -410,12 +405,12 @@ mod tests {
     use ovrley_widgets::model::document::{OverlayConfig, UnitSystem};
     use serde_json::json;
 
-    fn defaults(kind: &str, display_type: Option<&str>) -> Map<String, Value> {
+    pub(crate) fn defaults(kind: &str, display_type: Option<&str>) -> Map<String, Value> {
         let selection = WidgetSelection { kind: kind.into(), display_type: display_type.map(str::to_string), ..WidgetSelection::default() };
         create_widget_defaults(&selection, &template_manifest().globals, &WidgetCreationOptions::default()).unwrap()
     }
 
-    fn value(kind: &str, id: &str, x: f64) -> Value {
+    pub(crate) fn value(kind: &str, id: &str, x: f64) -> Value {
         let mut data = defaults(kind, None);
         data.insert("id".into(), json!(id));
         data.insert("x".into(), json!(x));
@@ -423,7 +418,7 @@ mod tests {
     }
 
     /// A dispatcher over `values`, with the preview's frames run until its fonts are ready.
-    fn editor(values: Vec<Value>) -> (Dispatcher, Fakes) {
+    pub(crate) fn editor(values: Vec<Value>) -> (Dispatcher, Fakes) {
         let (parts, fakes) = fake_services(json!({}));
         let store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() }), ..Store::default() };
         let dispatcher = Dispatcher::new(store, parts);
@@ -443,40 +438,40 @@ mod tests {
         (dispatcher, fakes)
     }
 
-    fn patch(value: Value) -> Map<String, Value> {
+    pub(crate) fn patch(value: Value) -> Map<String, Value> {
         value.as_object().unwrap().clone()
     }
 
-    fn widget<R>(dispatcher: &Dispatcher, id: &str, read: impl FnOnce(&Map<String, Value>) -> R) -> R {
+    pub(crate) fn widget<R>(dispatcher: &Dispatcher, id: &str, read: impl FnOnce(&Map<String, Value>) -> R) -> R {
         dispatcher.with_store(|store| read(store.editor.config.widget(id).unwrap()))
     }
 
     /// Opens `id`'s inspector and returns its blocks.
-    fn inspector(dispatcher: &Dispatcher, id: &'static str) -> Vec<Block> {
+    pub(crate) fn inspector(dispatcher: &Dispatcher, id: &'static str) -> Vec<Block> {
         dispatcher.dispatch(move |store, _| store.editor.set_selected_widget_id(Some(id)));
         dispatcher.with_store(|store| sidebar_view(store).inspector.unwrap().blocks)
     }
 
     /// The cell `field` of `id`'s inspector.
-    fn cell(dispatcher: &Dispatcher, id: &'static str, field: &str) -> Option<blocks::Cell> {
+    pub(crate) fn cell(dispatcher: &Dispatcher, id: &'static str, field: &str) -> Option<blocks::Cell> {
         blocks::find(&inspector(dispatcher, id), field).cloned()
     }
 
-    fn slider_value(cell: &blocks::Cell) -> (f64, f64) {
+    pub(crate) fn slider_value(cell: &blocks::Cell) -> (f64, f64) {
         match &cell.kind {
             blocks::CellKind::Slider { value, max, .. } => (*value, *max),
             other => panic!("{} is not a slider: {other:?}", cell.id),
         }
     }
 
-    fn select_options(cell: &blocks::Cell) -> Vec<blocks::OptionView> {
+    pub(crate) fn select_options(cell: &blocks::Cell) -> Vec<blocks::OptionView> {
         match &cell.kind {
             blocks::CellKind::Select { options, .. } => options.clone(),
             other => panic!("{} is not a select: {other:?}", cell.id),
         }
     }
 
-    fn edit(dispatcher: &Dispatcher, id: &'static str, field: &'static str, input: Input) {
+    pub(crate) fn edit(dispatcher: &Dispatcher, id: &'static str, field: &'static str, input: Input) {
         dispatcher.dispatch(move |store, _| edit_field(store, id, field, input, false).unwrap());
     }
 

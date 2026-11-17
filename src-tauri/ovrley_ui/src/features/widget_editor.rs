@@ -35,6 +35,8 @@ fn switch_style(style: Option<blocks::SwitchRowStyle>) -> SwitchRowStyle {
         Some(blocks::SwitchRowStyle::Inline) => SwitchRowStyle::Inline,
         Some(blocks::SwitchRowStyle::Padded) => SwitchRowStyle::Padded,
         Some(blocks::SwitchRowStyle::PaddedLeft) => SwitchRowStyle::PaddedLeft,
+        Some(blocks::SwitchRowStyle::InlineX) => SwitchRowStyle::InlineX,
+        Some(blocks::SwitchRowStyle::Bottom) => SwitchRowStyle::Bottom,
         Some(blocks::SwitchRowStyle::Tall) => SwitchRowStyle::Tall,
     }
 }
@@ -46,10 +48,12 @@ pub fn cell(icons: &Icons<'_>, cell: &Cell) -> InspectorCell {
         label: cell.label.as_str().into(),
         disabled: cell.disabled,
         tooltip: cell.tooltip.as_str().into(),
+        end: cell.end,
         ..Default::default()
     };
     out.kind = match &cell.kind {
-        CellKind::Slider { value, min, max, step, scale, readout, suffix } => {
+        CellKind::Slider { editable, value, min, max, step, scale, readout, suffix } => {
+            out.editable = *editable;
             (out.value, out.minimum, out.maximum, out.step, out.scale) = (*value as f32, *min as f32, *max as f32, *step as f32, *scale as f32);
             (out.readout, out.suffix) = (readout.as_str().into(), suffix.as_str().into());
             InspectorCellKind::Slider
@@ -78,12 +82,22 @@ pub fn cell(icons: &Icons<'_>, cell: &Cell) -> InspectorCell {
             (out.checked, out.style) = (*checked, switch_style(Some(*style)));
             InspectorCellKind::SwitchRow
         }
-        CellKind::Font { value, recommended } => {
-            (out.text, out.options) = (value.as_str().into(), ModelRc::new(VecModel::from(font_choices(recommended))));
+        CellKind::Font { value, recommended, small_label } => {
+            (out.text, out.options, out.small_label) = (value.as_str().into(), ModelRc::new(VecModel::from(font_choices(recommended))), *small_label);
             InspectorCellKind::Font
         }
-        CellKind::ToggleGroup { value, options } => {
-            (out.text, out.options) = (value.as_str().into(), choices(options));
+        CellKind::ToggleGroup { value, options, labelled, multiple, pressed } => {
+            let items: Vec<Choice> = options
+                .iter()
+                .map(|option| Choice {
+                    kind: ChoiceKind::Item,
+                    value: option.value.as_str().into(),
+                    label: option.label.as_str().into(),
+                    pressed: pressed.contains(&option.value),
+                    ..Default::default()
+                })
+                .collect();
+            (out.text, out.options, out.labelled, out.multiple) = (value.as_str().into(), ModelRc::new(VecModel::from(items)), *labelled, *multiple);
             InspectorCellKind::ToggleGroup
         }
         CellKind::Alignment { value, options } => {
@@ -141,6 +155,7 @@ pub fn cell(icons: &Icons<'_>, cell: &Cell) -> InspectorCell {
             out.text = text.as_str().into();
             InspectorCellKind::Note
         }
+        CellKind::Empty => InspectorCellKind::Empty,
         CellKind::Tabs { value, options } => {
             (out.text, out.options) = (value.as_str().into(), choices(options));
             InspectorCellKind::Tabs

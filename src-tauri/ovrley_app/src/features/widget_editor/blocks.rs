@@ -75,6 +75,10 @@ pub enum SwitchRowStyle {
     Padded,
     /// `pl-1 pt-2 pb-2`, the label `pt-1` (Hundredths).
     PaddedLeft,
+    /// `px-1` (Show Indicator, the heading tape's label toggles).
+    InlineX,
+    /// `px-1 pb-2` (the heading tape's tick toggles, the altitude tape's Decimal).
+    Bottom,
     /// `flex h-9 items-center justify-between px-1` with a 9px label (the chart's area gradient).
     Tall,
 }
@@ -86,6 +90,8 @@ pub enum CellKind {
     /// `SliderField`: `readout` is the text without its suffix. The slider runs in field units;
     /// `scale` is `valueScale`, the inline input's display factor (percent sliders over 0–1).
     Slider {
+        /// `editable`: the readout turns into an inline input; the altitude tape's interval is not.
+        editable: bool,
         value: f64,
         min: f64,
         max: f64,
@@ -124,11 +130,19 @@ pub enum CellKind {
     Font {
         value: String,
         recommended: Vec<FontOption>,
+        /// A 9px label instead of 0.667rem.
+        small_label: bool,
     },
     /// `FieldBlock` with a full-width single `ToggleGroup` (`h-7 text-xs` items).
     ToggleGroup {
         value: String,
         options: Vec<OptionView>,
+        /// In a `FieldBlock` with its label; the heart zones' indicator group has none.
+        labelled: bool,
+        /// A multiple group: `pressed` lists the pressed values, and a click reports the item
+        /// it toggles as text.
+        multiple: bool,
+        pressed: Vec<String>,
     },
     /// `ContentAlignmentControl`, a heading's trailing control. The options carry the items'
     /// accessible labels (left, centre, right).
@@ -180,6 +194,8 @@ pub enum CellKind {
         value: String,
         options: Vec<OptionView>,
     },
+    /// An empty grid cell (`<div />`).
+    Empty,
 }
 
 /// One control and how its edits apply.
@@ -191,6 +207,8 @@ pub struct Cell {
     pub label: String,
     pub disabled: bool,
     pub tooltip: String,
+    /// `self-end`: the cell sits at the bottom of its row.
+    pub end: bool,
     pub kind: CellKind,
     pub rule: Rule,
 }
@@ -202,6 +220,7 @@ impl Cell {
             label: label.into(),
             disabled: false,
             tooltip: String::new(),
+            end: false,
             kind,
             rule: Rule::Field,
         }
@@ -215,6 +234,17 @@ impl Cell {
     pub fn rule(mut self, rule: Rule) -> Self {
         self.rule = rule;
         self
+    }
+
+    /// `self-end`.
+    pub fn end(mut self) -> Self {
+        self.end = true;
+        self
+    }
+
+    /// An empty grid cell; `id` keeps the row's key unique.
+    pub fn empty(id: impl Into<String>) -> Self {
+        Self::new(id, "", CellKind::Empty).rule(Rule::None)
     }
 
     pub fn tooltip(mut self, tooltip: impl Into<String>) -> Self {
@@ -295,9 +325,11 @@ pub enum Node {
         space: f32,
         children: Vec<Node>,
     },
-    /// Padding above the node (`pt-*`), or a margin above it (`mb-*` of the previous element).
+    /// Padding above and below the node (`pt-*`, `pb-*`), or a margin above it (`mb-*` of the
+    /// previous element). The bottom padding adds to the space above whatever follows.
     Pad {
         top: f32,
+        bottom: f32,
         node: Box<Node>,
     },
     /// An accent panel with `space-y-*` between its children.
@@ -312,6 +344,16 @@ impl Node {
     pub fn pt(self, top: f32) -> Node {
         Node::Pad {
             top,
+            bottom: 0.0,
+            node: Box::new(self),
+        }
+    }
+
+    /// `py-*`.
+    pub fn py(self, padding: f32) -> Node {
+        Node::Pad {
+            top: padding,
+            bottom: padding,
             node: Box::new(self),
         }
     }
@@ -409,6 +451,8 @@ pub fn flatten(space: f32, nodes: impl IntoIterator<Item = Node>) -> Vec<Block> 
 struct Flat {
     blocks: Vec<Block>,
     keys: std::collections::HashSet<String>,
+    /// A bottom padding not yet added to the next block's gap.
+    pending: f32,
 }
 
 impl Flat {
@@ -425,6 +469,7 @@ impl Flat {
         } else {
             PanelPart::None
         };
+        let gap = gap + std::mem::take(&mut self.pending);
         self.blocks.push(Block {
             key: unique,
             gap,
@@ -474,7 +519,10 @@ impl Flat {
                 }
             }
             Node::Stack { space, children } => self.stack(children, *space, gap, in_panel),
-            Node::Pad { top, node } => self.node(node, gap + top, in_panel),
+            Node::Pad { top, bottom, node } => {
+                self.node(node, gap + top, in_panel);
+                self.pending += bottom;
+            }
             Node::Panel { space, children } => {
                 let start = self.blocks.len();
                 self.stack(children, *space, gap, true);

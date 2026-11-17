@@ -8,6 +8,7 @@ import { FontSelectField } from "../../components/font-select-field.slint";
 import { SelectSize } from "../../components/select.slint";
 import { GradientPicker } from "../../components/gradient-picker.slint";
 import { ToggleGroup, ToggleGroupSize, ToggleGroupType } from "../../components/toggle-group.slint";
+import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Icons } from "../../components/icons.slint";
 import { Choice, ChoiceKind, GradientStop } from "../../components/logic.slint";
@@ -116,6 +117,7 @@ component CellView inherits CellEvents {
         maximum: root.cell.maximum;
         step: root.cell.step;
         scale: root.cell.scale;
+        editable: root.cell.editable;
         disabled: root.cell.disabled;
         value-display: root.cell.readout;
         suffix: root.cell.suffix;
@@ -187,20 +189,21 @@ component CellView inherits CellEvents {
         disabled: root.cell.disabled;
         recommended-options: root.cell.options;
         system-options: root.system-fonts;
-        label-font-size: 0.667rem;
+        label-font-size: root.cell.small-label ? 9px : 0.667rem;
         size: SelectSize.default;
         background: Theme.surface;
         value-changed(id) => {
             root.set-text(root.cell.id, id);
         }
     }
-    // `FieldBlock` with a full-width single `ToggleGroup` (`h-7 w-full px-3 text-xs` items);
-    // clicking the pressed item changes nothing.
-    if root.cell.kind == InspectorCellKind.toggle-group: FieldBlock {
+    // `FieldBlock` with a full-width `ToggleGroup` (`h-7 w-full px-3 text-xs` items); clicking the
+    // pressed item of a single group changes nothing. A multiple group reports the item it
+    // toggles. The heart zones' indicator group has no label.
+    if root.cell.kind == InspectorCellKind.toggle-group && root.cell.labelled: FieldBlock {
         label: root.cell.label;
         disabled: root.cell.disabled;
         ToggleGroup {
-            type: ToggleGroupType.single;
+            type: root.cell.multiple ? ToggleGroupType.multiple : ToggleGroupType.single;
             stretch: true;
             items: root.cell.options;
             value: root.cell.text;
@@ -211,6 +214,66 @@ component CellView inherits CellEvents {
             value-changed(value) => {
                 if value != "" {
                     root.set-text(root.cell.id, value);
+                }
+            }
+            item-pressed-changed(value, pressed) => {
+                root.set-text(root.cell.id, value);
+            }
+        }
+    }
+    if root.cell.kind == InspectorCellKind.toggle-group && !root.cell.labelled: ToggleGroup {
+        type: ToggleGroupType.single;
+        stretch: true;
+        items: root.cell.options;
+        value: root.cell.text;
+        disabled: root.cell.disabled;
+        item-padding-x: 0.75rem;
+        item-font-size: Theme.text-xs * 1rem;
+        accessible-label: root.cell.label;
+        value-changed(value) => {
+            if value != "" {
+                root.set-text(root.cell.id, value);
+            }
+        }
+    }
+    // `GForceAxisRow`: "{label} axis", then the toolbar tabs X, Y, Z (`p-3 px-5 font-bold`) beside
+    // the invert switch, 0.5rem below. Both report on the axis field: the axis as text, the invert
+    // switch as a flag.
+    if root.cell.kind == InspectorCellKind.gforce-axis: VerticalLayout {
+        spacing: 0.5rem;
+        FieldLabel {
+            text: root.cell.label;
+        }
+        HorizontalLayout {
+            spacing: 1rem;
+            property <length> column: (self.width - 1rem) / 2;
+            HorizontalLayout {
+                width: parent.column;
+                alignment: start;
+                TabsList {
+                    variant: TabsListVariant.toolbar;
+                    trigger-variant: TabsTriggerVariant.toolbar;
+                    items: [
+                        { kind: ChoiceKind.item, value: "x", label: "X" },
+                        { kind: ChoiceKind.item, value: "y", label: "Y" },
+                        { kind: ChoiceKind.item, value: "z", label: "Z" },
+                    ];
+                    value: root.cell.text;
+                    trigger-padding-x: 1.25rem;
+                    trigger-padding-y: 0.75rem;
+                    trigger-font-weight: Theme.font-weight-bold;
+                    value-changed(value) => {
+                        root.set-text(root.cell.id, value);
+                    }
+                }
+            }
+            SwitchRow {
+                width: parent.column;
+                label: root.cell.text2;
+                checked: root.cell.checked;
+                style: SwitchRowStyle.inline;
+                checked-changed(checked) => {
+                    root.set-flag(root.cell.id, checked);
                 }
             }
         }
@@ -239,7 +302,7 @@ component CellsRow inherits CellEvents {
         alignment: start;
         for cell in root.data.cells: VerticalLayout {
             width: root.column;
-            alignment: root.data.align-end ? LayoutAlignment.end : LayoutAlignment.start;
+            alignment: root.data.align-end || cell.end ? LayoutAlignment.end : LayoutAlignment.start;
             CellView {
                 cell: cell;
                 system-fonts: root.system-fonts;

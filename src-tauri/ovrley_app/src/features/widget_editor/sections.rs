@@ -95,6 +95,7 @@ impl<'a> Ctx<'a> {
             id,
             label,
             CellKind::Slider {
+                editable: true,
                 value,
                 min,
                 max,
@@ -171,7 +172,7 @@ impl<'a> Ctx<'a> {
         let id = id.into();
         let value = self.text(&id);
         let (recommended, _) = super::font_options(self.store, &value);
-        Cell::new(id, label, CellKind::Font { value, recommended })
+        Cell::new(id, label, CellKind::Font { value, recommended, small_label: false })
     }
 }
 
@@ -211,9 +212,26 @@ impl Cell {
                 scale,
                 readout,
                 suffix,
+                ..
             } => (value, min, max, step, scale, readout, suffix),
             other => panic!("{} is not a slider: {other:?}", self.id),
         }
+    }
+
+    /// A slider without `editable`: its readout is plain text.
+    pub fn fixed(mut self) -> Self {
+        if let CellKind::Slider { editable, .. } = &mut self.kind {
+            *editable = false;
+        }
+        self
+    }
+
+    /// The font select's 9px label.
+    pub fn small_label(mut self) -> Self {
+        if let CellKind::Font { small_label, .. } = &mut self.kind {
+            *small_label = true;
+        }
+        self
     }
 
     pub fn step(mut self, step: f64) -> Self {
