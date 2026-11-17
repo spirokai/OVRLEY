@@ -1,22 +1,23 @@
-//! Port of `features/widget-editor`, Phase 3 part: `SidebarWidgetsTab` (the widget list and its
-//! open item), `PositionSection`, `MetricWidgetEditor` with `TextDisplaySection`, and
-//! `useWidgetManager`'s actions. The other editors and display sections arrive in Phase 5.
-//!
-//! The view model here is what the components read; `ovrley_ui` copies it into the `WidgetEditor`
-//! global. Labels the locale files have are `@tr` in the markup; the ones built from the manifests
-//! (display types, units) and those React writes as defaults only are translated here.
+//! Port of `features/widget-editor`: `SidebarWidgetsTab` (the widget list and its open item),
+//! `useWidgetManager`'s actions, and every editor as a declarative description (D1) that
+//! `ovrley_ui` renders with one component. Descriptions translate their labels from the locale
+//! catalog.
+
+pub mod blocks;
+pub mod displays;
+pub mod rules;
+pub mod sections;
 
 use crate::features::overlay_editor::interaction::{content_rect, resize_draft_patch, rotation_draft_patch};
-use crate::i18n::{catalog as translations, Locale};
-use crate::lib::fonts::{font_selection, font_select_options, FontOption};
-use crate::lib::widget::{build_config_widgets, group_widgets_for_sidebar, starting_altitude_placeholder, ConfigWidget};
+use crate::lib::fonts::{font_select_options, FontOption};
+use crate::lib::widget::{build_config_widgets, group_widgets_for_sidebar, ConfigWidget};
 use crate::store::services::Services;
 use crate::store::Store;
-use ovrley_widgets::model::catalog::{catalog, IconRef, UnitOption};
-use ovrley_widgets::model::document::{
-    build_display_type_change_update, build_metric_unit_update, create_widget_defaults, js_round, merge_widget_data, number, resolve_active_widget_data,
-    Collection, WidgetCreationOptions, WidgetSelection,
-};
+use blocks::Block;
+use ovrley_widgets::model::catalog::{catalog, IconRef};
+use ovrley_widgets::model::document::{create_widget_defaults, js_round, merge_widget_data, number, resolve_active_widget_data, WidgetCreationOptions, WidgetSelection};
+use rules::{Input, Patch, RuleContext};
+use sections::Ctx;
 use serde_json::{Map, Value};
 
 /// `SidebarWidgetsTab`'s state beyond the store, and the font catalog (D16).
@@ -73,19 +74,6 @@ pub fn load_font_catalog(store: &mut Store, services: &mut Services) {
 
 // ── The view model ──────────────────────────────────────────────────────────────────────────────
 
-/// A select or toggle-group option.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct OptionView {
-    pub value: String,
-    pub label: String,
-}
-
-impl OptionView {
-    fn new(value: &str, label: &str) -> Self {
-        Self { value: value.into(), label: label.into() }
-    }
-}
-
 /// One row of the widget list.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WidgetRowView {
@@ -94,87 +82,11 @@ pub struct WidgetRowView {
     pub icon: IconRef,
 }
 
-/// `PositionSection` and the editor of the open widget (`WidgetInspector`).
+/// The open widget's inspector: its description (D1).
 #[derive(Clone, Debug, PartialEq)]
 pub struct InspectorView {
     pub id: String,
-    /// "Horizontal Anchor" for text values, else "Horizontal Position".
-    pub horizontal_label: String,
-    /// The number fields' text: whole numbers, as `NumberField` rounds them.
-    pub x: String,
-    pub y: String,
-    /// The transparency slider, in percent.
-    pub opacity: f64,
-    /// `MetricWidgetEditor`, for metric widgets.
-    pub metric: Option<MetricEditorView>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct MetricEditorView {
-    /// The display type select's options; it shows only with more than one.
-    pub display_types: Vec<OptionView>,
-    pub display_type: String,
-    /// `TextDisplaySection`, for the text display. The other displays arrive in Phase 5.
-    pub text: Option<TextDisplayView>,
-    /// "Altitude at start", for altitude widgets.
-    pub altitude: Option<AltitudeView>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct AltitudeView {
-    /// Empty without a configured starting altitude.
-    pub value: String,
-    /// The activity's starting altitude in the widget's unit; empty without one.
-    pub placeholder: String,
-    pub unit: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct TextDisplayView {
-    pub content_alignment: String,
-    /// The alignment control's items, labelled for screen readers.
-    pub alignments: Vec<OptionView>,
-    pub font_size: f64,
-    pub font: String,
-    pub color: String,
-    /// The decimals slider's value and maximum, for widgets with a decimal control.
-    pub decimals: Option<(f64, f64)>,
-    pub balance_format: Option<String>,
-    pub show_full_distance: Option<bool>,
-    pub coordinates: Option<CoordinatesView>,
-    pub show_full_ascent: Option<bool>,
-    pub icon: IconSectionView,
-    /// `UnitsControlRow`, unless the type hides its units.
-    pub units: Option<UnitsRowView>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct CoordinatesView {
-    pub format: String,
-    pub formats: Vec<OptionView>,
-    pub coordinate_format: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct IconSectionView {
-    pub show: bool,
-    pub color: String,
-    pub size: f64,
-    pub offset_x: String,
-    pub offset_y: String,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct UnitsRowView {
-    /// "Units" when the type offers several, else "Unit".
-    pub supports_selection: bool,
-    pub show_toggle: bool,
-    pub checked: bool,
-    /// The unit colour field shows when the widget has a unit colour.
-    pub color: Option<String>,
-    pub unit: String,
-    /// The unit select's options; empty hides it.
-    pub options: Vec<OptionView>,
+    pub blocks: Vec<Block>,
 }
 
 /// What `SidebarWidgetsTab` shows.
@@ -183,32 +95,6 @@ pub struct SidebarView {
     pub rows: Vec<WidgetRowView>,
     pub open_widget_id: Option<String>,
     pub inspector: Option<InspectorView>,
-}
-
-fn text(data: &Map<String, Value>, key: &str) -> String {
-    data.get(key).and_then(Value::as_str).unwrap_or_default().to_string()
-}
-
-fn float(data: &Map<String, Value>, key: &str) -> f64 {
-    data.get(key).and_then(Value::as_f64).unwrap_or_default()
-}
-
-/// `NumberField`'s shown value: empty for an absent value, else `Math.round(value)`.
-fn whole_number_text(value: Option<&Value>) -> String {
-    match value.and_then(Value::as_f64) {
-        // `+ 0.0` turns JavaScript's `-0` into `0`, as `String(-0)` does.
-        Some(number) => format!("{}", js_round(number) + 0.0),
-        None => String::new(),
-    }
-}
-
-/// A unit option's label: its own label, else its translated key.
-fn unit_label(option: &UnitOption, locale: Locale) -> String {
-    match (&option.label, &option.label_key) {
-        (Some(label), _) => label.clone(),
-        (None, Some(key)) => translations().t_or(locale, key, option.default_label.as_deref().unwrap_or_default()).to_string(),
-        (None, None) => panic!("unit option {} has no label", option.value),
-    }
 }
 
 /// The sidebar's widgets (`useWidgetManager`'s `widgets`): document widgets with their live drafts
@@ -224,111 +110,43 @@ fn sidebar_widgets(store: &Store) -> Vec<ConfigWidget> {
     group_widgets_for_sidebar(&widgets, store.i18n.language)
 }
 
-fn text_display_view(store: &Store, widget: &ConfigWidget) -> TextDisplayView {
-    let locale = store.i18n.language;
-    let theme = store.theme.as_ref().expect("ovrley_ui reads the theme before the first dispatch");
-    let definition = catalog().require_widget(&widget.kind).expect("listed widgets are in the catalog");
-    let data = &widget.data;
-    let units_mode = definition.units_mode.as_deref().unwrap_or("hidden");
-    let supports_selection = definition.supported_display_units.len() > 1;
-    let is_coordinates = widget.kind == "gps_coordinates";
-    let alignment = |value: &str, key: &str, default: &str| OptionView::new(value, translations().t_or(locale, key, default));
-    TextDisplayView {
-        content_alignment: text(data, "content_alignment"),
-        alignments: vec![
-            alignment("left", "widget-editor.alignLeft", "Align left"),
-            alignment("center", "widget-editor.alignCenter", "Align center"),
-            alignment("right", "widget-editor.alignRight", "Align right"),
-        ],
-        font_size: float(data, "font_size"),
-        font: text(data, "font"),
-        color: data.get("color").and_then(Value::as_str).filter(|color| !color.is_empty()).unwrap_or(&theme.ice).to_string(),
-        decimals: definition.has_decimal_control.then(|| (float(data, "decimals"), f64::from(definition.max_decimals))),
-        balance_format: (definition.formatter.as_deref() == Some("balance")).then(|| text(data, "balance_format")),
-        show_full_distance: (widget.kind == "distance").then(|| data.get("show_full_distance").and_then(Value::as_bool).unwrap_or(true)),
-        coordinates: is_coordinates.then(|| CoordinatesView {
-            format: text(data, "display_unit"),
-            formats: definition.supported_display_units.iter().map(|option| OptionView { value: option.value.clone(), label: unit_label(option, locale) }).collect(),
-            coordinate_format: text(data, "coordinate_format"),
-        }),
-        show_full_ascent: (widget.kind == "total_ascent").then(|| data.get("show_full_ascent").and_then(Value::as_bool).unwrap_or_default()),
-        icon: IconSectionView {
-            show: data.get("show_icon").and_then(Value::as_bool).unwrap_or_default(),
-            color: data.get("icon_color").and_then(Value::as_str).filter(|color| !color.is_empty()).unwrap_or(&theme.aqua).to_string(),
-            size: float(data, "icon_size"),
-            offset_x: whole_number_text(data.get("icon_offset_x")),
-            offset_y: whole_number_text(data.get("icon_offset_y")),
-        },
-        units: (units_mode != "hidden").then(|| UnitsRowView {
-            supports_selection,
-            show_toggle: !is_coordinates,
-            checked: data.get("show_units").and_then(Value::as_bool).unwrap_or_default(),
-            color: data.get("unit_color").map(|color| color.as_str().unwrap_or_default().to_string()),
-            unit: text(data, "display_unit"),
-            options: if !is_coordinates && supports_selection {
-                definition.supported_display_units.iter().map(|option| OptionView { value: option.value.clone(), label: unit_label(option, locale) }).collect()
-            } else {
-                Vec::new()
-            },
-        }),
-    }
-}
-
-fn metric_editor_view(store: &Store, widget: &ConfigWidget) -> Option<MetricEditorView> {
-    let catalog = catalog();
-    let definition = catalog.require_widget(&widget.kind).expect("listed widgets are in the catalog");
-    if !definition.metric {
-        return None;
-    }
-    let locale = store.i18n.language;
-    let display_type = text(&widget.data, "display_type");
-    // The activity driving widgets at the playhead (`useActivityContext`).
-    let preview_activity = crate::features::widget_preview::preview_activity(store);
-    let activity = preview_activity.activity().map(|imported| imported.activity.as_ref());
-    Some(MetricEditorView {
-        display_types: definition
-            .display_types
-            .iter()
-            .map(|value| OptionView::new(value, translations().t(locale, definition.display_type_label_key(catalog, value))))
-            .collect(),
-        text: (display_type == "text").then(|| text_display_view(store, widget)),
-        display_type,
-        altitude: (widget.kind == "altitude").then(|| AltitudeView {
-            value: whole_number_text(widget.data.get("starting_altitude").filter(|value| !value.is_null())),
-            placeholder: starting_altitude_placeholder(widget, activity).map(|value| format!("{value}")).unwrap_or_default(),
-            unit: text(&widget.data, "display_unit"),
-        }),
-    })
-}
-
-fn inspector_view(store: &Store, committed: &ConfigWidget) -> InspectorView {
-    let locale = store.i18n.language;
-    // `useGestureWidget`: only the open inspector follows the live canvas gesture.
+/// The widget as its inspector shows it: drafts applied, then the live canvas gesture
+/// (`useGestureWidget`: only the open inspector follows it).
+fn inspector_widget(store: &Store, committed: &ConfigWidget) -> ConfigWidget {
     let mut widget = committed.clone();
     if let Some(patch) = store.drafts.gesture_patch(&widget.id) {
         widget.data = resolve_active_widget_data(&merge_widget_data(Some(&widget.data), patch));
     }
-    let data = &widget.data;
-    let uses_horizontal_anchor = widget.collection == Collection::Values && text(data, "display_type") == "text" && widget.kind != "gradient" && widget.kind != "lap_timer";
-    InspectorView {
-        id: widget.id.clone(),
-        horizontal_label: if uses_horizontal_anchor {
-            translations().t_or(locale, "widget-editor.horizontalAnchor", "Horizontal Anchor").to_string()
-        } else {
-            translations().t(locale, "widget-editor.horizontalPosition").to_string()
-        },
-        x: whole_number_text(data.get("x")),
-        y: whole_number_text(data.get("y")),
-        opacity: js_round(float(data, "opacity") * 100.0),
-        metric: metric_editor_view(store, &widget),
+    widget
+}
+
+/// The widget `widget_id` as its inspector shows it.
+fn inspected(store: &Store, widget_id: &str) -> Result<ConfigWidget, String> {
+    let widgets = sidebar_widgets(store);
+    let committed = widgets.iter().find(|widget| widget.id == widget_id).ok_or_else(|| format!("No widget {widget_id}"))?;
+    Ok(inspector_widget(store, committed))
+}
+
+/// `WidgetInspector`: `PositionSection`, then the widget's editor (`renderWidgetEditor`), 1.5rem
+/// apart.
+pub fn describe(store: &Store, widget: &ConfigWidget) -> Vec<Block> {
+    let ctx = Ctx::new(store, widget);
+    let mut nodes = vec![sections::position_section(&ctx)];
+    let definition = catalog().require_widget(&widget.kind).expect("listed widgets are in the catalog");
+    if definition.metric {
+        nodes.extend(displays::metric_widget_editor(&ctx));
     }
+    blocks::flatten(1.5, nodes)
 }
 
 /// `SidebarWidgetsTab`'s view: the rows, the open item and its inspector.
 pub fn sidebar_view(store: &Store) -> SidebarView {
     let widgets = sidebar_widgets(store);
     let open = open_widget_id(store).map(str::to_string);
-    let inspector = open.as_deref().and_then(|id| widgets.iter().find(|widget| widget.id == id)).map(|widget| inspector_view(store, widget));
+    let inspector = open.as_deref().and_then(|id| widgets.iter().find(|widget| widget.id == id)).map(|committed| {
+        let widget = inspector_widget(store, committed);
+        InspectorView { id: widget.id.clone(), blocks: describe(store, &widget) }
+    });
     SidebarView {
         rows: widgets
             .iter()
@@ -343,12 +161,38 @@ pub fn sidebar_view(store: &Store) -> SidebarView {
     }
 }
 
+/// An inspector edit (D1): the field is looked up in the widget's description, and its rule turns
+/// the input into a patch. A slider's live value is a draft (`draft`); everything else commits.
+pub fn edit_field(store: &mut Store, widget_id: &str, field_id: &str, input: Input, draft: bool) -> Result<(), String> {
+    let widget = inspected(store, widget_id)?;
+    let blocks = describe(store, &widget);
+    let cell = blocks::find(&blocks, field_id).ok_or_else(|| format!("The {} inspector has no field {field_id}", widget.kind))?;
+    if cell.disabled {
+        return Err(format!("{field_id} is disabled"));
+    }
+    let context = RuleContext { data: &widget.data, kind: &widget.kind, unit_system: store.editor.unit_system };
+    match rules::patch(cell, input, &context)? {
+        Patch::Data(patch) if draft => update_widget_draft(store, widget_id, patch),
+        Patch::Data(patch) => update_widget_data(store, widget_id, patch),
+        Patch::Numeric { key, raw, options } => set_numeric_field(store, widget_id, &key, &raw, options),
+        Patch::Reset => reset_widget(store, widget_id),
+    }
+}
+
 /// The font select's two lists for the open widget (`getFontSelectOptions`).
 pub fn font_options(store: &Store, value: &str) -> (Vec<FontOption>, Vec<FontOption>) {
     font_select_options(value, &store.widget_editor.fonts.recommended, &store.widget_editor.fonts.system)
 }
 
 // ── `useWidgetManager`'s actions ────────────────────────────────────────────────────────────────
+
+fn text(data: &Map<String, Value>, key: &str) -> String {
+    data.get(key).and_then(Value::as_str).unwrap_or_default().to_string()
+}
+
+fn float(data: &Map<String, Value>, key: &str) -> f64 {
+    data.get(key).and_then(Value::as_f64).unwrap_or_default()
+}
 
 /// `CONTENT_ALIGNMENT_FACTORS`.
 fn alignment_factor(alignment: &str) -> Result<f64, String> {
@@ -503,27 +347,6 @@ pub fn reset_widget(store: &mut Store, widget_id: &str) -> Result<(), String> {
     store.editor.edit_config(|config| config.replace_widget(widget_id, &data))
 }
 
-/// `handleDisplayTypeChange`.
-pub fn change_display_type(store: &mut Store, widget_id: &str, display_type: &str) -> Result<(), String> {
-    let data = store.editor.config.widget(widget_id)?;
-    let patch = build_display_type_change_update(data, display_type, store.editor.unit_system);
-    update_widget_data(store, widget_id, patch)
-}
-
-/// `TextDisplaySection`'s `handleUnitChange`: altitude widgets convert their starting altitude.
-pub fn change_metric_unit(store: &mut Store, widget_id: &str, unit: &str) -> Result<(), String> {
-    let (collection, _) = store.editor.config.find_widget(widget_id)?;
-    let data = store.editor.config.widget(widget_id)?;
-    let kind = collection.widget_type(data)?;
-    let patch = build_metric_unit_update(&kind, data.get("starting_altitude").unwrap_or(&Value::Null), &text(data, "display_unit"), unit);
-    update_widget_data(store, widget_id, patch)
-}
-
-/// `changeFont`: `font` and its `font_family`.
-pub fn change_font(store: &mut Store, widget_id: &str, font: &str) -> Result<(), String> {
-    update_widget_data(store, widget_id, font_selection(font))
-}
-
 /// The MCP form of `updateWidgetData` (Q2): a field patch, checked against the type's fields, then
 /// validated by the durable normalization and by the renderer. An invalid patch changes nothing and
 /// fails with the reason.
@@ -612,9 +435,33 @@ mod tests {
         dispatcher.with_store(|store| read(store.editor.config.widget(id).unwrap()))
     }
 
-    fn inspector(dispatcher: &Dispatcher, id: &'static str) -> InspectorView {
+    /// Opens `id`'s inspector and returns its blocks.
+    fn inspector(dispatcher: &Dispatcher, id: &'static str) -> Vec<Block> {
         dispatcher.dispatch(move |store, _| store.editor.set_selected_widget_id(Some(id)));
-        dispatcher.with_store(|store| sidebar_view(store).inspector.unwrap())
+        dispatcher.with_store(|store| sidebar_view(store).inspector.unwrap().blocks)
+    }
+
+    /// The cell `field` of `id`'s inspector.
+    fn cell(dispatcher: &Dispatcher, id: &'static str, field: &str) -> Option<blocks::Cell> {
+        blocks::find(&inspector(dispatcher, id), field).cloned()
+    }
+
+    fn slider_value(cell: &blocks::Cell) -> (f64, f64) {
+        match &cell.kind {
+            blocks::CellKind::Slider { value, max, .. } => (*value, *max),
+            other => panic!("{} is not a slider: {other:?}", cell.id),
+        }
+    }
+
+    fn select_options(cell: &blocks::Cell) -> Vec<blocks::OptionView> {
+        match &cell.kind {
+            blocks::CellKind::Select { options, .. } => options.clone(),
+            other => panic!("{} is not a select: {other:?}", cell.id),
+        }
+    }
+
+    fn edit(dispatcher: &Dispatcher, id: &'static str, field: &'static str, input: Input) {
+        dispatcher.dispatch(move |store, _| edit_field(store, id, field, input, false).unwrap());
     }
 
     #[test]
@@ -628,7 +475,7 @@ mod tests {
             update_widget_draft(store, "speed-0", patch(json!({"font_size": 60.375}))).unwrap();
         });
         assert_eq!(widget(&dispatcher, "speed-0", |data| data["font_size"].clone()), initial, "drafts leave the document alone");
-        assert_eq!(inspector(&dispatcher, "speed-0").metric.unwrap().text.unwrap().font_size, 60.375, "the inspector shows the draft");
+        assert_eq!(slider_value(&cell(&dispatcher, "speed-0", "font_size").unwrap()).0, 60.375, "the inspector shows the draft");
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 0);
 
         dispatcher.dispatch(|store, _| commit_widget_draft(store, "speed-0").unwrap());
@@ -683,44 +530,44 @@ mod tests {
         ];
         let values: Vec<Value> = kinds.iter().map(|kind| value(kind, kind, 0.0)).collect();
         let (dispatcher, _) = editor(values);
-        let text = |id: &'static str| inspector(&dispatcher, id).metric.unwrap().text.unwrap();
+        let has = |id: &'static str, field: &str| cell(&dispatcher, id, field).is_some();
         for kind in ["speed", "g_force", "distance", "stride_length", "torque", "vertical_speed", "vertical_oscillation"] {
-            assert!(text(kind).decimals.is_some(), "{kind} has a decimal control");
+            assert!(has(kind, "decimals"), "{kind} has a decimal control");
         }
         for kind in ["pace", "air_pressure", "ground_contact_time", "stroke_rate", "left_right_balance"] {
-            assert!(text(kind).decimals.is_none(), "{kind} has no decimal control");
+            assert!(!has(kind, "decimals"), "{kind} has no decimal control");
         }
-        assert_eq!(text("speed").decimals, Some((0.0, 1.0)), "speed's slider runs 0 to 1");
-        assert_eq!(text("distance").show_full_distance, Some(true), "full distance defaults to on");
-        assert_eq!(text("left_right_balance").balance_format.as_deref(), Some("percent_label"));
-        assert_eq!(text("speed").balance_format, None);
-        assert!(text("total_ascent").show_full_ascent.is_some());
+        assert_eq!(slider_value(&cell(&dispatcher, "speed", "decimals").unwrap()), (0.0, 1.0), "speed's slider runs 0 to 1");
+        let full_distance = cell(&dispatcher, "distance", "show_full_distance").unwrap();
+        assert!(matches!(full_distance.kind, blocks::CellKind::SwitchRow { checked: true, .. }), "full distance defaults to on");
+        assert!(matches!(cell(&dispatcher, "left_right_balance", "balance_format").unwrap().kind, blocks::CellKind::Select { ref value, .. } if value == "percent_label"));
+        assert!(!has("speed", "balance_format"));
+        assert!(has("total_ascent", "show_full_ascent"));
 
-        let coordinates = text("gps_coordinates");
-        let formats: Vec<_> = coordinates.coordinates.as_ref().unwrap().formats.iter().map(|option| option.label.as_str()).collect();
+        let formats: Vec<_> = select_options(&cell(&dispatcher, "gps_coordinates", "display_unit").unwrap()).into_iter().map(|option| option.label).collect();
         assert_eq!(formats, ["Latitude", "Longitude", "Both"]);
-        let units = coordinates.units.unwrap();
-        assert!(!units.show_toggle && units.options.is_empty(), "coordinates have no units toggle or unit select");
-        let speed_units = text("speed").units.unwrap();
-        assert!(speed_units.supports_selection && speed_units.show_toggle);
-        assert_eq!(speed_units.options[0], OptionView::new("kmh", "km/h"));
+        assert!(!has("gps_coordinates", "show_units"), "coordinates have no units toggle");
+        assert!(has("speed", "show_units"));
+        assert_eq!(select_options(&cell(&dispatcher, "speed", "display_unit").unwrap())[0], blocks::OptionView::new("kmh", "km/h"));
 
-        let speed = inspector(&dispatcher, "speed").metric.unwrap();
-        assert!(speed.display_types.len() > 1, "speed offers several displays");
-        assert_eq!(inspector(&dispatcher, "speed").horizontal_label, "Horizontal Anchor");
+        assert!(select_options(&cell(&dispatcher, "speed", "display_type").unwrap()).len() > 1, "speed offers several displays");
+        assert_eq!(cell(&dispatcher, "speed", "x").unwrap().label, "Horizontal Anchor");
     }
 
     #[test]
     fn altitude_units_convert_calibration_and_show_the_activity_start() {
         let (dispatcher, _) = editor(vec![value("altitude", "alt", 0.0)]);
-        dispatcher.dispatch(|store, _| change_metric_unit(store, "alt", "ft").unwrap());
+        dispatcher.dispatch(|store, _| store.editor.set_selected_widget_id(Some("alt")));
+        edit(&dispatcher, "alt", "display_unit", Input::Text("ft".into()));
         widget(&dispatcher, "alt", |data| assert_eq!((data["display_unit"].clone(), data["starting_altitude"].clone()), (json!("ft"), Value::Null)));
-        dispatcher.dispatch(|store, _| change_metric_unit(store, "alt", "m").unwrap());
-        dispatcher.dispatch(|store, _| update_widget_data(store, "alt", patch(json!({"starting_altitude": 100}))).unwrap());
-        dispatcher.dispatch(|store, _| change_metric_unit(store, "alt", "ft").unwrap());
+        edit(&dispatcher, "alt", "display_unit", Input::Text("m".into()));
+        edit(&dispatcher, "alt", "starting_altitude", Input::Text("100".into()));
+        edit(&dispatcher, "alt", "display_unit", Input::Text("ft".into()));
         assert_eq!(widget(&dispatcher, "alt", |data| data["starting_altitude"].clone()), json!(328));
-        let altitude = inspector(&dispatcher, "alt").metric.unwrap().altitude.unwrap();
-        assert_eq!((altitude.value.as_str(), altitude.unit.as_str()), ("328", "ft"));
+        let altitude = cell(&dispatcher, "alt", "starting_altitude").unwrap();
+        assert!(matches!(&altitude.kind, blocks::CellKind::Number { value, suffix, resettable: true, .. } if value == "328" && suffix == "ft"));
+        edit(&dispatcher, "alt", "starting_altitude", Input::Clear);
+        assert_eq!(widget(&dispatcher, "alt", |data| data["starting_altitude"].clone()), Value::Null);
     }
 
     #[test]
@@ -755,7 +602,7 @@ mod tests {
     fn display_type_changes_and_unit_systems_follow_the_catalog() {
         let (dispatcher, _) = editor(vec![value("speed", "a", 0.0)]);
         dispatcher.dispatch(|store, _| store.editor.initialize_unit_system(UnitSystem::Imperial));
-        dispatcher.dispatch(|store, _| change_display_type(store, "a", "linear").unwrap());
+        edit(&dispatcher, "a", "display_type", Input::Text("linear".into()));
         widget(&dispatcher, "a", |data| {
             assert_eq!(data["display_type"], "linear");
             assert!(data["display_variants"]["linear"].is_object());

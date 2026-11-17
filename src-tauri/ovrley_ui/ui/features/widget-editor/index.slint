@@ -1,4 +1,4 @@
-import { Choice } from "../../components/logic.slint";
+import { Choice, GradientStop } from "../../components/logic.slint";
 
 // One row of the widget list: its name and icon. A manifest icon is either a lucide glyph (an
 // `Icons` path in `glyph`) or a bundled SVG (`image`, tinted with the row's text colour).
@@ -9,60 +9,100 @@ export struct WidgetRowView {
     image: image,
 }
 
-// `TextDisplaySection` of the open widget (`TextDisplayView`). Optional sections carry a `has-…`
-// flag; their other fields are then unused.
-export struct TextDisplayView {
-    content-alignment: string,
-    alignment-label: string,
-    alignments: [Choice],
-    font-size: float,
-    font: string,
-    color: string,
-    has-decimals: bool,
-    decimals: float,
-    max-decimals: float,
-    has-balance-format: bool,
-    balance-format: string,
-    has-full-distance: bool,
-    show-full-distance: bool,
-    has-coordinates: bool,
-    coordinate-unit: string,
-    coordinate-units: [Choice],
-    coordinate-format: string,
-    has-full-ascent: bool,
-    show-full-ascent: bool,
-    show-icon: bool,
-    icon-color: string,
-    icon-size: float,
-    icon-offset-x: string,
-    icon-offset-y: string,
-    has-units: bool,
-    units-supports-selection: bool,
-    units-show-toggle: bool,
-    units-checked: bool,
-    has-unit-color: bool,
-    unit-color: string,
-    unit: string,
-    units: [Choice],
+// What a cell of the declarative inspector shows (D1); `ovrley_app`'s `CellKind`.
+export enum InspectorCellKind {
+    slider,
+    color,
+    select,
+    number,
+    text,
+    switch,
+    switch-row,
+    font,
+    toggle-group,
+    alignment,
+    italic,
+    icon-button,
+    gradient,
+    shape-grid,
+    chart-series,
+    gforce-axis,
+    raster-picker,
+    alert,
+    window-seconds,
+    locked,
+    note,
+    tabs,
 }
 
-// The open widget's inspector (`InspectorView`): `PositionSection`, then `MetricWidgetEditor` for
-// metric widgets.
-export struct InspectorView {
+// How a label-and-switch row is laid out; `ovrley_app`'s `SwitchRowStyle`. `none` is a heading
+// switch without a visible label.
+export enum SwitchRowStyle { none, toggle, inline, padded, padded-left, tall }
+
+// Where a row sits in an accent panel.
+export enum PanelPart { none, first, middle, last, only }
+
+// A toggle of the backdrop's shape grid.
+export struct ShapeToggleView {
+    key: string,
+    edge: bool,
+    active: bool,
+    label: string,
+}
+
+// One control. Which fields a kind reads is listed in `ovrley_ui/src/features/widget_editor.rs`
+// (`cell`); the others keep their defaults.
+export struct InspectorCell {
+    kind: InspectorCellKind,
+    // The field's JSON path, or the cell's stable name.
     id: string,
-    horizontal-label: string,
-    x: string,
-    y: string,
-    opacity: float,
-    is-metric: bool,
-    display-types: [Choice],
-    display-type: string,
-    has-text: bool,
-    text: TextDisplayView,
-    has-altitude: bool,
-    altitude: string,
-    altitude-placeholder: string,
-    altitude-unit: string,
+    label: string,
+    disabled: bool,
+    tooltip: string,
+    // The value: a select's or text's value, a colour, a number field's text, a path, a message.
+    text: string,
+    // A second string: a placeholder, a series colour, a button's label.
+    text2: string,
+    suffix: string,
+    // A slider's value, range, step, display scale and readout.
+    value: float,
+    minimum: float,
+    maximum: float,
+    step: float,
+    scale: float,
+    readout: string,
+    checked: bool,
+    invalid: bool,
+    resettable: bool,
+    // The chart series row's position; the raster picker's loading flag (`busy`).
+    first: bool,
+    last: bool,
+    only: bool,
+    busy: bool,
+    outline: bool,
+    // An `Icons` path.
+    icon: string,
+    style: SwitchRowStyle,
+    options: [Choice],
+    stops: [GradientStop],
+    toggles: [ShapeToggleView],
+}
+
+// One row of the inspector: a heading, or a grid row of cells. `gap` is the space above it, in
+// rem.
+export struct InspectorRow {
+    key: string,
+    heading: bool,
+    gap: float,
+    panel: PanelPart,
+    icon: string,
+    title: string,
+    has-trailing: bool,
+    trailing: InspectorCell,
+    columns: int,
+    column-gap: float,
+    align-end: bool,
+    cells: [InspectorCell],
 }
 
 // The widget editor feature's global (D5), written by `src/features/widget_editor.rs`.
@@ -70,26 +110,23 @@ export global WidgetEditor {
     in property <[WidgetRowView]> rows;
     in property <string> open-id;
     in property <bool> has-inspector;
-    in property <InspectorView> inspector;
-    // The font select's two groups for the open widget (`getFontSelectOptions`).
-    in property <[Choice]> recommended-fonts;
+    // The open widget's inspector (D1).
+    in property <[InspectorRow]> inspector;
+    // Every font select's system fonts; each font cell carries its own bundled options.
     in property <[Choice]> system-fonts;
 
     // The accordion: opening an item selects its widget; closing it clears the selection.
     callback toggle(id: string);
     callback delete-widget(id: string);
-    callback reset-widget(id: string);
-    // `setNumericField` for the number inputs (`x`, `y`, `icon_offset_x`, `icon_offset_y`,
-    // `starting_altitude`), with the field's raw text.
-    callback set-number(key: string, raw: string);
-    // A slider's live value (`updateWidgetDraft`), and its release (`commitWidgetDraft`).
-    callback draft(key: string, value: float);
+    // The inspector's edits, keyed by the field id: a slider's live value and its release, a
+    // number field's raw text, a text or choice, a switch, a field's reset button, a button, and
+    // a gradient's stops (live; the release is `commit-draft`).
+    callback draft(id: string, value: float);
     callback commit-draft();
-    // `updateWidgetData` with one text or flag field.
-    callback set-text(key: string, value: string);
-    callback set-flag(key: string, value: bool);
-    callback clear-field(key: string);
-    callback change-font(id: string);
-    callback change-display-type(value: string);
-    callback change-unit(value: string);
+    callback set-number(id: string, raw: string);
+    callback set-text(id: string, value: string);
+    callback set-flag(id: string, value: bool);
+    callback clear-field(id: string);
+    callback press(id: string);
+    callback set-stops(id: string, stops: [GradientStop]);
 }

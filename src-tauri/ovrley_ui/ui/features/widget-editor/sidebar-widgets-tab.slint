@@ -4,58 +4,35 @@ import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint
 import { AccordionTrigger, AccordionContent } from "../../components/accordion.slint";
 import { Icon, Icons } from "../../components/icons.slint";
 import { WidgetEditor } from "index.slint";
-import { MetricWidgetEditor, PositionSection } from "sections.slint";
+import { InspectorBlocks } from "inspector-blocks.slint";
 
-// `WidgetInspector`: the open item's content, `PositionSection` then the widget's editor, 1.5rem
-// apart.
-component WidgetInspector inherits VerticalLayout {
-    spacing: 1.5rem;
-    PositionSection {
-        inspector: WidgetEditor.inspector;
-        set-number(key, raw) => {
-            WidgetEditor.set-number(key, raw);
-        }
-        draft(key, value) => {
-            WidgetEditor.draft(key, value);
-        }
-        commit-draft => {
-            WidgetEditor.commit-draft();
-        }
-        reset => {
-            WidgetEditor.reset-widget(WidgetEditor.inspector.id);
-        }
+// `WidgetInspector`: the open widget's description (D1), `PositionSection` then its editor.
+component WidgetInspector inherits InspectorBlocks {
+    rows: WidgetEditor.inspector;
+    system-fonts: WidgetEditor.system-fonts;
+    draft(id, value) => {
+        WidgetEditor.draft(id, value);
     }
-    if WidgetEditor.inspector.is-metric: MetricWidgetEditor {
-        inspector: WidgetEditor.inspector;
-        recommended-fonts: WidgetEditor.recommended-fonts;
-        system-fonts: WidgetEditor.system-fonts;
-        set-number(key, raw) => {
-            WidgetEditor.set-number(key, raw);
-        }
-        draft(key, value) => {
-            WidgetEditor.draft(key, value);
-        }
-        commit-draft => {
-            WidgetEditor.commit-draft();
-        }
-        set-text(key, value) => {
-            WidgetEditor.set-text(key, value);
-        }
-        set-flag(key, value) => {
-            WidgetEditor.set-flag(key, value);
-        }
-        clear-field(key) => {
-            WidgetEditor.clear-field(key);
-        }
-        change-font(id) => {
-            WidgetEditor.change-font(id);
-        }
-        change-display-type(value) => {
-            WidgetEditor.change-display-type(value);
-        }
-        change-unit(value) => {
-            WidgetEditor.change-unit(value);
-        }
+    commit-draft => {
+        WidgetEditor.commit-draft();
+    }
+    set-number(id, raw) => {
+        WidgetEditor.set-number(id, raw);
+    }
+    set-text(id, value) => {
+        WidgetEditor.set-text(id, value);
+    }
+    set-flag(id, value) => {
+        WidgetEditor.set-flag(id, value);
+    }
+    clear-field(id) => {
+        WidgetEditor.clear-field(id);
+    }
+    press(id) => {
+        WidgetEditor.press(id);
+    }
+    set-stops(id, stops) => {
+        WidgetEditor.set-stops(id, stops);
     }
 }
 

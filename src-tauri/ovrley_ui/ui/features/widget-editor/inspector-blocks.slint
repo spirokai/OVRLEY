@@ -1,0 +1,346 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { BlurInput } from "../../components/blur-input.slint";
+import { SectionHeading } from "../../components/section-heading.slint";
+import { Switch } from "../../components/switch.slint";
+import { FontSelectField } from "../../components/font-select-field.slint";
+import { SelectSize } from "../../components/select.slint";
+import { GradientPicker } from "../../components/gradient-picker.slint";
+import { ToggleGroup, ToggleGroupSize, ToggleGroupType } from "../../components/toggle-group.slint";
+import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { Icons } from "../../components/icons.slint";
+import { Choice, ChoiceKind, GradientStop } from "../../components/logic.slint";
+import { InspectorCell, InspectorCellKind, InspectorRow, PanelPart, SwitchRowStyle } from "index.slint";
+import { ColorField, ContentAlignmentControl, FieldBlock, FieldLabel, NumberField, SelectField, SliderField, SwitchRow } from "form-controls.slint";
+
+// The declarative inspector's renderer (D1): every editor, display section and scene settings
+// panel is a list of rows that `ovrley_app` describes, rendered here from the shared form
+// controls. It holds no state beyond what the controls hold. Edits report by field id.
+
+// The callbacks every cell reports through.
+component CellEvents inherits VerticalLayout {
+    callback draft(id: string, value: float);
+    callback commit-draft();
+    callback set-number(id: string, raw: string);
+    callback set-text(id: string, value: string);
+    callback set-flag(id: string, value: bool);
+    callback clear-field(id: string);
+    callback press(id: string);
+    callback set-stops(id: string, stops: [GradientStop]);
+    @children
+}
+
+// A heading's trailing control: a switch (with its label for the labelled styles), the content
+// alignment control, the italic toggle, or an icon button.
+component HeadingControl inherits CellEvents {
+    in property <InspectorCell> cell;
+
+    horizontal-stretch: 0;
+    // A switch is centred on the heading's line (`items-center`); the toggle groups and buttons
+    // sit at its top, as Phase 3 matched them.
+    if root.cell.kind == InspectorCellKind.switch: VerticalLayout {
+        alignment: center;
+        HorizontalLayout {
+            spacing: 0.375rem;
+            if root.cell.style != SwitchRowStyle.none: VerticalLayout {
+                alignment: center;
+                FieldLabel {
+                    height: root.cell.style == SwitchRowStyle.tall ? 9px : 0.667rem;
+                    inset-left: 0px;
+                    font-size: root.cell.style == SwitchRowStyle.tall ? 9px : 0.667rem;
+                    text: root.cell.label;
+                }
+            }
+            Switch {
+                checked: root.cell.checked;
+                disabled: root.cell.disabled;
+                accessible-label: root.cell.label;
+                checked-changed(checked) => {
+                    root.set-flag(root.cell.id, checked);
+                }
+            }
+        }
+    }
+    if root.cell.kind == InspectorCellKind.alignment: ContentAlignmentControl {
+        value: root.cell.text;
+        group-label: root.cell.label;
+        labels: root.cell.options;
+        value-changed(value) => {
+            root.set-text(root.cell.id, value);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.italic: SimpleTooltip {
+        content: root.cell.label;
+        ToggleGroup {
+            size: ToggleGroupSize.compact;
+            type: ToggleGroupType.multiple;
+            disabled: root.cell.disabled;
+            items: [{ kind: ChoiceKind.item, value: "italic", icon: Icons.italic, accessible-label: root.cell.label, pressed: root.cell.checked }];
+            item-pressed-changed(value, pressed) => {
+                root.set-flag(root.cell.id, pressed);
+            }
+        }
+    }
+    if root.cell.kind == InspectorCellKind.icon-button: VerticalLayout {
+        alignment: center;
+        Button {
+            width: root.cell.outline ? 1.75rem : 1.5rem;
+            height: self.width;
+            variant: root.cell.outline ? ButtonVariant.outline : ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            icon: root.cell.icon;
+            icon-size: root.cell.outline ? 0.9rem : 0.75rem;
+            disabled: root.cell.disabled;
+            text-color: Theme.muted-foreground;
+            hover-text-color: Theme.foreground;
+            hover-background: root.cell.outline ? Theme.surface-elevated : Theme.foreground.transparentize(0.8);
+            accessible-label: root.cell.label;
+            clicked => {
+                root.press(root.cell.id);
+            }
+        }
+    }
+
+}
+
+// One cell of a grid row.
+component CellView inherits CellEvents {
+    in property <InspectorCell> cell;
+    in property <[Choice]> system-fonts;
+
+    if root.cell.kind == InspectorCellKind.slider: SliderField {
+        label: root.cell.label;
+        value: root.cell.value;
+        minimum: root.cell.minimum;
+        maximum: root.cell.maximum;
+        step: root.cell.step;
+        scale: root.cell.scale;
+        disabled: root.cell.disabled;
+        value-display: root.cell.readout;
+        suffix: root.cell.suffix;
+        value-changed(value) => {
+            root.draft(root.cell.id, value);
+        }
+        value-committed => {
+            root.commit-draft();
+        }
+    }
+    if root.cell.kind == InspectorCellKind.color: ColorField {
+        label: root.cell.label;
+        value: root.cell.text;
+        disabled: root.cell.disabled;
+        changed(hex) => {
+            root.set-text(root.cell.id, hex);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.select: SelectField {
+        label: root.cell.label;
+        value: root.cell.text;
+        options: root.cell.options;
+        disabled: root.cell.disabled;
+        value-changed(value) => {
+            root.set-text(root.cell.id, value);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.number: NumberField {
+        label: root.cell.label;
+        value: root.cell.text;
+        placeholder: root.cell.text2;
+        suffix: root.cell.suffix;
+        disabled: root.cell.disabled;
+        resettable: root.cell.resettable;
+        changed(raw) => {
+            root.set-number(root.cell.id, raw);
+        }
+        reset => {
+            root.clear-field(root.cell.id);
+        }
+    }
+    // `TextField`.
+    if root.cell.kind == InspectorCellKind.text: FieldBlock {
+        label: root.cell.label;
+        BlurInput {
+            height: 2.25rem;
+            value: root.cell.text;
+            placeholder: root.cell.text2;
+            font-size: Theme.text-xs * 1rem;
+            background: Theme.surface;
+            label: root.cell.label;
+            changed(value) => {
+                root.set-text(root.cell.id, value);
+            }
+        }
+    }
+    if root.cell.kind == InspectorCellKind.switch-row: SwitchRow {
+        label: root.cell.label;
+        checked: root.cell.checked;
+        disabled: root.cell.disabled;
+        style: root.cell.style;
+        checked-changed(checked) => {
+            root.set-flag(root.cell.id, checked);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.font: FontSelectField {
+        label: root.cell.label;
+        value: root.cell.text;
+        disabled: root.cell.disabled;
+        recommended-options: root.cell.options;
+        system-options: root.system-fonts;
+        label-font-size: 0.667rem;
+        size: SelectSize.default;
+        background: Theme.surface;
+        value-changed(id) => {
+            root.set-text(root.cell.id, id);
+        }
+    }
+    // `FieldBlock` with a full-width single `ToggleGroup` (`h-7 w-full px-3 text-xs` items);
+    // clicking the pressed item changes nothing.
+    if root.cell.kind == InspectorCellKind.toggle-group: FieldBlock {
+        label: root.cell.label;
+        disabled: root.cell.disabled;
+        ToggleGroup {
+            type: ToggleGroupType.single;
+            stretch: true;
+            items: root.cell.options;
+            value: root.cell.text;
+            disabled: root.cell.disabled;
+            item-padding-x: 0.75rem;
+            item-font-size: Theme.text-xs * 1rem;
+            accessible-label: root.cell.label;
+            value-changed(value) => {
+                if value != "" {
+                    root.set-text(root.cell.id, value);
+                }
+            }
+        }
+    }
+    if root.cell.kind == InspectorCellKind.gradient: GradientPicker {
+        stops: root.cell.stops;
+        changed(stops) => {
+            root.set-stops(root.cell.id, stops);
+        }
+        committed => {
+            root.commit-draft();
+        }
+    }
+}
+
+// A grid row: `columns` equal columns `column-gap` apart; fewer cells take the first columns.
+component CellsRow inherits CellEvents {
+    in property <InspectorRow> data;
+    in property <[Choice]> system-fonts;
+
+    property <length> gap: root.data.column-gap * 1rem;
+    property <length> column: (root.width - (root.data.columns - 1) * root.gap) / max(1, root.data.columns);
+
+    HorizontalLayout {
+        spacing: root.gap;
+        alignment: start;
+        for cell in root.data.cells: VerticalLayout {
+            width: root.column;
+            alignment: root.data.align-end ? LayoutAlignment.end : LayoutAlignment.start;
+            CellView {
+                cell: cell;
+                system-fonts: root.system-fonts;
+                draft(id, value) => {
+                    root.draft(id, value);
+                }
+                commit-draft => {
+                    root.commit-draft();
+                }
+                set-number(id, raw) => {
+                    root.set-number(id, raw);
+                }
+                set-text(id, value) => {
+                    root.set-text(id, value);
+                }
+                set-flag(id, value) => {
+                    root.set-flag(id, value);
+                }
+                clear-field(id) => {
+                    root.clear-field(id);
+                }
+                press(id) => {
+                    root.press(id);
+                }
+                set-stops(id, stops) => {
+                    root.set-stops(id, stops);
+                }
+            }
+        }
+    }
+}
+
+// The inspector: each row with the space above it. A row in an accent panel draws its part of
+// the panel (`rounded-xs bg-surface-accent-soft/70 p-4`): the gaps between its rows are inside it.
+export component InspectorBlocks inherits CellEvents {
+    in property <[InspectorRow]> rows;
+    in property <[Choice]> system-fonts;
+
+    for row in root.rows: item := VerticalLayout {
+        property <bool> starts-panel: row.panel == PanelPart.first || row.panel == PanelPart.only;
+        property <bool> ends-panel: row.panel == PanelPart.last || row.panel == PanelPart.only;
+        property <bool> in-panel: row.panel != PanelPart.none;
+        property <length> radius: Theme.radius-xs * 1rem;
+
+        padding-top: !self.in-panel || self.starts-panel ? row.gap * 1rem : 0px;
+        Rectangle {
+            background: item.in-panel ? Theme.surface-accent-soft.transparentize(0.3) : transparent;
+            border-top-left-radius: item.starts-panel ? item.radius : 0px;
+            border-top-right-radius: self.border-top-left-radius;
+            border-bottom-left-radius: item.ends-panel ? item.radius : 0px;
+            border-bottom-right-radius: self.border-bottom-left-radius;
+            VerticalLayout {
+                padding-left: item.in-panel ? 1rem : 0px;
+                padding-right: self.padding-left;
+                padding-top: item.starts-panel ? 1rem : item.in-panel ? row.gap * 1rem : 0px;
+                padding-bottom: item.ends-panel ? 1rem : 0px;
+                if row.heading: SectionHeading {
+                    icon: row.icon;
+                    title: row.title;
+                    if row.has-trailing: HeadingControl {
+                        cell: row.trailing;
+                        set-text(id, value) => {
+                            root.set-text(id, value);
+                        }
+                        set-flag(id, value) => {
+                            root.set-flag(id, value);
+                        }
+                        press(id) => {
+                            root.press(id);
+                        }
+                    }
+                }
+                if !row.heading: CellsRow {
+                    data: row;
+                    system-fonts: root.system-fonts;
+                    draft(id, value) => {
+                        root.draft(id, value);
+                    }
+                    commit-draft => {
+                        root.commit-draft();
+                    }
+                    set-number(id, raw) => {
+                        root.set-number(id, raw);
+                    }
+                    set-text(id, value) => {
+                        root.set-text(id, value);
+                    }
+                    set-flag(id, value) => {
+                        root.set-flag(id, value);
+                    }
+                    clear-field(id) => {
+                        root.clear-field(id);
+                    }
+                    press(id) => {
+                        root.press(id);
+                    }
+                    set-stops(id, stops) => {
+                        root.set-stops(id, stops);
+                    }
+                }
+            }
+        }
+    }
+}

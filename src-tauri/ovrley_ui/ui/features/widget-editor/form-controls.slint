@@ -11,6 +11,7 @@ import { HexColorPicker } from "../../components/hex-color-picker.slint";
 import { ToggleGroup, ToggleGroupSize, ToggleGroupType } from "../../components/toggle-group.slint";
 import { Icons } from "../../components/icons.slint";
 import { Choice, ChoiceKind } from "../../components/logic.slint";
+import { SwitchRowStyle } from "index.slint";
 
 // widgetFormControls.jsx: thin wrappers with the widget editor's styling. `CONTROL_CLASS` is a
 // 2.25rem control in `text-xs` on `surface` with a `border` at 70%; `FIELD_LABEL_CLASS` a 0.75rem
@@ -144,7 +145,8 @@ export component ColorField inherits VerticalLayout {
 
 // `SliderField`, always `editable` in the widget editor: the label and the value readout, which
 // turns into an inline number input on focus, then the slider. `value-display` is the readout
-// without its suffix. Live values go to `value-changed`, the release and a typed value also to
+// without its suffix; `scale` is `valueScale`, the inline input's display factor (a 0–1 opacity
+// typed in percent). Live values go to `value-changed`, the release and a typed value also to
 // `value-committed`.
 export component SliderField inherits VerticalLayout {
     in property <string> label;
@@ -152,6 +154,7 @@ export component SliderField inherits VerticalLayout {
     in property <float> minimum;
     in property <float> maximum;
     in property <float> step: 1;
+    in property <float> scale: 1;
     in property <bool> disabled;
     in property <string> value-display;
     in property <string> suffix;
@@ -191,13 +194,14 @@ export component SliderField inherits VerticalLayout {
                 height: 1.1875rem;
                 y: (parent.height - self.height) / 2;
                 opacity: (self.has-focus || self.is-invalid) && !root.disabled ? 1 : 0;
-                value: root.value;
-                constraints: { has-min: true, min: root.minimum, has-max: true, max: root.maximum, step: root.step + "" };
+                // `Number((value * valueScale).toPrecision(12))`.
+                value: round(root.value * root.scale * 1000000000) / 1000000000;
+                constraints: { has-min: true, min: root.minimum * root.scale, has-max: true, max: root.maximum * root.scale, step: root.step * root.scale + "" };
                 disabled: root.disabled;
                 label: root.label;
                 committed(value) => {
-                    root.value-changed(value);
-                    root.value-committed(value);
+                    root.value-changed(value / root.scale);
+                    root.value-committed(value / root.scale);
                 }
             }
         }
@@ -248,6 +252,59 @@ export component ContentAlignmentControl inherits HorizontalLayout {
         value-changed(value) => {
             if value != "" {
                 root.value-changed(value);
+            }
+        }
+    }
+}
+
+// A label and a switch filling a grid cell, as each editor styles it: `toggle` is
+// `TextDisplaySection`'s row (0.741rem bold `tracking-wider`, `py-2`); `inline` the map's layer
+// toggles (`flex items-center justify-between gap-2 pl-1`, a 0.667rem uppercase bold label);
+// `padded` Flat Track (`px-1 pt-2 pb-2`); `padded-left` Hundredths (`pl-1 pt-2 pb-2`, the label
+// `pt-1`); `tall` the chart's area gradient (`h-9 px-1`, a 9px label).
+export component SwitchRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <bool> checked;
+    in property <bool> disabled;
+    in property <SwitchRowStyle> style: SwitchRowStyle.toggle;
+    callback checked-changed(checked: bool);
+
+    property <bool> vertical-padding: root.style == SwitchRowStyle.toggle || root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.padded-left;
+    padding-top: root.vertical-padding ? 0.5rem : 0px;
+    padding-bottom: self.padding-top;
+    padding-left: root.style == SwitchRowStyle.toggle ? 0px : 0.25rem;
+    padding-right: root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.tall ? 0.25rem : 0px;
+    height: root.style == SwitchRowStyle.tall ? 2.25rem : self.preferred-height;
+    spacing: 0.5rem;
+    if root.style == SwitchRowStyle.toggle: AppText {
+        horizontal-stretch: 1;
+        content: root.label;
+        font-size: 0.741rem;
+        font-weight: Theme.font-weight-bold;
+        tracking: Theme.tracking-wider;
+        color: Theme.muted-foreground;
+        vertical-alignment: center;
+    }
+    if root.style != SwitchRowStyle.toggle: VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        padding-top: root.style == SwitchRowStyle.padded-left ? 0.25rem : 0px;
+        FieldLabel {
+            height: root.style == SwitchRowStyle.tall ? 9px : 0.667rem;
+            inset-left: 0px;
+            font-size: root.style == SwitchRowStyle.tall ? 9px : 0.667rem;
+            text: root.label;
+            disabled: root.disabled;
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        Switch {
+            checked: root.checked;
+            disabled: root.disabled;
+            accessible-label: root.label;
+            checked-changed(checked) => {
+                root.checked-changed(checked);
             }
         }
     }

@@ -1,19 +1,24 @@
 //! The widget editor feature: its projection into the `WidgetEditor` global and its callbacks.
+//! The inspector is the open widget's description (D1), synced row by row by key.
 
-use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
-use crate::{AppWindow, Choice, ChoiceKind, Icons, InspectorView, TextDisplayView, WidgetEditor, WidgetRowView};
-use ovrley_app::features::widget_editor::{
-    self as editor, font_options, open_widget_id, sidebar_view, NumericFieldOptions, OptionView, SidebarView,
+use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed, sync_keyed};
+use crate::hooks::icons::{glyph, kebab};
+use crate::{
+    AppWindow, Choice, ChoiceKind, GradientStop, Icons, InspectorCell, InspectorCellKind, InspectorRow, PanelPart, ShapeToggleView, SwitchRowStyle, WidgetEditor,
+    WidgetRowView,
 };
+use ovrley_app::features::widget_editor::blocks::{self, Block, BlockContent, Cell, CellKind, OptionView};
+use ovrley_app::features::widget_editor::rules::Input;
+use ovrley_app::features::widget_editor::{self as editor, font_options, open_widget_id, sidebar_view, SidebarView};
 use ovrley_app::lib::fonts::FontOption;
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_widgets::model::catalog::IconRef;
-use serde_json::{Map, Value};
-use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
+use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-fn choices(options: &[OptionView]) -> ModelRc<Choice> {
+pub fn choices(options: &[OptionView]) -> ModelRc<Choice> {
     let items: Vec<Choice> = options
         .iter()
         .map(|option| Choice { kind: ChoiceKind::Item, value: option.value.as_str().into(), label: option.label.as_str().into(), ..Default::default() })
@@ -25,84 +30,210 @@ fn font_choices(fonts: &[FontOption]) -> Vec<Choice> {
     fonts.iter().map(|font| Choice { kind: ChoiceKind::Item, value: font.id.as_str().into(), label: font.name.as_str().into(), ..Default::default() }).collect()
 }
 
-fn text_display(view: &editor::TextDisplayView) -> TextDisplayView {
-    let mut text = TextDisplayView {
-        content_alignment: view.content_alignment.as_str().into(),
-        alignments: choices(&view.alignments),
-        font_size: view.font_size as f32,
-        font: view.font.as_str().into(),
-        color: view.color.as_str().into(),
-        show_icon: view.icon.show,
-        icon_color: view.icon.color.as_str().into(),
-        icon_size: view.icon.size as f32,
-        icon_offset_x: view.icon.offset_x.as_str().into(),
-        icon_offset_y: view.icon.offset_y.as_str().into(),
-        ..Default::default()
-    };
-    if let Some((decimals, max)) = view.decimals {
-        (text.has_decimals, text.decimals, text.max_decimals) = (true, decimals as f32, max as f32);
+fn switch_style(style: Option<blocks::SwitchRowStyle>) -> SwitchRowStyle {
+    match style {
+        None => SwitchRowStyle::None,
+        Some(blocks::SwitchRowStyle::Toggle) => SwitchRowStyle::Toggle,
+        Some(blocks::SwitchRowStyle::Inline) => SwitchRowStyle::Inline,
+        Some(blocks::SwitchRowStyle::Padded) => SwitchRowStyle::Padded,
+        Some(blocks::SwitchRowStyle::PaddedLeft) => SwitchRowStyle::PaddedLeft,
+        Some(blocks::SwitchRowStyle::Tall) => SwitchRowStyle::Tall,
     }
-    if let Some(format) = &view.balance_format {
-        (text.has_balance_format, text.balance_format) = (true, format.as_str().into());
-    }
-    if let Some(full) = view.show_full_distance {
-        (text.has_full_distance, text.show_full_distance) = (true, full);
-    }
-    if let Some(coordinates) = &view.coordinates {
-        text.has_coordinates = true;
-        text.coordinate_unit = coordinates.format.as_str().into();
-        text.coordinate_units = choices(&coordinates.formats);
-        text.coordinate_format = coordinates.coordinate_format.as_str().into();
-    }
-    if let Some(full) = view.show_full_ascent {
-        (text.has_full_ascent, text.show_full_ascent) = (true, full);
-    }
-    if let Some(units) = &view.units {
-        text.has_units = true;
-        text.units_supports_selection = units.supports_selection;
-        text.units_show_toggle = units.show_toggle;
-        text.units_checked = units.checked;
-        if let Some(color) = &units.color {
-            (text.has_unit_color, text.unit_color) = (true, color.as_str().into());
-        }
-        text.unit = units.unit.as_str().into();
-        text.units = choices(&units.options);
-    }
-    text
 }
 
-fn inspector(view: &editor::InspectorView) -> InspectorView {
-    let mut inspector = InspectorView {
-        id: view.id.as_str().into(),
-        horizontal_label: view.horizontal_label.as_str().into(),
-        x: view.x.as_str().into(),
-        y: view.y.as_str().into(),
-        opacity: view.opacity as f32,
+/// A cell as the `InspectorCell` struct: which fields each kind fills.
+pub fn cell(icons: &Icons<'_>, cell: &Cell) -> InspectorCell {
+    let mut out = InspectorCell {
+        id: cell.id.as_str().into(),
+        label: cell.label.as_str().into(),
+        disabled: cell.disabled,
+        tooltip: cell.tooltip.as_str().into(),
         ..Default::default()
     };
-    if let Some(metric) = &view.metric {
-        inspector.is_metric = true;
-        inspector.display_types = choices(&metric.display_types);
-        inspector.display_type = metric.display_type.as_str().into();
-        if let Some(text) = &metric.text {
-            (inspector.has_text, inspector.text) = (true, text_display(text));
+    out.kind = match &cell.kind {
+        CellKind::Slider { value, min, max, step, scale, readout, suffix } => {
+            (out.value, out.minimum, out.maximum, out.step, out.scale) = (*value as f32, *min as f32, *max as f32, *step as f32, *scale as f32);
+            (out.readout, out.suffix) = (readout.as_str().into(), suffix.as_str().into());
+            InspectorCellKind::Slider
         }
-        if let Some(altitude) = &metric.altitude {
-            inspector.has_altitude = true;
-            inspector.altitude = altitude.value.as_str().into();
-            inspector.altitude_placeholder = altitude.placeholder.as_str().into();
-            inspector.altitude_unit = altitude.unit.as_str().into();
+        CellKind::Color { value } => {
+            out.text = value.as_str().into();
+            InspectorCellKind::Color
         }
-    }
-    inspector
+        CellKind::Select { value, options } => {
+            (out.text, out.options) = (value.as_str().into(), choices(options));
+            InspectorCellKind::Select
+        }
+        CellKind::Number { value, placeholder, suffix, resettable } => {
+            (out.text, out.text2, out.suffix, out.resettable) = (value.as_str().into(), placeholder.as_str().into(), suffix.as_str().into(), *resettable);
+            InspectorCellKind::Number
+        }
+        CellKind::Text { value, placeholder } => {
+            (out.text, out.text2) = (value.as_str().into(), placeholder.as_str().into());
+            InspectorCellKind::Text
+        }
+        CellKind::Switch { checked, label_style } => {
+            (out.checked, out.style) = (*checked, switch_style(*label_style));
+            InspectorCellKind::Switch
+        }
+        CellKind::SwitchRow { checked, style } => {
+            (out.checked, out.style) = (*checked, switch_style(Some(*style)));
+            InspectorCellKind::SwitchRow
+        }
+        CellKind::Font { value, recommended } => {
+            (out.text, out.options) = (value.as_str().into(), ModelRc::new(VecModel::from(font_choices(recommended))));
+            InspectorCellKind::Font
+        }
+        CellKind::ToggleGroup { value, options } => {
+            (out.text, out.options) = (value.as_str().into(), choices(options));
+            InspectorCellKind::ToggleGroup
+        }
+        CellKind::Alignment { value, options } => {
+            (out.text, out.options) = (value.as_str().into(), choices(options));
+            InspectorCellKind::Alignment
+        }
+        CellKind::Italic { pressed } => {
+            out.checked = *pressed;
+            InspectorCellKind::Italic
+        }
+        CellKind::IconButton { icon, outline } => {
+            (out.icon, out.outline) = (glyph(icons, icon), *outline);
+            InspectorCellKind::IconButton
+        }
+        CellKind::Gradient { stops } => {
+            let stops: Vec<GradientStop> = stops.iter().map(|stop| GradientStop { offset: stop.offset as f32, color: stop.color.as_str().into() }).collect();
+            out.stops = ModelRc::new(VecModel::from(stops));
+            InspectorCellKind::Gradient
+        }
+        CellKind::ShapeGrid { toggles } => {
+            let toggles: Vec<ShapeToggleView> = toggles
+                .iter()
+                .map(|toggle| ShapeToggleView { key: toggle.key.as_str().into(), edge: toggle.edge, active: toggle.active, label: toggle.label.as_str().into() })
+                .collect();
+            out.toggles = ModelRc::new(VecModel::from(toggles));
+            InspectorCellKind::ShapeGrid
+        }
+        CellKind::ChartSeries { metric, options, color, first, last, only } => {
+            (out.text, out.options, out.text2) = (metric.as_str().into(), choices(options), color.as_str().into());
+            (out.first, out.last, out.only) = (*first, *last, *only);
+            InspectorCellKind::ChartSeries
+        }
+        CellKind::GForceAxis { axis, inverted, invert_label } => {
+            (out.text, out.checked, out.text2) = (axis.as_str().into(), *inverted, invert_label.as_str().into());
+            InspectorCellKind::GforceAxis
+        }
+        CellKind::RasterPicker { path, placeholder, button_label, loading, error } => {
+            (out.text, out.text2, out.suffix, out.busy) = (path.as_str().into(), placeholder.as_str().into(), button_label.as_str().into(), *loading);
+            out.readout = error.as_str().into();
+            InspectorCellKind::RasterPicker
+        }
+        CellKind::Alert { text } => {
+            out.text = text.as_str().into();
+            InspectorCellKind::Alert
+        }
+        CellKind::WindowSeconds { text, invalid } => {
+            (out.text, out.invalid) = (text.as_str().into(), *invalid);
+            InspectorCellKind::WindowSeconds
+        }
+        CellKind::Locked { text } => {
+            out.text = text.as_str().into();
+            InspectorCellKind::Locked
+        }
+        CellKind::Note { text } => {
+            out.text = text.as_str().into();
+            InspectorCellKind::Note
+        }
+        CellKind::Tabs { value, options } => {
+            (out.text, out.options) = (value.as_str().into(), choices(options));
+            InspectorCellKind::Tabs
+        }
+    };
+    out
 }
 
-/// The projection's memory: the bundled icon images, decoded once each, and the last view written,
-/// so a dispatch that changes nothing here writes nothing.
+fn panel(part: blocks::PanelPart) -> PanelPart {
+    match part {
+        blocks::PanelPart::None => PanelPart::None,
+        blocks::PanelPart::First => PanelPart::First,
+        blocks::PanelPart::Middle => PanelPart::Middle,
+        blocks::PanelPart::Last => PanelPart::Last,
+        blocks::PanelPart::Only => PanelPart::Only,
+    }
+}
+
+/// A block as an `InspectorRow`, with `cells` as its cells' model.
+fn row(icons: &Icons<'_>, block: &Block, cells: ModelRc<InspectorCell>) -> InspectorRow {
+    let mut out = InspectorRow { key: block.key.as_str().into(), gap: block.gap, panel: panel(block.panel), cells, ..Default::default() };
+    match &block.content {
+        BlockContent::Heading(heading) => {
+            (out.heading, out.icon, out.title) = (true, glyph(icons, heading.icon), heading.title.as_str().into());
+            if let Some(trailing) = &heading.trailing {
+                (out.has_trailing, out.trailing) = (true, cell(icons, trailing));
+            }
+        }
+        BlockContent::Row(grid) => {
+            (out.columns, out.column_gap, out.align_end) = (i32::from(grid.columns), grid.column_gap, grid.align == blocks::Align::End);
+        }
+    }
+    out
+}
+
+fn row_cells(block: &Block) -> &[Cell] {
+    match &block.content {
+        BlockContent::Row(grid) => &grid.cells,
+        BlockContent::Heading(_) => &[],
+    }
+}
+
+/// Keeps an inspector model in step with `next` (D1): a changed row is rewritten, but its cells
+/// model stays and only its changed cells are, so a dragged slider keeps its element.
+pub struct BlocksModel {
+    model: Rc<VecModel<InspectorRow>>,
+    last: RefCell<Vec<Block>>,
+}
+
+impl Default for BlocksModel {
+    fn default() -> Self {
+        Self { model: Rc::new(VecModel::default()), last: RefCell::new(Vec::new()) }
+    }
+}
+
+impl BlocksModel {
+    pub fn model(&self) -> ModelRc<InspectorRow> {
+        ModelRc::from(self.model.clone())
+    }
+
+    pub fn sync(&self, icons: &Icons<'_>, next: &[Block]) {
+        let previous = self.last.borrow();
+        let model = &self.model;
+        let create = |block: &Block| {
+            let cells: Vec<InspectorCell> = row_cells(block).iter().map(|item| cell(icons, item)).collect();
+            row(icons, block, ModelRc::new(VecModel::from(cells)))
+        };
+        sync_keyed(model, &previous, next, |block| &block.key, create, |index, before, after| {
+            let current = model.row_data(index).expect("the synced row exists");
+            let cells_model = current.cells.clone();
+            let inner = cells_model.as_any().downcast_ref::<VecModel<InspectorCell>>().expect("rows hold a VecModel of cells");
+            sync_keyed(inner, row_cells(before), row_cells(after), |item| &item.id, |item| cell(icons, item), |cell_index, _, item| {
+                inner.set_row_data(cell_index, cell(icons, item));
+            });
+            let next_row = row(icons, after, cells_model);
+            if next_row != current {
+                model.set_row_data(index, next_row);
+            }
+        });
+        drop(previous);
+        *self.last.borrow_mut() = next.to_vec();
+    }
+}
+
+/// The projection's memory: the bundled icon images, decoded once each, the inspector's model,
+/// and the last view written, so a dispatch that changes nothing here writes nothing.
 #[derive(Default)]
 pub struct Projection {
     icon_images: RefCell<HashMap<String, slint::Image>>,
-    last: RefCell<Option<(SidebarView, Vec<FontOption>, Vec<FontOption>)>>,
+    inspector: BlocksModel,
+    last: RefCell<Option<(SidebarView, Vec<FontOption>)>>,
 }
 
 impl Projection {
@@ -120,27 +251,18 @@ impl Projection {
                 .clone();
             return (SharedString::new(), image);
         }
-        let icons = window.global::<Icons>();
-        let glyph = match icon.name.as_deref() {
-            Some("Image") => icons.get_image(),
-            Some("Navigation") => icons.get_navigation(),
-            Some("Presentation") => icons.get_presentation(),
-            Some("Timer") => icons.get_timer(),
-            Some("Type") => icons.get_type(),
-            other => panic!("unsupported manifest icon {other:?}"),
-        };
-        (glyph, slint::Image::default())
+        let name = icon.name.as_deref().unwrap_or_else(|| panic!("manifest icon {icon:?} has neither a name nor an asset"));
+        (glyph(&window.global::<Icons>(), &kebab(name)), slint::Image::default())
     }
 
     pub fn project(&self, window: &AppWindow, store: &Store) {
         let view = sidebar_view(store);
-        let font = view.inspector.as_ref().and_then(|inspector| inspector.metric.as_ref()?.text.as_ref()).map(|text| text.font.clone()).unwrap_or_default();
-        let (recommended, system) = font_options(store, &font);
-        let next = (view, recommended, system);
+        let (_, system) = font_options(store, "");
+        let next = (view, system);
         if self.last.borrow().as_ref() == Some(&next) {
             return;
         }
-        let (view, recommended, system) = &next;
+        let (view, system) = &next;
         let global = window.global::<WidgetEditor>();
         let rows: Vec<WidgetRowView> = view
             .rows
@@ -153,16 +275,17 @@ impl Projection {
         replace_if_changed(global.get_rows(), rows, |model| global.set_rows(model));
         set_if_changed(global.get_open_id(), view.open_widget_id.as_deref().unwrap_or_default().into(), |value| global.set_open_id(value));
         set_if_changed(global.get_has_inspector(), view.inspector.is_some(), |value| global.set_has_inspector(value));
-        if let Some(view) = &view.inspector {
-            global.set_inspector(inspector(view));
-        }
-        replace_if_changed(global.get_recommended_fonts(), font_choices(recommended), |model| global.set_recommended_fonts(model));
+        let blocks = view.inspector.as_ref().map_or(&[][..], |inspector| &inspector.blocks[..]);
+        self.inspector.sync(&window.global::<Icons>(), blocks);
+        let model = self.inspector.model();
+        set_if_changed(global.get_inspector(), model, |model| global.set_inspector(model));
         replace_if_changed(global.get_system_fonts(), font_choices(system), |model| global.set_system_fonts(model));
         *self.last.borrow_mut() = Some(next);
     }
 }
 
-/// Runs an action against the open widget; its errors are bugs in what the inspector offered.
+/// Runs an action against the open widget; its errors are bugs in what the inspector offered,
+/// logged as Phase 3 decided.
 fn on_open_widget(dispatcher: &Dispatcher, action: impl FnOnce(&mut Store, &str) -> Result<(), String> + 'static) {
     dispatcher.handle().dispatch(move |store, _| {
         let Some(widget_id) = open_widget_id(store).map(str::to_string) else { return };
@@ -172,19 +295,10 @@ fn on_open_widget(dispatcher: &Dispatcher, action: impl FnOnce(&mut Store, &str)
     });
 }
 
-fn one_field(key: &str, value: Value) -> Map<String, Value> {
-    let mut patch = Map::new();
-    patch.insert(key.into(), value);
-    patch
-}
-
-/// The number inputs' `setNumericField` options.
-fn numeric_options(key: &str) -> NumericFieldOptions {
-    match key {
-        "x" | "y" | "icon_offset_x" | "icon_offset_y" => NumericFieldOptions::default(),
-        "starting_altitude" => NumericFieldOptions { optional: true, round: true, ..NumericFieldOptions::default() },
-        other => panic!("the inspector has no number field {other}"),
-    }
+/// A field edit of the open widget (D1).
+fn edit(dispatcher: &Dispatcher, id: SharedString, input: Input, draft: bool) {
+    let id = id.to_string();
+    on_open_widget(dispatcher, move |store, widget_id| editor::edit_field(store, widget_id, &id, input, draft));
 }
 
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
@@ -207,58 +321,24 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             }
         });
     });
-    let dispatch = dispatcher.handle();
-    global.on_reset_widget(move |id| {
-        let id = id.to_string();
-        dispatch.dispatch(move |store, _| {
-            if let Err(error) = editor::reset_widget(store, &id) {
-                log::error!("widget editor: {error}");
-            }
-        });
-    });
 
     let handle = dispatcher.clone();
-    global.on_set_number(move |key, raw| {
-        let (key, raw) = (key.to_string(), raw.to_string());
-        on_open_widget(&handle, move |store, id| editor::set_numeric_field(store, id, &key, &raw, numeric_options(&key)));
-    });
-    let handle = dispatcher.clone();
-    global.on_draft(move |key, value| {
-        let key = key.to_string();
-        // The transparency slider runs in percent.
-        let value = if key == "opacity" { f64::from(value) / 100.0 } else { f64::from(value) };
-        on_open_widget(&handle, move |store, id| editor::update_widget_draft(store, id, one_field(&key, ovrley_widgets::model::document::number(value))));
-    });
+    global.on_draft(move |id, value| edit(&handle, id, Input::Number(f64::from(value)), true));
     let handle = dispatcher.clone();
     global.on_commit_draft(move || on_open_widget(&handle, editor::commit_widget_draft));
     let handle = dispatcher.clone();
-    global.on_set_text(move |key, value| {
-        let patch = one_field(&key, Value::String(value.to_string()));
-        on_open_widget(&handle, move |store, id| editor::update_widget_data(store, id, patch));
-    });
+    global.on_set_number(move |id, raw| edit(&handle, id, Input::Text(raw.to_string()), false));
     let handle = dispatcher.clone();
-    global.on_set_flag(move |key, value| {
-        let patch = one_field(&key, Value::Bool(value));
-        on_open_widget(&handle, move |store, id| editor::update_widget_data(store, id, patch));
-    });
+    global.on_set_text(move |id, value| edit(&handle, id, Input::Text(value.to_string()), false));
     let handle = dispatcher.clone();
-    global.on_clear_field(move |key| {
-        let patch = one_field(&key, Value::Null);
-        on_open_widget(&handle, move |store, id| editor::update_widget_data(store, id, patch));
-    });
+    global.on_set_flag(move |id, value| edit(&handle, id, Input::Flag(value), false));
     let handle = dispatcher.clone();
-    global.on_change_font(move |font| {
-        let font = font.to_string();
-        on_open_widget(&handle, move |store, id| editor::change_font(store, id, &font));
-    });
+    global.on_clear_field(move |id| edit(&handle, id, Input::Clear, false));
     let handle = dispatcher.clone();
-    global.on_change_display_type(move |value| {
-        let value = value.to_string();
-        on_open_widget(&handle, move |store, id| editor::change_display_type(store, id, &value));
-    });
+    global.on_press(move |id| edit(&handle, id, Input::Press, false));
     let handle = dispatcher.clone();
-    global.on_change_unit(move |value| {
-        let value = value.to_string();
-        on_open_widget(&handle, move |store, id| editor::change_metric_unit(store, id, &value));
+    global.on_set_stops(move |id, stops| {
+        let stops = stops.iter().map(|stop| blocks::StopView { offset: f64::from(stop.offset), color: stop.color.to_string() }).collect();
+        edit(&handle, id, Input::Stops(stops), true);
     });
 }
