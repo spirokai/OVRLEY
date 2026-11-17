@@ -15,7 +15,7 @@ use crate::store::services::Services;
 use crate::store::Store;
 use blocks::Block;
 use ovrley_widgets::model::catalog::{catalog, IconRef};
-use ovrley_widgets::model::document::{create_widget_defaults, js_round, merge_widget_data, number, resolve_active_widget_data, WidgetCreationOptions, WidgetSelection};
+use ovrley_widgets::model::document::{create_widget_defaults, Collection, js_round, merge_widget_data, number, resolve_active_widget_data, WidgetCreationOptions, WidgetSelection};
 use rules::{Input, Patch, RuleContext};
 use sections::Ctx;
 use serde_json::{Map, Value};
@@ -309,6 +309,22 @@ pub fn set_numeric_field(store: &mut Store, widget_id: &str, key: &str, raw: &st
     let clamped = parsed.max(options.min.unwrap_or(parsed)).min(options.max.unwrap_or(parsed));
     patch.insert(key.into(), number(clamped));
     update_widget_data(store, widget_id, patch)
+}
+
+/// `addWidget`: fresh defaults for the selection, appended to the type's collection, then
+/// selected. New course plots fit the activity at the playhead. Oddity kept: the scene font size
+/// comes from the global defaults here, from the scene in `reset_widget`.
+pub fn add_widget(store: &mut Store, selection: &WidgetSelection) -> Result<String, String> {
+    let definition = catalog().require_widget(&selection.kind)?;
+    let collection = Collection::from_name(&definition.collection).ok_or_else(|| format!("{} has no collection {}", selection.kind, definition.collection))?;
+    let preview_activity = crate::features::widget_preview::preview_activity(store);
+    let course_points = preview_activity.activity().map(|imported| imported.activity.sample_course_points.clone()).unwrap_or_default();
+    let globals = &store.template.global_defaults;
+    let options = WidgetCreationOptions { course_points, scene_font_size: globals.get("font_size").and_then(Value::as_f64), unit_system: store.editor.unit_system };
+    let data = create_widget_defaults(selection, globals, &options)?;
+    let id = store.editor.edit_config(|config| config.add_widget(collection, data));
+    store.editor.set_selected_widget_id(Some(&id));
+    Ok(id)
 }
 
 /// `deleteWidget`.

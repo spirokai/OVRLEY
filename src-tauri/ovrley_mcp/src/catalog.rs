@@ -377,6 +377,7 @@ pub fn tools() -> Vec<ToolDefinition> {
         },
     ];
     tools.extend(crate::player::tools());
+    tools.extend(crate::widgets::tools());
     tools
 }
 
@@ -589,6 +590,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                 template_manager::save_template(store, services, path, template_manager::reply_with(agent_reply(reply), describe_template));
                 Ok(Answer::Later)
             }
+            other if crate::widgets::handles(other) => crate::widgets::call(other, arguments_value, store, services, reply),
             other => crate::player::call(other, arguments_value, store, services, reply).unwrap_or_else(|| Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}")))),
         }
     };

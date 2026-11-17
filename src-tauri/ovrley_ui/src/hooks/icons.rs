@@ -120,3 +120,29 @@ pub fn kebab(name: &str) -> String {
     }
     out
 }
+
+/// Manifest icons as the `Icons` glyph or a bundled SVG image, each SVG decoded once.
+#[derive(Default)]
+pub struct IconCache {
+    images: std::cell::RefCell<std::collections::HashMap<String, slint::Image>>,
+}
+
+impl IconCache {
+    /// A manifest icon: `(glyph, image)`, one of them empty.
+    pub fn icon(&self, icons: &Icons<'_>, icon: &ovrley_widgets::model::catalog::IconRef) -> (SharedString, slint::Image) {
+        if let Some(asset_file) = &icon.asset_file {
+            let image = self
+                .images
+                .borrow_mut()
+                .entry(asset_file.clone())
+                .or_insert_with(|| {
+                    slint::Image::load_from_svg_data(ovrley_widgets::render::icons::icon_asset_markup(asset_file).as_bytes())
+                        .unwrap_or_else(|error| panic!("the bundled icon {asset_file} is not a valid SVG: {error:?}"))
+                })
+                .clone();
+            return (SharedString::new(), image);
+        }
+        let name = icon.name.as_deref().unwrap_or_else(|| panic!("manifest icon {icon:?} has neither a name nor an asset"));
+        (glyph(icons, &kebab(name)), slint::Image::default())
+    }
+}

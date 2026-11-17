@@ -2,7 +2,7 @@
 //! The inspector is the open widget's description (D1), synced row by row by key.
 
 use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed, sync_keyed};
-use crate::hooks::icons::{glyph, kebab};
+use crate::hooks::icons::{glyph, IconCache};
 use crate::{
     AppWindow, Choice, ChoiceKind, GradientStop, Icons, InspectorCell, InspectorCellKind, InspectorRow, PanelPart, ShapeToggleView, SwitchRowStyle, WidgetEditor,
     WidgetRowView,
@@ -12,10 +12,8 @@ use ovrley_app::features::widget_editor::rules::Input;
 use ovrley_app::features::widget_editor::{self as editor, font_options, open_widget_id, sidebar_view, SidebarView};
 use ovrley_app::lib::fonts::FontOption;
 use ovrley_app::store::{Dispatcher, Store};
-use ovrley_widgets::model::catalog::IconRef;
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn choices(options: &[OptionView]) -> ModelRc<Choice> {
@@ -231,30 +229,12 @@ impl BlocksModel {
 /// and the last view written, so a dispatch that changes nothing here writes nothing.
 #[derive(Default)]
 pub struct Projection {
-    icon_images: RefCell<HashMap<String, slint::Image>>,
+    icons: IconCache,
     inspector: BlocksModel,
     last: RefCell<Option<(SidebarView, Vec<FontOption>)>>,
 }
 
 impl Projection {
-    /// A manifest icon: a lucide glyph from the `Icons` global, or a bundled SVG.
-    fn icon(&self, window: &AppWindow, icon: &IconRef) -> (SharedString, slint::Image) {
-        if let Some(asset_file) = &icon.asset_file {
-            let image = self
-                .icon_images
-                .borrow_mut()
-                .entry(asset_file.clone())
-                .or_insert_with(|| {
-                    slint::Image::load_from_svg_data(ovrley_widgets::render::icons::icon_asset_markup(asset_file).as_bytes())
-                        .unwrap_or_else(|error| panic!("the bundled icon {asset_file} is not a valid SVG: {error:?}"))
-                })
-                .clone();
-            return (SharedString::new(), image);
-        }
-        let name = icon.name.as_deref().unwrap_or_else(|| panic!("manifest icon {icon:?} has neither a name nor an asset"));
-        (glyph(&window.global::<Icons>(), &kebab(name)), slint::Image::default())
-    }
-
     pub fn project(&self, window: &AppWindow, store: &Store) {
         let view = sidebar_view(store);
         let (_, system) = font_options(store, "");
@@ -268,7 +248,7 @@ impl Projection {
             .rows
             .iter()
             .map(|row| {
-                let (glyph, image) = self.icon(window, &row.icon);
+                let (glyph, image) = self.icons.icon(&window.global::<Icons>(), &row.icon);
                 WidgetRowView { id: row.id.as_str().into(), name: row.name.as_str().into(), glyph, image }
             })
             .collect();

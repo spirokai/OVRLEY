@@ -1,4 +1,4 @@
-//! Embed exactly the metric icons declared by the shared manifests.
+//! Embed exactly the icons declared by the shared manifests (current metrics only).
 use serde_json::Value;
 use std::{collections::BTreeSet, env, fmt::Write, fs, path::PathBuf};
 
@@ -32,12 +32,28 @@ fn main() {
             );
         }
     }
-    for widget in widgets["definitions"]
-        .as_array()
-        .expect("widget definitions must be an array")
-    {
-        if let Some(asset_file) = widget["icon"]["assetFile"].as_str() {
-            asset_files.insert(asset_file);
+    // Every other icon the manifests declare: widgets, displays, display modes and drawer groups,
+    // which the native editor's drawer shows.
+    fn collect<'a>(value: &'a Value, out: &mut BTreeSet<&'a str>) {
+        match value {
+            Value::Object(map) => {
+                for (key, item) in map {
+                    match (key.as_str(), item) {
+                        ("assetFile", Value::String(file)) => {
+                            out.insert(file);
+                        }
+                        _ => collect(item, out),
+                    }
+                }
+            }
+            Value::Array(items) => items.iter().for_each(|item| collect(item, out)),
+            _ => {}
+        }
+    }
+    collect(&widgets, &mut asset_files);
+    for (key, value) in metrics.as_object().expect("the metrics manifest is an object") {
+        if key != "definitions" {
+            collect(value, &mut asset_files);
         }
     }
 

@@ -249,6 +249,15 @@ impl OverlayConfig {
         }
     }
 
+    /// `addWidget`'s append: the new widget at the end of its collection with a generated id
+    /// (`ensureWidgetIdsInConfig`), which it returns.
+    pub fn add_widget(&mut self, collection: Collection, mut data: WidgetData) -> String {
+        let id = format!("widget-{}", self.next_generated_id());
+        data.insert("id".into(), Value::String(id.clone()));
+        self.collection_mut(collection).push(data);
+        id
+    }
+
     /// `duplicateWidgetsInConfig`: appends copies with new ids, offset by (24, 24) unless given,
     /// and returns the new ids in document order.
     pub fn duplicate_widgets(
@@ -1020,12 +1029,21 @@ pub fn course_widget_dimensions(
 }
 
 /// A drawer selection: a widget type, its display, a drawer group's preset, and a display mode.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct WidgetSelection {
+    /// The widget type, for example `speed`, `label` or `map`.
+    #[serde(rename = "type")]
     pub kind: String,
+    /// The display, for types with several (for example `text`, `linear` or `arc`).
+    #[serde(default)]
     pub display_type: Option<String>,
+    /// A drawer group's preset fields (for example a map's `{"camera_mode": "fixed"}`).
+    #[serde(default)]
     pub preset: Map<String, Value>,
     /// The display-owned mode selection (for example the lap timer's mode).
+    #[serde(default)]
     pub mode: Option<String>,
 }
 

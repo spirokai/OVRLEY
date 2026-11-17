@@ -1,0 +1,31 @@
+// One creation option of a drawer button. A manifest icon is a lucide glyph (`glyph`) or a
+// bundled SVG (`image`, tinted).
+export struct DrawerOptionView {
+    label: string,
+    glyph: string,
+    image: image,
+}
+
+// One button: its icon and short name, the availability marker, and its options (one adds at
+// once; several open the option popover).
+export struct DrawerItemView {
+    key: string,
+    short-name: string,
+    glyph: string,
+    image: image,
+    available: bool,
+    options: [DrawerOptionView],
+}
+
+// A category with its buttons.
+export struct DrawerGroupView {
+    name: string,
+    items: [DrawerItemView],
+}
+
+// The widget drawer feature's global (D4), written by `src/features/widget_drawer.rs`.
+export global WidgetDrawer {
+    in property <[DrawerGroupView]> groups;
+    // Adds the item's option at `index`.
+    callback add(key: string, index: int);
+}

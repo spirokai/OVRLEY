@@ -7,4 +7,5 @@ pub mod template_manager;
 pub mod toolbar;
 pub mod transitions;
 pub mod undo_redo;
+pub mod widget_drawer;
 pub mod widget_editor;
