@@ -84,17 +84,22 @@ fn visible_span(x: f64, width: f64, timeline_width: f64) -> (f64, f64, f64) {
     (start, (end - start).max(0.0), start - x)
 }
 
-/// Diagonal stripes as path commands over a `width × height` box, a line every `period` px measured
-/// across the stripes: rising (`/`, CSS 135°) or falling (`\`, CSS 45°).
-pub fn stripes_commands(width: f64, height: f64, period: f64, rising: bool) -> String {
-    let step = period * std::f64::consts::SQRT_2;
+/// Diagonal stripes as path commands over a `width × height` box: `stripe`-px lines with `stripe`-px
+/// gaps, measured across the stripes (CSS `repeating-linear-gradient` with a `2 × stripe` period),
+/// rising (`/`, CSS 135°) or falling (`\`, CSS 45°). Each line runs `stripe` px past the top and
+/// bottom so its butt caps fall outside the box, which the view clips.
+pub fn stripes_commands(width: f64, height: f64, stripe: f64, rising: bool) -> String {
+    let step = 2.0 * stripe * std::f64::consts::SQRT_2;
+    let over = stripe;
+    let (top, bottom) = (-over, height + over);
     let mut commands = String::new();
-    let mut c = -height;
+    let mut c = -height - step;
     while c < width + step {
+        let (start, end) = (c - over, c + height + over);
         if rising {
-            commands.push_str(&format!("M {:.2} {:.2} L {:.2} 0 ", c, height, c + height));
+            commands.push_str(&format!("M {start:.2} {bottom:.2} L {end:.2} {top:.2} "));
         } else {
-            commands.push_str(&format!("M {:.2} 0 L {:.2} {:.2} ", c, c + height, height));
+            commands.push_str(&format!("M {start:.2} {top:.2} L {end:.2} {bottom:.2} "));
         }
         c += step;
     }
@@ -738,7 +743,10 @@ mod tests {
 
     #[test]
     fn stripes_cover_the_box() {
-        assert_eq!(stripes_commands(6.0, 6.0, 3.0, false).matches('M').count(), 4);
-        assert!(stripes_commands(10.0, 4.0, 4.0, true).starts_with("M -4.00 4.00 L 0.00 0"));
+        // A 3px stripe repeats every 6px across, 6√2 ≈ 8.49px along the x axis.
+        let commands = stripes_commands(20.0, 6.0, 3.0, false);
+        assert_eq!(commands.matches('M').count(), 6);
+        assert!(commands.starts_with("M -17.49 -3.00 L -5.49 9.00 M -9.00 -3.00 L 3.00 9.00"));
+        assert!(stripes_commands(10.0, 4.0, 4.0, true).starts_with("M -19.31 8.00 L -7.31 -4.00"));
     }
 }

@@ -43,11 +43,13 @@ global LanePointer {
 }
 
 // Striped shade (an excluded part or the trimmed-off activity, `background` at 90% with white at
-// 8%; an overlap band, `destructive` at 45% with black at 25%).
+// 8%; an overlap band, `destructive` at 45% with black at 25%). The lines overshoot the box, which
+// clips them to straight top and bottom edges.
 component Stripes inherits Rectangle {
     in property <string> commands;
     in property <color> stripe-color;
     in property <length> stripe-width;
+    clip: true;
     Path {
         width: parent.width;
         height: parent.height;
@@ -56,7 +58,6 @@ component Stripes inherits Rectangle {
         commands: root.commands;
         stroke: root.stripe-color;
         stroke-width: root.stripe-width;
-        clip: true;
     }
 }
 

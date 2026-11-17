@@ -40,10 +40,9 @@ export component TimelineSurface {
         }
     }
 
-    VerticalLayout {
-        padding-top: 0.5rem;
+    surface := VerticalLayout {
         // The axis.
-        VerticalLayout {
+        axis-box := VerticalLayout {
             padding-top: 1rem;
             padding-bottom: 0.25rem;
             axis := Rectangle {
@@ -141,12 +140,12 @@ export component TimelineSurface {
     }
 
     // The playhead: the head and the 1px line share one parent at a screen-pixel origin, so the
-    // line never drifts against the head.
+    // line never drifts against the head. It starts at the top of the axis.
     Rectangle {
         x: Player.playhead-x;
-        y: 0px;
+        y: surface.y + axis-box.y + axis.y;
         width: root.playhead-width;
-        height: root.height;
+        height: root.height - self.y;
         Rectangle {
             x: root.playhead-line-x;
             y: 0px;
