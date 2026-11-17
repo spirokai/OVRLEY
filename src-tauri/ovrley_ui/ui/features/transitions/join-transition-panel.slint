@@ -45,7 +45,7 @@ export component JoinTransitionPanel inherits VerticalLayout {
             preview: Player.join-duration-preview;
             error: Player.join-duration-error;
             edited(text) => {
-                Player.join-duration-edited(text);
+                Player.join-duration-edited(text)
             }
             key(text, alt, control, shift, meta) => {
                 Player.join-duration-key(text, alt, control, shift, meta)

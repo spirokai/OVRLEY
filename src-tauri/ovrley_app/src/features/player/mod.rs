@@ -146,6 +146,12 @@ pub fn reconcile_player(store: &mut Store) {
         }
     }
     timeline::reconcile_timeline(store);
+    // A join panel closes with its join (React unmounts the marker's popover).
+    if let Some(panel) = &store.player.join_panel {
+        if crate::features::transitions::join_model(store, &panel.key).is_none() {
+            store.player.join_panel = None;
+        }
+    }
     playback::reconcile_playback(store);
     let dragging = store.player.is_dragging();
     viewport::reconcile_viewport(store, dragging);

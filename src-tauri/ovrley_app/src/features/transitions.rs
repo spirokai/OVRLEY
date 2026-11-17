@@ -117,22 +117,38 @@ pub fn join_model(store: &Store, key: &str) -> Option<JoinModel> {
 /// `onSelect`: the default (no override), a hard cut, or an `xfade`, which keeps an override's
 /// duration or starts from the default snapped to the joined frames. One undo step.
 pub fn select_join_transition(store: &mut Store, key: &str, value: &str) -> Result<(), String> {
+    set_join(store, key, value, None)
+}
+
+/// A join's transition by picker value, as `select_join_transition` chooses it, or with an
+/// explicit `xfade` duration snapped to the joined frames as the duration field snaps it. One undo
+/// step; the agent's `video_join_transition_set`.
+pub fn set_join(store: &mut Store, key: &str, value: &str, duration_seconds: Option<f64>) -> Result<(), String> {
     let model = join_model(store, key).ok_or_else(|| format!("Unknown join: {key}"))?;
     let override_ = store.player.timeline.timeline().displayed.clips.iter().find(|clip| clip.id() == model.video_id).and_then(|clip| clip.segment(&model.segment_key).transition_in);
     let transition = match value {
+        DEFAULT_TRANSITION_OPTION if duration_seconds.is_some() => return Err("The default transition takes its duration from the defaults".into()),
         DEFAULT_TRANSITION_OPTION => None,
         _ => match TransitionKind::from_name(value)? {
+            TransitionKind::HardCut if duration_seconds.is_some() => return Err("A hard cut (`none`) has no duration".into()),
             TransitionKind::HardCut => Some(Transition::HARD_CUT),
             TransitionKind::Xfade(name) => {
-                let duration = match override_ {
-                    Some(transition) if !transition.is_hard_cut() => transition.duration_seconds(),
-                    _ => model.duration_fps.snap_duration_to_frames(store.video_import.transition_defaults.duration_seconds),
+                let duration = match (duration_seconds, override_) {
+                    (Some(seconds), _) => model.duration_fps.snap_duration_to_frames(seconds),
+                    (None, Some(transition)) if !transition.is_hard_cut() => transition.duration_seconds(),
+                    (None, _) => model.duration_fps.snap_duration_to_frames(store.video_import.transition_defaults.duration_seconds),
                 };
-                Some(Transition::xfade(name, duration))
+                Some(Transition::new(TransitionKind::Xfade(name), duration)?)
             }
         },
     };
     set_join_transition(store, &model.video_id, &model.segment_key, transition)
+}
+
+/// The key of the join into a clip's segment.
+pub fn join_key_of_segment(store: &Store, video_id: &str, segment_key: &str) -> Option<String> {
+    let timeline = store.player.timeline.timeline();
+    timeline.displayed.program.joins.iter().find(|join| join.video_id == video_id && join.segment_key == segment_key).map(|join| join.key.clone())
 }
 
 /// `commitDuration`: a typed duration (already snapped to the joined frames) as an override of the

@@ -16,17 +16,30 @@ export component SecondsInput inherits VerticalLayout {
     in property <bool> show-unit;
     in property <length> field-height: 2.25rem;
     in property <length> font-size: Theme.text-sm * 1rem;
-    callback edited(text: string);
+    // The text changed; returns whether Rust accepted it. A refused edit restores `text`.
+    callback edited(text: string) -> bool;
     // A key in the field; returns whether Rust used it.
     callback key(text: string, alt: bool, control: bool, shift: bool, meta: bool) -> bool;
     callback key-up(text: string) -> bool;
     callback blurred();
 
+    // The field's own text: Rust's `text`, and the typing in between. A one-way binding would be
+    // dropped at the first keystroke.
+    property <string> draft;
+    init => {
+        root.draft = root.text;
+    }
+    changed text => {
+        root.draft = root.text;
+    }
+
     spacing: 0.25rem;
     Rectangle {
         height: root.field-height;
         field := Input {
-            text: root.text;
+            width: parent.width;
+            height: parent.height;
+            text <=> root.draft;
             label: root.label;
             invalid: root.error != "";
             font-size: root.font-size;
@@ -34,7 +47,9 @@ export component SecondsInput inherits VerticalLayout {
             border-color: Theme.border.transparentize(0.3);
             inset-right: root.show-unit ? 2.25rem : 0.75rem;
             edited(text) => {
-                root.edited(text);
+                if !root.edited(text) {
+                    root.draft = root.text;
+                }
             }
             accepted => {
                 root.key("\n", false, false, false, false);

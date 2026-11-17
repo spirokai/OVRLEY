@@ -79,6 +79,8 @@ export component TransitionPicker inherits VerticalLayout {
     Rectangle {
         height: 1.75rem;
         Input {
+            width: parent.width;
+            height: parent.height;
             text: root.filter;
             placeholder: @tr("transitions.filter" => "Filter transitions");
             label: @tr("transitions.filter" => "Filter transitions");

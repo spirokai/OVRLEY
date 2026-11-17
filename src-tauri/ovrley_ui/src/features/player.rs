@@ -7,7 +7,9 @@
 //! paused.
 
 use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
-use crate::{AppWindow, TileView, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TimelineSurfaceKind};
+use crate::{AppWindow, TileView, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, JoinMarkerView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TimelineSurfaceKind, TransitionOption, TransitionOptionKind};
+use crate::platform::key_input::{key_input, SlintModifiers};
+use ovrley_app::features::transitions;
 use ovrley_app::features::player::lanes::{self, MarkerTarget};
 use ovrley_app::lib::activity::TrimEdge;
 use ovrley_app::store::slices::video_import::ClipLane;
@@ -188,6 +190,7 @@ impl Projection {
         set_if_changed(player.get_playhead_x(), playhead as f32, |value| player.set_playhead_x(value));
         self.project_lanes(&player, store);
         project_edits(&player, store);
+        project_join_panel(&player, store);
         // One drag runs at a time: the guideline of a dragged cut, or of a dragged clip.
         let guideline = store.player.cut_drag.as_ref().and_then(|drag| drag.guideline_second).or_else(|| store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second));
         set_if_changed(player.get_guideline_visible(), guideline.is_some(), |value| player.set_guideline_visible(value));
@@ -271,6 +274,56 @@ fn marker_view(marker: &lanes::MarkerView) -> MarkerView {
     }
 }
 
+fn join_view(join: &lanes::JoinMarkerView) -> JoinMarkerView {
+    let (band_x, band_width) = join.band.unwrap_or_default();
+    JoinMarkerView {
+        key: join.key.as_str().into(),
+        x: join.x as f32,
+        visible: join.visible,
+        has_band: join.band.is_some(),
+        band_x: band_x as f32,
+        band_width: band_width as f32,
+        invalid: join.invalid,
+        has_transition: join.has_transition,
+        disabled_reason: join.disabled_reason.as_deref().unwrap_or_default().into(),
+        label: join.label.as_str().into(),
+    }
+}
+
+/// The open join's panel (D13): its transition, duration field and picker.
+fn project_join_panel(player: &Player<'_>, store: &Store) {
+    let open = store.player.join_panel.as_ref().and_then(|panel| transitions::join_model(store, &panel.key).map(|model| (panel, model)));
+    let Some((panel, model)) = open else {
+        set_if_changed(player.get_join_panel_key(), SharedString::new(), |value| player.set_join_panel_key(value));
+        return;
+    };
+    let locale = store.i18n.language;
+    set_if_changed(player.get_join_panel_key(), SharedString::from(model.key.as_str()), |value| player.set_join_panel_key(value));
+    set_if_changed(player.get_join_label(), SharedString::from(model.label.as_str()), |value| player.set_join_label(value));
+    let catalogue = ovrley_core::encode::ffmpeg::transitions::xfade_transitions();
+    let index_of = |name: &str| catalogue.iter().position(|candidate| candidate == name).map_or(-1, |index| index as i32);
+    set_if_changed(player.get_join_preview_index(), model.preview_type.map_or(-1, index_of), |value| player.set_join_preview_index(value));
+    set_if_changed(player.get_join_duration_visible(), model.duration_seconds.is_some(), |value| player.set_join_duration_visible(value));
+    if let Some(seconds) = model.duration_seconds {
+        let field = panel.duration.view(transitions::duration_options(model.duration_fps), seconds, locale);
+        set_if_changed(player.get_join_duration_text(), SharedString::from(field.text), |value| player.set_join_duration_text(value));
+        set_if_changed(player.get_join_duration_preview(), SharedString::from(field.preview.unwrap_or_default()), |value| player.set_join_duration_preview(value));
+        set_if_changed(player.get_join_duration_error(), SharedString::from(field.error.unwrap_or_default()), |value| player.set_join_duration_error(value));
+    }
+    set_if_changed(player.get_join_error(), SharedString::from(model.error.unwrap_or_default()), |value| player.set_join_error(value));
+    let none_label = ovrley_app::i18n::catalog().t_or(locale, "transitions.none", "No transition").to_string();
+    let options = [
+        TransitionOption { kind: TransitionOptionKind::Default, value: transitions::DEFAULT_TRANSITION_OPTION.into(), label: model.default_label.as_str().into(), index: -1 },
+        TransitionOption { kind: TransitionOptionKind::None, value: ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION.into(), label: none_label.into(), index: -1 },
+    ]
+    .into_iter()
+    .chain(transitions::filtered_transitions(&panel.filter).into_iter().map(|name| TransitionOption { kind: TransitionOptionKind::Xfade, value: name.into(), label: name.into(), index: index_of(name) }))
+    .collect();
+    replace_if_changed(player.get_join_options(), options, |model| player.set_join_options(model));
+    set_if_changed(player.get_join_value(), SharedString::from(model.value.as_str()), |value| player.set_join_value(value));
+    set_if_changed(player.get_join_filter(), SharedString::from(panel.filter.as_str()), |value| player.set_join_filter(value));
+}
+
 fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activity: Option<lanes::ActivityLaneView>) -> Vec<lanes::TileView> {
     set_if_changed(player.get_video_lane_visible(), video.is_some(), |value| player.set_video_lane_visible(value));
     set_if_changed(player.get_activity_lane_visible(), activity.is_some(), |value| player.set_activity_lane_visible(value));
@@ -296,6 +349,7 @@ fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activ
     replace_if_changed(player.get_segments(), segments, |model| player.set_segments(model));
     replace_if_changed(player.get_overlap_bands(), video.bands.iter().map(band_view).collect(), |model| player.set_overlap_bands(model));
     replace_if_changed(player.get_cut_markers(), video.cut_markers.iter().map(marker_view).collect(), |model| player.set_cut_markers(model));
+    replace_if_changed(player.get_joins(), video.joins.iter().map(join_view).collect(), |model| player.set_joins(model));
 
     let activity_clip = activity.as_ref().and_then(|lane| lane.clip.as_ref());
     set_if_changed(player.get_activity_clip_visible(), activity_clip.is_some(), |value| player.set_activity_clip_visible(value));
@@ -354,7 +408,8 @@ fn project_edits(player: &Player<'_>, store: &Store) {
     set_if_changed(player.get_cut_popover_cut(), SharedString::from(cut), |value| player.set_cut_popover_cut(value));
     let asking = store.video_import.cut_removal_request.is_some();
     set_if_changed(player.get_cut_removal_open(), asking, |value| player.set_cut_removal_open(value));
-    set_if_changed(player.get_keeps_clip_selection(), asking || store.player.cut_popover.is_some(), |value| player.set_keeps_clip_selection(value));
+    let popover = store.player.cut_popover.is_some() || store.player.join_panel.is_some();
+    set_if_changed(player.get_keeps_clip_selection(), asking || popover, |value| player.set_keeps_clip_selection(value));
 }
 
 fn surface(kind: TimelineSurfaceKind) -> SurfaceGesture {
@@ -490,6 +545,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         });
     });
     player.on_keep_cut(on(dispatcher, ovrley_app::features::player::dismiss_cut_removal));
+    bind_join_panel(&player, dispatcher);
     let wheel = dispatcher.clone();
     player.on_wheel(move |delta_y, x, ctrl| {
         wheel.dispatch(move |store, _| {
@@ -505,6 +561,60 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             if store.player.viewport.metrics != next {
                 store.player.viewport.metrics = next;
             }
+        });
+    });
+}
+
+/// The join panel's callbacks (D13). A choice and a committed duration are one undo step each.
+fn bind_join_panel(player: &Player<'_>, dispatcher: &Dispatcher) {
+    let open = dispatcher.clone();
+    player.on_open_join(move |key| open.dispatch(move |store, _| transitions::open_join_panel(store, &key)));
+    let close = dispatcher.clone();
+    player.on_close_join(move || close.dispatch(|store, _| store.player.join_panel = None));
+    let chosen = dispatcher.clone();
+    player.on_join_chosen(move |value| {
+        chosen.dispatch(move |store, _| {
+            let Some(key) = store.player.join_panel.as_ref().map(|panel| panel.key.clone()) else { return };
+            if let Err(error) = transitions::select_join_transition(store, &key, &value) {
+                log::error!("join transition: {error}");
+            }
+        });
+    });
+    let filter = dispatcher.clone();
+    player.on_join_filter_edited(move |text| {
+        filter.dispatch(move |store, _| {
+            if let Some(panel) = store.player.join_panel.as_mut() {
+                panel.filter = text.to_string();
+            }
+        });
+    });
+    let edited = dispatcher.handle();
+    player.on_join_duration_edited(move |text| {
+        edited
+            .dispatch_with_result(move |store, _| transitions::with_duration_field(store, |field, options, _, _, _| field.change(options, &text)).unwrap_or(false))
+            .unwrap_or(false)
+    });
+    let key = dispatcher.handle();
+    player.on_join_duration_key(move |text, alt, control, shift, meta| {
+        let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, false, cfg!(target_os = "macos"));
+        key.dispatch_with_result(move |store, _| {
+            transitions::with_duration_field(store, |field, options, value, locale, commit| field.key_down(options, value, &input, locale, commit)).unwrap_or(false)
+        })
+        .unwrap_or(false)
+    });
+    let key_up = dispatcher.handle();
+    player.on_join_duration_key_up(move |text| {
+        let released = key_input(&text, SlintModifiers::default(), false, cfg!(target_os = "macos")).key;
+        key_up
+            .dispatch_with_result(move |store, _| {
+                transitions::with_duration_field(store, |field, options, value, locale, commit| field.key_up(options, value, &released, locale, commit)).unwrap_or(false)
+            })
+            .unwrap_or(false)
+    });
+    let blurred = dispatcher.clone();
+    player.on_join_duration_blurred(move || {
+        blurred.dispatch(|store, _| {
+            transitions::with_duration_field(store, |field, options, value, locale, commit| field.blur(options, value, locale, commit));
         });
     });
 }

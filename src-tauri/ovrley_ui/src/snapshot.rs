@@ -44,7 +44,17 @@ fn tour() -> Vec<Step> {
             store.editor.set_selected_second(duration * 0.4);
             store.player.hovered_lane = Some(ovrley_app::store::slices::video_import::ClipLane::Activity);
         }),
+        // With `OVRLEY_DEV_VIDEOS` (two or more clips): the first join, with a fade, and its panel.
+        ("join-panel", |store, _| {
+            store.player.hovered_lane = None;
+            let first = store.player.timeline.timeline().displayed.program.joins.first().map(|join| join.key.clone());
+            if let Some(key) = first {
+                ovrley_app::features::transitions::select_join_transition(store, &key, "fade").expect("a join takes a fade");
+                ovrley_app::features::transitions::open_join_panel(store, &key);
+            }
+        }),
         ("widget-selected", |store, _| {
+            store.player.join_panel = None;
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
             let ids = store.editor.config.widget_ids();

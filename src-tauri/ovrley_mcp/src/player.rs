@@ -135,6 +135,31 @@ pub struct VideoSegmentSetExcludedArguments {
     pub excluded: bool,
 }
 
+/// A join's transition: an `xfade` type or `none`.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct TransitionArgument {
+    /// `none` for a hard cut, or an `xfade` type such as `fade`, `dissolve` or `wipeleft`.
+    #[serde(rename = "type")]
+    pub transition_type: String,
+    /// The `xfade` duration in seconds, snapped to whole frames of the joined pieces. Omitted, an existing transition's
+    /// duration is kept, else the default duration is used. Not allowed with `none`.
+    #[serde(default)]
+    pub duration_seconds: Option<f64>,
+}
+
+/// The transition into a segment from the piece before it.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct VideoJoinTransitionSetArguments {
+    /// A video id from `ovrley_summary`'s videos.
+    pub video_id: String,
+    /// The segment key of a join from `video_get`'s joins.
+    pub segment_key: String,
+    /// The transition, or `null` to follow the default transition.
+    pub transition: Option<TransitionArgument>,
+}
+
 pub fn tools() -> Vec<ToolDefinition> {
     vec![
         ToolDefinition {
@@ -244,6 +269,15 @@ pub fn tools() -> Vec<ToolDefinition> {
             description: "Excludes a part (segment) of a clip from the export or includes it again, as X does. Segment keys come from \
                           video_get. One undo step.",
             input_schema: input_schema::<VideoSegmentSetExcludedArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_join_transition_set",
+            title: "Set a join's transition",
+            description: "Sets the transition at a join (where one video piece follows another), as the join marker's panel does: \
+                          an xfade type with its duration, none for a hard cut, or null to follow the default transition. Joins and \
+                          their segment keys come from video_get. One undo step.",
+            input_schema: input_schema::<VideoJoinTransitionSetArguments>(),
             read_only: false,
         },
         ToolDefinition {
@@ -528,6 +562,24 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &m
             ovrley_app::store::slices::video_import::set_video_segment_excluded(store, &arguments.video_id, &arguments.segment_key, arguments.excluded).map_err(ToolOutcome::Failed)?;
             answer_video(store, &arguments.video_id)
         }),
+        "video_join_transition_set" => arguments::<VideoJoinTransitionSetArguments>(arguments_value).and_then(|arguments| {
+            use ovrley_app::features::transitions::{join_key_of_segment, set_join, DEFAULT_TRANSITION_OPTION};
+            find_clip(store, &arguments.video_id)?;
+            let key = join_key_of_segment(store, &arguments.video_id, &arguments.segment_key)
+                .ok_or_else(|| ToolOutcome::Failed(format!("Segment {} of video {} is not a join.", arguments.segment_key, arguments.video_id)))?;
+            let (value, duration) = match &arguments.transition {
+                None => (DEFAULT_TRANSITION_OPTION, None),
+                Some(transition) => (transition.transition_type.as_str(), transition.duration_seconds),
+            };
+            if duration.is_some_and(|seconds| !(seconds.is_finite() && seconds > 0.0)) {
+                return Err(ToolOutcome::InvalidParams("durationSeconds must be a positive number".into()));
+            }
+            if value == DEFAULT_TRANSITION_OPTION && arguments.transition.is_some() {
+                return Err(ToolOutcome::InvalidParams("Use null, not a type, to follow the default transition".into()));
+            }
+            set_join(store, &key, value, duration).map_err(ToolOutcome::Failed)?;
+            answer_video(store, &arguments.video_id)
+        }),
         "activity_trim_reset" => arguments::<NoArguments>(arguments_value).and_then(|_| {
             store.media.set_activity_trim(None);
             now(json!({ "activityTrim": describe_activity_trim(store) }))
@@ -682,6 +734,28 @@ pub(crate) mod tests {
         dispatcher.dispatch(|store, _| ovrley_app::features::player::dismiss_cut_removal(store));
         assert_eq!(receiver.try_recv().unwrap(), ToolOutcome::Ok(json!({ "removed": false })), "keeping the cut answers removed: false");
         assert_eq!(dispatcher.with_store(|store| store.video_import.video_edits["a"].cuts.len()), 1);
+    }
+
+    #[test]
+    fn join_transitions_are_set_snapped_reset_and_checked() {
+        let dispatcher = dispatcher_with(with_videos(&[("a", 0.0, 10.0), ("b", 10.0, 10.0)]));
+        let set = |transition: Value| run(&dispatcher, "video_join_transition_set", json!({ "videoId": "b", "segmentKey": "start", "transition": transition }));
+        let dissolve = ok(set(json!({ "type": "dissolve", "durationSeconds": 1.01 })));
+        assert_eq!(dissolve["joins"][0]["transition"], json!({ "type": "dissolve", "durationSeconds": 1.0 }), "snapped to the joined frames");
+        assert_eq!(dissolve["joins"][0]["isDefault"], false);
+        let kept = ok(set(json!({ "type": "fade" })));
+        assert_eq!(kept["joins"][0]["transition"], json!({ "type": "fade", "durationSeconds": 1.0 }), "the override's duration is kept");
+        let cut = ok(set(json!({ "type": "none" })));
+        assert_eq!(cut["joins"][0]["transition"]["type"], "none");
+        let default = ok(set(Value::Null));
+        assert_eq!(default["joins"][0]["isDefault"], true);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 4);
+        assert!(matches!(set(json!({ "type": "none", "durationSeconds": 1 })), ToolOutcome::Failed(_)));
+        assert!(matches!(set(json!({ "type": "spin" })), ToolOutcome::Failed(_)));
+        assert!(matches!(set(json!({ "type": "fade", "durationSeconds": 0 })), ToolOutcome::InvalidParams(_)));
+        assert!(matches!(set(json!({ "type": "default" })), ToolOutcome::InvalidParams(_)));
+        assert!(matches!(run(&dispatcher, "video_join_transition_set", json!({ "videoId": "a", "segmentKey": "start", "transition": null })), ToolOutcome::Failed(_)));
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 4, "refused calls change nothing");
     }
 
     #[test]

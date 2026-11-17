@@ -2,10 +2,11 @@
 // tile clipping its transition's cell. Written by `src/features/transitions.rs`.
 export global TransitionPreviews {
     in property <image> frame;
-    // The sheet's grid: cells of `cell-width` × `cell-height` pixels, `columns` per row.
-    in property <int> columns: 8;
-    in property <int> cell-width: 120;
-    in property <int> cell-height: 68;
+    // The sheet's grid from the catalogue: cells of `cell-width` × `cell-height` pixels, `columns`
+    // per row.
+    in property <int> columns;
+    in property <int> cell-width;
+    in property <int> cell-height;
 }
 
 export enum TransitionOptionKind { default, none, xfade }

@@ -193,7 +193,7 @@ export global Player {
     callback close-join();
     callback join-chosen(value: string);
     callback join-filter-edited(text: string);
-    callback join-duration-edited(text: string);
+    callback join-duration-edited(text: string) -> bool;
     callback join-duration-key(text: string, alt: bool, control: bool, shift: bool, meta: bool) -> bool;
     callback join-duration-key-up(text: string) -> bool;
     callback join-duration-blurred();
