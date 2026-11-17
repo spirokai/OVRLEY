@@ -218,6 +218,7 @@ pub fn text_display_section(ctx: &Ctx) -> Vec<Node> {
                     .data()
                     .get("unit_color")
                     .map(|color| color.as_str().unwrap_or_default().to_string()),
+                color_label: None,
                 select_label: ctx.t("widget-editor.unit", "Unit"),
                 options: if !is_coordinates && supports_selection {
                     unit_options(ctx, definition)
@@ -244,7 +245,7 @@ fn track_style_section(ctx: &Ctx, display: &str, border_max: f64, supports_gradi
     let gradient = supports_gradient && ctx.flag(&v(display, "track_filled_gradient"));
     let trailing = supports_gradient.then(|| {
         let mut cell = ctx.switch(v(display, "track_filled_gradient"), ctx.t("widget-editor.fillGradient", "Gradient"));
-        cell.kind = CellKind::Switch { checked: ctx.flag(&v(display, "track_filled_gradient")), label_style: Some(SwitchRowStyle::Inline) };
+        cell.kind = CellKind::Switch { checked: ctx.flag(&v(display, "track_filled_gradient")), label_style: Some(SwitchRowStyle::INLINE) };
         cell
     });
     stack(
@@ -297,7 +298,7 @@ fn bar_fill_style_field(ctx: &Ctx, track: &Track, disabled: bool) -> Cell {
     let display = track.display();
     let value = ctx.value(&v(display, "track_fill_style")).and_then(Value::as_str).unwrap_or("fill").to_string();
     let options = ctx.options(&[("fill", "widget-editor.continuousFill", "Continuous Fill"), ("bars", "widget-editor.segmentedBars", "Segmented Bars")]);
-    Cell::new(v(display, "track_fill_style"), ctx.t("widget-editor.trackStyle", "Track Style"), CellKind::Select { value, options })
+    Cell::new(v(display, "track_fill_style"), ctx.t("widget-editor.trackStyle", "Track Style"), CellKind::Select { value, options, resettable: false })
         .disabled(disabled)
         .rule(Rule::Named(Named::BarFillStyle(track.clone())))
 }
@@ -306,7 +307,7 @@ fn bar_fill_style_field(ctx: &Ctx, track: &Track, disabled: bool) -> Cell {
 fn bar_fill_style_details(ctx: &Ctx, track: &Track) -> Vec<Cell> {
     let display = track.display();
     if ctx.value(&v(display, "track_fill_style")).and_then(Value::as_str) != Some("bars") {
-        return vec![ctx.switch_row(v(display, "track_fill_flat"), ctx.t("widget-editor.flatTrack", "Flat Track"), SwitchRowStyle::Padded)];
+        return vec![ctx.switch_row(v(display, "track_fill_flat"), ctx.t("widget-editor.flatTrack", "Flat Track"), SwitchRowStyle::PADDED)];
     }
     let gap_max = bar_gap_max(track, &variant(ctx.data(), display)).unwrap_or_default();
     vec![
@@ -360,6 +361,7 @@ fn gauge_units(ctx: &Ctx, definition: &WidgetDefinition) -> Node {
             title: ctx.t("widget-editor.unit", "Unit"),
             show_toggle: true,
             color: ctx.data().get("unit_color").map(|color| color.as_str().unwrap_or_default().to_string()),
+            color_label: None,
             select_label: ctx.t("widget-editor.unit", "Unit"),
             options: if supports_selection { unit_options(ctx, definition) } else { Vec::new() },
         },
@@ -566,7 +568,7 @@ fn altitude_tape_section(ctx: &Ctx, definition: &WidgetDefinition) -> Vec<Node> 
                     2,
                     [
                         ctx.select(v(d, "vertical_speed_unit"), ctx.t("widget-editor.unit", "Unit"), unit_options(ctx, vertical_speed)).disabled(!show_speed),
-                        ctx.switch_row(v(d, "show_vertical_speed_decimal"), ctx.t("widget-editor.decimal", "Decimal"), SwitchRowStyle::Bottom).disabled(!show_speed).end(),
+                        ctx.switch_row(v(d, "show_vertical_speed_decimal"), ctx.t("widget-editor.decimal", "Decimal"), SwitchRowStyle::BOTTOM).disabled(!show_speed).end(),
                         ctx.slider(v(d, "vertical_speed_trend_seconds"), ctx.t("widget-editor.trendSeconds", "Trend"), 1.0, 60.0).int().suffix("s").disabled(!show_speed),
                         ctx.slider(v(d, "vertical_speed_bar_thickness"), ctx.t("widget-editor.thickness", "Thickness"), 1.0, 20.0).int().px().disabled(!show_speed),
                         ctx.slider(v(d, "vertical_speed_font_size"), ctx.t("widget-editor.fontSize", "Font Size"), 6.0, 48.0).int().px().disabled(!show_speed),
@@ -608,8 +610,8 @@ fn heading_tape_section(ctx: &Ctx) -> Vec<Node> {
                 grid(
                     2,
                     [
-                        ctx.switch_row(v(d, "show_major_ticks"), ctx.t("widget-editor.majorTicks", "Major Ticks"), SwitchRowStyle::Bottom),
-                        ctx.switch_row(v(d, "show_minor_ticks"), ctx.t("widget-editor.minorTicks", "Minor Ticks"), SwitchRowStyle::Bottom),
+                        ctx.switch_row(v(d, "show_major_ticks"), ctx.t("widget-editor.majorTicks", "Major Ticks"), SwitchRowStyle::BOTTOM),
+                        ctx.switch_row(v(d, "show_minor_ticks"), ctx.t("widget-editor.minorTicks", "Minor Ticks"), SwitchRowStyle::BOTTOM),
                         ctx.slider(v(d, "major_tick_length_pct"), ctx.t("widget-editor.majorLength", "Major Length"), 5.0, 100.0).suffix("%").disabled(!major),
                         ctx.slider(v(d, "minor_tick_length_pct"), ctx.t("widget-editor.minorLength", "Minor Length"), 5.0, 100.0).suffix("%").disabled(!minor),
                         ctx.slider(v(d, "major_tick_thickness"), ctx.t("widget-editor.majorThickness", "Major Thickness"), 0.5, 8.0).step(0.5).int().px().disabled(!major),
@@ -628,8 +630,8 @@ fn heading_tape_section(ctx: &Ctx) -> Vec<Node> {
                 grid(
                     2,
                     [
-                        ctx.switch_row(v(d, "show_minor_labels"), ctx.t("widget-editor.minorLabels", "Minor Labels"), SwitchRowStyle::InlineX),
-                        ctx.switch_row(v(d, "show_major_labels"), ctx.t("widget-editor.majorLabels", "Major Labels"), SwitchRowStyle::InlineX),
+                        ctx.switch_row(v(d, "show_minor_labels"), ctx.t("widget-editor.minorLabels", "Minor Labels"), SwitchRowStyle::INLINE_X),
+                        ctx.switch_row(v(d, "show_major_labels"), ctx.t("widget-editor.majorLabels", "Major Labels"), SwitchRowStyle::INLINE_X),
                     ],
                 )
                 .py(0.5),
@@ -647,7 +649,7 @@ fn heading_tape_section(ctx: &Ctx) -> Vec<Node> {
             1.0,
             [
                 heading("target", ctx.t("widget-editor.indicator", "Indicator"), None),
-                full(ctx.switch_row(v(d, "show_indicator"), ctx.t("widget-editor.showIndicator", "Show Indicator"), SwitchRowStyle::InlineX)),
+                full(ctx.switch_row(v(d, "show_indicator"), ctx.t("widget-editor.showIndicator", "Show Indicator"), SwitchRowStyle::INLINE_X)),
                 grid(
                     2,
                     [
@@ -925,7 +927,7 @@ fn lap_timer_section(ctx: &Ctx) -> Vec<Node> {
         .collect();
     vec![
         full(ctx.select("lap_timer_mode", ctx.t("widget-editor.readout", "Readout"), modes).rule(Rule::Named(Named::DisplayMode))),
-        when(lap_log, || full(ctx.switch_row("renumber_laps", ctx.t("widget-editor.renumberLaps", "Renumber laps"), SwitchRowStyle::Inline))),
+        when(lap_log, || full(ctx.switch_row("renumber_laps", ctx.t("widget-editor.renumberLaps", "Renumber laps"), SwitchRowStyle::INLINE))),
         font_section(ctx, FontSectionProps::default()),
         stack(
             1.0,
@@ -1049,7 +1051,7 @@ mod tests {
     fn every_metric_display_describes_and_its_fields_resolve() {
         for definition in catalog().widgets().iter().filter(|definition| definition.metric && definition.current) {
             for display in &definition.display_types {
-                let mut store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() }), ..Store::default() };
+                let mut store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() }), ..Store::default() };
                 store.editor.set_config(OverlayConfig::from_value(&json!({"values": [with_display(&definition.kind, display, "w")]})).unwrap());
                 let widget = build_config_widgets(&store.editor.config).remove(0);
                 let blocks = describe(&store, &widget);
@@ -1133,7 +1135,7 @@ mod tests {
         dispatcher.dispatch(|store, _| store.editor.set_selected_widget_id(Some("f")));
         let before = widget(&dispatcher, "f", |data| data["display_variants"]["g_force"].clone());
         let diameter = before["diameter"].as_f64().unwrap();
-        dispatcher.dispatch(move |store, _| super::super::edit_field(store, "f", "display_variants.g_force.diameter", Input::Number(diameter * 2.0), true).unwrap());
+        dispatcher.dispatch(move |store, services| super::super::edit_field(store, services, "f", "display_variants.g_force.diameter", Input::Number(diameter * 2.0), true).unwrap());
         let draft = dispatcher.with_store(|store| store.drafts.widget_draft("f").cloned().unwrap());
         assert_eq!(draft["display_variants"]["g_force"]["diameter"].as_f64().unwrap(), (diameter * 2.0).round());
         assert_eq!(draft["width"].as_f64().unwrap(), (before["width"].as_f64().unwrap() * 2.0).round());

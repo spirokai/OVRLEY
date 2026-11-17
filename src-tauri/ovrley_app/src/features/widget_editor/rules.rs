@@ -74,6 +74,35 @@ pub enum Named {
     DraftOnly,
     /// A G-force axis: picking the other direction's axis swaps the two.
     GForceAxis { horizontal: bool },
+    /// The label heading's italic toggle (`changeItalic`).
+    ToggleItalic,
+    /// The backdrop's display type (`initDisplayVariant`).
+    BackdropDisplay,
+    /// The backdrop's diameter: a whole number, the current one while the input is not one.
+    BackdropDiameter,
+    /// The rectangle backdrop's width or height: the corner radius and strip thickness stay
+    /// within the new size.
+    BackdropSize,
+    /// The backdrop's shape grid: a corner's rounding, or an edge strip in canonical order.
+    ShapeToggle,
+    /// `Number(value.toFixed(digits))`.
+    Fixed(usize),
+    /// The route line's Thickness: both line widths.
+    BothLineWidths,
+    /// The finished line colour, which is also the widget's colour.
+    FinishedColor,
+    /// A field of a nested object (`point_label.font_size`): the object is kept.
+    ObjectField,
+    /// The elevation's starting-altitude unit: the value converts; the reset clears it.
+    AltitudeInputUnit,
+    /// A chart series row: `metric:<type>`, `color:<hex>`, `up`, `down` or `remove`.
+    ChartSeries(usize),
+    /// Add series: the first unplotted metric in the first unused palette colour.
+    ChartAdd,
+    /// The chart's time window, typed as `45` or `1:30` (`useWindowSecondsInput`).
+    WindowSeconds,
+    /// The raster's folder button: the image dialog, then loading the chosen image (D5).
+    RasterPick,
 }
 
 /// What an edit asks the editor to do.
@@ -91,6 +120,10 @@ pub enum Patch {
     Reset,
     /// A live draft, whatever the control.
     Draft(Map<String, Value>),
+    /// The chart window's text did not parse; it stays as an invalid draft.
+    InvalidWindow(String),
+    /// Open the raster image dialog.
+    PickRaster,
     /// Nothing to store (an input the rule ignores, as React's handlers return early).
     Nothing,
 }
@@ -239,6 +272,136 @@ fn named_patch(named: &Named, cell: &Cell, input: Input, context: &RuleContext) 
             build_metric_unit_update(context.kind, data.get("starting_altitude").unwrap_or(&Value::Null), current, &unit)
         }
         Named::Reset => unreachable!("reset is not a data patch"),
+        Named::RasterPick => return Ok(Patch::PickRaster),
+        Named::ToggleItalic => {
+            let mut patch = Map::new();
+            patch.insert("italic".into(), Value::Bool(!data.get("italic").and_then(Value::as_bool).unwrap_or_default()));
+            patch
+        }
+        Named::BackdropDisplay => {
+            let display = text_input(cell, &input)?;
+            let next = ovrley_widgets::model::document::init_display_variant(data, &display, None, context.unit_system);
+            let mut patch = Map::new();
+            patch.insert("display_type".into(), Value::String(display));
+            patch.insert("display_variants".into(), next.get("display_variants").cloned().unwrap_or(Value::Null));
+            patch
+        }
+        Named::BackdropDiameter => {
+            let (display, key) = variant_key(cell)?;
+            let current = variant(data, display);
+            let value = parse_integer(&text_input(cell, &input)?, current.get(key).and_then(Value::as_f64).unwrap_or(1.0))?;
+            let mut updates = Map::new();
+            updates.insert(key.into(), number(value));
+            variant_patch(data, display, updates)
+        }
+        Named::BackdropSize => {
+            let (display, key) = variant_key(cell)?;
+            let current = variant(data, display);
+            let value = parse_integer(&text_input(cell, &input)?, current.get(key).and_then(Value::as_f64).unwrap_or(1.0))?;
+            let width = if key == "width" { value } else { field(&current, "width") };
+            let height = if key == "height" { value } else { field(&current, "height") };
+            let radius_max = (width.min(height) * 0.5).max(0.0);
+            let mut updates = Map::new();
+            updates.insert(key.into(), number(value));
+            updates.insert("corner_radius".into(), number(field(&current, "corner_radius").max(0.0).min(radius_max)));
+            updates.insert("edge_strip_thickness".into(), number(field(&current, "edge_strip_thickness").min(max_edge_strip_thickness(width, height))));
+            variant_patch(data, display, updates)
+        }
+        Named::ShapeToggle => {
+            let key = text_input(cell, &input)?;
+            let current = variant(data, "rectangle");
+            let mut updates = Map::new();
+            if RECTANGLE_EDGES.contains(&key.as_str()) {
+                let edges: Vec<&str> = current.get("edge_strips").and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).collect();
+                let has = |edge: &str| if edge == key { !edges.contains(&edge) } else { edges.contains(&edge) };
+                updates.insert("edge_strips".into(), Value::Array(RECTANGLE_EDGES.iter().filter(|edge| has(edge)).map(|edge| Value::String((*edge).into())).collect()));
+            } else {
+                updates.insert(key.clone(), Value::Bool(!current.get(&key).and_then(Value::as_bool).unwrap_or_default()));
+            }
+            variant_patch(data, "rectangle", updates)
+        }
+        Named::Fixed(digits) => at_cell(data, cell, number(crate::js::to_fixed(number_input(cell, &input)?, *digits))),
+        Named::BothLineWidths => {
+            let value = number(number_input(cell, &input)?);
+            let mut patch = Map::new();
+            patch.insert("completed_line_width".into(), value.clone());
+            patch.insert("remaining_line_width".into(), value);
+            patch
+        }
+        Named::FinishedColor => {
+            let color = Value::String(text_input(cell, &input)?);
+            let mut patch = Map::new();
+            patch.insert("completed_line_color".into(), color.clone());
+            patch.insert("color".into(), color);
+            patch
+        }
+        Named::ObjectField => {
+            let (parent, key) = cell.id.split_once('.').ok_or_else(|| format!("{} is not a nested field", cell.id))?;
+            let mut object = data.get(parent).and_then(Value::as_object).cloned().unwrap_or_default();
+            object.insert(key.into(), plain_value(cell, &input)?);
+            let mut patch = Map::new();
+            patch.insert(parent.into(), Value::Object(object));
+            patch
+        }
+        Named::AltitudeInputUnit => {
+            let mut patch = Map::new();
+            if input == Input::Clear {
+                patch.insert("starting_altitude".into(), Value::Null);
+            } else {
+                let unit = text_input(cell, &input)?;
+                let current = data.get("starting_altitude_unit").and_then(Value::as_str).unwrap_or_default();
+                let converted = ovrley_widgets::model::document::convert_altitude_input_value(data.get("starting_altitude").unwrap_or(&Value::Null), current, &unit);
+                patch.insert("starting_altitude".into(), converted);
+                patch.insert("starting_altitude_unit".into(), Value::String(unit));
+            }
+            patch
+        }
+        Named::ChartSeries(index) => {
+            let action = text_input(cell, &input)?;
+            let series = chart_series(data);
+            let next = match action.split_once(':') {
+                Some(("metric", metric)) => replace_series(&series, *index, "metric", metric),
+                Some(("color", color)) => replace_series(&series, *index, "color", color),
+                _ => match action.as_str() {
+                    "up" | "down" => {
+                        let other = if action == "up" { index.checked_sub(1) } else { Some(index + 1) }.filter(|other| *other < series.len());
+                        let other = other.ok_or_else(|| format!("series {index} cannot move {action}"))?;
+                        let mut next = series.clone();
+                        next.swap(*index, other);
+                        next
+                    }
+                    "remove" if series.len() > 1 => series.iter().enumerate().filter(|(item, _)| item != index).map(|(_, value)| value.clone()).collect(),
+                    other => return Err(format!("unknown chart series action {other}")),
+                },
+            };
+            let mut patch = Map::new();
+            patch.insert("series".into(), Value::Array(next));
+            patch
+        }
+        Named::ChartAdd => {
+            let mut series = chart_series(data);
+            let unused = unused_chart_metrics(&series);
+            let metric = unused.first().ok_or("every metric is plotted")?;
+            let palette = chart_palette();
+            let used: Vec<&str> = series.iter().filter_map(|item| item.get("color").and_then(Value::as_str)).collect();
+            let color = palette.iter().find(|color| !used.contains(&color.as_str())).cloned().unwrap_or_else(|| palette[series.len() % palette.len()].clone());
+            series.push(serde_json::json!({"metric": metric, "color": color}));
+            let mut patch = Map::new();
+            patch.insert("series".into(), Value::Array(series));
+            patch
+        }
+        Named::WindowSeconds => {
+            // Escape discards the draft.
+            if input == Input::Clear {
+                return Ok(Patch::Nothing);
+            }
+            let text = text_input(cell, &input)?;
+            let Some(seconds) = parse_window_seconds(&text) else { return Ok(Patch::InvalidWindow(text)) };
+            if Some(seconds) == data.get("window_seconds").and_then(Value::as_f64) {
+                return Ok(Patch::Nothing);
+            }
+            at_cell(data, cell, number(seconds))
+        }
         Named::TrackGeometry(track) => {
             let (display, key) = variant_key(cell)?;
             let value = number_input(cell, &input)?;
@@ -562,6 +725,93 @@ pub fn js_number(text: &str) -> f64 {
         return 0.0;
     }
     trimmed.parse().unwrap_or(f64::NAN)
+}
+
+// ── Backdrop shape (`backdropShape.js`) ──────────────────────────────────────────────────────────
+
+/// `RECTANGLE_EDGE_KEYS`, the canonical order of `edge_strips`.
+pub const RECTANGLE_EDGES: [&str; 4] = ["top", "right", "bottom", "left"];
+
+/// `maxEdgeStripThickness`: opposing strips may meet but not overlap, as the renderer requires.
+pub fn max_edge_strip_thickness(width: f64, height: f64) -> f64 {
+    (width.min(height) / 2.0).floor()
+}
+
+/// `parseInteger`.
+pub fn parse_integer(text: &str, fallback: f64) -> Result<f64, String> {
+    if text.is_empty() {
+        return Ok(fallback);
+    }
+    let parsed = js_number(text);
+    if !parsed.is_finite() {
+        return Err(format!("Invalid integer input: {text}"));
+    }
+    Ok(parsed.trunc())
+}
+
+// ── Rolling chart (`rollingChart.js`) ────────────────────────────────────────────────────────────
+
+fn chart_definition() -> &'static ovrley_widgets::model::catalog::WidgetDefinition {
+    ovrley_widgets::model::catalog::catalog().require_widget("rolling_chart").expect("the catalog defines the rolling chart")
+}
+
+/// `CHART_LIMITS`.
+pub fn chart_limits() -> &'static ovrley_widgets::model::catalog::ChartLimits {
+    chart_definition().chart_limits.as_ref().expect("the rolling chart declares its limits")
+}
+
+fn chart_palette() -> Vec<String> {
+    chart_definition().series_palette.as_ref().and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect()
+}
+
+fn chart_series(data: &Map<String, Value>) -> Vec<Value> {
+    data.get("series").and_then(Value::as_array).cloned().unwrap_or_default()
+}
+
+fn replace_series(series: &[Value], index: usize, key: &str, value: &str) -> Vec<Value> {
+    series.iter().enumerate().map(|(item, row)| {
+        let mut row = row.clone();
+        if item == index {
+            row[key] = Value::String(value.into());
+        }
+        row
+    }).collect()
+}
+
+/// `PLOTTABLE_METRICS`, in catalog order.
+pub fn plottable_metrics() -> Vec<String> {
+    ovrley_widgets::model::catalog::catalog().widgets().iter().filter(|definition| definition.plottable).map(|definition| definition.kind.clone()).collect()
+}
+
+/// `unusedChartMetrics`.
+pub fn unused_chart_metrics(series: &[Value]) -> Vec<String> {
+    let used: Vec<&str> = series.iter().filter_map(|item| item.get("metric").and_then(Value::as_str)).collect();
+    plottable_metrics().into_iter().filter(|metric| !used.contains(&metric.as_str())).collect()
+}
+
+/// `parseWindowSeconds`: whole seconds (`45`) or minutes and seconds (`1:30`) within the limits.
+/// `lib/seconds_input.rs` parses clock times with fractions and hours, so it is not reused.
+pub fn parse_window_seconds(text: &str) -> Option<f64> {
+    let text = text.trim();
+    let seconds = match text.split_once(':') {
+        Some((minutes, seconds)) => {
+            let all_digits = |part: &str| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit());
+            if !all_digits(minutes) || seconds.len() != 2 || !all_digits(seconds) || seconds.as_bytes()[0] > b'5' {
+                return None;
+            }
+            minutes.parse::<f64>().ok()? * 60.0 + seconds.parse::<f64>().ok()?
+        }
+        None if !text.is_empty() && text.bytes().all(|byte| byte.is_ascii_digit()) => text.parse().ok()?,
+        None => return None,
+    };
+    let limits = chart_limits();
+    (seconds >= f64::from(limits.min_window_seconds) && seconds <= f64::from(limits.max_window_seconds)).then_some(seconds)
+}
+
+/// `formatWindowSeconds`: `m:ss`.
+pub fn format_window_seconds(seconds: f64) -> String {
+    let whole = seconds as u64;
+    format!("{}:{:02}", whole / 60, whole % 60)
 }
 
 #[cfg(test)]

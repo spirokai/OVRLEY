@@ -246,8 +246,8 @@ pub fn tools() -> Vec<ToolDefinition> {
         ToolDefinition {
             name: "widget_get",
             title: "Read a widget",
-            description: "Describes one widget: its saved data, its content rectangle on the canvas in scene pixels, and the fields its \
-                          type takes.",
+            description: "Describes one widget: its saved data, its content rectangle on the canvas in scene pixels, the fields its \
+                          type takes, and the fields its editor offers (editorFields: id, kind, label, range or options, disabled).",
             input_schema: input_schema::<WidgetArguments>(),
             read_only: true,
         },
@@ -278,7 +278,9 @@ pub fn tools() -> Vec<ToolDefinition> {
             name: "widget_update",
             title: "Change widget settings",
             description: "Changes a widget's settings, as its editor in the Widgets tab does: give the fields to change. The widget's \
-                          fields and current values come from widget_get. A patch with an unknown field or a value the widget cannot \
+                          fields and current values come from widget_get. A field the editor changes with a rule (a bar fill style \
+                          suggesting bars, a size clamping the corner radius, a map shape, …) goes through the same rule. A patch with an \
+                          unknown field or a value the widget cannot \
                           show changes nothing and fails with the reason. One undo step.",
             input_schema: input_schema::<WidgetUpdateArguments>(),
             read_only: false,
@@ -502,7 +504,9 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             }
             "widget_get" => {
                 let arguments: WidgetArguments = arguments(arguments_value)?;
-                now(describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?)
+                let mut described = describe_widget(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?;
+                described["editorFields"] = Value::Array(widget_editor::editable_fields(store, &arguments.widget_id).map_err(ToolOutcome::Failed)?);
+                now(described)
             }
             "widget_move" => {
                 let arguments: WidgetMoveArguments = arguments(arguments_value)?;
@@ -609,7 +613,7 @@ mod tests {
     fn dispatcher(allowed: bool) -> (Dispatcher, ovrley_app::store::services::fakes::Fakes) {
         let (parts, fakes) = fake_services(json!({ "allowAgentEdits": allowed }));
         let mut store = Store::hydrate(&parts.preferences).unwrap();
-        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() });
+        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() });
         (Dispatcher::new(store, parts), fakes)
     }
 

@@ -5,6 +5,8 @@
 
 pub mod blocks;
 pub mod displays;
+pub mod editors;
+pub mod raster;
 pub mod rules;
 pub mod sections;
 
@@ -16,7 +18,7 @@ use crate::store::Store;
 use blocks::Block;
 use ovrley_widgets::model::catalog::{catalog, IconRef};
 use ovrley_widgets::model::document::{create_widget_defaults, Collection, js_round, merge_widget_data, number, resolve_active_widget_data, WidgetCreationOptions, WidgetSelection};
-use rules::{Input, Patch, RuleContext};
+use rules::{js_number, parse_integer, Input, Patch, RuleContext};
 use sections::Ctx;
 use serde_json::{Map, Value};
 
@@ -26,14 +28,61 @@ pub struct WidgetEditorState {
     /// `useHeldValue(selectedWidgetId, isMarqueeSelecting)`'s memory.
     held_open_widget_id: Option<String>,
     pub fonts: FontCatalogState,
+    /// `useRasterSelection`'s error and loading state, per raster widget (D5).
+    pub raster: std::collections::BTreeMap<String, raster::RasterSelectionState>,
+    /// `useWindowSecondsInput`'s invalid draft, per chart widget.
+    pub window_drafts: std::collections::BTreeMap<String, String>,
 }
 
-/// `useAvailableFonts`: the session's font catalog, loaded once on a worker.
+/// `useAvailableFonts`: the session's font catalog, loaded once on a worker, and the families'
+/// capabilities label typography reads (D6), loaded on demand.
 #[derive(Debug, Default)]
 pub struct FontCatalogState {
     requested: bool,
     pub recommended: Vec<FontOption>,
     pub system: Vec<FontOption>,
+    /// Capabilities by font id: `None` while loading.
+    capabilities: std::collections::HashMap<String, Option<std::sync::Arc<ovrley_core::fonts::FontFamily>>>,
+}
+
+impl FontCatalogState {
+    /// A family's capabilities, once loaded.
+    pub fn capabilities(&self, id: &str) -> Option<&ovrley_core::fonts::FontFamily> {
+        self.capabilities.get(id).and_then(Option::as_deref)
+    }
+}
+
+/// `getFontCapabilities` for `id`, once: a worker loads them, and a failure goes to the error alert,
+/// as `useLabelTypography` reports it.
+pub fn request_font_capabilities(store: &mut Store, services: &mut Services, id: &str) {
+    if store.widget_editor.fonts.capabilities.contains_key(id) {
+        return;
+    }
+    store.widget_editor.fonts.capabilities.insert(id.to_string(), None);
+    let font_dirs = services.paths.font_dirs.clone();
+    let id = id.to_string();
+    services.workers.spawn("font-capabilities", move || {
+        let loaded = ovrley_core::fonts::font_capabilities(&font_dirs, &id);
+        Box::new(move |store: &mut Store, _: &mut Services| match loaded {
+            Ok(family) => {
+                store.widget_editor.fonts.capabilities.insert(id, Some(std::sync::Arc::new(family)));
+            }
+            Err(error) => store.media.set_error_message(error.to_string()),
+        })
+    });
+}
+
+/// Reconcile step: the open label's font capabilities are requested (`useLabelTypography`).
+pub fn reconcile_label_typography(store: &mut Store, services: &mut Services) {
+    let Some(id) = open_widget_id(store).map(str::to_string) else { return };
+    let Ok((collection, _)) = store.editor.config.find_widget(&id) else { return };
+    if collection != Collection::Labels {
+        return;
+    }
+    let font = store.editor.config.widget(&id).ok().and_then(|data| data.get("font")).and_then(Value::as_str).map(str::to_string);
+    if let Some(font) = font {
+        request_font_capabilities(store, services, &font);
+    }
 }
 
 /// Reconcile step: the open item follows the selection, except while a marquee runs, when it keeps
@@ -133,7 +182,10 @@ pub fn describe(store: &Store, widget: &ConfigWidget) -> Vec<Block> {
     let ctx = Ctx::new(store, widget);
     let mut nodes = vec![sections::position_section(&ctx)];
     let definition = catalog().require_widget(&widget.kind).expect("listed widgets are in the catalog");
-    if definition.metric {
+    // The type's editor wins; otherwise a metric widget gets `MetricWidgetEditor`.
+    if let Some(editor) = editors::type_editor(&ctx) {
+        nodes.extend(editor);
+    } else if definition.metric {
         nodes.extend(displays::metric_widget_editor(&ctx));
     }
     blocks::flatten(1.5, nodes)
@@ -163,7 +215,7 @@ pub fn sidebar_view(store: &Store) -> SidebarView {
 
 /// An inspector edit (D1): the field is looked up in the widget's description, and its rule turns
 /// the input into a patch. A slider's live value is a draft (`draft`); everything else commits.
-pub fn edit_field(store: &mut Store, widget_id: &str, field_id: &str, input: Input, draft: bool) -> Result<(), String> {
+pub fn edit_field(store: &mut Store, services: &mut Services, widget_id: &str, field_id: &str, input: Input, draft: bool) -> Result<(), String> {
     let widget = inspected(store, widget_id)?;
     let blocks = describe(store, &widget);
     let cell = blocks::find(&blocks, field_id).ok_or_else(|| format!("The {} inspector has no field {field_id}", widget.kind))?;
@@ -173,11 +225,25 @@ pub fn edit_field(store: &mut Store, widget_id: &str, field_id: &str, input: Inp
     let context = RuleContext { data: &widget.data, kind: &widget.kind, unit_system: store.editor.unit_system };
     match rules::patch(cell, input, &context)? {
         Patch::Data(patch) if draft => update_widget_draft(store, widget_id, patch),
-        Patch::Data(patch) => update_widget_data(store, widget_id, patch),
+        Patch::Data(patch) => {
+            store.widget_editor.window_drafts.remove(widget_id);
+            update_widget_data(store, widget_id, patch)
+        }
         Patch::Numeric { key, raw, options } => set_numeric_field(store, widget_id, &key, &raw, options),
         Patch::Reset => reset_widget(store, widget_id),
         Patch::Draft(patch) => update_widget_draft(store, widget_id, patch),
-        Patch::Nothing => Ok(()),
+        Patch::Nothing => {
+            store.widget_editor.window_drafts.remove(widget_id);
+            Ok(())
+        }
+        Patch::InvalidWindow(text) => {
+            store.widget_editor.window_drafts.insert(widget_id.to_string(), text);
+            Ok(())
+        }
+        Patch::PickRaster => {
+            raster::select_raster_image(store, services, widget_id);
+            Ok(())
+        }
     }
 }
 
@@ -273,19 +339,6 @@ impl Default for NumericFieldOptions {
     }
 }
 
-use rules::js_number;
-
-/// `parseInteger`.
-fn parse_integer(text: &str, fallback: f64) -> Result<f64, String> {
-    if text.is_empty() {
-        return Ok(fallback);
-    }
-    let parsed = js_number(text);
-    if !parsed.is_finite() {
-        return Err(format!("Invalid integer input: {text}"));
-    }
-    Ok(parsed.trunc())
-}
 
 /// `setNumericField`: parses an input, clamps it to its range and updates the widget.
 pub fn set_numeric_field(store: &mut Store, widget_id: &str, key: &str, raw: &str, options: NumericFieldOptions) -> Result<(), String> {
@@ -358,6 +411,110 @@ pub fn reset_widget(store: &mut Store, widget_id: &str) -> Result<(), String> {
     store.editor.edit_config(|config| config.replace_widget(widget_id, &data))
 }
 
+/// The rule input of an agent's value for `cell`: what the control would report.
+fn agent_input(cell: &blocks::Cell, value: &Value) -> Result<Input, String> {
+    use blocks::CellKind;
+    Ok(match (value, &cell.kind) {
+        (Value::Null, _) => Input::Clear,
+        (Value::Bool(flag), _) => Input::Flag(*flag),
+        (Value::Number(number), CellKind::Number { .. } | CellKind::WindowSeconds { .. }) => Input::Text(blocks::js_string(number.as_f64().unwrap_or_default())),
+        (Value::Number(number), _) => Input::Number(number.as_f64().unwrap_or_default()),
+        (Value::String(text), _) => Input::Text(text.clone()),
+        (other, _) => return Err(format!("{} takes a single value, not {other}", cell.id)),
+    })
+}
+
+/// An agent's field patch through the inspector's rules (Q3): a field the inspector edits with a
+/// named rule (bar fill style, map shape, track geometry, …) goes through it, so the widget stays
+/// as consistent as the UI leaves it; other fields patch as they are. One patch, one undo step.
+fn ruled_patch(store: &Store, widget_id: &str, fields: Map<String, Value>) -> Result<Map<String, Value>, String> {
+    let widget = inspected(store, widget_id)?;
+    let blocks = describe(store, &widget);
+    let context = RuleContext { data: &widget.data, kind: &widget.kind, unit_system: store.editor.unit_system };
+    // Each leaf: a top-level field, or a display variant's field.
+    let mut leaves: Vec<(String, Value)> = Vec::new();
+    for (key, value) in fields {
+        match (key.as_str(), value) {
+            ("display_variants", Value::Object(variants)) => {
+                for (display, fields) in variants {
+                    match fields {
+                        Value::Object(fields) => leaves.extend(fields.into_iter().map(|(field, value)| (format!("display_variants.{display}.{field}"), value))),
+                        other => leaves.push((format!("display_variants.{display}"), other)),
+                    }
+                }
+            }
+            (_, value) => leaves.push((key, value)),
+        }
+    }
+    let mut patch = Map::new();
+    for (path, value) in leaves {
+        let cell = blocks::find(&blocks, &path).filter(|cell| matches!(cell.rule, blocks::Rule::Named(_)));
+        // A choice takes one of its options, as the select offers them.
+        if let Some(blocks::CellKind::Select { options, .. } | blocks::CellKind::ToggleGroup { options, .. }) = cell.map(|cell| &cell.kind) {
+            if !options.iter().any(|option| Some(option.value.as_str()) == value.as_str()) {
+                let values: Vec<&str> = options.iter().map(|option| option.value.as_str()).collect();
+                return Err(format!("{path} takes one of: {}.", values.join(", ")));
+            }
+        }
+        let next = match cell {
+            Some(cell) => match rules::patch(cell, agent_input(cell, &value)?, &context)? {
+                Patch::Data(next) | Patch::Draft(next) => next,
+                Patch::Nothing | Patch::InvalidWindow(_) => return Err(format!("The editor does not accept {value} for {path}.")),
+                Patch::Numeric { .. } | Patch::Reset | Patch::PickRaster => return Err(format!("{path} cannot be set this way.")),
+            },
+            None => rules::path_patch(&widget.data, &path, value),
+        };
+        patch = merge_widget_data(Some(&patch), &next);
+    }
+    Ok(patch)
+}
+
+/// The fields the open widget's editor offers, as agents read them (`widget_get`, D12): each
+/// field's id, kind, label, range and options, in English.
+pub fn editable_fields(store: &Store, widget_id: &str) -> Result<Vec<Value>, String> {
+    use blocks::CellKind;
+    let widget = inspected(store, widget_id)?;
+    let ctx = Ctx { locale: crate::i18n::Locale::En, ..Ctx::new(store, &widget) };
+    let mut nodes = vec![sections::position_section(&ctx)];
+    if let Some(editor) = editors::type_editor(&ctx) {
+        nodes.extend(editor);
+    } else if catalog().require_widget(&widget.kind)?.metric {
+        nodes.extend(displays::metric_widget_editor(&ctx));
+    }
+    let blocks = blocks::flatten(1.5, nodes);
+    let options = |options: &[blocks::OptionView]| options.iter().map(|option| serde_json::json!({"value": option.value, "label": option.label})).collect::<Vec<_>>();
+    Ok(blocks::cells(&blocks)
+        .filter(|cell| !matches!(cell.kind, CellKind::Empty | CellKind::IconButton { .. } | CellKind::Alert { .. } | CellKind::RasterPicker { .. }))
+        .map(|cell| {
+            let mut field = serde_json::json!({"id": cell.id, "label": cell.label, "disabled": cell.disabled});
+            let (kind, extra) = match &cell.kind {
+                // In the field's own units: Transparency's percent slider stores 0–1.
+                CellKind::Slider { min, max, step, .. } => {
+                    let divisor = if let blocks::Rule::Scaled(divisor) = cell.rule { divisor } else { 1.0 };
+                    ("number", serde_json::json!({"min": number(*min / divisor), "max": number(*max / divisor), "step": number(*step / divisor)}))
+                }
+                CellKind::Number { .. } => ("number", Value::Null),
+                CellKind::Color { .. } => ("color", Value::Null),
+                CellKind::Select { options: items, .. } | CellKind::ToggleGroup { options: items, .. } | CellKind::Tabs { options: items, .. } => ("choice", serde_json::json!({"options": options(items)})),
+                CellKind::Font { .. } => ("font", Value::Null),
+                CellKind::Text { .. } | CellKind::WindowSeconds { .. } => ("text", Value::Null),
+                CellKind::Switch { .. } | CellKind::SwitchRow { .. } | CellKind::Italic { .. } => ("flag", Value::Null),
+                CellKind::Alignment { options: items, .. } => ("choice", serde_json::json!({"options": options(items)})),
+                CellKind::Gradient { .. } => ("gradient stops", Value::Null),
+                CellKind::ShapeGrid { .. } => ("shape", Value::Null),
+                CellKind::ChartSeries { .. } => ("series row", Value::Null),
+                CellKind::GForceAxis { .. } => ("axis", Value::Null),
+                _ => ("other", Value::Null),
+            };
+            field["kind"] = Value::String(kind.into());
+            if let Value::Object(extra) = extra {
+                field.as_object_mut().expect("a field is an object").extend(extra);
+            }
+            field
+        })
+        .collect())
+}
+
 /// The MCP form of `updateWidgetData` (Q2): a field patch, checked against the type's fields, then
 /// validated by the durable normalization and by the renderer. An invalid patch changes nothing and
 /// fails with the reason.
@@ -374,9 +531,10 @@ pub fn update_widget_fields(store: &mut Store, services: &mut Services, widget_i
             return Err(format!("{kind} widgets have no field {key}. Their fields: {}.", definition.config_keys.join(", ")));
         }
     }
+    let patch = ruled_patch(store, widget_id, fields)?;
     let previous = std::rc::Rc::clone(&store.editor.config);
     let had_error = store.preview.error.is_some();
-    update_widget_data(store, widget_id, fields)?;
+    update_widget_data(store, widget_id, patch)?;
     let durable = ovrley_core::normalize::template::create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults));
     let rendered = durable.map_err(|error| error.to_string()).and_then(|_| {
         crate::features::widget_preview::present_pending_frame(store, services);
@@ -419,12 +577,20 @@ mod tests {
 
     /// A dispatcher over `values`, with the preview's frames run until its fonts are ready.
     pub(crate) fn editor(values: Vec<Value>) -> (Dispatcher, Fakes) {
+        editor_with(json!({"values": values}))
+    }
+
+    /// A dispatcher over a document of `collections` (`{"labels": [...], ...}`), its preview
+    /// frames run until every widget is presented.
+    pub(crate) fn editor_with(collections: Value) -> (Dispatcher, Fakes) {
         let (parts, fakes) = fake_services(json!({}));
-        let store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() }), ..Store::default() };
+        let store = Store { theme: Some(ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() }), ..Store::default() };
         let dispatcher = Dispatcher::new(store, parts);
         dispatcher.dispatch(move |store, _| {
             store.history.set_mode(HistoryMode::Reset);
-            store.editor.set_config(OverlayConfig::from_value(&json!({"scene": {"width": 1000, "height": 500}, "values": values})).unwrap());
+            let mut document = collections;
+            document["scene"] = json!({"width": 1000, "height": 500});
+            store.editor.set_config(OverlayConfig::from_value(&document).unwrap());
         });
         for _ in 0..400 {
             fakes.ui_post.drain(&dispatcher);
@@ -472,7 +638,7 @@ mod tests {
     }
 
     pub(crate) fn edit(dispatcher: &Dispatcher, id: &'static str, field: &'static str, input: Input) {
-        dispatcher.dispatch(move |store, _| edit_field(store, id, field, input, false).unwrap());
+        dispatcher.dispatch(move |store, services| edit_field(store, services, id, field, input, false).unwrap());
     }
 
     #[test]

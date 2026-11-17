@@ -123,7 +123,7 @@ impl<'a> Ctx<'a> {
     ) -> Cell {
         let id = id.into();
         let value = self.text(&id);
-        Cell::new(id, label, CellKind::Select { value, options })
+        Cell::new(id, label, CellKind::Select { value, options, resettable: false })
     }
 
     /// A heading's `ToggleField`.
@@ -400,7 +400,17 @@ impl Default for FontSectionProps {
 /// `FontSection`. Label typography (weight and italic) comes with the text editor (D6).
 pub fn font_section(ctx: &Ctx, props: FontSectionProps) -> Node {
     let is_label = ctx.widget.collection == Collection::Labels;
-    let trailing = if props.show_content_alignment && !is_label {
+    // `useLabelTypography`: the label's family capabilities, once loaded.
+    let family = is_label.then(|| ctx.store.widget_editor.fonts.capabilities(&ctx.text("font"))).flatten();
+    let italic_supported = family.is_some_and(|family| ovrley_core::fonts::family_supports_italic(family).unwrap_or_default());
+    let trailing = if is_label {
+        Some(
+            Cell::new("italic", ctx.t("widget-editor.italic", "Italic"), CellKind::Italic { pressed: ctx.flag("italic") && italic_supported })
+                .disabled(!italic_supported)
+                .tooltip(ctx.t("widget-editor.italic", "Italic"))
+                .rule(Rule::Named(Named::ToggleItalic)),
+        )
+    } else if props.show_content_alignment {
         let options = ctx.options(&[
             ("left", "widget-editor.alignLeft", "Align left"),
             ("center", "widget-editor.alignCenter", "Align center"),
@@ -470,8 +480,30 @@ pub fn font_section(ctx: &Ctx, props: FontSectionProps) -> Node {
                     ),
                 ],
             ),
+            when(is_label, || label_typography(ctx, family)),
         ],
     )
+}
+
+/// The labels' weight and letter spacing (`grid grid-cols-2 gap-4 items-end pt-2`). The weight
+/// slider shows once the family's capabilities are in: over the matched face's weight axis, step
+/// 100, disabled without one.
+fn label_typography(ctx: &Ctx, family: Option<&ovrley_core::fonts::FontFamily>) -> Node {
+    let weight = family.and_then(|family| ovrley_core::fonts::weight_control(family, ctx.num("font_weight") as f32, ctx.flag("italic")).ok());
+    let letter_spacing = ctx.num("letter_spacing");
+    grid_end(
+        2,
+        [
+            weight.map(|control| {
+                let (min, max) = control.axis.map_or((1.0, 1000.0), |(min, max)| (f64::from(min), f64::from(max)));
+                let mut cell = ctx.slider("font_weight", ctx.t("widget-editor.fontWeight", "Font Weight"), min, max).shown(f64::from(control.weight)).step(100.0).int();
+                cell = cell.readout(super::blocks::js_string(js_round(f64::from(control.weight))));
+                cell.disabled(control.axis.is_none())
+            }),
+            Some(ctx.slider("letter_spacing", ctx.t("widget-editor.letterSpacing", "Letter Spacing"), -35.0, 35.0).step(0.5).readout(fixed(letter_spacing, 1)).suffix("%")),
+        ],
+    )
+    .pt(0.5)
 }
 
 /// `IconSection` with `unitsField`, as `TextDisplaySection` composes it.
@@ -534,6 +566,8 @@ pub struct UnitsRowProps {
     pub title: String,
     pub show_toggle: bool,
     pub color: Option<String>,
+    /// The colour field's label; "Color" when absent.
+    pub color_label: Option<String>,
     pub select_label: String,
     /// The unit select's options; empty hides it.
     pub options: Vec<OptionView>,
@@ -558,7 +592,7 @@ pub fn units_row(ctx: &Ctx, props: UnitsRowProps) -> Node {
                     props.color.map(|value| {
                         Cell::new(
                             "unit_color",
-                            ctx.t("widget-editor.color", "Color"),
+                            props.color_label.clone().unwrap_or_else(|| ctx.t("widget-editor.color", "Color")),
                             CellKind::Color { value },
                         )
                         .disabled(controls_disabled)
@@ -570,6 +604,7 @@ pub fn units_row(ctx: &Ctx, props: UnitsRowProps) -> Node {
                             CellKind::Select {
                                 value: ctx.text("display_unit"),
                                 options: props.options,
+                                resettable: false,
                             },
                         )
                         .disabled(controls_disabled)

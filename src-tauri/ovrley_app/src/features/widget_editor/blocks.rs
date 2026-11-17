@@ -64,23 +64,28 @@ pub struct ShapeToggle {
 }
 
 /// How a label-and-switch row is laid out; React styles each a little differently.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SwitchRowStyle {
     /// `TextDisplaySection`'s toggle rows: 0.741rem bold `tracking-wider`, `py-2`.
     Toggle,
-    /// `flex items-center justify-between pl-1`, a 0.667rem uppercase bold label (the map's layer
-    /// toggles, the G-force invert switch).
-    Inline,
-    /// `px-1 pt-2 pb-2` (Flat Track).
-    Padded,
-    /// `pl-1 pt-2 pb-2`, the label `pt-1` (Hundredths).
-    PaddedLeft,
-    /// `px-1` (Show Indicator, the heading tape's label toggles).
-    InlineX,
-    /// `px-1 pb-2` (the heading tape's tick toggles, the altitude tape's Decimal).
-    Bottom,
+    /// `flex items-center justify-between gap-2` with a 0.667rem uppercase bold label, its
+    /// padding in rem (top, right, bottom, left) and the label's own top padding.
+    Label { padding: [f32; 4], label_top: f32 },
     /// `flex h-9 items-center justify-between px-1` with a 9px label (the chart's area gradient).
     Tall,
+}
+
+impl SwitchRowStyle {
+    /// `pl-1` (the map's layer toggles, the G-force invert switch, Renumber laps).
+    pub const INLINE: Self = Self::Label { padding: [0.0, 0.0, 0.0, 0.25], label_top: 0.0 };
+    /// `px-1` (Show Indicator, the heading tape's label toggles).
+    pub const INLINE_X: Self = Self::Label { padding: [0.0, 0.25, 0.0, 0.25], label_top: 0.0 };
+    /// `px-1 pt-2 pb-2` (Flat Track).
+    pub const PADDED: Self = Self::Label { padding: [0.5, 0.25, 0.5, 0.25], label_top: 0.0 };
+    /// `pl-1 pt-2 pb-2`, the label `pt-1` (Hundredths).
+    pub const PADDED_LEFT: Self = Self::Label { padding: [0.5, 0.0, 0.5, 0.25], label_top: 0.25 };
+    /// `px-1 pb-2` (the heading tape's tick toggles, the altitude tape's Decimal).
+    pub const BOTTOM: Self = Self::Label { padding: [0.0, 0.25, 0.5, 0.25], label_top: 0.0 };
 }
 
 /// What a cell shows. Each kind is one of the Phase 3 controls or a bespoke cell (D3); the values
@@ -106,6 +111,8 @@ pub enum CellKind {
     Select {
         value: String,
         options: Vec<OptionView>,
+        /// The label row\'s reset button (`onReset`).
+        resettable: bool,
     },
     /// `NumberField`: the shown text, whole numbers unless the caller keeps decimals.
     Number {
@@ -276,6 +283,9 @@ pub struct Row {
     pub columns: u8,
     pub column_gap: f32,
     pub align: Align,
+    /// `grid-cols-[auto_minmax(0,1fr)] h-32`: the first cell at its own width, the others stacked
+    /// in the second column, each half of the 8rem height (the backdrop's shape grid).
+    pub aside: bool,
 }
 
 /// Where a block sits in an accent panel (`rounded-xs bg-surface-accent-soft/70 p-4`).
@@ -332,6 +342,10 @@ pub enum Node {
         bottom: f32,
         node: Box<Node>,
     },
+    /// The first cell beside a column of the others (`Row::aside`).
+    Aside {
+        cells: Vec<Cell>,
+    },
     /// An accent panel with `space-y-*` between its children.
     Panel {
         space: f32,
@@ -362,6 +376,7 @@ impl Node {
         match self {
             Node::Empty => true,
             Node::Heading(_) => false,
+            Node::Aside { cells } => cells.is_empty(),
             Node::Grid { cells, .. } => cells.is_empty(),
             Node::Stack { children, .. } | Node::Panel { children, .. } => {
                 children.iter().all(Node::is_empty)
@@ -509,6 +524,7 @@ impl Flat {
                         columns: *columns,
                         column_gap: if *row_gap == 0.0 { 1.0 } else { *row_gap },
                         align: *align,
+                        aside: false,
                     };
                     self.push(
                         chunk[0].id.clone(),
@@ -519,6 +535,10 @@ impl Flat {
                 }
             }
             Node::Stack { space, children } => self.stack(children, *space, gap, in_panel),
+            Node::Aside { cells } => {
+                let row = Row { cells: cells.clone(), columns: 2, column_gap: 1.0, align: Align::Start, aside: true };
+                self.push(cells[0].id.clone(), gap, in_panel, BlockContent::Row(row));
+            }
             Node::Pad { top, bottom, node } => {
                 self.node(node, gap + top, in_panel);
                 self.pending += bottom;

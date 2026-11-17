@@ -869,6 +869,8 @@ mod tests {
         ThemeColors {
             ice: "#86aaaa".into(),
             aqua: "#40e0d0".into(),
+            teal: "#005b5b".into(),
+            accent: "#ad5013".into(),
         }
     }
 

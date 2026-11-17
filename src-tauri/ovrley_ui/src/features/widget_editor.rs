@@ -11,6 +11,7 @@ use ovrley_app::features::widget_editor::blocks::{self, Block, BlockContent, Cel
 use ovrley_app::features::widget_editor::rules::Input;
 use ovrley_app::features::widget_editor::{self as editor, font_options, open_widget_id, sidebar_view, SidebarView};
 use ovrley_app::lib::fonts::FontOption;
+use ovrley_app::store::services::Services;
 use ovrley_app::store::{Dispatcher, Store};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 use std::cell::RefCell;
@@ -28,17 +29,17 @@ fn font_choices(fonts: &[FontOption]) -> Vec<Choice> {
     fonts.iter().map(|font| Choice { kind: ChoiceKind::Item, value: font.id.as_str().into(), label: font.name.as_str().into(), ..Default::default() }).collect()
 }
 
-fn switch_style(style: Option<blocks::SwitchRowStyle>) -> SwitchRowStyle {
-    match style {
+/// A switch row's style into the cell: the kind, and a `label` row's padding.
+fn switch_style(out: &mut InspectorCell, style: Option<blocks::SwitchRowStyle>) {
+    out.style = match style {
         None => SwitchRowStyle::None,
         Some(blocks::SwitchRowStyle::Toggle) => SwitchRowStyle::Toggle,
-        Some(blocks::SwitchRowStyle::Inline) => SwitchRowStyle::Inline,
-        Some(blocks::SwitchRowStyle::Padded) => SwitchRowStyle::Padded,
-        Some(blocks::SwitchRowStyle::PaddedLeft) => SwitchRowStyle::PaddedLeft,
-        Some(blocks::SwitchRowStyle::InlineX) => SwitchRowStyle::InlineX,
-        Some(blocks::SwitchRowStyle::Bottom) => SwitchRowStyle::Bottom,
         Some(blocks::SwitchRowStyle::Tall) => SwitchRowStyle::Tall,
-    }
+        Some(blocks::SwitchRowStyle::Label { padding: [top, right, bottom, left], label_top }) => {
+            (out.padding_top, out.padding_right, out.padding_bottom, out.padding_left, out.label_top) = (top, right, bottom, left, label_top);
+            SwitchRowStyle::Label
+        }
+    };
 }
 
 /// A cell as the `InspectorCell` struct: which fields each kind fills.
@@ -62,8 +63,8 @@ pub fn cell(icons: &Icons<'_>, cell: &Cell) -> InspectorCell {
             out.text = value.as_str().into();
             InspectorCellKind::Color
         }
-        CellKind::Select { value, options } => {
-            (out.text, out.options) = (value.as_str().into(), choices(options));
+        CellKind::Select { value, options, resettable } => {
+            (out.text, out.options, out.resettable) = (value.as_str().into(), choices(options), *resettable);
             InspectorCellKind::Select
         }
         CellKind::Number { value, placeholder, suffix, resettable } => {
@@ -75,11 +76,13 @@ pub fn cell(icons: &Icons<'_>, cell: &Cell) -> InspectorCell {
             InspectorCellKind::Text
         }
         CellKind::Switch { checked, label_style } => {
-            (out.checked, out.style) = (*checked, switch_style(*label_style));
+            out.checked = *checked;
+            switch_style(&mut out, *label_style);
             InspectorCellKind::Switch
         }
         CellKind::SwitchRow { checked, style } => {
-            (out.checked, out.style) = (*checked, switch_style(Some(*style)));
+            out.checked = *checked;
+            switch_style(&mut out, Some(*style));
             InspectorCellKind::SwitchRow
         }
         CellKind::Font { value, recommended, small_label } => {
@@ -185,7 +188,7 @@ fn row(icons: &Icons<'_>, block: &Block, cells: ModelRc<InspectorCell>) -> Inspe
             }
         }
         BlockContent::Row(grid) => {
-            (out.columns, out.column_gap, out.align_end) = (i32::from(grid.columns), grid.column_gap, grid.align == blocks::Align::End);
+            (out.columns, out.column_gap, out.align_end, out.aside) = (i32::from(grid.columns), grid.column_gap, grid.align == blocks::Align::End, grid.aside);
         }
     }
     out
@@ -281,10 +284,10 @@ impl Projection {
 
 /// Runs an action against the open widget; its errors are bugs in what the inspector offered,
 /// logged as Phase 3 decided.
-fn on_open_widget(dispatcher: &Dispatcher, action: impl FnOnce(&mut Store, &str) -> Result<(), String> + 'static) {
-    dispatcher.handle().dispatch(move |store, _| {
+fn on_open_widget(dispatcher: &Dispatcher, action: impl FnOnce(&mut Store, &mut Services, &str) -> Result<(), String> + 'static) {
+    dispatcher.handle().dispatch(move |store, services| {
         let Some(widget_id) = open_widget_id(store).map(str::to_string) else { return };
-        if let Err(error) = action(store, &widget_id) {
+        if let Err(error) = action(store, services, &widget_id) {
             log::error!("widget editor: {error}");
         }
     });
@@ -293,7 +296,7 @@ fn on_open_widget(dispatcher: &Dispatcher, action: impl FnOnce(&mut Store, &str)
 /// A field edit of the open widget (D1).
 fn edit(dispatcher: &Dispatcher, id: SharedString, input: Input, draft: bool) {
     let id = id.to_string();
-    on_open_widget(dispatcher, move |store, widget_id| editor::edit_field(store, widget_id, &id, input, draft));
+    on_open_widget(dispatcher, move |store, services, widget_id| editor::edit_field(store, services, widget_id, &id, input, draft));
 }
 
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
@@ -320,7 +323,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let handle = dispatcher.clone();
     global.on_draft(move |id, value| edit(&handle, id, Input::Number(f64::from(value)), true));
     let handle = dispatcher.clone();
-    global.on_commit_draft(move || on_open_widget(&handle, editor::commit_widget_draft));
+    global.on_commit_draft(move || on_open_widget(&handle, |store, _, widget_id| editor::commit_widget_draft(store, widget_id)));
     let handle = dispatcher.clone();
     global.on_set_number(move |id, raw| edit(&handle, id, Input::Text(raw.to_string()), false));
     let handle = dispatcher.clone();

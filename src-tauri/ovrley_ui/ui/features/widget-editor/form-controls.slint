@@ -261,23 +261,26 @@ export component ContentAlignmentControl inherits HorizontalLayout {
 }
 
 // A label and a switch filling a grid cell, as each editor styles it: `toggle` is
-// `TextDisplaySection`'s row (0.741rem bold `tracking-wider`, `py-2`); `inline` the map's layer
-// toggles (`flex items-center justify-between gap-2 pl-1`, a 0.667rem uppercase bold label);
-// `padded` Flat Track (`px-1 pt-2 pb-2`); `padded-left` Hundredths (`pl-1 pt-2 pb-2`, the label
-// `pt-1`); `inline-x` `px-1`; `bottom` `px-1 pb-2`; `tall` the chart's area gradient (`h-9 px-1`,
-// a 9px label).
+// `TextDisplaySection`'s row (0.741rem bold `tracking-wider`, `py-2`); `label` a 0.667rem uppercase
+// bold label with the caller's padding (`flex items-center justify-between gap-2`); `tall` the
+// chart's area gradient (`h-9 px-1`, a 9px label).
 export component SwitchRow inherits HorizontalLayout {
     in property <string> label;
     in property <bool> checked;
     in property <bool> disabled;
     in property <SwitchRowStyle> style: SwitchRowStyle.toggle;
+    // A `label` row's padding, and its label's own top padding.
+    in property <length> inset-top;
+    in property <length> inset-right;
+    in property <length> inset-bottom;
+    in property <length> inset-left;
+    in property <length> label-top;
     callback checked-changed(checked: bool);
 
-    property <bool> vertical-padding: root.style == SwitchRowStyle.toggle || root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.padded-left;
-    padding-top: root.vertical-padding ? 0.5rem : 0px;
-    padding-bottom: root.vertical-padding || root.style == SwitchRowStyle.bottom ? 0.5rem : 0px;
-    padding-left: root.style == SwitchRowStyle.toggle ? 0px : 0.25rem;
-    padding-right: root.style == SwitchRowStyle.padded || root.style == SwitchRowStyle.tall || root.style == SwitchRowStyle.inline-x || root.style == SwitchRowStyle.bottom ? 0.25rem : 0px;
+    padding-top: root.style == SwitchRowStyle.toggle ? 0.5rem : root.style == SwitchRowStyle.label ? root.inset-top : 0px;
+    padding-bottom: root.style == SwitchRowStyle.toggle ? 0.5rem : root.style == SwitchRowStyle.label ? root.inset-bottom : 0px;
+    padding-left: root.style == SwitchRowStyle.toggle ? 0px : root.style == SwitchRowStyle.label ? root.inset-left : 0.25rem;
+    padding-right: root.style == SwitchRowStyle.tall ? 0.25rem : root.style == SwitchRowStyle.label ? root.inset-right : 0px;
     height: root.style == SwitchRowStyle.tall ? 2.25rem : self.preferred-height;
     spacing: 0.5rem;
     if root.style == SwitchRowStyle.toggle: AppText {
@@ -292,7 +295,7 @@ export component SwitchRow inherits HorizontalLayout {
     if root.style != SwitchRowStyle.toggle: VerticalLayout {
         horizontal-stretch: 1;
         alignment: center;
-        padding-top: root.style == SwitchRowStyle.padded-left ? 0.25rem : 0px;
+        padding-top: root.label-top;
         FieldLabel {
             height: root.style == SwitchRowStyle.tall ? 9px : 0.667rem;
             inset-left: 0px;

@@ -600,7 +600,7 @@ pub(crate) mod tests {
     pub(crate) fn dispatcher_with(mut store: Store) -> Dispatcher {
         let (parts, _) = fake_services(json!({ "allowAgentEdits": true }));
         store.agent_session.allow_agent_edits = true;
-        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into() });
+        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() });
         let dispatcher = Dispatcher::new(store, parts);
         dispatcher.dispatch(|_, _| {});
         dispatcher

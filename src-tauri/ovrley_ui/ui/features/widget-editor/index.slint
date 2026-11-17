@@ -38,7 +38,7 @@ export enum InspectorCellKind {
 
 // How a label-and-switch row is laid out; `ovrley_app`'s `SwitchRowStyle`. `none` is a heading
 // switch without a visible label.
-export enum SwitchRowStyle { none, toggle, inline, padded, padded-left, inline-x, bottom, tall }
+export enum SwitchRowStyle { none, toggle, label, tall }
 
 // Where a row sits in an accent panel.
 export enum PanelPart { none, first, middle, last, only }
@@ -93,6 +93,12 @@ export struct InspectorCell {
     // An `Icons` path.
     icon: string,
     style: SwitchRowStyle,
+    // A `label` switch row's padding (rem) and its label's own top padding.
+    padding-top: float,
+    padding-right: float,
+    padding-bottom: float,
+    padding-left: float,
+    label-top: float,
     options: [Choice],
     stops: [GradientStop],
     toggles: [ShapeToggleView],
@@ -112,6 +118,8 @@ export struct InspectorRow {
     columns: int,
     column-gap: float,
     align-end: bool,
+    // The first cell beside a column of the others (the backdrop's shape grid).
+    aside: bool,
     cells: [InspectorCell],
 }
 

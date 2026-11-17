@@ -187,6 +187,8 @@ fn theme_colors(window: &AppWindow) -> ovrley_app::lib::template::ThemeColors {
     ovrley_app::lib::template::ThemeColors {
         ice: hex(theme.get_theme_color_ice()),
         aqua: hex(theme.get_theme_color_aqua()),
+        teal: hex(theme.get_theme_color_teal()),
+        accent: hex(theme.get_theme_color_accent()),
     }
 }
 

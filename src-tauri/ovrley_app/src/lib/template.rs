@@ -21,6 +21,10 @@ pub struct ThemeColors {
     pub ice: String,
     /// `getThemeColor('aqua')`.
     pub aqua: String,
+    /// `getThemeColor('teal')`.
+    pub teal: String,
+    /// `getThemeColor('accent')`.
+    pub accent: String,
 }
 
 /// JavaScript truthiness of an optional value.
@@ -194,6 +198,8 @@ mod tests {
         ThemeColors {
             ice: "#010101".into(),
             aqua: "#020202".into(),
+            teal: "#030303".into(),
+            accent: "#040404".into(),
         }
     }
 

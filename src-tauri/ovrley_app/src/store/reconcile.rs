@@ -17,6 +17,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     overlay_editor::drafts::reconcile_widget_drafts(store);
     // 3. `useHeldValue`: the widgets tab's open item holds while a marquee runs.
     crate::features::widget_editor::reconcile_open_widget(store);
+    //    The open label's font capabilities, for its weight and italic controls (phase 5 D6).
+    crate::features::widget_editor::reconcile_label_typography(store, services);
     // 4. The durable template state behind the save status, cached by pointers.
     crate::features::template_manager::reconcile_durable_state(store);
     // 5. The player: the cached timeline, the playback effects and the viewport rules (phase 4).

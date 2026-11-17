@@ -1,4 +1,5 @@
-//! The widget tools of phase 5: adding widgets as the drawer does. Split from `catalog.rs` as
+//! The widget tools of phase 5: adding widgets as the drawer does, raster images and the font
+//! list. Split from `catalog.rs` as
 //! `player.rs` was; the catalog lists these after its own and hands them their calls.
 
 use crate::catalog::{input_schema, Answer, Reply, ToolDefinition, ToolOutcome};
@@ -7,8 +8,20 @@ use ovrley_app::features::widget_editor::add_widget;
 use ovrley_app::store::services::Services;
 use ovrley_app::store::Store;
 use ovrley_widgets::model::document::WidgetSelection;
+use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{json, Value};
+
+/// An image for a raster widget.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+pub struct RasterImageSetArguments {
+    /// A raster (image) widget's id from `ovrley_summary`'s widgets.
+    pub widget_id: String,
+    /// The image's absolute path: PNG, JPEG, BMP or TIFF.
+    pub path: String,
+}
 
 pub fn tools() -> Vec<ToolDefinition> {
     vec![ToolDefinition {
@@ -19,6 +32,22 @@ pub fn tools() -> Vec<ToolDefinition> {
                       list the options. Replies with the new widget. One undo step.",
         input_schema: input_schema::<WidgetSelection>(),
         read_only: false,
+    },
+    ToolDefinition {
+        name: "widget_raster_image_set",
+        title: "Set an image",
+        description: "Shows an image file in a raster (image) widget, as its folder button does: the image loads and the widget takes \
+                      its size. A file OVRLEY cannot use fails with the reason. One undo step.",
+        input_schema: input_schema::<RasterImageSetArguments>(),
+        read_only: false,
+    },
+    ToolDefinition {
+        name: "font_list",
+        title: "List fonts",
+        description: "Lists the fonts the font selects offer: the recommended (bundled) fonts and the system fonts, each with the id a \
+                      widget's font field takes and its name.",
+        input_schema: input_schema::<crate::catalog::NoArguments>(),
+        read_only: true,
     }]
 }
 
@@ -52,7 +81,7 @@ pub fn handles(name: &str) -> bool {
     tools().iter().any(|tool| tool.name == name)
 }
 
-pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mut Services, _reply: Reply) -> Result<Answer, ToolOutcome> {
+pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mut Services, reply: Reply) -> Result<Answer, ToolOutcome> {
     match name {
         "widget_add" => arguments::<WidgetSelection>(arguments_value).and_then(|selection| {
             let options = offered(store, &selection.kind);
@@ -67,6 +96,36 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             ovrley_app::features::widget_preview::present_pending_frame(store, services);
             Ok(Answer::Now(ToolOutcome::Ok(ovrley_app::store::agent::describe_widget(store, &id).map_err(ToolOutcome::Failed)?)))
         }),
+        "widget_raster_image_set" => {
+            let arguments: RasterImageSetArguments = arguments(arguments_value)?;
+            if !std::path::Path::new(&arguments.path).is_absolute() {
+                return Err(ToolOutcome::InvalidParams("path must be absolute".into()));
+            }
+            let (collection, _) = store.editor.config.find_widget(&arguments.widget_id).map_err(ToolOutcome::Failed)?;
+            if collection != ovrley_widgets::model::document::Collection::Rasters {
+                return Err(ToolOutcome::Failed(format!("{} is not an image widget.", arguments.widget_id)));
+            }
+            let widget_id = arguments.widget_id.clone();
+            ovrley_app::features::widget_editor::raster::load_raster_image(
+                store,
+                services,
+                &arguments.widget_id,
+                arguments.path,
+                Some(Box::new(move |store: &mut Store, result: Result<(), String>| {
+                    reply(match result.and_then(|_| ovrley_app::store::agent::describe_widget(store, &widget_id)) {
+                        Ok(value) => ToolOutcome::Ok(value),
+                        Err(error) => ToolOutcome::Failed(error),
+                    })
+                })),
+            );
+            Ok(Answer::Later)
+        }
+        "font_list" => {
+            arguments::<crate::catalog::NoArguments>(arguments_value)?;
+            let fonts = &store.widget_editor.fonts;
+            let list = |fonts: &[ovrley_app::lib::fonts::FontOption]| fonts.iter().map(|font| json!({"id": font.id, "name": font.name})).collect::<Vec<_>>();
+            Ok(Answer::Now(ToolOutcome::Ok(json!({"recommended": list(&fonts.recommended), "system": list(&fonts.system)}))))
+        }
         other => unreachable!("{other} is not a widget tool"),
     }
 }
@@ -91,5 +150,30 @@ mod tests {
         let ToolOutcome::Failed(message) = run(&dispatcher, "widget_add", json!({"type": "speed", "displayType": "nonsense"})) else { panic!() };
         assert!(message.contains("\"displayType\":\"text\""), "{message}");
         assert!(matches!(run(&dispatcher, "widget_add", json!({"type": "nonsense"})), ToolOutcome::Failed(_)));
+    }
+
+    #[test]
+    fn widget_update_applies_the_editors_rules_and_widget_get_lists_its_fields() {
+        let dispatcher = dispatcher_with(Store::default());
+        let ToolOutcome::Ok(added) = run(&dispatcher, "widget_add", json!({"type": "speed", "displayType": "linear"})) else { panic!("add failed") };
+        let id = added["id"].as_str().unwrap().to_string();
+        let leaked: &'static str = Box::leak(id.clone().into_boxed_str());
+        // A ruled field: switching to bars suggests the bar geometry, as the inspector does.
+        let ToolOutcome::Ok(updated) = run(&dispatcher, "widget_update", json!({"widgetId": leaked, "fields": {"display_variants": {"linear": {"track_fill_style": "bars"}}}})) else { panic!("update failed") };
+        let linear = &updated["data"]["display_variants"]["linear"];
+        assert_eq!(linear["track_fill_style"], "bars");
+        assert!(linear["bar_count"].as_f64().unwrap() >= 3.0, "bars are suggested: {linear}");
+        // A plain field patches as it is.
+        let ToolOutcome::Ok(updated) = run(&dispatcher, "widget_update", json!({"widgetId": leaked, "fields": {"decimals": 1}})) else { panic!("update failed") };
+        assert_eq!(updated["data"]["decimals"], 1);
+        dispatcher.with_store(|store| assert_eq!(store.history.past.len(), 3, "add and two updates"));
+
+        let ToolOutcome::Ok(described) = run(&dispatcher, "widget_get", json!({"widgetId": leaked})) else { panic!("get failed") };
+        let fields = described["editorFields"].as_array().unwrap();
+        let width = fields.iter().find(|field| field["id"] == "display_variants.linear.width").expect("the width slider");
+        assert_eq!((width["kind"].clone(), width["label"].clone()), (json!("number"), json!("Width")));
+        let opacity = fields.iter().find(|field| field["id"] == "opacity").unwrap();
+        assert_eq!(opacity["max"], 1, "ranges are in the field's units");
+        assert!(fields.iter().any(|field| field["id"] == "display_type" && field["kind"] == "choice"));
     }
 }

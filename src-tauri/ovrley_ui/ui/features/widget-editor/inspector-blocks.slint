@@ -14,6 +14,7 @@ import { Icons } from "../../components/icons.slint";
 import { Choice, ChoiceKind, GradientStop } from "../../components/logic.slint";
 import { InspectorCell, InspectorCellKind, InspectorRow, PanelPart, SwitchRowStyle } from "index.slint";
 import { ColorField, ContentAlignmentControl, FieldBlock, FieldLabel, NumberField, SelectField, SliderField, SwitchRow } from "form-controls.slint";
+import { ChartSeriesRow, RasterPicker, ShapeGrid, WindowSecondsField } from "cells.slint";
 
 // The declarative inspector's renderer (D1): every editor, display section and scene settings
 // panel is a list of rows that `ovrley_app` describes, rendered here from the shared form
@@ -141,8 +142,53 @@ component CellView inherits CellEvents {
         value: root.cell.text;
         options: root.cell.options;
         disabled: root.cell.disabled;
+        resettable: root.cell.resettable;
         value-changed(value) => {
             root.set-text(root.cell.id, value);
+        }
+        reset => {
+            root.clear-field(root.cell.id);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.shape-grid: ShapeGrid {
+        toggles: root.cell.toggles;
+        label: root.cell.label;
+        toggled(key) => {
+            root.set-text(root.cell.id, key);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.chart-series: ChartSeriesRow {
+        metric: root.cell.text;
+        options: root.cell.options;
+        color: root.cell.text2;
+        first: root.cell.first;
+        last: root.cell.last;
+        only: root.cell.only;
+        metric-label: root.cell.label;
+        action(value) => {
+            root.set-text(root.cell.id, value);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.raster-picker: RasterPicker {
+        path: root.cell.text;
+        placeholder: root.cell.text2;
+        label: root.cell.label;
+        button-label: root.cell.suffix;
+        loading: root.cell.busy;
+        error: root.cell.readout;
+        pick => {
+            root.press(root.cell.id);
+        }
+    }
+    if root.cell.kind == InspectorCellKind.window-seconds: WindowSecondsField {
+        label: root.cell.label;
+        text: root.cell.text;
+        invalid: root.cell.invalid;
+        committed(text) => {
+            root.set-text(root.cell.id, text);
+        }
+        cancelled => {
+            root.clear-field(root.cell.id);
         }
     }
     if root.cell.kind == InspectorCellKind.number: NumberField {
@@ -179,6 +225,11 @@ component CellView inherits CellEvents {
         checked: root.cell.checked;
         disabled: root.cell.disabled;
         style: root.cell.style;
+        inset-top: root.cell.padding-top * 1rem;
+        inset-right: root.cell.padding-right * 1rem;
+        inset-bottom: root.cell.padding-bottom * 1rem;
+        inset-left: root.cell.padding-left * 1rem;
+        label-top: root.cell.label-top * 1rem;
         checked-changed(checked) => {
             root.set-flag(root.cell.id, checked);
         }
@@ -246,9 +297,10 @@ component CellView inherits CellEvents {
         }
         HorizontalLayout {
             spacing: 1rem;
-            property <length> column: (self.width - 1rem) / 2;
+            // Two equal columns: no preferred width, the same stretch.
             HorizontalLayout {
-                width: parent.column;
+                preferred-width: 0px;
+                horizontal-stretch: 1;
                 alignment: start;
                 TabsList {
                     variant: TabsListVariant.toolbar;
@@ -268,10 +320,12 @@ component CellView inherits CellEvents {
                 }
             }
             SwitchRow {
-                width: parent.column;
+                preferred-width: 0px;
+                horizontal-stretch: 1;
                 label: root.cell.text2;
                 checked: root.cell.checked;
-                style: SwitchRowStyle.inline;
+                style: SwitchRowStyle.label;
+                inset-left: 0.25rem;
                 checked-changed(checked) => {
                     root.set-flag(root.cell.id, checked);
                 }
@@ -297,7 +351,7 @@ component CellsRow inherits CellEvents {
     property <length> gap: root.data.column-gap * 1rem;
     property <length> column: (root.width - (root.data.columns - 1) * root.gap) / max(1, root.data.columns);
 
-    HorizontalLayout {
+    if !root.data.aside: HorizontalLayout {
         spacing: root.gap;
         alignment: start;
         for cell in root.data.cells: VerticalLayout {
@@ -329,6 +383,37 @@ component CellsRow inherits CellEvents {
                 }
                 set-stops(id, stops) => {
                     root.set-stops(id, stops);
+                }
+            }
+        }
+    }
+    // `grid-cols-[auto_minmax(0,1fr)] gap-4`: the first cell at its own width beside the others,
+    // which share its 8rem height (`grid h-32 grid-rows-2`).
+    if root.data.aside: HorizontalLayout {
+        spacing: root.gap;
+        for cell[index] in root.data.cells: VerticalLayout {
+            horizontal-stretch: index == 0 ? 0 : 1;
+            visible: index == 0;
+            if index == 0: CellView {
+                cell: cell;
+                set-text(id, value) => {
+                    root.set-text(id, value);
+                }
+            }
+        }
+        VerticalLayout {
+            horizontal-stretch: 1;
+            for cell[index] in root.data.cells: VerticalLayout {
+                height: index == 0 ? 0px : 4rem;
+                visible: index > 0;
+                if index > 0: CellView {
+                    cell: cell;
+                    draft(id, value) => {
+                        root.draft(id, value);
+                    }
+                    commit-draft => {
+                        root.commit-draft();
+                    }
                 }
             }
         }

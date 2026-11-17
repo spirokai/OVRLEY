@@ -112,6 +112,11 @@ fn tour() -> Vec<Step> {
     tour.push(("editor-arc", StepKind::Action(|store, _| show_editor(store, "speed", "arc", serde_json::json!({})))));
     tour.push(("editor-linear-bars", StepKind::Action(|store, _| show_editor(store, "speed", "linear", serde_json::json!({"track_fill_style": "bars", "bar_count": 12, "bar_gap": 4})))));
     tour.push(("editor-g-force", StepKind::Action(|store, _| show_editor(store, "g_force", "g_force", serde_json::json!({})))));
+    tour.push(("editor-backdrop", StepKind::Action(|store, _| show_editor(store, "backdrop", "rectangle", serde_json::json!({"edge_strips": ["left"], "round_top_left": true})))));
+    tour.push(("editor-rolling-chart", StepKind::Action(|store, _| show_editor(store, "rolling_chart", "", serde_json::json!({})))));
+    tour.push(("editor-label", StepKind::Action(|store, _| show_editor(store, "label", "", serde_json::json!({"text": "Hello"})))));
+    tour.push(("editor-time", StepKind::Action(|store, _| show_editor(store, "time", "", serde_json::json!({})))));
+    tour.push(("editor-elevation", StepKind::Action(|store, _| show_editor(store, "elevation", "", serde_json::json!({})))));
     tour.push(("editor-heart-zones", StepKind::Action(|store, _| show_editor(store, "heartrate", "heart_zones", serde_json::json!({"zone_calculation": "manual"})))));
     tour.push((
         "agent-connected",
@@ -136,10 +141,16 @@ fn tour() -> Vec<Step> {
 fn show_editor(store: &mut Store, kind: &str, display: &str, variant: serde_json::Value) {
     use ovrley_widgets::model::catalog::catalog;
     use ovrley_widgets::model::document::{create_widget_defaults, merge_widget_data, OverlayConfig, WidgetSelection};
-    let mode = catalog().require_display(display).modes.first().map(|mode| mode.value.clone());
-    let selection = WidgetSelection { kind: kind.into(), display_type: Some(display.into()), mode, ..WidgetSelection::default() };
+    // An empty display is a type without displays; `variant` then patches the widget itself.
+    let (display_type, mode) = if display.is_empty() {
+        (None, None)
+    } else {
+        (Some(display.to_string()), catalog().require_display(display).modes.first().map(|mode| mode.value.clone()))
+    };
+    let selection = WidgetSelection { kind: kind.into(), display_type, mode, ..WidgetSelection::default() };
     let data = create_widget_defaults(&selection, &store.template.global_defaults, &Default::default()).expect("catalog defaults");
-    let mut data = merge_widget_data(Some(&data), serde_json::json!({"display_variants": {display: variant}}).as_object().expect("a patch"));
+    let patch = if display.is_empty() { variant } else { serde_json::json!({"display_variants": {display: variant}}) };
+    let mut data = merge_widget_data(Some(&data), patch.as_object().expect("a patch"));
     data.insert("id".into(), "editor".into());
     let collection = catalog().require_widget(kind).expect("a catalog widget").collection.clone();
     let config = OverlayConfig::from_value(&serde_json::json!({"scene": store.editor.config.scene, collection: [data]})).expect("a valid document");
@@ -171,7 +182,13 @@ fn take(window: slint::Weak<AppWindow>, dispatcher: Dispatcher, dir: PathBuf, st
     let settle = match action {
         StepKind::Action(action) => {
             dispatcher.dispatch(action);
-            800
+            // An editor capture waits for the accordion item to grow to its new content: its
+            // height animation advances slowly while the window only renders snapshots.
+            if name.starts_with("editor-") {
+                3000
+            } else {
+                800
+            }
         }
         StepKind::WidgetsTab => {
             let app = window.upgrade().expect("the window is open");
