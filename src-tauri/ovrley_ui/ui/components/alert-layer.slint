@@ -103,7 +103,6 @@ export component AlertLayerView {
             }
             // Selectable, wrapping anywhere and keeping newlines; scrolls past 60% of the window.
             ScrollArea {
-                thin: true;
                 max-height: WindowMetrics.height * 0.6;
                 preferred-height: message.preferred-height;
                 message := TextInput {

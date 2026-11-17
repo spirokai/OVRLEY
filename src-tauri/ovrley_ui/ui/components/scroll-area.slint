@@ -1,16 +1,16 @@
 import { Theme } from "../theme/theme.slint";
 
-// A Flickable with the app's own scrollbar (utilities.css): 0.444rem wide, thumb `foreground` at
-// 40% inset by a 1px transparent border, `accent` on hover and while dragged, transparent track.
-// `thin` is `.thin-scrollbar`: 0.148rem wide, 1px radius, no inset.
+// A Flickable with the app's one scrollbar, `.thin-scrollbar` (utilities.css): 0.148rem wide, a
+// 1px radius thumb `foreground` at 40%, `accent` on hover and while dragged, on a transparent track.
+// React also has a wider default scrollbar (the control panel's); the regression review asked for
+// one style everywhere, so every scroll area uses the thin one. The bar sits beside the content,
+// never over it (`scrollbar-gutter: stable`).
 export component ScrollArea {
-    in property <bool> thin;
     in-out property <length> content-y <=> flick.content-y;
     out property <length> content-height: flick.content-height;
     out property <length> visible-height: flick.height;
 
-    property <length> bar-size: (root.thin ? Theme.scrollbar-thin-size : Theme.scrollbar-size) * 1rem;
-    property <length> inset: root.thin ? 0px : 1px;
+    property <length> bar-size: Theme.scrollbar-size * 1rem;
     property <length> scroll-range: max(0px, flick.content-height - flick.height);
     property <length> thumb-length: flick.content-height > 0px ? max(2rem, flick.height * flick.height / flick.content-height) : 0px;
     property <length> drag-start-content-y;
@@ -25,7 +25,10 @@ export component ScrollArea {
         // The webview's styled scrollbar takes layout space only while the content overflows.
         // Here the width would then depend on the height it produces, a binding loop, so the
         // scrollbar's width is always reserved.
+        // `x` pins the content to the left edge: an element with a width but no `x` is centred,
+        // which would push it half a bar under the scrollbar.
         VerticalLayout {
+            x: 0px;
             width: root.width - root.bar-size;
             alignment: start;
             @children
@@ -42,11 +45,9 @@ export component ScrollArea {
         property <bool> dragging;
 
         Rectangle {
-            x: root.inset;
-            y: parent.thumb-y + root.inset;
-            width: parent.width - 2 * root.inset;
-            height: root.thumb-length - 2 * root.inset;
-            border-radius: root.thin ? 1px : Theme.scrollbar-thumb-radius * 1rem - root.inset;
+            y: parent.thumb-y;
+            height: root.thumb-length;
+            border-radius: Theme.scrollbar-thumb-radius * 1rem;
             background: parent.thumb-hovered || parent.dragging ? Theme.scrollbar-thumb-hover : Theme.scrollbar-thumb;
         }
 

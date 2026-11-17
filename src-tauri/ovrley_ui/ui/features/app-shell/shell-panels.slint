@@ -6,11 +6,19 @@ import { ScrollArea } from "../../components/scroll-area.slint";
 import { SidebarWidgetsTab } from "../widget-editor/sidebar-widgets-tab.slint";
 
 // `ControlPanel`: two equal tabs, Settings and Widgets, over a scrolling area that keeps a stable
-// gutter. The tab is local state, uncontrolled as today. A 1px left divider is drawn above the
-// content. The Settings tab's scene settings arrive in Phase 5.
+// gutter. The tab is local state, uncontrolled as today. The Settings tab's scene settings arrive
+// in Phase 5.
 export component ControlPanel inherits Rectangle {
     property <string> tab: "settings";
     background: Theme.card;
+
+    // The 1px left divider, under the content, so an open widget's accent border covers it instead
+    // of doubling it (React draws the divider at `z-20`, the open item's frame at `z-30`).
+    Rectangle {
+        x: 0px;
+        width: Theme.hairline;
+        background: Theme.border;
+    }
 
     VerticalLayout {
         TabsList {
@@ -26,13 +34,15 @@ export component ControlPanel inherits Rectangle {
                 root.tab = value;
             }
         }
+        // Radix unmounts the inactive tab's content; here only the active one is instantiated, so
+        // the widgets tab's height cannot give the settings tab a scrollbar.
         scroll := ScrollArea {
             vertical-stretch: 1;
-            TabsContent {
+            if root.tab == "settings": TabsContent {
                 value: "settings";
                 active-value: root.tab;
             }
-            TabsContent {
+            if root.tab == "widgets": TabsContent {
                 value: "widgets";
                 active-value: root.tab;
                 inset-top: 0px;
@@ -44,11 +54,6 @@ export component ControlPanel inherits Rectangle {
                 }
             }
         }
-    }
-    Rectangle {
-        x: 0px;
-        width: Theme.hairline;
-        background: Theme.border;
     }
 }
 

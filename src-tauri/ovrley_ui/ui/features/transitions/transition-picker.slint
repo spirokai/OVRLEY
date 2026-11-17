@@ -91,7 +91,6 @@ export component TransitionPicker inherits VerticalLayout {
         }
     }
     ScrollArea {
-        thin: true;
         height: min(20rem, root.rows * (root.tile-height + root.gap));
         grid := Rectangle {
             height: root.rows * (root.tile-height + root.gap) - root.gap;

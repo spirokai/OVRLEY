@@ -1,13 +1,13 @@
 //! Layout is shared by drawing and geometry reporting. All coordinates are scene pixels.
 use crate::widgets::value::layout::{
-    metric_horizontal_layout, metric_icon_top_from_value_layout, metric_vertical_metrics_text,
+    metric_horizontal_layout, metric_icon_top_from_value_layout, metric_vertical_metrics_text, scene_opacity,
     METRIC_WIDGET_LINE_HEIGHT, METRIC_WIDGET_UNIT_RATIO, MIN_UNITS_FONT_SIZE,
 };
 use crate::{
     error::WidgetResult,
     render::icons::metric_icon_bounds,
     render::text::{
-        measure_text, parse_color, resolve_styled_font, text_selection_bounds, FontResolver,
+        measure_text, resolve_styled_font, rgba_color, text_selection_bounds, FontResolver,
         ResolvedTextStyle,
     },
     widgets::value::{format::MetricDisplayParts, validation::ValidatedValueWidget},
@@ -139,17 +139,7 @@ pub fn prepare_metric_frame(
         unit_style.x = horizontal.unit_x.expect("visible unit has a position");
         unit_style.y = bottom
             - (unit_style.line_height + (vertical.bounds_bottom - vertical.bounds_top).abs()) * 0.5;
-        // Preserve the existing renderer's color/opacity semantics.
-        unit_style.color = parse_color(
-            &format!(
-                "#{:02x}{:02x}{:02x}{:02x}",
-                widget.unit_color[0],
-                widget.unit_color[1],
-                widget.unit_color[2],
-                widget.unit_color[3]
-            ),
-            style.opacity,
-        );
+        unit_style.color = rgba_color(widget.unit_color, scene_opacity(style, widget));
         let (unit_bounds, unit_content) = text_bounds(text, reference, &unit_style, fonts)?;
         bounds.join(unit_bounds);
         content_bounds.join(unit_content);
@@ -286,8 +276,6 @@ fn prepare_coordinate_frame(
         .iter()
         .map(|(_, value_width)| *value_width)
         .fold(0.0, f32::max);
-    let unit_color_hex =
-        crate::widgets::value::layout::ColorHexSlice(validated.unit_color).to_hex_string();
     let icon_size = validated.icon_size * scale;
     let show_icon = parts.show_icon && parts.icon_asset_file.is_some();
     let text_group_left = if show_icon {
@@ -332,7 +320,7 @@ fn prepare_coordinate_frame(
             let mut direction_style = value_style.clone();
             direction_style.x = line_x;
             direction_style.y = line_y;
-            direction_style.color = parse_color(&unit_color_hex, base_style.opacity);
+            direction_style.color = rgba_color(validated.unit_color, scene_opacity(base_style, validated));
             let (direction_bounds, direction_content) = text_bounds(
                 direction,
                 line_vertical_metrics_text,

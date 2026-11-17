@@ -6,7 +6,7 @@
 use crate::error::WidgetResult;
 use crate::model::types::DisplayType;
 use crate::render::text::{
-    draw_text_with_vertical_metrics_text, measure_text, parse_color, ResolvedTextStyle,
+    draw_text_with_vertical_metrics_text, measure_text, rgba_color, ResolvedTextStyle,
 };
 use crate::widgets::value::validation::{ContentAlignment, ValidatedValueWidget};
 use skia_safe::Canvas;
@@ -103,8 +103,7 @@ pub fn draw_prepared_metric_frame(
         crate::render::icons::draw_metric_icon(
             canvas,
             parts.icon_asset_file,
-            &ColorHexSlice(validated.icon_color).to_hex_string(),
-            style.opacity,
+            rgba_color(validated.icon_color, scene_opacity(style, validated)),
             style.shadow_color,
             style.shadow_strength,
             style.shadow_distance,
@@ -144,16 +143,14 @@ pub fn draw_prepared_metric_frame(
     Ok(())
 }
 
-/// Small wrapper to present `[u8; 4]` RGBA bytes as a `#RRGGBBAA` hex string
-/// for functions that still expect a `&str` colour.
-pub(crate) struct ColorHexSlice(pub(crate) [u8; 4]);
-
-impl ColorHexSlice {
-    pub(crate) fn to_hex_string(&self) -> String {
-        format!(
-            "#{:02x}{:02x}{:02x}{:02x}",
-            self.0[0], self.0[1], self.0[2], self.0[3]
-        )
+/// The scene opacity a resolved style applies on top of the widget opacity. Validated colours
+/// already carry the widget opacity, so the unit and icon take only this factor, as the value's
+/// colour does (`validated_value_style`). A transparent widget's colours are transparent already.
+pub(crate) fn scene_opacity(style: &ResolvedTextStyle, validated: &ValidatedValueWidget) -> f32 {
+    if validated.opacity == 0.0 {
+        0.0
+    } else {
+        style.opacity / validated.opacity
     }
 }
 
@@ -207,7 +204,6 @@ pub fn draw_static_metric_parts_for_value(
         return Ok(static_parts);
     }
 
-    let icon_color_hex = ColorHexSlice(validated.icon_color).to_hex_string();
     let icon_top = if validated.metric == crate::model::types::MetricKind::GpsCoordinates {
         let is_stacked = validated.display_unit == "both";
         let coordinate_font_size = if is_stacked {
@@ -250,8 +246,7 @@ pub fn draw_static_metric_parts_for_value(
     crate::render::icons::draw_metric_icon(
         canvas,
         Some(icon_asset_file),
-        &icon_color_hex,
-        base_style.opacity,
+        rgba_color(validated.icon_color, scene_opacity(base_style, validated)),
         base_style.shadow_color,
         base_style.shadow_strength,
         base_style.shadow_distance,
@@ -278,10 +273,7 @@ fn draw_static_metric_unit(
     unit_style.font_size =
         (base_style.font_size * METRIC_WIDGET_UNIT_RATIO).max(MIN_UNITS_FONT_SIZE * scale);
     unit_style.line_height = unit_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
-    unit_style.color = parse_color(
-        &ColorHexSlice(validated.unit_color).to_hex_string(),
-        base_style.opacity,
-    );
+    unit_style.color = rgba_color(validated.unit_color, scene_opacity(base_style, validated));
     let unit_measure = measure_text(unit_text, &unit_style, fonts)?;
     let horizontal_layout = metric_horizontal_layout(
         validated.content_alignment,
@@ -395,6 +387,37 @@ mod tests {
             hours_offset: None,
             format: None,
         }
+    }
+
+    #[test]
+    fn units_and_icons_take_the_widget_opacity_once() {
+        let mut validated = value_widget(ContentAlignment::Left);
+        validated.opacity = 0.5;
+        let scene = crate::model::scene::ValidatedScenePresentation {
+            width: 100,
+            height: 100,
+            scale: 1.0,
+            font: None,
+            font_size: None,
+            opacity: 0.8,
+            decimal_rounding: None,
+            time_format: None,
+            shadow_color: String::new(),
+            shadow_strength: 0.0,
+            shadow_distance: 0.0,
+            border_color: String::new(),
+            border_thickness: 0.0,
+            numerals: crate::model::scene::Numerals::Default,
+            overlay_filename: None,
+        };
+        let style = crate::render::text::validated_value_style(&validated, &scene, 1.0);
+        assert!((scene_opacity(&style, &validated) - 0.8).abs() < 1e-6);
+        // Validated colours carry the widget opacity, so the unit fades with the value.
+        validated.unit_color = [255, 255, 255, 128];
+        let unit = rgba_color(validated.unit_color, scene_opacity(&style, &validated));
+        assert_eq!(unit.a(), (128.0f32 * 0.8).round() as u8);
+        validated.opacity = 0.0;
+        assert_eq!(scene_opacity(&style, &validated), 0.0);
     }
 
     #[test]

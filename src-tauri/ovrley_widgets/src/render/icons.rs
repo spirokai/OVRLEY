@@ -93,8 +93,7 @@ pub fn metric_icon_bounds(asset_file: &str, placement: Rect) -> Rect {
 pub fn draw_metric_icon(
     canvas: &Canvas,
     icon_asset_file: Option<&str>,
-    icon_color: &str,
-    widget_opacity: f32,
+    icon_color: Color,
     shadow_color: Option<Color>,
     shadow_strength: f32,
     shadow_distance: f32,
@@ -113,7 +112,7 @@ pub fn draw_metric_icon(
 
     let paint = metric_icon_paint(
         &icon,
-        crate::render::text::parse_color(icon_color, widget_opacity),
+        icon_color,
     );
 
     canvas.save();
