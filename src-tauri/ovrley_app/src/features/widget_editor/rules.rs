@@ -173,7 +173,7 @@ fn named_patch(
 ) -> Result<Map<String, Value>, String> {
     let data = context.data;
     Ok(match named {
-        Named::Font => crate::lib::fonts::font_selection(&text_input(cell, &input)?),
+        Named::Font => ovrley_widgets::model::document::font_selection(&text_input(cell, &input)?),
         Named::DisplayType => {
             build_display_type_change_update(data, &text_input(cell, &input)?, context.unit_system)
         }

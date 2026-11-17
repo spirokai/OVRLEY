@@ -3,28 +3,8 @@
 //! arrives with the text widget editor in Phase 5.
 
 use ovrley_core::fonts::FontFamily;
-use serde_json::{Map, Value};
-
-const FONT_EXTENSIONS: [&str; 6] = ["ttf", "otf", "ttc", "woff", "woff2", "fon"];
-
-/// `getFontFamilyName`: a font identity without its font-file extension.
-pub fn font_family_name(value: &str) -> String {
-    let trimmed = value.trim();
-    if let Some((stem, extension)) = trimmed.rsplit_once('.') {
-        if FONT_EXTENSIONS.iter().any(|known| extension.eq_ignore_ascii_case(known)) {
-            return stem.to_string();
-        }
-    }
-    trimmed.to_string()
-}
-
-/// `createFontSelection`: `font` and its `font_family`.
-pub fn font_selection(value: &str) -> Map<String, Value> {
-    let mut selection = Map::new();
-    selection.insert("font".into(), Value::String(value.to_string()));
-    selection.insert("font_family".into(), Value::String(font_family_name(value)));
-    selection
-}
+use ovrley_widgets::model::document::font_family_name;
+use serde_json::Value;
 
 /// One option of the font select.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -108,13 +88,6 @@ mod tests {
 
     fn option(id: &str, name: &str) -> FontOption {
         FontOption { id: id.into(), name: name.into() }
-    }
-
-    #[test]
-    fn family_names_drop_font_extensions() {
-        assert_eq!(font_family_name(" Inter.TTF "), "Inter");
-        assert_eq!(font_family_name("Roboto Mono"), "Roboto Mono");
-        assert_eq!(font_selection("Teko.otf"), json!({"font": "Teko.otf", "font_family": "Teko"}).as_object().unwrap().clone());
     }
 
     #[test]

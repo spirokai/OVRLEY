@@ -493,6 +493,215 @@ pub fn resolve_active_widget_data(data: &Map<String, Value>) -> Map<String, Valu
     resolved
 }
 
+const FONT_EXTENSIONS: [&str; 6] = ["ttf", "otf", "ttc", "woff", "woff2", "fon"];
+
+/// `getFontFamilyName`: a font identity without its font-file extension.
+pub fn font_family_name(value: &str) -> String {
+    let trimmed = value.trim();
+    if let Some((stem, extension)) = trimmed.rsplit_once('.') {
+        if FONT_EXTENSIONS
+            .iter()
+            .any(|known| extension.eq_ignore_ascii_case(known))
+        {
+            return stem.to_string();
+        }
+    }
+    trimmed.to_string()
+}
+
+/// `createFontSelection`: `font` and its `font_family`.
+pub fn font_selection(value: &str) -> Map<String, Value> {
+    let mut selection = Map::new();
+    selection.insert("font".into(), Value::String(value.to_string()));
+    selection.insert("font_family".into(), Value::String(font_family_name(value)));
+    selection
+}
+
+/// A label's italic and weight as a family supports them (`createLabelFontSelection`'s style),
+/// from the requested italic and weight. The caller resolves it with the family's prepared
+/// capabilities.
+pub type LabelStyle<'a> = &'a dyn Fn(bool, f64) -> Result<(bool, f64), String>;
+
+impl OverlayConfig {
+    /// `syncGlobalDefaultsToConfig`: applies the global defaults to the existing widgets, all of
+    /// them, or only `changed_keys`. Applying `font_text` re-resolves each label's italic and
+    /// weight in the new family through `label_style`.
+    pub fn sync_global_defaults(
+        &self,
+        globals: &Map<String, Value>,
+        changed_keys: Option<&[&str]>,
+        label_style: LabelStyle,
+    ) -> Result<OverlayConfig, String> {
+        let apply = |key: &str| changed_keys.is_none_or(|keys| keys.contains(&key));
+        let global = |key: &str| globals.get(key).cloned().unwrap_or(Value::Null);
+        let text = |key: &str| globals.get(key).and_then(Value::as_str).unwrap_or_default().to_string();
+        let mut next = self.clone();
+        for label in &mut next.labels {
+            if apply("font_text") {
+                let italic = label.get("italic").and_then(Value::as_bool).unwrap_or_default();
+                let weight = label.get("font_weight").and_then(Value::as_f64).unwrap_or_default();
+                let (italic, weight) = label_style(italic, weight)?;
+                label.extend(font_selection(&text("font_text")));
+                label.insert("italic".into(), Value::Bool(italic));
+                label.insert("font_weight".into(), number(weight));
+            }
+            if apply("color_text") {
+                label.insert("color".into(), global("color_text"));
+            }
+        }
+        for value in &mut next.values {
+            let kind = value.get("value").and_then(Value::as_str).unwrap_or_default().to_string();
+            let has_labels = kind == "lap_timer" || kind == "splits_run";
+            if apply("font_values") {
+                value.extend(font_selection(&text("font_values")));
+            }
+            if has_labels && apply("font_text") {
+                value.insert("label_font".into(), global("font_text"));
+            }
+            if apply("font_values") {
+                if let Some(Value::Object(variants)) = value.get_mut("display_variants") {
+                    for (display, key) in [
+                        ("linear", "min_max_label_font"),
+                        ("arc", "min_max_label_font"),
+                        ("corner", "min_max_label_font"),
+                        ("g_force", "label_font"),
+                        ("altitude_tape", "label_font"),
+                    ] {
+                        if let Some(Value::Object(variant)) = variants.get_mut(display) {
+                            variant.insert(key.into(), global("font_values"));
+                        }
+                    }
+                }
+            }
+            if apply("color_values") {
+                value.insert("color".into(), global("color_values"));
+            }
+            if has_labels && apply("color_text") {
+                value.insert("label_color".into(), global("color_text"));
+            }
+            if apply("color_icons") && value.contains_key("icon_color") {
+                value.insert("icon_color".into(), global("color_icons"));
+            }
+            if apply("color_units") && kind != "time" {
+                value.insert("unit_color".into(), global("color_units"));
+            }
+        }
+        for plot in &mut next.plots {
+            let kind = plot.get("value").and_then(Value::as_str).unwrap_or_default().to_string();
+            if (kind == "elevation" || kind == "diving_profile") && apply("font_values") {
+                let mut point_label = plot.get("point_label").and_then(Value::as_object).cloned().unwrap_or_default();
+                point_label.extend(font_selection(&text("font_values")));
+                plot.insert("point_label".into(), Value::Object(point_label));
+            }
+            if kind == "rolling_chart" {
+                if apply("font_values") {
+                    plot.insert("legend_font".into(), global("font_values"));
+                }
+                if apply("color_values") {
+                    plot.insert("legend_color".into(), global("color_values"));
+                }
+            }
+            if apply("color_values") && plot.contains_key("color") {
+                plot.insert("color".into(), global("color_values"));
+            }
+        }
+        Ok(next)
+    }
+}
+
+/// `scaleNumber`: `Math.round(value * factor)` clamped to the field's range.
+fn scale_number(value: f64, factor: f64, min: f64, max: f64) -> f64 {
+    js_round(value * factor).max(min).min(max)
+}
+
+fn scale_fields(data: &Map<String, Value>, factor: f64, fields: &[(&str, f64, f64)], patch: &mut Map<String, Value>) {
+    for (key, min, max) in fields {
+        let value = data.get(*key).and_then(Value::as_f64).unwrap_or_default();
+        patch.insert((*key).into(), number(scale_number(value, factor, *min, *max)));
+    }
+}
+
+/// `buildUniformResizeUpdate`: the inspector's Size slider for gauges, lean angle, the heading
+/// compass and G-force. Unlike the canvas's resize policy it keeps the widget's position, rounds
+/// every scaled field to whole pixels, and scales the editable content with the frame.
+pub fn build_uniform_resize_update(data: &Map<String, Value>, size: f64) -> Result<Map<String, Value>, String> {
+    let display = display_type(data).ok_or("a sized widget has a display type")?.to_string();
+    let resolved = resolve_active_widget_data(data);
+    let field = |key: &str| resolved.get(key).and_then(Value::as_f64).unwrap_or_default();
+    let mut variant = object(data.get("display_variants"))
+        .and_then(|variants| object(variants.get(&display)))
+        .cloned()
+        .unwrap_or_default();
+    let mut patch = Map::new();
+    let mut content = Map::new();
+    if display == "lean_angle" || display == "heading_compass" {
+        let factor = size / field("diameter");
+        patch.insert("x".into(), data.get("x").cloned().unwrap_or(Value::Null));
+        patch.insert("y".into(), data.get("y").cloned().unwrap_or(Value::Null));
+        let min_font = if display == "lean_angle" { 8.0 } else { 6.0 };
+        patch.insert("font_size".into(), number(scale_number(field("font_size"), factor, min_font, 400.0)));
+        let diameter = scale_number(field("diameter"), factor, 8.0, 10_000.0);
+        content.insert("diameter".into(), number(diameter));
+        if display == "lean_angle" {
+            scale_fields(&resolved, factor, &[("value_offset_x", -10_000.0, 10_000.0), ("value_offset_y", -10_000.0, 10_000.0)], &mut content);
+            let thickness = scale_number(field("track_thickness"), factor, 1.0, diameter * 0.5 - f64::EPSILON);
+            content.insert("track_thickness".into(), number(thickness));
+            let border_max = (thickness * 0.5 - f64::EPSILON).max(0.0);
+            content.insert("track_border_thickness".into(), number(scale_number(field("track_border_thickness"), factor, 0.0, border_max)));
+        } else {
+            scale_fields(
+                &resolved,
+                factor,
+                &[("cardinal_font_size", 4.0, 400.0), ("indicator_size", 1.0, 10_000.0), ("value_offset_x", -10_000.0, 10_000.0), ("value_offset_y", -10_000.0, 10_000.0)],
+                &mut content,
+            );
+            content.insert("track_thickness".into(), number(scale_number(field("track_thickness"), factor, 1.0, 10_000.0)));
+            content.insert("track_corner_radius".into(), number(scale_number(field("track_corner_radius"), factor, 0.0, 10_000.0)));
+        }
+    } else {
+        let width = js_round(size);
+        let height = if display == "g_force" { width } else { js_round(field("height") * (size / field("width"))) };
+        let factor = (width / field("width") + height / field("height")) * 0.5;
+        if display == "g_force" {
+            let diameter = scale_number(field("diameter"), factor, 8.0, 10_000.0);
+            scale_fields(&resolved, factor, &[("label_font_size", 8.0, 400.0), ("label_offset_x", -10_000.0, 10_000.0), ("label_offset_y", -10_000.0, 10_000.0)], &mut content);
+            content.insert("diameter".into(), number(diameter));
+            content.insert("border_thickness".into(), number(scale_number(field("border_thickness"), factor, 0.0, (diameter - 1.0) * 0.5)));
+            content.insert("marker_size".into(), number(scale_number(field("marker_size"), factor, 1.0, diameter)));
+        } else if ["arc", "corner", "gt_gauge"].contains(&display.as_str()) {
+            scale_fields(
+                &resolved,
+                factor,
+                &[
+                    ("track_border_thickness", 0.0, 24.0),
+                    ("inner_widget_offset_x", -10_000.0, 10_000.0),
+                    ("inner_widget_offset_y", -10_000.0, 10_000.0),
+                    ("min_max_label_font_size", 6.0, 50.0),
+                ],
+                &mut content,
+            );
+            if display == "gt_gauge" {
+                content.insert("tick_length".into(), number(scale_number(field("tick_length"), factor, 0.0, 100.0)));
+            }
+            let thickness = scale_number(field("track_thickness"), factor, 1.0, 100.0);
+            content.insert("track_thickness".into(), number(thickness));
+            content.insert("track_corner_radius".into(), number(scale_number(field("track_corner_radius"), factor, 0.0, thickness * 0.5)));
+            patch.insert("font_size".into(), number(scale_number(field("font_size"), factor, 8.0, 400.0)));
+        } else {
+            return Err(format!("Unsupported inspector size policy: {display}"));
+        }
+        patch.insert("width".into(), number(width));
+        patch.insert("height".into(), number(height));
+        content.insert("width".into(), number(width));
+        content.insert("height".into(), number(height));
+    }
+    variant.extend(content);
+    let mut variants = object(data.get("display_variants")).cloned().unwrap_or_default();
+    variants.insert(display, Value::Object(variant));
+    patch.insert("display_variants".into(), Value::Object(variants));
+    Ok(patch)
+}
+
 /// The unit systems; manifest defaults are metric.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -958,6 +1167,108 @@ mod tests {
 
     fn map(value: Value) -> Map<String, Value> {
         value.as_object().unwrap().clone()
+    }
+
+    #[test]
+    fn family_names_drop_font_extensions() {
+        assert_eq!(font_family_name(" Inter.TTF "), "Inter");
+        assert_eq!(font_family_name("Roboto Mono"), "Roboto Mono");
+        assert_eq!(font_selection("Teko.otf"), map(json!({"font": "Teko.otf", "font_family": "Teko"})));
+    }
+
+    fn gauge(display: &str) -> Map<String, Value> {
+        map(json!({"display_type": display, "font_size": 60, "display_variants": {display: {
+            "width": 220, "height": 220, "arc_angle": 225, "track_thickness": 24, "track_corner_radius": 15,
+            "track_border_thickness": 2, "inner_widget_offset_x": 5, "inner_widget_offset_y": -3,
+            "min_max_label_font_size": 12, "track_empty_color": "#222222"}}}))
+    }
+
+    #[test]
+    fn the_size_slider_scales_gauges_and_keeps_their_configuration() {
+        for display in ["arc", "corner"] {
+            let update = build_uniform_resize_update(&gauge(display), 440.0).unwrap();
+            assert_eq!((update["width"].clone(), update["height"].clone(), update["font_size"].clone()), (json!(440), json!(440), json!(120)));
+            let variant = &update["display_variants"][display];
+            for (key, value) in [("width", json!(440)), ("arc_angle", json!(225)), ("track_thickness", json!(48)), ("track_empty_color", json!("#222222"))] {
+                assert_eq!(variant[key], value, "{display} {key}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_size_slider_changes_a_lean_angle_diameter_only() {
+        let data = map(json!({"display_type": "lean_angle", "font_size": 60, "x": 1, "y": 2, "display_variants": {"lean_angle": {
+            "diameter": 180, "track_thickness": 24, "track_border_thickness": 2, "value_offset_x": 5, "value_offset_y": -3}}}));
+        let update = build_uniform_resize_update(&data, 360.0).unwrap();
+        let variant = &update["display_variants"]["lean_angle"];
+        assert_eq!((variant["diameter"].clone(), variant["track_thickness"].clone(), variant["track_border_thickness"].clone()), (json!(360), json!(48), json!(4)));
+        assert!(!update.contains_key("width") && !update.contains_key("height"));
+    }
+
+    fn g_force() -> Map<String, Value> {
+        map(json!({"display_type": "g_force", "display_variants": {"g_force": {
+            "width": 220, "height": 220, "diameter": 200, "border_thickness": 2, "marker_size": 12,
+            "label_font_size": 14, "label_offset_x": 4, "label_offset_y": -6, "fill_color": "#212121", "invert_vertical": true}}}))
+    }
+
+    #[test]
+    fn the_size_slider_scales_every_g_force_dimension_within_its_minimums() {
+        let update = build_uniform_resize_update(&g_force(), 330.0).unwrap();
+        assert_eq!((update["width"].clone(), update["height"].clone()), (json!(330), json!(330)));
+        assert_eq!(
+            update["display_variants"]["g_force"],
+            json!({"width": 330, "height": 330, "diameter": 300, "border_thickness": 3, "marker_size": 18, "label_font_size": 21,
+                "label_offset_x": 6, "label_offset_y": -9, "fill_color": "#212121", "invert_vertical": true})
+        );
+        assert!(!update.contains_key("diameter") && !update.contains_key("font_size"));
+        let small = build_uniform_resize_update(&g_force(), 1.0).unwrap();
+        let variant = &small["display_variants"]["g_force"];
+        assert_eq!(
+            (variant["diameter"].clone(), variant["border_thickness"].clone(), variant["marker_size"].clone(), variant["label_font_size"].clone()),
+            (json!(8), json!(0), json!(1), json!(8))
+        );
+    }
+
+    fn no_labels(_: bool, _: f64) -> Result<(bool, f64), String> {
+        panic!("no label is resolved")
+    }
+
+    #[test]
+    fn global_defaults_sync_into_labels_values_and_plots() {
+        let config = OverlayConfig::from_value(&json!({
+            "labels": [{"id": "label-1", "text": "Hello", "color": "#ffffff", "font_weight": 900, "italic": true, "letter_spacing": -1.25}],
+        }))
+        .unwrap();
+        let globals = map(json!({"font_text": "LabelFont.ttf", "color_text": "#0000ff"}));
+        // A family with one upright 700 face: the label loses its italic and takes that weight.
+        let synced = config.sync_global_defaults(&globals, None, &|_, _| Ok((false, 700.0))).unwrap();
+        assert_eq!(
+            Value::Object(synced.labels[0].clone()),
+            json!({"id": "label-1", "text": "Hello", "color": "#0000ff", "font_weight": 700, "italic": false, "letter_spacing": -1.25,
+                "font": "LabelFont.ttf", "font_family": "LabelFont"})
+        );
+
+        let config = OverlayConfig::from_value(&json!({
+            "values": [
+                {"id": "val-1", "value": "speed", "color": "#ffffff"},
+                {"id": "lap-1", "value": "lap_timer", "label_font": "Arial.ttf", "label_color": "#ffffff"},
+                {"id": "g-1", "value": "g_force", "display_variants": {"g_force": {"label_font": "Arial.ttf"}}},
+            ],
+            "plots": [{"id": "plot-1", "value": "speed", "color": "#111111"}],
+        }))
+        .unwrap();
+        let globals = map(json!({"font_values": "ValueFont.ttf", "color_values": "#ff0000", "font_text": "LabelFont.ttf", "color_text": "#123456"}));
+        let synced = config.sync_global_defaults(&globals, None, &no_labels).unwrap();
+        assert_eq!((synced.values[0]["font"].clone(), synced.values[0]["color"].clone()), (json!("ValueFont.ttf"), json!("#ff0000")));
+        assert_eq!((synced.values[1]["label_font"].clone(), synced.values[1]["label_color"].clone()), (json!("LabelFont.ttf"), json!("#123456")));
+        assert_eq!(synced.values[2]["display_variants"]["g_force"]["label_font"], "ValueFont.ttf");
+        assert_eq!(synced.plots[0]["color"], "#ff0000");
+
+        // Only the changed keys apply.
+        let synced = config.sync_global_defaults(&globals, Some(&["color_values"]), &no_labels).unwrap();
+        assert_eq!(synced.values[0]["color"], "#ff0000");
+        assert!(synced.values[0].get("font").is_none());
+        assert_eq!(synced.values[1]["label_color"], "#ffffff");
     }
 
     fn globals() -> Map<String, Value> {

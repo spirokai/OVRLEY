@@ -4,7 +4,7 @@
 //! language (D3). Durable normalization is `ovrley_core::normalize::template`.
 
 use crate::i18n::{catalog as translations, Locale};
-use crate::lib::fonts::{font_family_name, font_selection};
+use ovrley_widgets::model::document::{font_family_name, font_selection};
 use ovrley_core::normalize::template::{normalize_global_defaults, template_manifest};
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::model::document::{pick_defined, resolve_active_widget_data, Collection, OverlayConfig, WidgetData};

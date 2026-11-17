@@ -493,6 +493,61 @@ fn italic_rank(face: &FontFace) -> u8 {
     }
 }
 
+/// The face and weight a request resolves to: among the upright faces, or the italic-capable ones
+/// when `italic` (genuine italics and ital axes first), the closest weight by CSS Fonts 4. A
+/// visible weight axis takes the requested weight within its range; a hidden one its default.
+fn match_face(faces: &[&FontFace], weight: f32, italic: bool) -> Option<(usize, f32)> {
+    faces
+        .iter()
+        .enumerate()
+        .filter(|(_, face)| if italic { supports_italic(face) } else { face.style == "normal" })
+        .map(|(index, face)| {
+            let candidate = match face.axes.iter().find(|axis| axis.tag == "wght") {
+                Some(axis) if !axis.hidden => weight.clamp(axis.min, axis.max),
+                Some(axis) => axis.default,
+                None => face.weight,
+            };
+            (index, candidate)
+        })
+        .min_by(|(a_index, a), (b_index, b)| {
+            let rank = |index: usize, candidate: f32| (if italic { italic_rank(faces[index]) } else { 0 }, weight_rank(weight, candidate));
+            rank(*a_index, *a).partial_cmp(&rank(*b_index, *b)).unwrap()
+        })
+}
+
+/// Whether a family can show italics (genuine, oblique or a slanting axis).
+pub fn family_supports_italic(family: &FontFamily) -> CoreResult<bool> {
+    Ok(prepared_faces(family)?.iter().any(supports_italic))
+}
+
+fn prepared_faces(family: &FontFamily) -> CoreResult<&[FontFace]> {
+    family.faces.as_deref().ok_or_else(|| CoreError::Config(format!("{}: font capabilities were not prepared", family.id)))
+}
+
+/// The label editor's weight control (`getFontWeightControl`): the matched face's visible weight
+/// axis, if it has one, and the weight the request resolves to.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WeightControl {
+    pub axis: Option<(f32, f32)>,
+    pub weight: f32,
+}
+
+/// `getFontWeightControl`, by the policy `resolve_typeface` draws with.
+pub fn weight_control(family: &FontFamily, weight: f32, italic: bool) -> CoreResult<WeightControl> {
+    let faces: Vec<&FontFace> = prepared_faces(family)?.iter().collect();
+    let italic = italic && faces.iter().any(|face| supports_italic(face));
+    let (index, weight) = match_face(&faces, weight, italic).ok_or_else(|| CoreError::Config(format!("{}: no matching font face", family.id)))?;
+    let axis = faces[index].axes.iter().find(|axis| axis.tag == "wght" && !axis.hidden).map(|axis| (axis.min, axis.max));
+    Ok(WeightControl { axis, weight })
+}
+
+/// `createLabelFontSelection`'s style: the italic a label keeps in this family and the weight it
+/// resolves to.
+pub fn label_font_style(family: &FontFamily, weight: f32, italic: bool) -> CoreResult<(bool, f32)> {
+    let italic = italic && family_supports_italic(family)?;
+    Ok((italic, weight_control(family, weight, italic)?.weight))
+}
+
 /// Resolves genuine italic faces or ital/slnt instances, then matches weight.
 /// Unsupported families stay upright without synthesis. ital selects 1;
 /// slnt selects -12 degrees (or +12 for a positive-only axis), clamped to its
@@ -505,47 +560,10 @@ pub fn resolve_typeface(
 ) -> CoreResult<Typeface> {
     let loaded = loaded_family(font_dirs, id)?;
     let faces = &loaded.faces;
-    let italic = italic && faces.iter().any(|face| supports_italic(&face.metadata));
-    let (index, resolved_weight) = faces
-        .iter()
-        .enumerate()
-        .filter(|(_, face)| {
-            let face = &face.metadata;
-            if italic {
-                supports_italic(face)
-            } else {
-                face.style == "normal"
-            }
-        })
-        .map(|(index, face)| {
-            let face = &face.metadata;
-            let candidate = match face.axes.iter().find(|axis| axis.tag == "wght") {
-                Some(axis) if !axis.hidden => weight.clamp(axis.min, axis.max),
-                Some(axis) => axis.default,
-                None => face.weight,
-            };
-            (index, candidate)
-        })
-        .min_by(|(a_index, a), (b_index, b)| {
-            (
-                if italic {
-                    italic_rank(&faces[*a_index].metadata)
-                } else {
-                    0
-                },
-                weight_rank(weight, *a),
-            )
-                .partial_cmp(&(
-                    if italic {
-                        italic_rank(&faces[*b_index].metadata)
-                    } else {
-                        0
-                    },
-                    weight_rank(weight, *b),
-                ))
-                .unwrap()
-        })
-        .ok_or_else(|| CoreError::Config(format!("{id}: no matching font face")))?;
+    let metadata: Vec<&FontFace> = faces.iter().map(|face| &face.metadata).collect();
+    let italic = italic && metadata.iter().any(|face| supports_italic(face));
+    let (index, resolved_weight) =
+        match_face(&metadata, weight, italic).ok_or_else(|| CoreError::Config(format!("{id}: no matching font face")))?;
     let face = &faces[index].metadata;
     let typeface = &faces[index].typeface;
     if face.axes.is_empty() {
@@ -598,4 +616,43 @@ pub fn resolve_typeface(
         .ok_or_else(|| CoreError::Render(format!("{id}: unable to resolve font variation")))?;
     cache.insert(key, typeface.clone());
     Ok(typeface)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn face(style: &str, weight: f32, axes: Vec<FontAxis>) -> FontFace {
+        FontFace { style: style.into(), weight, axes, file: None, simulated: false }
+    }
+
+    fn wght(min: f32, max: f32, hidden: bool) -> FontAxis {
+        FontAxis { tag: "wght".into(), min, default: 400.0, max, hidden }
+    }
+
+    fn family(faces: Vec<FontFace>) -> FontFamily {
+        FontFamily { id: "Test.ttf".into(), name: "Test".into(), faces: Some(faces) }
+    }
+
+    #[test]
+    fn weight_controls_follow_css_matching() {
+        let statics = family(vec![face("normal", 400.0, vec![]), face("normal", 700.0, vec![])]);
+        assert_eq!(weight_control(&statics, 600.0, false).unwrap(), WeightControl { axis: None, weight: 700.0 });
+        assert_eq!(weight_control(&statics, 450.0, false).unwrap().weight, 400.0, "between 400 and 500 prefers lighter faces");
+        let variable = family(vec![face("normal", 400.0, vec![wght(100.0, 900.0, false)])]);
+        assert_eq!(weight_control(&variable, 1000.0, false).unwrap(), WeightControl { axis: Some((100.0, 900.0)), weight: 900.0 });
+        let hidden = family(vec![face("normal", 400.0, vec![wght(100.0, 900.0, true)])]);
+        assert_eq!(weight_control(&hidden, 700.0, false).unwrap(), WeightControl { axis: None, weight: 400.0 });
+        let unprepared = FontFamily { faces: None, ..statics };
+        assert!(weight_control(&unprepared, 400.0, false).is_err());
+    }
+
+    #[test]
+    fn labels_keep_italic_only_where_the_family_has_it() {
+        let upright = family(vec![face("normal", 400.0, vec![])]);
+        assert_eq!(label_font_style(&upright, 700.0, true).unwrap(), (false, 400.0));
+        let italic = family(vec![face("normal", 400.0, vec![]), face("italic", 700.0, vec![]), face("oblique", 400.0, vec![])]);
+        assert!(family_supports_italic(&italic).unwrap());
+        assert_eq!(label_font_style(&italic, 400.0, true).unwrap(), (true, 700.0), "a genuine italic wins over an oblique");
+    }
 }
