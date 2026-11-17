@@ -122,16 +122,24 @@ export component Icon {
     max-height: 100000px;
     accessible-role: AccessibleRole.none;
 
+    // The glyph snaps to the physical pixel grid, as a browser snaps an element's box: drawn at a
+    // whole number of physical pixels, centred in the icon's box, from a physical pixel. Its box in
+    // the layout keeps `size`.
+    property <length> drawn: max(1phx, round(root.size / 1phx) * 1phx);
+    property <length> left: round((root.absolute-position.x + (root.width - root.drawn) / 2) / 1phx) * 1phx - root.absolute-position.x;
+    property <length> top: round((root.absolute-position.y + (root.height - root.drawn) / 2) / 1phx) * 1phx - root.absolute-position.y;
+
     Path {
-        y: (root.height - root.size) / 2;
-        width: root.size;
-        height: root.size;
+        x: root.left;
+        y: root.top;
+        width: root.drawn;
+        height: root.drawn;
         viewbox-width: 24;
         viewbox-height: 24;
         commands: root.glyph;
         fill: transparent;
         stroke: root.color;
-        stroke-width: root.size * root.stroke / 24;
+        stroke-width: root.drawn * root.stroke / 24;
         stroke-line-cap: round;
         stroke-line-join: round;
     }

@@ -270,16 +270,23 @@ fn main() {
              preferred-height: root.size;\n    \
              max-height: 100000px;\n    \
              accessible-role: AccessibleRole.none;\n\n    \
+             // The glyph snaps to the physical pixel grid, as a browser snaps an element's box: drawn at a\n    \
+             // whole number of physical pixels, centred in the icon's box, from a physical pixel. Its box in\n    \
+             // the layout keeps `size`.\n    \
+             property <length> drawn: max(1phx, round(root.size / 1phx) * 1phx);\n    \
+             property <length> left: round((root.absolute-position.x + (root.width - root.drawn) / 2) / 1phx) * 1phx - root.absolute-position.x;\n    \
+             property <length> top: round((root.absolute-position.y + (root.height - root.drawn) / 2) / 1phx) * 1phx - root.absolute-position.y;\n\n    \
              Path {\n        \
-                 y: (root.height - root.size) / 2;\n        \
-                 width: root.size;\n        \
-                 height: root.size;\n        \
+                 x: root.left;\n        \
+                 y: root.top;\n        \
+                 width: root.drawn;\n        \
+                 height: root.drawn;\n        \
                  viewbox-width: 24;\n        \
                  viewbox-height: 24;\n        \
                  commands: root.glyph;\n        \
                  fill: transparent;\n        \
                  stroke: root.color;\n        \
-                 stroke-width: root.size * root.stroke / 24;\n        \
+                 stroke-width: root.drawn * root.stroke / 24;\n        \
                  stroke-line-cap: round;\n        \
                  stroke-line-join: round;\n    \
              }\n\
