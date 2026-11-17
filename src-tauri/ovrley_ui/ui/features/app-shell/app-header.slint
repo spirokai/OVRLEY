@@ -93,8 +93,8 @@ export component WindowControls inherits HorizontalLayout {
 // `AppHeader`: `card` with a bottom border; 0.75rem top and bottom padding, 0.25rem right, and
 // 1.5rem left, or 7rem while the macOS traffic lights overlay it. Three columns 1.5rem apart:
 // `ActivitySection` (logo, version, divider, File menu), `TemplateSection`, and the right column
-// with the window controls. Empty header space drags the window; presses on controls stay with the
-// controls.
+// with the window controls. Empty header space drags the window and a double-click on it maximises
+// or restores; presses on controls stay with the controls.
 export component AppHeader inherits Rectangle {
     in property <bool> traffic-light-inset;
     in property <string> version;
@@ -121,6 +121,13 @@ export component AppHeader inherits Rectangle {
     }
 
     WindowMoveArea {
+        // Behind the header content: a double-click on empty header space maximises or restores,
+        // like a native title bar. A drag past the threshold is still taken by the move area.
+        TouchArea {
+            double-clicked => {
+                root.toggle-maximize-window();
+            }
+        }
         HorizontalLayout {
             padding-top: 0.75rem;
             padding-bottom: 0.75rem;

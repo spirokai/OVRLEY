@@ -26,6 +26,8 @@ export component AppWindow inherits FluidWindow {
     preferred-height: 1080px;
     no-frame: Platform.os != OperatingSystemType.macos;
     resize-border-width: Platform.os == OperatingSystemType.macos ? 0px : 6px;
+    // macOS and Windows round a frameless window themselves; Linux draws it square and edgeless.
+    rounded-frame: Platform.os == OperatingSystemType.linux && !AppShell.window-maximized;
 
     property <length> control-panel-width: 26.5rem;
 

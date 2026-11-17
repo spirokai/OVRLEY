@@ -14,7 +14,11 @@ export component FluidWindow inherits Window {
     default-font-size: max(9px, min(14.6px, WindowMetrics.width * 0.00584 + 5.5px));
     default-font-family: Theme.font-sans;
     default-font-weight: Theme.font-weight-normal;
-    background: Theme.background;
+    // A frameless window whose system draws no corners or edge (Linux): the content is clipped to
+    // rounded corners over a transparent window, with a light grey 1px border.
+    in property <bool> rounded-frame;
+    property <length> frame-radius: root.rounded-frame ? 8px : 0px;
+    background: root.rounded-frame ? transparent : Theme.background;
 
     property <length> hairline: max(1px, 1phx);
 
@@ -33,8 +37,18 @@ export component FluidWindow inherits Window {
         WindowMetrics.height = self.height;
     }
 
-    @children
-    TooltipLayerView { }
-    // Last, so the error alert stays above everything in the main tree (D12).
-    AlertLayerView { }
+    Rectangle {
+        background: Theme.background;
+        border-radius: root.frame-radius;
+        clip: root.rounded-frame;
+        @children
+        TooltipLayerView { }
+        // Last, so the error alert stays above everything in the main tree (D12).
+        AlertLayerView { }
+    }
+    if root.rounded-frame: Rectangle {
+        border-radius: root.frame-radius;
+        border-width: 1px;
+        border-color: #d4d4d4;
+    }
 }

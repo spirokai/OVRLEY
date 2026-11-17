@@ -202,7 +202,8 @@ fn select_language(locale: Locale) {
 /// Platform work that needs the winit window, which exists only after the first event-loop turn:
 /// on macOS the traffic lights and `useTrafficLightInset`, which follows AppKit's full-screen
 /// transitions (the header gives up its inset as the window starts entering full screen and takes
-/// it back as it starts leaving); on Linux the Wayland drop listener.
+/// it back as it starts leaving); on Linux the Wayland drop listener; everywhere the window's
+/// starting maximised state.
 fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::DispatchHandle) {
     let window = window.as_weak();
     let spawned = slint::spawn_local(async move {
@@ -214,6 +215,7 @@ fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::Dis
                 return;
             }
         };
+        platform::window_events::set_window_maximized(winit_window.is_maximized() || winit_window.fullscreen().is_some());
         #[cfg(target_os = "macos")]
         {
             use platform::macos::FullscreenTransition;

@@ -86,6 +86,17 @@ pub(crate) fn set_hovering(hovering: bool) {
     dispatch_ui(move |store, _| app_shell::set_file_drag_hovering(store, hovering));
 }
 
+/// Window chrome, not app state: written to the global directly, like minimise and maximise (D3).
+pub(crate) fn set_window_maximized(maximized: bool) {
+    APP_WINDOW.with(|slot| {
+        let Some(window) = slot.borrow().as_ref().and_then(|window| window.upgrade()) else { return };
+        let shell = window.global::<AppShell>();
+        if shell.get_window_maximized() != maximized {
+            shell.set_window_maximized(maximized);
+        }
+    });
+}
+
 fn blur_if_pressed_away(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<f64>) {
     APP_WINDOW.with(|slot| {
         let Some(window) = slot.borrow().as_ref().and_then(|window| window.upgrade()) else { return };
@@ -136,7 +147,7 @@ impl CustomApplicationHandler for AppEvents {
         &mut self,
         _event_loop: &ActiveEventLoop,
         _window_id: winit::window::WindowId,
-        _winit_window: Option<&winit::window::Window>,
+        winit_window: Option<&winit::window::Window>,
         slint_window: Option<&slint::Window>,
         event: &WindowEvent,
     ) -> EventResult {
@@ -145,6 +156,12 @@ impl CustomApplicationHandler for AppEvents {
             WindowEvent::HoveredFileCancelled => set_hovering(false),
             WindowEvent::DroppedFile(path) => self.pending_drop.push(path.clone()),
             WindowEvent::CursorMoved { position, .. } => self.cursor = Some(*position),
+            // Maximising, restoring and fullscreen each resize the window: the frame's corners follow.
+            WindowEvent::Resized(_) => {
+                if let Some(winit_window) = winit_window {
+                    set_window_maximized(winit_window.is_maximized() || winit_window.fullscreen().is_some());
+                }
+            }
             // Losing the window's focus cancels a running transform, as React's window blur does.
             WindowEvent::Focused(false) => super::dispatch_ui(|store, _| {
                 ovrley_app::features::overlay_editor::interaction::cancel_gesture(store);
