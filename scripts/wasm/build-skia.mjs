@@ -1,7 +1,7 @@
 // Regenerate the versioned Skia bundle. Ordinary bindings builds never run this.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { delimiter, join, resolve } from 'node:path'
 import { archivePathFor, cargoBuild, emscriptenVersion, revision, root, rustVersion, target, toolchainEnvironment, vendorDir } from './build.mjs'
 
@@ -76,15 +76,29 @@ Object.assign(env, {
   FORCE_SKIA_BUILD: '1',
   SKIA_GN_COMMAND: gn,
   SKIA_NINJA_COMMAND: ninja,
-  // Skia 0.153.3 expects .bat SDK launchers on Windows; SDK 6 supplies .exe.
-  // Select the installed tools explicitly, including their WASM sysroot.
-  SKIA_GN_ARGS: `skia_emsdk_dir="" ar="${emar.replaceAll('\\', '/')}" cc="${emcc.replaceAll('\\', '/')}" cxx="${emxx.replaceAll('\\', '/')}" extra_cflags+=${JSON.stringify(['-fwasm-exceptions', `--sysroot=${sysroot}`, ...simdCflags])} extra_ldflags=["--sysroot=${sysroot}","-msimd128"]`,
+  // rust-skia names the SDK launchers without an extension on Windows; SDK 6 supplies .exe.
+  // Select the installed tools explicitly, including their WASM sysroot. rust-skia sets its own
+  // flag lists, so these append to them.
+  SKIA_GN_ARGS: `skia_emsdk_dir="" ar="${emar.replaceAll('\\', '/')}" cc="${emcc.replaceAll('\\', '/')}" cxx="${emxx.replaceAll('\\', '/')}" extra_cflags+=${JSON.stringify(['-fwasm-exceptions', `--sysroot=${sysroot}`, ...simdCflags])} extra_ldflags+=["--sysroot=${sysroot}","-msimd128"]`,
   BINDGEN_EXTRA_CLANG_ARGS: `-isystem"${join(emscripten, 'system', 'include', 'compat')}"`,
-  BUILD_ARTIFACTSTAGINGDIRECTORY: staging,
 })
 cargoBuild(env, ['--lib'])
 
+// rust-skia's own export needs skia-bindings to be a Git checkout with its Skia sources, and the
+// crates.io package is neither. The bundle is assembled from the build's output instead, in
+// rust-skia's archive layout; the import does not read the export's key.txt and tag.txt.
+const buildRoot = join(cache, 'target', target, 'wasm', 'build')
+const [skiaOutput] = readdirSync(buildRoot)
+  .filter((name) => name.startsWith('skia-bindings-'))
+  .map((name) => join(buildRoot, name, 'out', 'skia'))
+  .filter((dir) => existsSync(join(dir, 'libskia.a')))
+  .sort((a, b) => statSync(join(b, 'libskia.a')).mtimeMs - statSync(join(a, 'libskia.a')).mtimeMs)
+if (!skiaOutput) throw new Error('The skia-bindings build produced no libskia.a.')
 const binaries = join(staging, 'skia-binaries')
+rmSync(staging, { recursive: true, force: true })
+mkdirSync(binaries, { recursive: true })
+for (const name of ['libskia.a', 'libskia-bindings.a', 'bindings.rs']) cpSync(join(skiaOutput, name), join(binaries, name))
+cpSync(join(skia, 'LICENSE'), join(binaries, 'LICENSE_SKIA'))
 for (const name of ['libskia.a', 'libskia-bindings.a', 'bindings.rs', 'LICENSE_SKIA']) {
   if (!existsSync(join(binaries, name))) throw new Error(`Skia export is incomplete: ${name}`)
 }

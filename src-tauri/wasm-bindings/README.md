@@ -2,7 +2,7 @@
 
 This crate is OVRLEY's Emscripten binding boundary. It is an isolated Cargo
 workspace to isolate its Emscripten toolchain and output. Native and WASM both
-pin rust-skia 0.153.3 at `b7f043e0b1e2a850e702245de811f01df1f6b0ff`.
+pin rust-skia 0.157.0 at `30669978c3f39a73e8a7ac74eead8d414eb1891d`.
 OverlayEditor uses the shared `ovrley_widgets` renderer for every widget family.
 
 ## Daily development

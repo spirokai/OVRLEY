@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
 export const crateDir = join(root, 'src-tauri', 'wasm-bindings')
 export const target = 'wasm32-unknown-emscripten'
-export const revision = 'b7f043e0b1e2a850e702245de811f01df1f6b0ff'
+export const revision = '30669978c3f39a73e8a7ac74eead8d414eb1891d'
 /** The repo's single Rust toolchain, which the stored Skia archive must have been built with. */
 export const rustVersion = readFileSync(join(root, 'rust-toolchain.toml'), 'utf8').match(/^channel = "(.+)"$/m)[1]
 export const emscriptenVersion = '6.0.9'

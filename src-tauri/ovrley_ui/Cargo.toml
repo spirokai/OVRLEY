@@ -33,7 +33,7 @@ log = "0.4"
 serde_json = "1.0"
 pollster = "0.4"
 rfd = "0.16"
-slint = { version = "=1.18.1", default-features = false, features = [
+slint = { version = "=1.19.0", default-features = false, features = [
   "std",
   "compat-1-2",
   "backend-winit",
@@ -46,7 +46,7 @@ slint = { version = "=1.18.1", default-features = false, features = [
 
 # Not used directly. Slint's Skia renderer depends on it; `no-compile` makes a missing
 # prebuilt binary fail the build instead of compiling Skia, also when this crate builds alone.
-skia-safe = { version = "=0.153.3", features = ["binary-cache", "no-compile"] }
+skia-safe = { version = "=0.157.0", features = ["binary-cache", "no-compile"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
@@ -76,11 +76,11 @@ wayland-client = "0.31.15"
 wayland-backend = { version = "0.3.17", features = ["client_system", "dlopen"] }
 
 [build-dependencies]
-slint-build = "=1.18.1"
+slint-build = "=1.19.0"
 serde_json = "1.0"
 
 [dev-dependencies]
-i-slint-backend-testing = "=1.18.1"
+i-slint-backend-testing = "=1.19.0"
 iconify = "=0.3.1"
 regex = "1"
 serde_json = "1.0"

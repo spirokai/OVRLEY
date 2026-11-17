@@ -7,6 +7,11 @@ license = "GPL-3.0-or-later"
 
 [build-dependencies]
 serde_json = "1"
+# Unused: it steers dependency resolution. bindgen 0.73.2 (skia-bindings' build dependency)
+# accepts syn 2 or 3 and prettyplease 0.2 or 0.3 but only compiles with a matching pair. syn 3 is
+# in the graph and prost-build pins prettyplease 0.2, so without this Cargo pairs bindgen with
+# prettyplease 0.2 and syn 3, and the build fails.
+prettyplease = "0.3"
 
 [features]
 # JSON schemas for the document types MCP tools take; enabled by ovrley_mcp only.
@@ -23,4 +28,9 @@ thiserror = "2"
 unicode-segmentation = "=1.12.0"
 image = { version = "0.25", default-features = false }
 ovrley_map = { path = "../ovrley_map" }
-skia-safe = { version = "=0.153.3", features = ["binary-cache", "no-compile"] }
+skia-safe = { version = "=0.157.0", features = ["binary-cache"] }
+
+# Native builds take only rust-skia's prebuilt binary. The Wasm bundle is a source build
+# (`pnpm wasm:skia:build`), which `no-compile` would refuse.
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+skia-safe = { version = "=0.157.0", features = ["no-compile"] }

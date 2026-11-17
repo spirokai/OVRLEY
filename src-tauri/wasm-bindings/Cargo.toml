@@ -19,4 +19,4 @@ panic = "abort"
 [dependencies]
 ovrley_widgets = { path = "../ovrley_widgets" }
 serde_json = "1"
-skia-safe = { version = "=0.153.3", features = ["binary-cache"] }
+skia-safe = { version = "=0.157.0", features = ["binary-cache"] }
