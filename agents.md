@@ -101,6 +101,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 
 - `ovrley --mcp` is an MCP server on stdio that drives the open window (enable "Allow agent edits" in Settings). Register it with an agent, e.g. `claude mcp add ovrley -- <path>/ovrley --mcp`.
 - Debug builds: `OVRLEY_SNAPSHOT=<dir>` renders a tour of shell states to PNGs through Slint's own `take_snapshot()` (no screen-recording permission needed) and quits; it reads but never writes the shared `ovrley-settings.json`.
+- Debug builds: `OVRLEY_DEV_VIDEOS=<path>[;<path>…]` loads those videos onto the player's video lane at startup, end to end, outside the history (phase 4 D18; there is no import dialog until Phase 6, which deletes it). With two or more clips, the `OVRLEY_SNAPSHOT` tour also captures a join's transition panel.
 - Translations: `.slint` files use `@tr("<json key>" => "<English text>")`; `build.rs` converts `app/src/i18n/locales/*.json` to bundled gettext catalogs. `tests/translations.rs` checks every `@tr` against `en-translation.json`.
 
 ## Testing
