@@ -4,6 +4,7 @@ pub mod app_shell;
 pub mod maps;
 pub mod overlay_editor;
 pub mod player;
+pub mod scene_settings;
 pub mod template_manager;
 pub mod toolbar;
 pub mod transitions;

@@ -2,7 +2,7 @@ import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
 import { BlurInput } from "../../components/blur-input.slint";
-import { SectionHeading } from "../../components/section-heading.slint";
+import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
 import { Switch } from "../../components/switch.slint";
 import { FontSelectField } from "../../components/font-select-field.slint";
 import { SelectSize } from "../../components/select.slint";
@@ -10,7 +10,7 @@ import { GradientPicker } from "../../components/gradient-picker.slint";
 import { ToggleGroup, ToggleGroupSize, ToggleGroupType } from "../../components/toggle-group.slint";
 import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
-import { Icons } from "../../components/icons.slint";
+import { Icon, Icons } from "../../components/icons.slint";
 import { Choice, ChoiceKind, GradientStop } from "../../components/logic.slint";
 import { InspectorCell, InspectorCellKind, InspectorRow, PanelPart, SwitchRowStyle } from "index.slint";
 import { ColorField, ContentAlignmentControl, FieldBlock, FieldLabel, NumberField, SelectField, SliderField, SwitchRow } from "form-controls.slint";
@@ -332,6 +332,95 @@ component CellView inherits CellEvents {
             }
         }
     }
+    // Scene settings: "Locked to N fps", a disabled-looking control (`CONTROL_CLASS`, `rounded-sm`,
+    // `px-3`, muted, 50%) under its label.
+    if root.cell.kind == InspectorCellKind.locked: FieldBlock {
+        label: root.cell.label;
+        Rectangle {
+            height: 2.25rem;
+            border-radius: Theme.radius-sm * 1rem;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            background: Theme.surface;
+            opacity: 0.5;
+            HorizontalLayout {
+                padding-left: 0.75rem;
+                padding-right: 0.75rem;
+                AppText {
+                    content: root.cell.text;
+                    uppercase: false;
+                    font-size: Theme.text-xs * 1rem;
+                    color: Theme.muted-foreground;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+    // Scene settings: the resolution mismatch note (`rounded-sm`, amber-500 at 15%, `p-2 pl-4`,
+    // amber-400, a 0.75rem Bell, 0.65rem semibold).
+    if root.cell.kind == InspectorCellKind.note: Rectangle {
+        border-radius: Theme.radius-sm * 1rem;
+        background: #f59e0b26;
+        HorizontalLayout {
+            padding: 0.5rem;
+            padding-left: 1rem;
+            spacing: 0.5rem;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    glyph: Icons.bell;
+                    size: 0.75rem;
+                    color: #fbbf24;
+                }
+            }
+            AppText {
+                horizontal-stretch: 1;
+                content: root.cell.text;
+                uppercase: false;
+                font-size: 0.65rem;
+                font-weight: Theme.font-weight-semibold;
+                color: #fbbf24;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+        }
+    }
+    // Scene settings: the widget update rate, the Gauge icon and its `text-xs` semibold label
+    // (`gap-2`), then 0.75rem below the tabs (`h-8`, full width, `surface`, `p-0.5`, equal
+    // columns, 0.75rem bold triggers).
+    if root.cell.kind == InspectorCellKind.tabs: VerticalLayout {
+        spacing: 0.75rem;
+        HorizontalLayout {
+            spacing: 0.5rem;
+            alignment: start;
+            Icon {
+                glyph: Icons.gauge;
+                size: 1rem;
+                color: Theme.primary;
+            }
+            AppText {
+                content: root.cell.label;
+                uppercase: false;
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-semibold;
+                vertical-alignment: center;
+            }
+        }
+        TabsList {
+            height: 2rem;
+            stretch: true;
+            items: root.cell.options;
+            value: root.cell.text;
+            background: Theme.surface;
+            list-padding: 0.125rem;
+            trigger-font-size: 0.75rem;
+            trigger-font-weight: Theme.font-weight-bold;
+            value-changed(value) => {
+                root.set-text(root.cell.id, value);
+            }
+        }
+    }
     if root.cell.kind == InspectorCellKind.gradient: GradientPicker {
         stops: root.cell.stops;
         changed(stops) => {
@@ -447,6 +536,7 @@ export component InspectorBlocks inherits CellEvents {
                 if row.heading: SectionHeading {
                     icon: row.icon;
                     title: row.title;
+                    variant: row.scene-heading ? SectionHeadingVariant.scene : SectionHeadingVariant.compact;
                     if row.has-trailing: HeadingControl {
                         cell: row.trailing;
                         set-text(id, value) => {

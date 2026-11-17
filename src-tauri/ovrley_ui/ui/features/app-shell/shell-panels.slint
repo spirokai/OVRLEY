@@ -4,10 +4,10 @@ import { Icon, Icons } from "../../components/icons.slint";
 import { TabsList, TabsContent, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
 import { SidebarWidgetsTab } from "../widget-editor/sidebar-widgets-tab.slint";
+import { SidebarSettingsTab } from "../scene-settings/sidebar-settings-tab.slint";
 
 // `ControlPanel`: two equal tabs, Settings and Widgets, over a scrolling area that keeps a stable
-// gutter. The tab is local state, uncontrolled as today. The Settings tab's scene settings arrive
-// in Phase 5.
+// gutter. The tab is local state, uncontrolled as today. The Settings tab holds the scene settings.
 export component ControlPanel inherits Rectangle {
     property <string> tab: "settings";
     background: Theme.card;
@@ -41,6 +41,7 @@ export component ControlPanel inherits Rectangle {
             if root.tab == "settings": TabsContent {
                 value: "settings";
                 active-value: root.tab;
+                SidebarSettingsTab { }
             }
             if root.tab == "widgets": TabsContent {
                 value: "widgets";

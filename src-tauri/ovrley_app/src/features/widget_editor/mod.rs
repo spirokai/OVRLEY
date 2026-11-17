@@ -50,6 +50,11 @@ impl FontCatalogState {
     pub fn capabilities(&self, id: &str) -> Option<&ovrley_core::fonts::FontFamily> {
         self.capabilities.get(id).and_then(Option::as_deref)
     }
+
+    /// Whether a family's capabilities are loading or loaded; a failed load is forgotten.
+    pub fn capabilities_requested(&self, id: &str) -> bool {
+        self.capabilities.contains_key(id)
+    }
 }
 
 /// `getFontCapabilities` for `id`, once: a worker loads them, and a failure goes to the error alert,
@@ -67,7 +72,11 @@ pub fn request_font_capabilities(store: &mut Store, services: &mut Services, id:
             Ok(family) => {
                 store.widget_editor.fonts.capabilities.insert(id, Some(std::sync::Arc::new(family)));
             }
-            Err(error) => store.media.set_error_message(error.to_string()),
+            Err(error) => {
+                // Forgotten, so a later edit asks again; a waiting font edit is dropped.
+                store.widget_editor.fonts.capabilities.remove(&id);
+                store.media.set_error_message(error.to_string());
+            }
         })
     });
 }
@@ -826,5 +835,49 @@ pub(crate) mod tests {
         });
         run(&mut dispatcher, json!({"decimals": 1})).unwrap();
         assert_eq!(widget(&dispatcher, "a", |data| data["decimals"].clone()), json!(1));
+    }
+}
+
+/// D1: the keys the descriptions translate in Rust are checked against the English catalog, as
+/// `ovrley_ui/tests/translations.rs` checks every `@tr`. A key no locale has shows its code
+/// default, as React's `t(key, default)` does; those are listed here so a new one is a decision.
+#[cfg(test)]
+mod translation_keys {
+    use crate::i18n::{catalog, Locale};
+
+    /// Keys React translates with a code default the locale files lack.
+    const CODE_DEFAULTS: &[&str] = &[
+        "components.gradient",
+        "widget-editor.alignCenter",
+        "widget-editor.alignLeft",
+        "widget-editor.alignRight",
+        "widget-editor.contentAlignment",
+        "widget-editor.dimensions",
+        "widget-editor.horizontalAnchor",
+    ];
+
+    #[test]
+    fn every_key_a_description_translates_is_in_the_english_catalog() {
+        let sources = [
+            include_str!("blocks.rs"),
+            include_str!("displays.rs"),
+            include_str!("editors.rs"),
+            include_str!("mod.rs"),
+            include_str!("raster.rs"),
+            include_str!("rules.rs"),
+            include_str!("sections.rs"),
+            include_str!("../scene_settings.rs"),
+            include_str!("../maps.rs"),
+            include_str!("../widget_drawer.rs"),
+        ];
+        let key = regex::Regex::new(r#""((?:widget-editor|scene-settings|widgets|raster|overlay-editor|app-shell|components|toolbar)\.[A-Za-z0-9_.]+)""#).unwrap();
+        let mut missing: Vec<String> = sources
+            .iter()
+            .flat_map(|source| key.captures_iter(source).map(|found| found[1].to_string()).collect::<Vec<_>>())
+            .filter(|key| !key.ends_with('.') && !key.ends_with(".rs") && catalog().t_or(Locale::En, key, "\u{0}") == "\u{0}" && !CODE_DEFAULTS.contains(&key.as_str()))
+            .collect();
+        missing.sort();
+        missing.dedup();
+        assert!(missing.is_empty(), "keys missing from en-translation.json: {missing:?}");
     }
 }

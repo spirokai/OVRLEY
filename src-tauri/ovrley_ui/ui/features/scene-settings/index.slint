@@ -1,0 +1,15 @@
+import { InspectorRow } from "../widget-editor/index.slint";
+
+// The scene settings feature's global (D5), written by `src/features/scene_settings.rs`: the
+// settings tab's description (phase 5 D1, D8), rendered by the inspector's renderer, and its edits
+// by field id.
+export global SceneSettings {
+    in property <[InspectorRow]> rows;
+
+    callback draft(id: string, value: float);
+    callback commit-draft();
+    callback set-number(id: string, raw: string);
+    callback set-text(id: string, value: string);
+    callback set-flag(id: string, value: bool);
+    callback press(id: string);
+}

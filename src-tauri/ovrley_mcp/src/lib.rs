@@ -6,4 +6,5 @@ pub mod catalog;
 pub mod link;
 pub mod player;
 pub mod protocol;
+pub mod scene_settings;
 pub mod widgets;

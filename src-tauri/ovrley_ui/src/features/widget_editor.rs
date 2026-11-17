@@ -182,7 +182,7 @@ fn row(icons: &Icons<'_>, block: &Block, cells: ModelRc<InspectorCell>) -> Inspe
     let mut out = InspectorRow { key: block.key.as_str().into(), gap: block.gap, panel: panel(block.panel), cells, ..Default::default() };
     match &block.content {
         BlockContent::Heading(heading) => {
-            (out.heading, out.icon, out.title) = (true, glyph(icons, heading.icon), heading.title.as_str().into());
+            (out.heading, out.icon, out.title, out.scene_heading) = (true, glyph(icons, heading.icon), heading.title.as_str().into(), heading.scene);
             if let Some(trailing) = &heading.trailing {
                 (out.has_trailing, out.trailing) = (true, cell(icons, trailing));
             }

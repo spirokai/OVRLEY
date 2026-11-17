@@ -380,6 +380,7 @@ pub fn tools() -> Vec<ToolDefinition> {
     ];
     tools.extend(crate::player::tools());
     tools.extend(crate::widgets::tools());
+    tools.extend(crate::scene_settings::tools());
     tools
 }
 
@@ -416,6 +417,7 @@ fn summary(store: &Store) -> Value {
         "videos": crate::player::describe_videos(store),
         "playback": crate::player::describe_playback(store),
         "activityTrim": crate::player::describe_activity_trim(store),
+        "scene": crate::scene_settings::describe_scene(store),
         "widgets": describe_widgets(store),
         "history": { "canUndo": store.history.can_undo(), "canRedo": store.history.can_redo() },
     })
@@ -595,6 +597,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                 Ok(Answer::Later)
             }
             other if crate::widgets::handles(other) => crate::widgets::call(other, arguments_value, store, services, reply),
+            other if crate::scene_settings::handles(other) => crate::scene_settings::call(other, arguments_value, store, services, reply),
             other => crate::player::call(other, arguments_value, store, services, reply).unwrap_or_else(|| Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}")))),
         }
     };

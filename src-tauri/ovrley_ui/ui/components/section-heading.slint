@@ -4,12 +4,13 @@ import { Icon } from "icons.slint";
 import { Separator } from "separator.slint";
 import { HelpTooltip } from "help-tooltip.slint";
 
-export enum SectionHeadingVariant { compact, drawer }
+export enum SectionHeadingVariant { compact, drawer, scene }
 
 // section-heading.jsx: a `primary` 1rem icon and a bold, uppercase title in `muted-foreground` at
 // 70%, 0.741rem, tracking 0.05em; a separator fills the remaining width, followed by the optional
 // trailing slot. compact: 0.5rem gap, 0.75rem vertical padding, 0.75rem root gap; drawer: no
-// vertical padding. Callers pass the translated `title`, and optionally `help`, shown by an info
+// vertical padding; scene (scene settings' own heading): 0.75rem gap, no vertical padding,
+// `tracking-widest`, muted at full strength. Callers pass the translated `title`, and optionally `help`, shown by an info
 // icon right after the title (0.25rem closer).
 export component SectionHeading inherits HorizontalLayout {
     in property <string> title;
@@ -24,7 +25,7 @@ export component SectionHeading inherits HorizontalLayout {
 
     HorizontalLayout {
         horizontal-stretch: 1;
-        spacing: 0.5rem;
+        spacing: root.variant == SectionHeadingVariant.scene ? 0.75rem : 0.5rem;
         padding-top: root.variant == SectionHeadingVariant.compact ? 0.75rem : 0px;
         padding-bottom: self.padding-top;
         Icon {
@@ -38,8 +39,8 @@ export component SectionHeading inherits HorizontalLayout {
             uppercase: true;
             font-size: 0.741rem;
             font-weight: Theme.font-weight-extrabold;
-            tracking: Theme.tracking-wider;
-            color: Theme.muted-foreground.transparentize(0.3);
+            tracking: root.variant == SectionHeadingVariant.scene ? Theme.tracking-widest : Theme.tracking-wider;
+            color: root.variant == SectionHeadingVariant.scene ? Theme.muted-foreground : Theme.muted-foreground.transparentize(0.3);
         }
 
         if root.help != "": HorizontalLayout {

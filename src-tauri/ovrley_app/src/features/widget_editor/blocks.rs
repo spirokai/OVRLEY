@@ -196,7 +196,7 @@ pub enum CellKind {
     Locked { text: String },
     /// Scene settings: the resolution mismatch note.
     Note { text: String },
-    /// Scene settings: the widget update rate tabs.
+    /// Scene settings: the widget update rate, its label beside the Gauge icon over the tabs.
     Tabs {
         value: String,
         options: Vec<OptionView>,
@@ -274,6 +274,8 @@ pub struct Heading {
     pub icon: Glyph,
     pub title: String,
     pub trailing: Option<Cell>,
+    /// Scene settings' heading: `gap-3`, no vertical padding, `tracking-widest`, full muted.
+    pub scene: bool,
 }
 
 /// One grid row: up to `columns` cells in equal columns, 1rem apart (`gap-4`) or 0.75rem (`gap-3`).
@@ -443,6 +445,17 @@ pub fn heading(icon: Glyph, title: impl Into<String>, trailing: Option<Cell>) ->
         icon,
         title: title.into(),
         trailing,
+        scene: false,
+    })
+}
+
+/// Scene settings' section heading (`OverlaySettingsSection`, `GlobalSettingsSection`).
+pub fn scene_heading(icon: Glyph, title: impl Into<String>, trailing: Option<Cell>) -> Node {
+    Node::Heading(Heading {
+        icon,
+        title: title.into(),
+        trailing,
+        scene: true,
     })
 }
 

@@ -25,6 +25,7 @@ struct Projections {
     widget_editor: features::widget_editor::Projection,
     widget_drawer: features::widget_drawer::Projection,
     maps: features::maps::Projection,
+    scene_settings: features::scene_settings::Projection,
     language: Cell<Locale>,
     /// The first run writes what depends on the language even though it has not changed.
     first: Cell<bool>,
@@ -47,6 +48,7 @@ impl Projections {
         self.widget_editor.project(&window, store);
         self.widget_drawer.project(&window, store);
         self.maps.project(store);
+        self.scene_settings.project(&window, store);
     }
 }
 
@@ -67,6 +69,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
         widget_editor: features::widget_editor::Projection::default(),
         widget_drawer: features::widget_drawer::Projection::default(),
         maps: features::maps::Projection::new(dispatcher.handle()),
+        scene_settings: features::scene_settings::Projection::default(),
         language: Cell::new(language),
         first: Cell::new(true),
     };
@@ -80,6 +83,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::undo_redo::bind(window, &dispatcher);
     features::widget_editor::bind(window, &dispatcher);
     features::widget_drawer::bind(window, &dispatcher);
+    features::scene_settings::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher

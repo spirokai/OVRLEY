@@ -64,6 +64,8 @@ pub struct Store {
     pub overlay_editor: crate::features::overlay_editor::OverlayEditorState,
     /// The native preview host (D8).
     pub preview: crate::features::widget_preview::PreviewHost,
+    /// `useSceneSettingsState`'s anchors and the pending label-font edit (phase 5 D8).
+    pub scene_settings: crate::features::scene_settings::SceneSettingsState,
     /// The maps' styles, adapter and frame thread (phase 5 D9).
     pub maps: crate::features::maps::MapsState,
     /// `useTemplateManagement`'s state and the cached durable state.
