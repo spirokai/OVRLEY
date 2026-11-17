@@ -91,11 +91,14 @@ export component PlayerToolbar {
 
     height: root.row-height;
 
+    // The zoom, fit, trim and edit buttons and the transport are still during playback: drawn from
+    // cached layers. The time label changes every second and stays outside them.
     left := HorizontalLayout {
         x: 0px;
         y: 0px;
         height: root.row-height;
         width: root.side-width;
+        cache-rendering-hint: true;
         spacing: 0.25rem;
         alignment: start;
         PlayerToolButton {
@@ -197,6 +200,7 @@ export component PlayerToolbar {
         width: root.transport-width;
         alignment: center;
         Rectangle {
+            cache-rendering-hint: true;
             Shadow {
                 size: ShadowSize.sm;
                 radius: Theme.radius-xs * 1rem;

@@ -273,6 +273,8 @@ export component OverlayEditorView inherits Rectangle {
         y: 1rem;
         width: chip-text.preferred-width + 1.5rem;
         height: chip-text.preferred-height + 0.5rem;
+        // A still region: drawn from a cached layer.
+        cache-rendering-hint: true;
         Shadow {
             size: ShadowSize.lg;
             radius: Theme.radius-xs * 1rem;
@@ -296,6 +298,8 @@ export component OverlayEditorView inherits Rectangle {
         y: 1rem;
         width: self.preferred-width;
         height: self.preferred-height;
+        // A still region: drawn from a cached layer.
+        cache-rendering-hint: true;
         can-undo: UndoRedo.can-undo;
         can-redo: UndoRedo.can-redo;
         background-mode: OverlayEditor.background-mode;

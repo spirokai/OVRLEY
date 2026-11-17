@@ -48,6 +48,10 @@ export component AppWindow inherits FluidWindow {
 
     VerticalLayout {
         AppHeader {
+            // Skia on wgpu repaints the whole window on every frame, and playback repaints at the
+            // preview's frame rate. Regions that stay still draw from a cached layer, which is
+            // rasterized again only when something inside it changes.
+            cache-rendering-hint: true;
             traffic-light-inset: AppShell.traffic-light-inset;
             version: AppShell.version;
             agent-connected: AppShell.agent-connected;
@@ -126,6 +130,8 @@ export component AppWindow inherits FluidWindow {
             }
             Rectangle {
                 width: root.control-panel-width;
+                // A still region: drawn from a cached layer (see `AppHeader`).
+                cache-rendering-hint: true;
                 background: Theme.card.transparentize(0.4);
                 ControlPanel { }
                 AreaReport {

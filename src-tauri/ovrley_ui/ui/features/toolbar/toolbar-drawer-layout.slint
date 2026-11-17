@@ -154,6 +154,8 @@ export component ToolbarDrawerLayout {
         width: root.drawer-width;
         height: root.height;
         animate x { duration: Theme.duration-300; easing: ease-in-out; }
+        // A still region: drawn from a cached layer, which also slides without being redrawn.
+        cache-rendering-hint: true;
 
         Shadow {
             size: ShadowSize.md;
@@ -236,6 +238,8 @@ export component ToolbarDrawerLayout {
         x: 0px;
         width: root.rail-width;
         height: root.height;
+        // A still region: drawn from a cached layer.
+        cache-rendering-hint: true;
         active-tool: root.active-tool;
         drawer-visible: root.drawer-visible;
         select-tool(tool) => {

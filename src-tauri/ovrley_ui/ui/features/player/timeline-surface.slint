@@ -48,6 +48,9 @@ export component TimelineSurface {
             axis := Rectangle {
                 height: 1.75rem;
                 clip: true;
+                // The axis and the lanes are still during playback: drawn from cached layers. The
+                // playhead, which moves, stays outside them.
+                cache-rendering-hint: true;
                 Rectangle {
                     x: Player.strip-offset;
                     for tick in Player.minor-ticks: Rectangle {
@@ -103,6 +106,7 @@ export component TimelineSurface {
             border-color: Theme.border.transparentize(0.6);
             background: Theme.foreground.transparentize(0.97);
             min-height: lane-layout.preferred-height;
+            cache-rendering-hint: true;
             TouchArea {
                 mouse-cursor: MouseCursor.e-resize;
                 pointer-event(event) => {
