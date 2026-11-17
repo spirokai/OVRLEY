@@ -10,7 +10,7 @@ use crate::widgets::{
     map::{
         config::MapConfig,
         content::MapContent,
-        preview::{MapFrameProvider, PreviewMap},
+        preview::{MapFrameProvider, PreviewMap, PreviewMaps},
         validation::ValidatedMapWidget,
     },
     raster::validation::RasterGeometry,
@@ -40,7 +40,7 @@ use crate::{
         },
     },
 };
-use ovrley_map::{MapCamera, MapStyleCatalog, MapStyleInfo};
+use ovrley_map::{MapCamera, MapStyleInfo};
 use serde::{Deserialize, Deserializer, Serialize};
 use skia_safe::Canvas;
 use std::sync::Arc;
@@ -318,7 +318,7 @@ impl PreviewWidget {
         raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
-        map_styles: Option<&MapStyleCatalog>,
+        maps: &PreviewMaps,
     ) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
@@ -337,7 +337,7 @@ impl PreviewWidget {
                 widget,
                 scene,
                 raster_scale,
-                map_styles,
+                maps,
                 fonts,
             )?)),
             WidgetRequest::Raster { widget, scene, .. } => Ok(Self::Raster(PreviewRaster::new(

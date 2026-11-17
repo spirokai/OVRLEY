@@ -1,6 +1,6 @@
 //! The type editors of `WIDGET_EDITOR_MAP` (text, time, backdrop, gradient, raster, elevation,
-//! diving profile, route map, rolling chart) and the sections they share (`PlotMarkerSection`,
-//! `RouteLineSection`), as descriptions. The tile map's editor arrives with maps (step 9).
+//! diving profile, route map, tile map, rolling chart) and the sections they share
+//! (`PlotMarkerSection`, `RouteLineSection`), as descriptions.
 
 use super::blocks::{
     full, grid, grid_end, heading, js_string, stack, when, Cell, CellKind, Node, OptionView, Rule,
@@ -123,6 +123,7 @@ pub fn type_editor(ctx: &Ctx) -> Option<Vec<Node>> {
         "elevation" => profile_editor(ctx, false),
         "diving_profile" => profile_editor(ctx, true),
         "course" => route_map_editor(ctx),
+        "map" => map_editor(ctx),
         "rolling_chart" => rolling_chart_editor(ctx),
         _ => return None,
     })
@@ -864,6 +865,178 @@ fn route_map_editor(ctx: &Ctx) -> Vec<Node> {
     ]
 }
 
+/// `MapWidgetEditor`.
+fn map_editor(ctx: &Ctx) -> Vec<Node> {
+    use crate::features::maps::{gpu_alert, map_buildings_available, map_style_select};
+    let chase = ctx.text("camera_mode") == "follow";
+    let circle = ctx.text("shape") == "circle";
+    let buildings_available = map_buildings_available(ctx.data());
+    let radius_max = ctx.num("width").min(ctx.num("height")) / 2.0;
+    let (style_options, style_value) = map_style_select(ctx.store, ctx.value("map_style").and_then(Value::as_str));
+    let msaa = || {
+        Cell::new(
+            "msaa_samples",
+            ctx.t("widget-editor.msaa", "Anti-aliasing (MSAA)"),
+            CellKind::Select {
+                value: js_string(ctx.num("msaa_samples")),
+                options: vec![OptionView::new("4", "4x"), OptionView::new("1", ctx.t("widget-editor.msaaOff", "Off"))],
+                resettable: false,
+            },
+        )
+        .rule(Rule::NumberChoice)
+    };
+    let zoom = |id: &str, min: f64| {
+        let value = ctx.num(id);
+        ctx.slider(id, ctx.t("widget-editor.zoom", "Zoom"), min, 19.0)
+            .step(0.1)
+            .readout(fixed(value, 1))
+            .rule(Rule::Named(Named::Fixed(1)))
+    };
+    let layer = |id: &str, label: String| ctx.switch_row(id, label, SwitchRowStyle::INLINE);
+    let mut buildings = layer("show_buildings", ctx.t("widget-editor.mapBuildings", "Buildings")).disabled(!buildings_available);
+    if let CellKind::SwitchRow { checked, .. } = &mut buildings.kind {
+        *checked = buildings_available && *checked;
+    }
+    let style = Cell::new(
+        "map_style",
+        ctx.t("widget-editor.mapStyle", "Map Style"),
+        CellKind::Select { value: style_value, options: style_options, resettable: false },
+    );
+    let mut nodes = vec![];
+    if let Some(text) = gpu_alert(ctx.store, ctx.locale) {
+        nodes.push(full(Cell::new("gpu_alert", "", CellKind::Alert { text }).rule(Rule::None)));
+    }
+    nodes.push(if circle {
+        grid(
+            2,
+            [Cell::new(
+                "width",
+                ctx.t("widget-editor.diameter", "Diameter"),
+                CellKind::Number {
+                    value: super::sections::whole_number_text(ctx.value("width")),
+                    placeholder: String::new(),
+                    suffix: String::new(),
+                    resettable: false,
+                },
+            )
+            .rule(Rule::Named(Named::MapDiameter))],
+        )
+    } else {
+        dimensions_section(ctx, 8.0)
+    });
+    nodes.push(stack(
+        1.0,
+        [
+            heading("map", ctx.t("widget-editor.mapView", "Map View"), None),
+            grid(
+                2,
+                [
+                    style,
+                    ctx.select(
+                        "camera_mode",
+                        ctx.t("widget-editor.cameraMode", "Camera Mode"),
+                        ctx.options(&[
+                            ("follow", "widget-editor.chaseCamera", "Chase Camera"),
+                            ("fixed", "widget-editor.topDown", "Top Down"),
+                        ]),
+                    ),
+                ],
+            ),
+            when(chase, || {
+                stack(
+                    1.0,
+                    [
+                        grid(
+                            2,
+                            [
+                                ctx.select(
+                                    "orientation",
+                                    ctx.t("widget-editor.orientation", "Orientation"),
+                                    ctx.options(&[
+                                        ("rider_up", "widget-editor.riderUp", "Rider Up"),
+                                        ("north_up", "widget-editor.northUp", "North Up"),
+                                    ]),
+                                ),
+                                msaa(),
+                            ],
+                        ),
+                        grid(
+                            2,
+                            [
+                                zoom("follow_zoom", 14.0),
+                                ctx.slider("pitch", ctx.t("widget-editor.pitch", "Pitch"), 0.0, 60.0).int().suffix("°"),
+                            ],
+                        ),
+                    ],
+                )
+            }),
+            when(!chase, || grid(2, [zoom("fixed_zoom", 2.0), msaa()])),
+            grid(
+                2,
+                [
+                    buildings,
+                    layer("show_paths", ctx.t("widget-editor.mapPaths", "Paths")),
+                    layer("show_labels", ctx.t("widget-editor.mapLabels", "Labels")),
+                    layer("local_names", ctx.t("widget-editor.mapLocalNames", "Local Names")).disabled(!ctx.flag("show_labels")),
+                ],
+            ),
+        ],
+    ));
+    nodes.push(stack(
+        1.0,
+        [
+            heading("shapes", ctx.t("widget-editor.shape", "Shape"), None),
+            grid(
+                2,
+                [
+                    Some(
+                        ctx.select(
+                            "shape",
+                            ctx.t("widget-editor.shape", "Shape"),
+                            ctx.options(&[
+                                ("rectangle", "widgets.backdropTypes.rectangle", "Rectangle"),
+                                ("circle", "widgets.backdropTypes.circle", "Circle"),
+                            ]),
+                        )
+                        .rule(Rule::Named(Named::MapShape)),
+                    ),
+                    (!circle).then(|| {
+                        let radius = ctx.num("corner_radius").min(radius_max);
+                        ctx.slider("corner_radius", ctx.t("widget-editor.cornerRadius", "Corner Radius"), 0.0, radius_max)
+                            .shown(radius)
+                            .readout(js_string(js_round(radius)))
+                            .px()
+                    }),
+                ],
+            ),
+            grid(
+                2,
+                [
+                    ctx.color("border_color", ctx.t("widget-editor.borderColor", "Border Color")),
+                    ctx.slider("border_thickness", ctx.t("widget-editor.borderThickness", "Border Thickness"), 0.0, 50.0).int().px(),
+                ],
+            ),
+            grid(2, [ctx.slider("border_opacity", ctx.t("widget-editor.borderOpacity", "Border Opacity"), 0.0, 1.0).percent()]),
+        ],
+    ));
+    let smoothing = ctx.num("route_smoothing_m");
+    nodes.push(route_line_section(
+        ctx,
+        RouteLineSlots {
+            thickness: Some(ctx.slider("line_width", ctx.t("widget-editor.thickness", "Thickness"), 1.0, 20.0).int().px()),
+            detail: None,
+            smoothing: Some(
+                ctx.slider("route_smoothing_m", ctx.t("widget-editor.smoothing", "Smoothing"), 1.0, 20.0)
+                    .step(0.5)
+                    .readout(fixed(smoothing, 1))
+                    .suffix("m"),
+            ),
+        },
+    ));
+    nodes.push(plot_marker_section(ctx, true, true, false, None));
+    nodes
+}
+
 /// `ElevationWidgetEditor` and `DivingProfileWidgetEditor`, which differ in the second section, the
 /// label toggles' fields and the starting elevation.
 fn profile_editor(ctx: &Ctx, diving: bool) -> Vec<Node> {
@@ -1435,7 +1608,7 @@ fn rolling_chart_editor(ctx: &Ctx) -> Vec<Node> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::blocks::{at, cells, find, Rule};
+    use super::super::blocks::{at, cells, Rule};
     use super::super::rules::{format_window_seconds, parse_window_seconds, Input};
     use super::super::tests::{cell, edit, editor_with, patch, widget};
     use super::super::{describe, update_widget_data};
@@ -1466,7 +1639,7 @@ mod tests {
 
     #[test]
     fn every_type_editor_describes_and_its_fields_resolve() {
-        for definition in catalog().widgets().iter().filter(|definition| definition.current && !definition.metric && definition.kind != "map") {
+        for definition in catalog().widgets().iter().filter(|definition| definition.current && !definition.metric) {
             let displays: Vec<Option<&str>> = if definition.display_types.is_empty() { vec![None] } else { definition.display_types.iter().map(|display| Some(display.as_str())).collect() };
             for display in displays {
                 let mut store = Store { theme: Some(ThemeColors { ice: "#1".into(), aqua: "#2".into(), teal: "#3".into(), accent: "#4".into() }), ..Store::default() };

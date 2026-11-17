@@ -378,7 +378,7 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
         for (variant, request) in bounds_variants(&base) {
             let kind = format!("{} ({variant})", request["type"].as_str().unwrap());
             let raster = request["type"] == "raster";
-            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &preview.fonts, &preview.images, preview.map_styles.as_ref())
+            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &preview.fonts, &preview.images, &preview.maps)
                 .unwrap_or_else(|error| panic!("{kind}: {error}"));
             let allocated = allocated_surfaces();
             let bounds: Vec<TileBounds> = seconds
@@ -786,7 +786,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
     let request_scene = raster["scene"].clone();
     for (mut preview, request) in [(raster_preview, raster), label_preview()] {
         let kind = request["type"].as_str().unwrap().to_owned();
-        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, None).unwrap();
+        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, &ovrley_widgets::widgets::map::preview::PreviewMaps::default()).unwrap();
         let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
         let session = &preview.widgets[&id];
         assert_eq!(native.pixels(), session.pixels(), "{kind} pixels must not depend on the host");
@@ -794,7 +794,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
         assert_eq!(native.bounds(), session.bounds(), "{kind} bounds must not depend on the host");
     }
     let missing = json!({ "type":"raster", "widget": { "id":"raster", "x":0, "y":0, "width":1, "height":1, "rotation":0, "opacity":1, "path":"/image.png", "resourceId":"missing" }, "scene": request_scene });
-    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, None).is_err(), "unresolved native rasters must fail loudly");
+    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, &ovrley_widgets::widgets::map::preview::PreviewMaps::default()).is_err(), "unresolved native rasters must fail loudly");
 }
 
 #[test]

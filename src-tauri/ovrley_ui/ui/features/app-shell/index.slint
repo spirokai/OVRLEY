@@ -21,6 +21,21 @@ export struct ShortcutGroupView {
 
 // The app-shell feature's global (D5): the properties its projection writes and the callbacks
 // `src/features/app_shell.rs` binds to dispatches. Only the shell's composition components read it.
+// Settings → Map tile cache (phase 5 D11): shown once its usage has loaded. Sizes are in MiB for
+// the slider; the texts are formatted in Rust.
+export struct MapTileCacheView {
+    shown: bool,
+    used: string,
+    limit: string,
+    used-percent: float,
+    value-mib: float,
+    min-mib: float,
+    max-mib: float,
+    step-mib: float,
+    value-display: string,
+    clear-disabled: bool,
+}
+
 export global AppShell {
     // `useAppBootstrap`: the startup screen shows until the drawer is hydrated and startup work ran.
     in property <bool> show-startup-screen: true;
@@ -63,6 +78,11 @@ export global AppShell {
     callback change-language(string);
     callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
+    in property <MapTileCacheView> map-tile-cache;
+    callback map-tile-cache-opened();
+    callback map-tile-cache-draft(mib: float);
+    callback map-tile-cache-commit(mib: float);
+    callback map-tile-cache-clear();
     // The File menu's "Import Activity".
     callback import-activity();
 

@@ -6,7 +6,7 @@ use crate::{
     preview_widget::{PreviewWidget, ResizeRequest, ResizeUpdate, WidgetRequest},
     render::{preview::PreviewRasterScale, text::FontResolver},
 };
-use ovrley_map::MapStyleCatalog;
+use crate::widgets::map::preview::PreviewMaps;
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
 
@@ -70,8 +70,8 @@ impl FontResolver for PreviewFonts {
 pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
-    /// The installed map styles, once the host has set them. No map is created before.
-    pub map_styles: Option<MapStyleCatalog>,
+    /// The installed map styles, once the host has set them, and a native host's frames.
+    pub maps: PreviewMaps,
     activity: Option<ActivitySampler>,
     /// The editor's disabled laps, applied to every activity this session samples.
     disabled_laps: Vec<usize>,
@@ -448,7 +448,7 @@ impl PreviewSession {
     }
     /// The shell's installed map styles, as JSON. Maps created after this resolve against them.
     pub fn replace_map_styles(&mut self, bytes: &[u8]) -> WidgetResult<()> {
-        self.map_styles = Some(
+        self.maps.styles = Some(
             serde_json::from_slice(bytes)
                 .map_err(|error| WidgetError::Config(error.to_string()))?,
         );
@@ -526,7 +526,7 @@ impl PreviewSession {
             self.raster_scale,
             &self.fonts,
             &self.images,
-            self.map_styles.as_ref(),
+            &self.maps,
         )?;
         self.next_id = self
             .next_id
@@ -544,7 +544,7 @@ impl PreviewSession {
                 self.raster_scale,
                 &self.fonts,
                 &self.images,
-                self.map_styles.as_ref(),
+                &self.maps,
             )
     }
     /// Zoom changes only the density, so widgets re-rasterize from their applied requests.
@@ -560,7 +560,7 @@ impl PreviewSession {
                 raster_scale,
                 &self.fonts,
                 &self.images,
-                self.map_styles.as_ref(),
+                &self.maps,
             );
             if result.is_ok() {
                 result = rebuilt;

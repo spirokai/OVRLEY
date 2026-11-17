@@ -1,5 +1,5 @@
-//! The widget tools of phase 5: adding widgets as the drawer does, raster images and the font
-//! list. Split from `catalog.rs` as
+//! The widget tools of phase 5: adding widgets as the drawer does, raster images, and the font and
+//! map style lists. Split from `catalog.rs` as
 //! `player.rs` was; the catalog lists these after its own and hands them their calls.
 
 use crate::catalog::{input_schema, Answer, Reply, ToolDefinition, ToolOutcome};
@@ -48,6 +48,14 @@ pub fn tools() -> Vec<ToolDefinition> {
                       widget's font field takes and its name.",
         input_schema: input_schema::<crate::catalog::NoArguments>(),
         read_only: true,
+    },
+    ToolDefinition {
+        name: "map_style_list",
+        title: "List map styles",
+        description: "Lists the installed map styles a map widget's Map Style select offers, each with the id its map_style field takes \
+                      and its name. A map naming a style that is not installed draws the first.",
+        input_schema: input_schema::<crate::catalog::NoArguments>(),
+        read_only: true,
     }]
 }
 
@@ -92,7 +100,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
                 let list: Vec<Value> = options.iter().map(describe_selection).collect();
                 return Err(ToolOutcome::Failed(format!("The drawer offers {} as: {}.", selection.kind, Value::Array(list))));
             }
-            let id = add_widget(store, &selection).map_err(ToolOutcome::Failed)?;
+            let id = add_widget(store, services, &selection).map_err(ToolOutcome::Failed)?;
             ovrley_app::features::widget_preview::present_pending_frame(store, services);
             Ok(Answer::Now(ToolOutcome::Ok(ovrley_app::store::agent::describe_widget(store, &id).map_err(ToolOutcome::Failed)?)))
         }),
@@ -125,6 +133,11 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             let fonts = &store.widget_editor.fonts;
             let list = |fonts: &[ovrley_app::lib::fonts::FontOption]| fonts.iter().map(|font| json!({"id": font.id, "name": font.name})).collect::<Vec<_>>();
             Ok(Answer::Now(ToolOutcome::Ok(json!({"recommended": list(&fonts.recommended), "system": list(&fonts.system)}))))
+        }
+        "map_style_list" => {
+            arguments::<crate::catalog::NoArguments>(arguments_value)?;
+            let styles = services.maps.styles().styles().iter().map(|style| json!({"id": style.id.as_str(), "name": style.label})).collect::<Vec<_>>();
+            Ok(Answer::Now(ToolOutcome::Ok(json!({ "styles": styles }))))
         }
         other => unreachable!("{other} is not a widget tool"),
     }
@@ -175,5 +188,14 @@ mod tests {
         let opacity = fields.iter().find(|field| field["id"] == "opacity").unwrap();
         assert_eq!(opacity["max"], 1, "ranges are in the field's units");
         assert!(fields.iter().any(|field| field["id"] == "display_type" && field["kind"] == "choice"));
+    }
+
+    #[test]
+    fn map_style_list_lists_the_installed_styles_default_first() {
+        let dispatcher = dispatcher_with(Store::default());
+        let ToolOutcome::Ok(listed) = run(&dispatcher, "map_style_list", json!({})) else { panic!("list failed") };
+        let ids: Vec<&str> = listed["styles"].as_array().unwrap().iter().map(|style| style["id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["liberty", "bright", "dark", "fiord", "positron"]);
+        assert!(listed["styles"][0]["name"].is_string());
     }
 }

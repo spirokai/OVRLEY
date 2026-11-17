@@ -24,6 +24,7 @@ struct Projections {
     transitions: features::transitions::Projection,
     widget_editor: features::widget_editor::Projection,
     widget_drawer: features::widget_drawer::Projection,
+    maps: features::maps::Projection,
     language: Cell<Locale>,
     /// The first run writes what depends on the language even though it has not changed.
     first: Cell<bool>,
@@ -45,6 +46,7 @@ impl Projections {
         self.transitions.project(&window, store);
         self.widget_editor.project(&window, store);
         self.widget_drawer.project(&window, store);
+        self.maps.project(store);
     }
 }
 
@@ -64,6 +66,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
         transitions: features::transitions::Projection::default(),
         widget_editor: features::widget_editor::Projection::default(),
         widget_drawer: features::widget_drawer::Projection::default(),
+        maps: features::maps::Projection::new(dispatcher.handle()),
         language: Cell::new(language),
         first: Cell::new(true),
     };
@@ -84,11 +87,13 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
 
 /// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
 /// the compositor (Phase 6). Agents reach the window through `agent_socket`.
+#[allow(clippy::too_many_arguments)]
 pub fn run(
     store: Store,
     paths: ovrley_core::paths::AppPaths,
     app_cache_dir: &std::path::Path,
     preferences: PreferencesStore,
+    maps: Arc<dyn ovrley_app::store::services::MapServices>,
     gpu: Option<GpuDevice>,
     agent_socket: ovrley_mcp::link::SocketLocation,
 ) -> Result<(), String> {
@@ -106,6 +111,7 @@ pub fn run(
             clipboard: Box::new(SystemClipboard::default()),
             window: Box::new(SlintWindowControl { window: window.as_weak() }),
             video_tools,
+            maps,
         },
     );
     platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());
@@ -149,6 +155,7 @@ pub fn run(
         startup.dispatch(|store, services| {
             ovrley_app::features::template_manager::fetch_templates(store, services, None);
             ovrley_app::features::widget_editor::load_font_catalog(store, services);
+            ovrley_app::features::maps::initialize(store, services);
             ovrley_app::features::template_manager::restore_last_loaded_template(store, services, Box::new(|store, _| store.bootstrap.set_startup_ready()));
             // Debug builds: the videos of `OVRLEY_DEV_VIDEOS`, after the template restore (D18).
             if cfg!(debug_assertions) {

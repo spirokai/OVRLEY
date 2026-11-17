@@ -5,7 +5,7 @@ use crate::{
     render::{image::ImageSource, preview::PreviewRasterScale, text::FontResolver},
     widgets::value::preview::{TileBounds, WidgetGeometry},
 };
-use ovrley_map::MapStyleCatalog;
+use crate::widgets::map::preview::PreviewMaps;
 use serde::{Deserialize, Serialize};
 
 impl WidgetRequest {
@@ -176,11 +176,11 @@ impl PreviewInstance {
         raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
-        map_styles: Option<&MapStyleCatalog>,
+        maps: &PreviewMaps,
     ) -> WidgetResult<Self> {
         let (position, _) = request.placement()?;
         let mut instance = Self {
-            widget: PreviewWidget::new(request.clone(), raster_scale, fonts, images, map_styles)?,
+            widget: PreviewWidget::new(request.clone(), raster_scale, fonts, images, maps)?,
             request,
             raster_scale,
             origin: position,
@@ -200,14 +200,14 @@ impl PreviewInstance {
         raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
-        map_styles: Option<&MapStyleCatalog>,
+        maps: &PreviewMaps,
     ) -> WidgetResult<()> {
         self.update(
             self.request.clone(),
             raster_scale,
             fonts,
             images,
-            map_styles,
+            maps,
         )
     }
 
@@ -217,7 +217,7 @@ impl PreviewInstance {
         raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
-        map_styles: Option<&MapStyleCatalog>,
+        maps: &PreviewMaps,
     ) -> WidgetResult<()> {
         let (position, transient) = request.placement()?;
         let mut config = request.clone();
@@ -273,13 +273,13 @@ impl PreviewInstance {
                 },
             ) => route.update(widget, scene, raster_scale, transient)?,
             (PreviewWidget::Map(map), WidgetRequest::Map { widget, scene, .. }) => {
-                map.update(widget, scene, raster_scale, map_styles, fonts)?
+                map.update(widget, scene, raster_scale, maps, fonts)?
             }
             (PreviewWidget::Raster(raster), WidgetRequest::Raster { widget, scene, .. }) => {
                 raster.update(widget, scene, raster_scale, images)?
             }
             (_, request) => {
-                self.widget = PreviewWidget::new(request, raster_scale, fonts, images, map_styles)?;
+                self.widget = PreviewWidget::new(request, raster_scale, fonts, images, maps)?;
                 self.rendered_revision = None;
             }
         }

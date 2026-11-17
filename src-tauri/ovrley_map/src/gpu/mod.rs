@@ -701,19 +701,7 @@ impl GpuMapRenderer {
         source: &dyn MapDataSource,
     ) -> Result<Self, String> {
         let style = config.read_style(&source.style(&config.spec.style)?)?;
-        let instance =
-            wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
-        let request = |force_fallback_adapter| {
-            pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::HighPerformance,
-                force_fallback_adapter,
-                ..Default::default()
-            }))
-        };
-        // A GPU when there is one. Some backends only offer their software rasterizer when asked.
-        let adapter = request(false)
-            .or_else(|_| request(true))
-            .map_err(|error| format!("No adapter for the map renderer: {error}"))?;
+        let adapter = request_adapter()?;
         let adapter_name = adapter_name(&adapter);
         let max_buffer_size = adapter.limits().max_buffer_size;
         pools.check(max_buffer_size, &adapter_name)?;
@@ -729,6 +717,19 @@ impl GpuMapRenderer {
         Self::assemble(config, pools, style, device, adapter_name, output)
     }
 
+    /// Draws at a new size from the next frame. Only the output changes: tiles stay resident, and the
+    /// map keeps its scale and pixel ratio, so a size edit shows more or less of it.
+    pub fn resize(&mut self, width: u32, height: u32) -> Result<(), String> {
+        self.config.viewport = MapViewport::new(width, height, self.config.viewport.pixel_ratio())?;
+        self.targets = Targets::new(&self.device, width, height, self.config.sample_count);
+        self.output = Output::new(&self.device, self.config.viewport);
+        self.check_gpu()
+    }
+
+    pub fn config(&self) -> &GpuMapConfig {
+        &self.config
+    }
+
     /// Puts every tile of one view on the GPU, or fails. The pools evict oldest first, so loading can
     /// evict a tile this view still shows, which would leave a blank patch. When it does, the pools
     /// start empty and take only this view, which always fits if the view fits at all. Costs a few
@@ -738,14 +739,32 @@ impl GpuMapRenderer {
         tiles: &[TileId],
         source: &dyn MapDataSource,
     ) -> Result<(), String> {
+        if self.try_load_view(tiles, source)? {
+            Ok(())
+        } else {
+            Err(format!(
+                "A view of {} map tiles does not fit its {} byte pools",
+                tiles.len(),
+                self.pool_bytes()
+            ))
+        }
+    }
+
+    /// [`Self::load_view`], answering `false` when the view does not fit the pools, so a host that
+    /// grows them can rebuild with larger ones.
+    pub fn try_load_view(
+        &mut self,
+        tiles: &[TileId],
+        source: &dyn MapDataSource,
+    ) -> Result<bool, String> {
         if self.has_all(tiles) {
             // An atlas refilled for another view may lack the glyphs of this one's resident tiles.
-            return match &mut self.labels {
-                Some(labels) if labels.atlas_is_partial() => {
-                    labels.fill_atlas(&self.queue, &self.loaded, tiles, &service_bitmap(source))
+            if let Some(labels) = &mut self.labels {
+                if labels.atlas_is_partial() {
+                    labels.fill_atlas(&self.queue, &self.loaded, tiles, &service_bitmap(source))?;
                 }
-                _ => Ok(()),
-            };
+            }
+            return Ok(true);
         }
         self.load_tiles(tiles, source)?;
         if !self.has_all(tiles) {
@@ -755,15 +774,7 @@ impl GpuMapRenderer {
             self.pool_clears += 1;
             self.load_tiles(tiles, source)?;
         }
-        if self.has_all(tiles) {
-            Ok(())
-        } else {
-            Err(format!(
-                "A view of {} map tiles does not fit its {} byte pools",
-                tiles.len(),
-                self.pool_bytes()
-            ))
-        }
+        Ok(self.has_all(tiles))
     }
 
     /// Puts the glyphs a job will use in the label atlas before its first frame. Glyphs that don't fit
@@ -926,6 +937,45 @@ impl GpuMapRenderer {
         }
         self.output.staging.unmap();
         self.check_gpu()
+    }
+}
+
+/// The adapter a renderer opens: a GPU when there is one. Some backends only offer their software
+/// rasterizer when asked.
+#[cfg(not(target_arch = "wasm32"))]
+fn request_adapter() -> Result<wgpu::Adapter, String> {
+    let instance =
+        wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
+    let request = |force_fallback_adapter| {
+        pollster::block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance,
+            force_fallback_adapter,
+            ..Default::default()
+        }))
+    };
+    request(false)
+        .or_else(|_| request(true))
+        .map_err(|error| format!("No adapter for the map renderer: {error}"))
+}
+
+/// How this system draws maps.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MapAdapterSupport {
+    Hardware,
+    /// A software rasterizer: WARP, lavapipe, llvmpipe.
+    Software,
+    Unavailable,
+}
+
+/// Which adapter a renderer would open, without opening a device. Blocking.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn probe_adapter() -> MapAdapterSupport {
+    match request_adapter() {
+        Ok(adapter) if adapter.get_info().device_type == wgpu::DeviceType::Cpu => {
+            MapAdapterSupport::Software
+        }
+        Ok(_) => MapAdapterSupport::Hardware,
+        Err(_) => MapAdapterSupport::Unavailable,
     }
 }
 

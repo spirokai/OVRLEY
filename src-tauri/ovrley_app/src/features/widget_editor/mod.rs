@@ -273,11 +273,22 @@ fn alignment_factor(alignment: &str) -> Result<f64, String> {
 }
 
 /// `updateWidgetData`: applies a patch to a widget as one undo step. A content alignment change
-/// keeps the content in place by shifting x by the presented content width. (A map switching to the
-/// fixed camera fits its route; that rule arrives with the map editor in Phase 5.)
+/// keeps the content in place by shifting x by the presented content width. A map switching to the
+/// top-down camera starts with its whole route in view.
 pub fn update_widget_data(store: &mut Store, widget_id: &str, updates: Map<String, Value>) -> Result<(), String> {
     let data = store.editor.config.widget(widget_id)?.clone();
     let mut updates = updates;
+    let (collection, _) = store.editor.config.find_widget(widget_id)?;
+    if collection.widget_type(&data)? == "map" && updates.get("camera_mode").and_then(Value::as_str) == Some("fixed") && text(&data, "camera_mode") != "fixed" {
+        let theme = store.theme.clone().ok_or("The editor has not started yet.")?;
+        let effective = crate::features::widget_preview::preview_widgets(store, &theme)
+            .into_iter()
+            .find(|widget| widget.id == widget_id)
+            .ok_or_else(|| format!("Unknown widget ID: {widget_id}"))?
+            .data;
+        let fit = crate::features::overlay_editor::interaction::map_view_patch(store, widget_id, Some(merge_widget_data(Some(&effective), &updates)), Value::String("fit".into()))?;
+        updates.extend(fit);
+    }
     if let Some(next) = updates.get("content_alignment").cloned() {
         if Some(&next) != data.get("content_alignment") {
             let current = alignment_factor(&text(&data, "content_alignment"))?;
@@ -362,7 +373,12 @@ pub fn set_numeric_field(store: &mut Store, widget_id: &str, key: &str, raw: &st
 /// `addWidget`: fresh defaults for the selection, appended to the type's collection, then
 /// selected. New course plots fit the activity at the playhead. Oddity kept: the scene font size
 /// comes from the global defaults here, from the scene in `reset_widget`.
-pub fn add_widget(store: &mut Store, selection: &WidgetSelection) -> Result<String, String> {
+///
+/// Difference from React (asked for at review): a top-down map starts with its whole route in
+/// view, as switching to the top-down camera does, in the same undo step. Its route is measured on
+/// the preview, so the new map presents first; a map that cannot present yet (its font still
+/// loading) keeps the defaults' view.
+pub fn add_widget(store: &mut Store, services: &mut Services, selection: &WidgetSelection) -> Result<String, String> {
     let definition = catalog().require_widget(&selection.kind)?;
     let collection = Collection::from_name(&definition.collection).ok_or_else(|| format!("{} has no collection {}", selection.kind, definition.collection))?;
     let preview_activity = crate::features::widget_preview::preview_activity(store);
@@ -370,8 +386,16 @@ pub fn add_widget(store: &mut Store, selection: &WidgetSelection) -> Result<Stri
     let globals = &store.template.global_defaults;
     let options = WidgetCreationOptions { course_points, scene_font_size: globals.get("font_size").and_then(Value::as_f64), unit_system: store.editor.unit_system };
     let data = create_widget_defaults(selection, globals, &options)?;
+    let top_down_map = selection.kind == "map" && data.get("camera_mode").and_then(Value::as_str) == Some("fixed");
     let id = store.editor.edit_config(|config| config.add_widget(collection, data));
     store.editor.set_selected_widget_id(Some(&id));
+    if top_down_map {
+        crate::features::widget_preview::present_pending_frame(store, services);
+        match crate::features::overlay_editor::interaction::map_view_patch(store, &id, None, Value::String("fit".into())) {
+            Ok(fit) => store.editor.edit_config(|config| config.update_widgets(&[(id.clone(), fit)]))?,
+            Err(error) => log::warn!("The new map keeps its default view: {error}"),
+        }
+    }
     Ok(id)
 }
 
@@ -552,7 +576,7 @@ pub fn update_widget_fields(store: &mut Store, services: &mut Services, widget_i
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::features::undo_redo::{undo, HistoryMode};
     use crate::features::widget_preview::preview_frame;

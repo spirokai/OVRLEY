@@ -10,6 +10,7 @@ use serde_json::Value;
 use crate::lib::preferences_store::PreferencesStore;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 
 /// A file type a native file dialog offers.
@@ -146,6 +147,90 @@ impl VideoTools for NativeVideoTools {
     }
 }
 
+pub use ovrley_services::map_styles::{MapAdapterSupport, MapStyleCatalog};
+pub use ovrley_services::map_tile_service::TileCacheUsage;
+pub use ovrley_services::widget_preview::{MapFrameWake, MapPrepareRequest};
+pub use ovrley_widgets::widgets::map::preview::MapFrameFactory;
+
+/// The maps' data and renderer (phase 5 D9, D11): the installed styles, the preview's frame
+/// thread, the background tile download, the tile cache, and the GPU the renderer would use.
+pub trait MapServices: Send + Sync {
+    /// The installed styles, read at startup.
+    fn styles(&self) -> &MapStyleCatalog;
+    /// Starts the preview's map frame thread, which calls `wake` whenever a map's frame changed.
+    fn frames(&self, wake: MapFrameWake) -> Result<Arc<dyn MapFrameFactory>, String>;
+    /// Which adapter the map renderer would open. Blocking.
+    fn probe_adapter(&self) -> MapAdapterSupport;
+    /// `prepare_map_tiles`: downloads the tiles the maps will show into the disk cache. Blocking;
+    /// a cancelled download ends with `Ok`.
+    fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String>;
+    fn tile_cache_usage(&self) -> Result<TileCacheUsage, String>;
+    /// Applies and saves a new limit, evicting down to it.
+    fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String>;
+    fn clear_tile_cache(&self) -> Result<TileCacheUsage, String>;
+}
+
+/// The settings key of the map tile cache limit, shared with the Tauri app.
+pub const MAP_TILE_CACHE_LIMIT_KEY: &str = "mapTileCacheLimitBytes";
+
+/// The native maps over `MapData`, which the Tauri shell and export use.
+pub struct NativeMapServices {
+    data: ovrley_services::map_styles::MapData,
+}
+
+impl NativeMapServices {
+    /// Reads the installed styles and opens the tile cache, as the Tauri shell does. The saved
+    /// limit is a behaviour preference, so it stays strict: absent means the default, anything but
+    /// a valid whole number of bytes fails (D11).
+    pub fn open(roots: &ovrley_services::runtime_paths::RuntimeRoots, preferences: &PreferencesStore) -> Result<Self, String> {
+        use ovrley_services::map_tile_service::{validate_tile_cache_limit, MapTileService, DEFAULT_TILE_CACHE_LIMIT};
+        let limit = match preferences.get(MAP_TILE_CACHE_LIMIT_KEY) {
+            None => DEFAULT_TILE_CACHE_LIMIT,
+            Some(value) => validate_tile_cache_limit(
+                value.as_u64().ok_or_else(|| format!("Setting {MAP_TILE_CACHE_LIMIT_KEY} must be a whole number of bytes: {value}"))?,
+            )?,
+        };
+        Ok(Self {
+            data: ovrley_services::map_styles::MapData::new(
+                ovrley_services::map_styles::MapStyleRegistry::load(&roots.map_style_dirs())?,
+                MapTileService::for_application_cache(roots.app_cache_dir.clone(), limit)?,
+                Arc::new(ovrley_services::map_styles::GlyphService::open(&roots.map_font_dir())?),
+            ),
+        })
+    }
+}
+
+impl MapServices for NativeMapServices {
+    fn styles(&self) -> &MapStyleCatalog {
+        self.data.registry().catalog()
+    }
+
+    fn frames(&self, wake: MapFrameWake) -> Result<Arc<dyn MapFrameFactory>, String> {
+        Ok(Arc::new(ovrley_services::widget_preview::PreviewMapFrames::start(self.data.clone(), wake)?))
+    }
+
+    fn probe_adapter(&self) -> MapAdapterSupport {
+        ovrley_services::map_styles::probe_adapter()
+    }
+
+    fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String> {
+        ovrley_services::widget_preview::prepare_map_tiles(request, &self.data, cancelled, &|_| {})
+    }
+
+    fn tile_cache_usage(&self) -> Result<TileCacheUsage, String> {
+        self.data.tiles().usage()
+    }
+
+    fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String> {
+        self.data.tiles().set_limit(limit)
+    }
+
+    fn clear_tile_cache(&self) -> Result<TileCacheUsage, String> {
+        self.data.tiles().clear()?;
+        self.data.tiles().usage()
+    }
+}
+
 /// Everything an action may use besides the store.
 pub struct Services {
     /// The runtime paths `ovrley_core` reads templates, fonts and tools from.
@@ -159,6 +244,7 @@ pub struct Services {
     pub clipboard: Box<dyn Clipboard>,
     pub window: Box<dyn WindowControl>,
     pub video_tools: Arc<dyn VideoTools>,
+    pub maps: Arc<dyn MapServices>,
     /// Dispatches later on the UI thread, for replies that arrive there (dialogs).
     pub dispatch: DispatchHandle,
 }
@@ -172,6 +258,7 @@ pub struct ServiceParts {
     pub clipboard: Box<dyn Clipboard>,
     pub window: Box<dyn WindowControl>,
     pub video_tools: Arc<dyn VideoTools>,
+    pub maps: Arc<dyn MapServices>,
 }
 
 impl ServiceParts {
@@ -185,6 +272,7 @@ impl ServiceParts {
             ui_post: self.ui_post,
             clipboard: self.clipboard,
             video_tools: self.video_tools,
+            maps: self.maps,
             window: self.window,
             dispatch,
         }
@@ -290,6 +378,99 @@ pub mod fakes {
         pub clipboard: FakeClipboard,
         pub window: FakeWindow,
         pub video_tools: Arc<FakeVideoTools>,
+        pub maps: Arc<FakeMapServices>,
+    }
+
+    /// Maps over the checkout's bundled styles, with frames from a test's factory, a fixed adapter
+    /// and an in-memory tile cache. Every call is recorded.
+    pub struct FakeMapServices {
+        pub styles: MapStyleCatalog,
+        pub adapter: Mutex<MapAdapterSupport>,
+        pub frames: Mutex<Arc<dyn MapFrameFactory>>,
+        pub wake: Mutex<Option<MapFrameWake>>,
+        pub prepared: Mutex<Vec<usize>>,
+        pub usage: Mutex<TileCacheUsage>,
+        pub calls: Mutex<Vec<String>>,
+    }
+
+    impl Default for FakeMapServices {
+        fn default() -> Self {
+            let paths = repository_paths();
+            let dirs = ovrley_services::map_styles::MapStyleDirs {
+                bundled: paths.repo_root.join("assets").join("map-styles"),
+                user: std::env::temp_dir().join(format!("ovrley-test-map-styles-{}", std::process::id())),
+            };
+            let registry = ovrley_services::map_styles::MapStyleRegistry::load(&dirs).expect("the bundled map styles install");
+            Self {
+                styles: registry.catalog().clone(),
+                adapter: Mutex::new(MapAdapterSupport::Hardware),
+                frames: Mutex::new(Arc::new(NoFrames)),
+                wake: Mutex::new(None),
+                prepared: Mutex::new(Vec::new()),
+                usage: Mutex::new(TileCacheUsage { used_bytes: 0, limit_bytes: 512 << 20, min_limit_bytes: 128 << 20, max_limit_bytes: 40 * (128 << 20), limit_step_bytes: 128 << 20 }),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    /// Frames that never draw: each fails at once, so a map shows its placeholder.
+    pub struct NoFrames;
+
+    impl MapFrameFactory for NoFrames {
+        fn provider(&self, _style: &ovrley_services::map_styles::MapStyleInfo, _sample_count: u32) -> Arc<dyn ovrley_widgets::widgets::map::preview::MapFrameProvider> {
+            Arc::new(NoFrames)
+        }
+    }
+
+    impl ovrley_widgets::widgets::map::preview::MapFrameProvider for NoFrames {
+        fn frame(
+            &self,
+            _request: &ovrley_widgets::widgets::map::preview::MapFrameRequest,
+            _spare: Option<Vec<u8>>,
+        ) -> ovrley_widgets::error::WidgetResult<ovrley_widgets::widgets::map::preview::MapFrameReply> {
+            let (reply, answer) = std::sync::mpsc::channel();
+            reply.send(Err("test maps draw no frames".into())).expect("the answer is held");
+            Ok(answer)
+        }
+    }
+
+    impl MapServices for FakeMapServices {
+        fn styles(&self) -> &MapStyleCatalog {
+            &self.styles
+        }
+
+        fn frames(&self, wake: MapFrameWake) -> Result<Arc<dyn MapFrameFactory>, String> {
+            *self.wake.lock().unwrap() = Some(wake);
+            Ok(self.frames.lock().unwrap().clone())
+        }
+
+        fn probe_adapter(&self) -> MapAdapterSupport {
+            *self.adapter.lock().unwrap()
+        }
+
+        fn prepare_tiles(&self, request: MapPrepareRequest, _cancelled: &AtomicBool) -> Result<(), String> {
+            self.prepared.lock().unwrap().push(request.widgets.len());
+            Ok(())
+        }
+
+        fn tile_cache_usage(&self) -> Result<TileCacheUsage, String> {
+            self.calls.lock().unwrap().push("usage".into());
+            Ok(*self.usage.lock().unwrap())
+        }
+
+        fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String> {
+            self.calls.lock().unwrap().push(format!("limit {limit}"));
+            let mut usage = self.usage.lock().unwrap();
+            usage.limit_bytes = ovrley_services::map_tile_service::validate_tile_cache_limit(limit)?;
+            Ok(*usage)
+        }
+
+        fn clear_tile_cache(&self) -> Result<TileCacheUsage, String> {
+            self.calls.lock().unwrap().push("clear".into());
+            let mut usage = self.usage.lock().unwrap();
+            usage.used_bytes = 0;
+            Ok(*usage)
+        }
     }
 
     /// Video tools answering from a table: a strip per window key (cached or decoded), and
@@ -338,6 +519,7 @@ pub mod fakes {
             clipboard: FakeClipboard::default(),
             window: FakeWindow::default(),
             video_tools: Arc::new(FakeVideoTools::default()),
+            maps: Arc::new(FakeMapServices::default()),
         };
         let parts = ServiceParts {
             paths: Arc::new(repository_paths()),
@@ -347,6 +529,7 @@ pub mod fakes {
             clipboard: Box::new(fakes.clipboard.clone()),
             window: Box::new(fakes.window.clone()),
             video_tools: fakes.video_tools.clone(),
+            maps: fakes.maps.clone(),
         };
         (parts, fakes)
     }

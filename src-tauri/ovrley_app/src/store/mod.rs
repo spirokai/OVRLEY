@@ -64,6 +64,8 @@ pub struct Store {
     pub overlay_editor: crate::features::overlay_editor::OverlayEditorState,
     /// The native preview host (D8).
     pub preview: crate::features::widget_preview::PreviewHost,
+    /// The maps' styles, adapter and frame thread (phase 5 D9).
+    pub maps: crate::features::maps::MapsState,
     /// `useTemplateManagement`'s state and the cached durable state.
     pub template_manager: crate::features::template_manager::TemplateManagerState,
     pub i18n: I18nState,

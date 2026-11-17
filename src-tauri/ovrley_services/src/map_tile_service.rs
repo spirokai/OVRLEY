@@ -27,14 +27,14 @@ const MIN_TILE_CACHE_LIMIT: u64 = TILE_CACHE_LIMIT_STEP;
 const MAX_TILE_CACHE_LIMIT: u64 = 40 * TILE_CACHE_LIMIT_STEP;
 
 /// The cache's current size and its configurable limit bounds and step, in bytes.
-#[derive(Clone, Copy, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TileCacheUsage {
-    used_bytes: u64,
-    limit_bytes: u64,
-    min_limit_bytes: u64,
-    max_limit_bytes: u64,
-    limit_step_bytes: u64,
+    pub used_bytes: u64,
+    pub limit_bytes: u64,
+    pub min_limit_bytes: u64,
+    pub max_limit_bytes: u64,
+    pub limit_step_bytes: u64,
 }
 
 /// Accepts a user-configured cache limit only on a step inside the supported bounds.

@@ -2,6 +2,8 @@ import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Checkerboard } from "../../components/checkerboard.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Icons } from "../../components/icons.slint";
 import { UndoRedo } from "../undo-redo/index.slint";
 import { BackgroundMode, EditorCursor, OverlayEditor, WidgetView, HandleView, GuideLabelView, BadgeView } from "index.slint";
 
@@ -63,6 +65,16 @@ component SelectionLayer inherits Rectangle {
         height: root.height;
         viewbox-width: self.width / 1px;
         viewbox-height: self.height / 1px;
+        commands: OverlayEditor.selection-dashed-commands;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.border-width;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
         commands: OverlayEditor.knob-line-commands;
         stroke: Theme.theme-color-accent;
         stroke-width: OverlayEditor.guide-scale;
@@ -114,6 +126,61 @@ component SelectionLayer inherits Rectangle {
             font-weight: Theme.font-weight-semibold;
             color: Theme.muted-foreground;
             line-height: Theme.leading-none;
+        }
+    }
+    // A map's view hint (`-mt-3`, centred, above the frame's bottom edge): the hint chip (1.5rem
+    // high, `rounded-xs`, `border` at 70%, `card` at 90%, `px-2`, 0.741rem medium muted,
+    // `shadow-sm`) and, top down, the outline Reset button 0.375rem after it.
+    for badge in OverlayEditor.badges: Rectangle {
+        if badge.map: HorizontalLayout {
+            x: badge.hint-x - self.preferred-width / 2;
+            y: badge.hint-y - 0.75rem - 1.5rem;
+            width: self.preferred-width;
+            height: 1.5rem;
+            spacing: 0.375rem;
+            Rectangle {
+                width: hint-text.preferred-width + 1rem;
+                Shadow {
+                    size: ShadowSize.sm;
+                    radius: Theme.radius-xs * 1rem;
+                }
+                Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 1px;
+                    border-color: Theme.border.transparentize(0.3);
+                    background: Theme.card.transparentize(0.1);
+                }
+                hint-text := AppText {
+                    // A chase camera follows the rider, so it only zooms.
+                    content: badge.fixed ? @tr("overlay-editor.mapViewHint" => "Double-click to pan & zoom") : @tr("overlay-editor.mapViewZoomHint" => "Double-click to zoom");
+                    uppercase: false;
+                    font-size: 0.741rem;
+                    font-weight: Theme.font-weight-medium;
+                    color: Theme.muted-foreground;
+                    line-height: Theme.leading-none;
+                }
+            }
+            if badge.fixed: Button {
+                variant: ButtonVariant.outline;
+                size: ButtonSize.sm;
+                min-height: 1.5rem;
+                preferred-height: 1.5rem;
+                max-height: 1.5rem;
+                text: @tr("overlay-editor.mapReset" => "Reset");
+                icon: Icons.rotate-ccw;
+                icon-size: 0.75rem;
+                font-size: 0.741rem;
+                padding-x: 0.5rem;
+                spacing: 0.25rem;
+                radius: Theme.radius-xs * 1rem;
+                border-color: Theme.accent-border.transparentize(0.3);
+                text-color: Theme.muted-foreground;
+                hover-text-color: Theme.foreground;
+                hover-background: Theme.surface-accent-soft;
+                clicked => {
+                    OverlayEditor.reset-map-view(badge.id);
+                }
+            }
         }
     }
 }
@@ -233,6 +300,9 @@ export component OverlayEditorView inherits Rectangle {
                 if !self.has-hover && !self.pressed {
                     OverlayEditor.pointer-leave();
                 }
+            }
+            double-clicked => {
+                OverlayEditor.double-click(self.mouse-x, self.mouse-y);
             }
             scroll-event(event) => {
                 OverlayEditor.wheel(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y,

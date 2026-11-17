@@ -139,7 +139,11 @@ fn selected_preview_data(store: &Store) -> Vec<PreviewWidgetData> {
 /// The capture phase's Escape (D14, step 2): a running gesture is cancelled before anything else
 /// sees the key, as React's capture listener does.
 pub fn handle_capture_key(store: &mut Store, input: &KeyInput) -> bool {
-    input.key == "escape" && cancel_gesture(store)
+    if input.key == "escape" && cancel_gesture(store) {
+        return true;
+    }
+    // A map's view mode leaves on Escape wherever focus is (phase 5 D10).
+    matches!(match_keyboard_shortcut(input, Scope::Editor), Some(found) if found.command.id == "editor.clearSelection") && crate::features::maps::escape(store)
 }
 
 #[cfg(test)]

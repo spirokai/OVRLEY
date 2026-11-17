@@ -2,8 +2,11 @@
 //! size and camera straight away, so a resize shows more or less of the map and never stretches it.
 //!
 //! Export's frames reach the widget through a [`MapFrameProvider`] its host implements:
-//! `ovrley_widgets` compiles to WASM and never depends on the renderer. The editor preview has none:
-//! its map is a canvas under the widget, not an image inside it (see [`PreviewMap::set_layer_ready`]).
+//! `ovrley_widgets` compiles to WASM and never depends on the renderer. The WASM editor preview has
+//! none: its map is a canvas under the widget, not an image inside it (see
+//! [`PreviewMap::set_layer_ready`]). The native editor preview streams frames from a
+//! [`MapFrameFactory`]: it never waits for one, and keeps showing the last frame until the next
+//! arrives.
 use super::{
     config::MapConfig,
     content::{ContentKey, MapContent, RouteExtent},
@@ -32,7 +35,10 @@ use ovrley_map::{
 };
 use serde_json::json;
 use skia_safe::{images, AlphaType, Canvas, ColorType, Data, Image, ImageInfo, Rect, Surface};
-use std::sync::{mpsc::Receiver, Arc};
+use std::sync::{
+    mpsc::{Receiver, TryRecvError},
+    Arc,
+};
 
 /// Everything a frame's pixels depend on.
 #[derive(Clone, Debug, PartialEq)]
@@ -111,7 +117,32 @@ pub trait MapFrameProvider: Send + Sync {
         request: &MapFrameRequest,
         spare: Option<Vec<u8>>,
     ) -> WidgetResult<MapFrameReply>;
+
+    /// Rises each time the provider's renderer is rebuilt, so a frame it drew before is asked for
+    /// again. Export's renderers live as long as their job and never rebuild.
+    fn generation(&self) -> u64 {
+        0
+    }
 }
+
+/// Makes the frame provider of each map in a native editor preview.
+pub trait MapFrameFactory: Send + Sync {
+    /// The provider of one map drawing `style` with `sample_count` MSAA samples. Dropping it releases
+    /// the renderer it holds.
+    fn provider(&self, style: &MapStyleInfo, sample_count: u32) -> Arc<dyn MapFrameProvider>;
+}
+
+/// What the editor preview's maps draw with.
+#[derive(Default)]
+pub struct PreviewMaps {
+    /// The installed styles, which the host sets once it has them: until then no map is created.
+    pub styles: Option<MapStyleCatalog>,
+    /// A native host's frames. The WASM host has none: its canvas draws the map under the widget.
+    pub frames: Option<Arc<dyn MapFrameFactory>>,
+}
+
+/// The renderer identity a streamed map's provider was made for: its style and MSAA samples.
+type StreamKey = (ovrley_map::MapStyleId, u32);
 
 /// What is behind the marker and attribution.
 enum MapBacking {
@@ -153,20 +184,33 @@ pub struct PreviewMap {
     window: Option<RouteWindow>,
     preview_duration: f64,
     raster_scale: PreviewRasterScale,
-    /// Export's frames. The editor preview has none: its map is the host's canvas.
+    /// Export's frames, or a native preview's. The WASM preview has none: its map is the host's
+    /// canvas.
     frames: Option<Arc<dyn MapFrameProvider>>,
+    /// What a native preview's provider was made for. Some when frames stream: then the widget
+    /// never waits for a frame.
+    streamed: Option<StreamKey>,
     layout: MapLayout,
     content: Option<MapContent>,
     /// The inputs of `content`.
     content_key: ContentKey,
-    /// The last frame by request, so an unchanged request asks the provider once.
-    last_frame: Option<(MapFrameRequest, MapFramePixels)>,
-    /// The frame the provider is drawing.
-    drawing: Option<(MapFrameRequest, MapFrameReply)>,
+    /// The frame on show.
+    shown: Option<MapFramePixels>,
+    /// The request and provider generation `shown` answers, so an unchanged request asks the
+    /// provider once. A new provider has drawn nothing yet, so it clears this and keeps `shown`.
+    held: Option<(MapFrameRequest, u64)>,
+    /// The frame the provider is drawing, with the provider generation it was asked of.
+    drawing: Option<(MapFrameRequest, u64, MapFrameReply)>,
+    /// A streamed request whose frame failed, so it is not asked for again. The provider has
+    /// logged why; the map shows its placeholder.
+    failed: Option<(MapFrameRequest, u64)>,
+    /// Counts the streamed frames that arrived or failed, so one arriving for an unchanged state
+    /// draws again.
+    frame_serial: u64,
     /// The top-down route's stroke under this layout, kept while the map's line stays the same.
     /// [`Self::frame_request`] brings it up to date, so it is current for any frame with a request.
     screen_route: Option<ScreenRoute>,
-    last_render: Option<(MapFrameState, bool)>,
+    last_render: Option<(MapFrameState, bool, u64)>,
     /// Whether the host's map canvas is showing under this widget.
     layer_ready: bool,
     /// JSON of what the map canvas should draw. Empty when it should draw nothing.
@@ -185,25 +229,34 @@ pub struct PreviewMap {
 }
 
 impl PreviewMap {
-    /// The editor preview's map, which the host's map canvas draws.
+    /// The editor preview's map: drawn by the host's map canvas (WASM), or from frames streamed
+    /// by the host's factory (native).
     pub fn new(
         widget: MapConfig,
         scene: ScenePresentationConfig,
         raster_scale: PreviewRasterScale,
-        styles: Option<&MapStyleCatalog>,
+        maps: &PreviewMaps,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         let config = validate_map_widget(&widget, 0)?;
         let host = WidgetHost::from_scene(&scene, raster_scale)?;
-        Self::with_content(
-            resolve_style(styles, &config)?,
+        let style = resolve_style(maps.styles.as_ref(), &config)?;
+        let streamed = maps
+            .frames
+            .as_ref()
+            .map(|factory| (factory.provider(&style, config.msaa_samples), (style.id.clone(), config.msaa_samples)));
+        let (frames, streamed) = streamed.map_or((None, None), |(frames, key)| (Some(frames), Some(key)));
+        let mut map = Self::with_content(
+            style,
             config,
             validate_scene_presentation(scene)?,
             &host,
-            None,
+            frames,
             None,
             fonts,
-        )
+        )?;
+        map.streamed = streamed;
+        Ok(map)
     }
 
     /// `style` is the installed style `config`'s resolved to, and `content` what the host resolved
@@ -248,9 +301,13 @@ impl PreviewMap {
             config,
             scene,
             frames,
+            streamed: None,
             content,
-            last_frame: None,
+            shown: None,
+            held: None,
             drawing: None,
+            failed: None,
+            frame_serial: 0,
             screen_route: None,
             last_render: None,
             layer_ready: false,
@@ -272,11 +329,11 @@ impl PreviewMap {
         widget: MapConfig,
         scene: ScenePresentationConfig,
         raster_scale: PreviewRasterScale,
-        styles: Option<&MapStyleCatalog>,
+        maps: &PreviewMaps,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<()> {
         let config = validate_map_widget(&widget, 0)?;
-        let style = resolve_style(styles, &config)?;
+        let style = resolve_style(maps.styles.as_ref(), &config)?;
         let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let window = host.plot_window(config.show_full_activity);
         let preview_duration = host.placeholder_duration()?;
@@ -295,6 +352,18 @@ impl PreviewMap {
             self.content_key = key;
         }
         self.layout = MapLayout::new(&config, &style, &scene, raster_scale, fonts)?;
+        // Another style or sample count needs another renderer. The frame on show stays until the
+        // new one draws, so the edit never flashes the placeholder.
+        if let (Some(factory), Some(key)) = (&maps.frames, &self.streamed) {
+            let wanted = (style.id.clone(), config.msaa_samples);
+            if *key != wanted {
+                self.frames = Some(factory.provider(&style, config.msaa_samples));
+                self.streamed = Some(wanted);
+                self.held = None;
+                self.drawing = None;
+                self.failed = None;
+            }
+        }
         // Its stroke is the old layout's.
         self.screen_route = None;
         self.config = config;
@@ -322,8 +391,10 @@ impl PreviewMap {
 
     pub fn invalidate_activity(&mut self) {
         self.content = None;
-        self.last_frame = None;
+        self.shown = None;
+        self.held = None;
         self.drawing = None;
+        self.failed = None;
         self.last_render = None;
     }
 
@@ -477,24 +548,64 @@ impl PreviewMap {
         })
     }
 
-    /// Asks the provider for a frame neither held nor being drawn, handing it the last frame's buffer.
+    /// Asks the provider for a frame neither held nor being drawn. Export hands it the last frame's
+    /// buffer; a streamed map keeps showing that frame, asks for one frame at a time, and does not
+    /// ask again for one that failed.
     fn start_request(&mut self, request: &MapFrameRequest) -> WidgetResult<()> {
         let Some(frames) = &self.frames else {
             return Ok(());
         };
-        let held = |frame: Option<&MapFrameRequest>| frame == Some(request);
-        if held(self.last_frame.as_ref().map(|(frame, _)| frame))
-            || held(self.drawing.as_ref().map(|(frame, _)| frame))
+        let generation = frames.generation();
+        let answered = |slot: &Option<(MapFrameRequest, u64)>| {
+            slot.as_ref()
+                .is_some_and(|(frame, drawn)| frame == request && *drawn == generation)
+        };
+        if answered(&self.held)
+            || answered(&self.failed)
+            || self
+                .drawing
+                .as_ref()
+                .is_some_and(|(frame, _, _)| frame == request)
         {
             return Ok(());
         }
+        if self.streamed.is_some() {
+            if self.drawing.is_none() {
+                self.drawing = Some((request.clone(), generation, frames.frame(request, None)?));
+            }
+            return Ok(());
+        }
         // Performance: the previous frame's buffer is reused, so a frame allocates nothing.
-        let spare = self
-            .last_frame
-            .take()
-            .and_then(|(_, frame)| frame.into_pixels());
-        self.drawing = Some((request.clone(), frames.frame(request, spare)?));
+        self.held = None;
+        let spare = self.shown.take().and_then(MapFramePixels::into_pixels);
+        self.drawing = Some((request.clone(), generation, frames.frame(request, spare)?));
         Ok(())
+    }
+
+    /// Takes a streamed frame that has arrived, or failed, since the last look.
+    fn collect_streamed(&mut self) {
+        let Some((_, _, reply)) = &self.drawing else {
+            return;
+        };
+        let result = match reply.try_recv() {
+            Err(TryRecvError::Empty) => return,
+            Ok(result) => result,
+            Err(TryRecvError::Disconnected) => Err("The map frame thread stopped".into()),
+        };
+        let (request, generation, _) = self.drawing.take().expect("a frame was being drawn");
+        self.frame_serial = self.frame_serial.wrapping_add(1);
+        match result {
+            Ok(frame) => {
+                self.shown = Some(frame);
+                self.held = Some((request, generation));
+                self.failed = None;
+            }
+            Err(_) => {
+                self.shown = None;
+                self.held = None;
+                self.failed = Some((request, generation));
+            }
+        }
     }
 
     /// Starts the frame `draw` will show at `second`, so a host with other work to do first does not
@@ -523,18 +634,24 @@ impl PreviewMap {
         if self.layer_ready {
             return Ok(Some((camera, MapBacking::Layer)));
         }
-        self.start_request(&request)?;
-        if let Some((_, answer)) = self.drawing.take() {
-            let frame = answer
-                .recv()
-                .map_err(|_| WidgetError::Render("The map renderer stopped mid-frame".into()))?
-                .map_err(WidgetError::Render)?;
-            self.last_frame = Some((request, frame));
+        if self.streamed.is_some() {
+            self.collect_streamed();
+            self.start_request(&request)?;
+        } else {
+            self.start_request(&request)?;
+            if let Some((_, generation, answer)) = self.drawing.take() {
+                let frame = answer
+                    .recv()
+                    .map_err(|_| WidgetError::Render("The map renderer stopped mid-frame".into()))?
+                    .map_err(WidgetError::Render)?;
+                self.shown = Some(frame);
+                self.held = Some((request, generation));
+            }
         }
         Ok(Some((
             camera,
-            match &self.last_frame {
-                Some((_, frame)) => MapBacking::Image(frame.clone()),
+            match &self.shown {
+                Some(frame) => MapBacking::Image(frame.clone()),
                 None => MapBacking::Placeholder,
             },
         )))
@@ -629,7 +746,7 @@ impl PreviewMap {
             .as_ref()
             .is_some_and(|(_, backing)| !matches!(backing, MapBacking::Placeholder));
         // A pending frame may have arrived, so this compares more than the sampled state.
-        if self.last_render == Some((state, has_frame)) {
+        if self.last_render == Some((state, has_frame, self.frame_serial)) {
             return Ok(());
         }
         let marker = resolved
@@ -671,7 +788,7 @@ impl PreviewMap {
             self.geometry_stale = false;
         }
         self.revision = self.revision.wrapping_add(1);
-        self.last_render = Some((state, has_frame));
+        self.last_render = Some((state, has_frame, self.frame_serial));
         Ok(())
     }
 }

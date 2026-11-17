@@ -10,11 +10,13 @@
 //! The default style lists first, so it is also what a widget naming a missing style draws. The rest
 //! list by label, bundled before the user's.
 
+/// The map types the native app reaches through this crate, so it needs no map dependency.
+pub use ovrley_map::gpu::{labels::GlyphService, probe_adapter, MapAdapterSupport};
+pub use ovrley_map::{MapStyleCatalog, MapStyleInfo};
+
 use crate::map_tile_service::{MapTileService, TileCoordinates};
-use ovrley_map::gpu::labels::GlyphService;
 use ovrley_map::{
-    read_style_file, MapDataSource, MapSource, MapStyleCatalog, MapStyleId, MapStyleInfo,
-    VECTOR_SOURCE,
+    read_style_file, MapDataSource, MapSource, MapStyleId, VECTOR_SOURCE,
 };
 use ovrley_widgets::model::standard_widgets::default_map_style;
 use serde_json::{json, Value as Json};

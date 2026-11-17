@@ -389,6 +389,10 @@ pub fn cursor(store: &Store) -> EditorCursor {
 /// A press on the stage at `point` (stage pixels).
 pub fn pointer_down(store: &mut Store, point: (f64, f64), modifiers: PointerModifiers) {
     cancel_gesture(store);
+    // A map in view mode takes presses on it (D10).
+    if crate::features::maps::pointer_down(store, point) {
+        return;
+    }
     let scene_point = stage_to_scene(store, point);
     let radius = handle_radius(store);
     if let Some((_, handle)) = handles(store).into_iter().find(|(position, _)| {
@@ -855,6 +859,9 @@ fn resolve(
 
 /// A pointer move: a running gesture resolves; a marquee follows; otherwise hover.
 pub fn pointer_move(store: &mut Store, point: (f64, f64), modifiers: PointerModifiers) {
+    if crate::features::maps::pointer_move(store, point) {
+        return;
+    }
     let scene_point = stage_to_scene(store, point);
     match std::mem::take(&mut store.overlay_editor.pointer) {
         PointerState::Gesture(mut gesture) => {
@@ -911,6 +918,9 @@ pub fn pointer_move(store: &mut Store, point: (f64, f64), modifiers: PointerModi
 /// The release: a gesture commits its patches as one action (one undo step); a marquee keeps its
 /// preview, or restores the base selection when it did not move.
 pub fn pointer_up(store: &mut Store, point: (f64, f64), modifiers: PointerModifiers) {
+    if crate::features::maps::pointer_up(store) {
+        return;
+    }
     match std::mem::take(&mut store.overlay_editor.pointer) {
         PointerState::Gesture(mut gesture) => {
             store.drafts.clear_gesture_patches();
@@ -1023,6 +1033,10 @@ pub struct Badge {
     pub left: f64,
     pub top: f64,
     pub rotation: f64,
+    /// A map's camera mode, for its view hint.
+    pub camera_mode: Option<String>,
+    /// The middle of the frame's bottom edge, in stage pixels, for hints inside the widget.
+    pub bottom_center: (f64, f64),
 }
 
 /// `buildWidgetBadges`: hovered and selected widgets, hidden during group gestures.
@@ -1044,12 +1058,19 @@ pub fn badges(store: &Store) -> Vec<Badge> {
             let (ox, oy) = content.origin;
             let left = content.rect.left + ox - ox * cos + oy * sin;
             let top = content.rect.top + oy - ox * sin - oy * cos;
+            let (width, height) = (content.rect.width, content.rect.height);
+            let camera_mode = (kind == "map").then(|| store.editor.config.widget(&id).ok().and_then(|data| data.get("camera_mode")).and_then(Value::as_str).unwrap_or_default().to_string());
             Badge {
-                id,
-                kind,
                 left: layout.scene_left + left * scale + 2.0 * cos + 20.0 * sin,
                 top: layout.scene_top + (top * scale + 2.0 * sin - 20.0 * cos).max(0.0),
                 rotation: sin.atan2(cos).to_degrees(),
+                camera_mode,
+                bottom_center: (
+                    layout.scene_left + (left + width / 2.0 * cos - height * sin) * scale,
+                    layout.scene_top + (top + width / 2.0 * sin + height * cos) * scale,
+                ),
+                id,
+                kind,
             }
         })
         .collect()
@@ -1462,6 +1483,23 @@ pub fn resize_draft_patch(store: &mut Store, widget_id: &str, geometry: Map<Stri
     request.extend(geometry);
     let second = store.editor.selected_second;
     let request = resize_request(&origin, request, second, false);
+    store.preview.resize_widget(widget_id, request)
+}
+
+/// `resize({ map_view })` (D10): a map's view fields after a view gesture (`pan`, `zoom`, `fit`),
+/// measured on its preview handle. `data` replaces the widget's effective data, for a patch that is
+/// about to apply (the camera switching to top down).
+pub fn map_view_patch(store: &mut Store, widget_id: &str, data: Option<Map<String, Value>>, gesture: Value) -> Result<Map<String, Value>, String> {
+    let mut origin = widget_origin(store, widget_id)?;
+    if let Some(data) = data {
+        origin.data = data;
+    }
+    let mut geometry = Map::new();
+    geometry.insert("fixed".into(), serde_json::json!([0, 0]));
+    geometry.insert("point".into(), serde_json::json!([number_of(&origin.data, "x"), number_of(&origin.data, "y")]));
+    geometry.insert("map_view".into(), gesture);
+    let second = store.editor.selected_second;
+    let request = resize_request(&origin, geometry, second, false);
     store.preview.resize_widget(widget_id, request)
 }
 

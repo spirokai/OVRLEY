@@ -8,6 +8,8 @@ import { Theme } from "../theme/theme.slint";
 export component Progress {
     in property <float> value;
     in property <color> track-color: Theme.primary.transparentize(0.8);
+    in property <color> indicator-color: Theme.primary;
+    in property <length> radius: root.height / 2;
 
     // `x * 0 == 0` is false for NaN and ±Infinity.
     property <float> target: root.value > 0 && root.value * 0 == 0 ? min(root.value, 100) : 0;
@@ -37,14 +39,14 @@ export component Progress {
     accessible-value-maximum: 100;
 
     Rectangle {
-        border-radius: root.height / 2;
+        border-radius: root.radius;
         background: root.track-color;
         clip: true;
 
         Rectangle {
             x: -(100 - root.shown-value) / 100 * parent.width;
             width: parent.width;
-            background: Theme.primary;
+            background: root.indicator-color;
         }
     }
 

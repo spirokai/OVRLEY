@@ -88,6 +88,7 @@ pub fn project(window: &AppWindow, store: &Store, language_changed: bool) {
     });
 
     set_if_changed(shell.get_allow_agent_edits(), store.agent_session.allow_agent_edits, |value| shell.set_allow_agent_edits(value));
+    set_if_changed(shell.get_map_tile_cache(), map_tile_cache_view(store), |value| shell.set_map_tile_cache(value));
     set_if_changed(shell.get_agent_connected(), store.agent_session.shows_indicator(), |value| shell.set_agent_connected(value));
     set_if_changed(shell.get_file_drag_hovering(), store.file_drop.hovering, |value| shell.set_file_drag_hovering(value));
     set_if_changed(shell.get_processing(), store.media.is_processing, |value| shell.set_processing(value));
@@ -138,6 +139,15 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     });
 
     let dispatch = dispatcher.handle();
+    shell.on_map_tile_cache_opened(move || dispatch.dispatch(ovrley_app::features::maps::load_tile_cache));
+    let dispatch = dispatcher.handle();
+    shell.on_map_tile_cache_draft(move |mib| dispatch.dispatch(move |store, _| ovrley_app::features::maps::draft_tile_cache_limit(store, mib_to_bytes(mib))));
+    let dispatch = dispatcher.handle();
+    shell.on_map_tile_cache_commit(move |mib| dispatch.dispatch(move |store, services| ovrley_app::features::maps::commit_tile_cache_limit(store, services, mib_to_bytes(mib))));
+    let dispatch = dispatcher.handle();
+    shell.on_map_tile_cache_clear(move || dispatch.dispatch(ovrley_app::features::maps::clear_tile_cache));
+
+    let dispatch = dispatcher.handle();
     shell.on_set_allow_agent_edits(move |allowed| dispatch.dispatch(move |store, services| app_shell::set_allow_agent_edits(store, services, allowed)));
 
     // Minimise and maximise change no app state: they call the window directly (D3).
@@ -179,4 +189,32 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     });
     let dispatch = dispatcher.handle();
     alert.on_dismiss_requested(move || dispatch.dispatch(|store, _| store.media.clear_error()));
+}
+
+const MIB: f64 = 1024.0 * 1024.0;
+
+/// The cache slider runs in MiB, which a Slint float holds exactly.
+fn mib_to_bytes(mib: f32) -> u64 {
+    (f64::from(mib) * MIB).round() as u64
+}
+
+/// Settings → Map tile cache (phase 5 D11), hidden until its usage has loaded.
+fn map_tile_cache_view(store: &Store) -> crate::MapTileCacheView {
+    use ovrley_app::lib::format::format_cache_bytes;
+    let cache = &store.maps.tile_cache;
+    let Some(usage) = cache.usage else { return crate::MapTileCacheView::default() };
+    let limit = cache.limit().expect("a loaded cache has a limit");
+    let mib = |bytes: u64| (bytes as f64 / MIB) as f32;
+    crate::MapTileCacheView {
+        shown: true,
+        used: format_cache_bytes(usage.used_bytes).into(),
+        limit: format_cache_bytes(usage.limit_bytes).into(),
+        used_percent: (usage.used_bytes as f64 / usage.limit_bytes as f64 * 100.0) as f32,
+        value_mib: mib(limit),
+        min_mib: mib(usage.min_limit_bytes),
+        max_mib: mib(usage.max_limit_bytes),
+        step_mib: mib(usage.limit_step_bytes),
+        value_display: format_cache_bytes(limit).into(),
+        clear_disabled: cache.pending || usage.used_bytes == 0,
+    }
 }

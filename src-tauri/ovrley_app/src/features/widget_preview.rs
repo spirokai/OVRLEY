@@ -420,6 +420,11 @@ impl PreviewHost {
         self.dirty
     }
 
+    /// Asks for a frame although no input changed: a map's frame arrived from the map thread.
+    pub fn mark_dirty(&mut self) {
+        self.dirty = true;
+    }
+
     /// What each widget presents, by id.
     pub fn presented(&self) -> &BTreeMap<String, Presented> {
         &self.presented
@@ -650,6 +655,14 @@ fn sync(
         store.preview.document_revision = store.editor.editor_document_revision;
         store.preview.new_session();
     }
+    // Maps draw the installed styles, with frames from the map thread, which starts with the
+    // first map (D9).
+    if store.preview.session.maps.styles.is_none() {
+        store.preview.session.maps.styles = Some(services.maps.styles().clone());
+    }
+    if store.preview.session.maps.frames.is_none() && widgets.iter().any(|widget| widget.kind == "map") {
+        store.preview.session.maps.frames = Some(crate::features::maps::frame_factory(store, services)?);
+    }
     // The activity: its bytes replace the session's; time-dependent widgets present again.
     let preview_activity = preview_activity(store);
     let activity = preview_activity.activity().map(|imported| Arc::clone(&imported.preview_bytes));
@@ -770,6 +783,12 @@ fn sync(
         }
         let transient = store.overlay_editor.is_transient(&widget.id, &widget.kind);
         let request = json!({ "type": widget.kind, "widget": widget.data, "scene": scene, "transient": transient });
+        // An id that now names another type is another widget.
+        if store.preview.instances.get(&widget.id).is_some_and(|instance| instance.kind != widget.kind) {
+            let instance = store.preview.instances.remove(&widget.id).expect("checked above");
+            store.preview.session.widgets.remove(&instance.handle);
+            store.preview.presented.remove(&widget.id);
+        }
         match store.preview.instances.get_mut(&widget.id) {
             Some(instance) if instance.request == request => {}
             Some(instance) => {
@@ -802,6 +821,10 @@ fn sync(
             }
         }
     }
+
+    let maps: Vec<&Map<String, Value>> = widgets.iter().filter(|widget| widget.kind == "map").map(|widget| &widget.data).collect();
+    let activity = store.preview.activity.clone();
+    crate::features::maps::update_download(store, &maps, &scene, scale, activity.as_ref());
 
     if activity_ready && widgets.iter().any(|widget| time_dependent(&widget.kind)) {
         store

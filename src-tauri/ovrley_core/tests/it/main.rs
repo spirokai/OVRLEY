@@ -46,6 +46,7 @@ mod lean_angle_tests;
 mod linear_gauge_tests;
 mod manifest_activity_tests;
 mod map_frame_copy_tests;
+mod map_preview_stream_tests;
 mod metric_kind_serde_tests;
 mod mp4_telemetry_fixture_tests;
 mod plot_multiplicity_tests;

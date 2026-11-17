@@ -15,6 +15,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     //    selection ends the gesture's patches (D7).
     overlay_editor::interaction::reconcile_gesture(store);
     overlay_editor::drafts::reconcile_widget_drafts(store);
+    //    The map view mode ends when its map is gone or deselected, committing its patch (phase 5 D10).
+    crate::features::maps::reconcile_map_view(store);
     // 3. `useHeldValue`: the widgets tab's open item holds while a marquee runs.
     crate::features::widget_editor::reconcile_open_widget(store);
     //    The open label's font capabilities, for its weight and italic controls (phase 5 D6).

@@ -178,11 +178,17 @@ fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
     let metrics = &store.overlay_editor.viewport.metrics;
     let handle_scale = editor::viewport::handle_scale(metrics);
     let moveable = 0.75 * handle_scale;
-    let outlines: String = interaction::selection_outlines(store)
+    // The map in view mode draws its outline dashed (phase 5 D10).
+    let dashed = ovrley_app::features::maps::map_view_widget(store).is_some();
+    let corners = interaction::selection_outlines(store);
+    let outlines: String = corners
         .iter()
+        .filter(|_| !dashed)
         .map(|corners| format!("M {} {} L {} {} L {} {} L {} {} Z ", corners[0].0, corners[0].1, corners[1].0, corners[1].1, corners[2].0, corners[2].1, corners[3].0, corners[3].1))
         .collect();
     set_if_changed(global.get_selection_commands(), SharedString::from(outlines.trim_end()), |value| global.set_selection_commands(value));
+    let dashes = if dashed { corners.iter().map(|corners| dashed_outline(corners, 3.0)).collect::<String>() } else { String::new() };
+    set_if_changed(global.get_selection_dashed_commands(), SharedString::from(dashes.trim_end()), |value| global.set_selection_dashed_commands(value));
     let device_pixel = (1.0 / metrics.scale_factor.max(1.0)) as f32;
     set_if_changed(global.get_border_width(), device_pixel, |value| global.set_border_width(value));
     set_if_changed(global.get_guide_scale(), moveable as f32, |value| global.set_guide_scale(value));
@@ -239,6 +245,11 @@ fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
             y: badge.top as f32,
             rotation: badge.rotation as f32,
             label: ovrley_app::lib::widget::widget_type_name(&badge.kind, store.i18n.language).into(),
+            id: badge.id.as_str().into(),
+            map: badge.camera_mode.is_some(),
+            fixed: badge.camera_mode.as_deref() == Some("fixed"),
+            hint_x: badge.bottom_center.0 as f32,
+            hint_y: badge.bottom_center.1 as f32,
         })
         .collect();
     replace_model(global.get_badges(), badges, |model| global.set_badges(model));
@@ -252,6 +263,29 @@ fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
         interaction::EditorCursor::Rotate => EditorCursor::Rotate,
     };
     set_if_changed(global.get_cursor(), cursor, |value| global.set_cursor(value));
+}
+
+/// A closed outline as dashes of `dash` stage pixels with equal gaps, continuing round its corners.
+fn dashed_outline(corners: &[(f64, f64); 4], dash: f64) -> String {
+    let mut commands = String::new();
+    let mut phase = 0.0;
+    for side in 0..4 {
+        let (from, to) = (corners[side], corners[(side + 1) % 4]);
+        let length = (to.0 - from.0).hypot(to.1 - from.1);
+        let mut along = 0.0;
+        while along < length {
+            let period = phase % (2.0 * dash);
+            let step = if period < dash { dash - period } else { 2.0 * dash - period }.min(length - along);
+            if period < dash {
+                let at = |t: f64| (from.0 + (to.0 - from.0) * t / length, from.1 + (to.1 - from.1) * t / length);
+                let (start, end) = (at(along), at(along + step));
+                commands.push_str(&format!("M {} {} L {} {} ", start.0, start.1, end.0, end.1));
+            }
+            along += step;
+            phase += step;
+        }
+    }
+    commands
 }
 
 fn modifiers(alt: bool, control: bool, shift: bool, meta: bool) -> PointerModifiers {
@@ -297,7 +331,15 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             delta_y: -f64::from(delta_y),
             cursor: (f64::from(x), f64::from(y)),
         };
-        dispatch.dispatch(move |store, _| editor::handle_wheel(store, &input, wheel));
+        let pointer = modifiers(alt, control, shift, meta);
+        dispatch.dispatch(move |store, services| {
+            // A map in view mode zooms with an unmodified wheel over it (phase 5 D10).
+            if ovrley_app::features::maps::wheel(store, &wheel, pointer, std::time::Instant::now()) {
+                present_pending_frame(store, services);
+                return;
+            }
+            editor::handle_wheel(store, &input, wheel)
+        });
     });
     let dispatch = dispatcher.handle();
     global.on_pointer_down(move |x, y, alt, control, shift, meta| {
@@ -328,6 +370,22 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     });
     let dispatch = dispatcher.handle();
     global.on_pointer_leave(move || dispatch.dispatch(interaction::pointer_leave_action));
+    let dispatch = dispatcher.handle();
+    global.on_double_click(move |x, y| {
+        dispatch.dispatch(move |store, _| {
+            let point = stage_point(store, x, y);
+            ovrley_app::features::maps::double_click(store, point);
+        });
+    });
+    let dispatch = dispatcher.handle();
+    global.on_reset_map_view(move |id| {
+        let id = id.to_string();
+        dispatch.dispatch(move |store, _| {
+            if let Err(error) = ovrley_app::features::maps::reset_map_view(store, &id) {
+                log::error!("The map view could not reset: {error}");
+            }
+        });
+    });
     let dispatch = dispatcher.handle();
     global.on_zoom_in(move || dispatch.dispatch(|store, _| editor::set_zoom(store, step_zoom(store, true), None)));
     let dispatch = dispatcher.handle();

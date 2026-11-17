@@ -103,7 +103,14 @@ pub enum Named {
     WindowSeconds,
     /// The raster's folder button: the image dialog, then loading the chosen image (D5).
     RasterPick,
+    /// `mapShapeUpdate`: a circular map is square, so choosing one crops the longer side.
+    MapShape,
+    /// `mapDiameterUpdate`: a circle's width and height, at least the smallest map edge.
+    MapDiameter,
 }
+
+/// The smallest map edge, as the resize gesture's (`MIN_MAP_EDGE`).
+const MIN_MAP_EDGE: f64 = 8.0;
 
 /// What an edit asks the editor to do.
 #[derive(Clone, Debug, PartialEq)]
@@ -273,6 +280,26 @@ fn named_patch(named: &Named, cell: &Cell, input: Input, context: &RuleContext) 
         }
         Named::Reset => unreachable!("reset is not a data patch"),
         Named::RasterPick => return Ok(Patch::PickRaster),
+        Named::MapShape => {
+            let shape = text_input(cell, &input)?;
+            let mut patch = Map::new();
+            if shape == "circle" {
+                let size = |key: &str| data.get(key).and_then(Value::as_f64).unwrap_or_default();
+                let diameter = number(size("width").min(size("height")));
+                patch.insert("width".into(), diameter.clone());
+                patch.insert("height".into(), diameter);
+            }
+            patch.insert("shape".into(), Value::String(shape));
+            patch
+        }
+        Named::MapDiameter => {
+            let current = data.get("width").and_then(Value::as_f64).unwrap_or_default();
+            let diameter = number(parse_integer(&text_input(cell, &input)?, current)?.max(MIN_MAP_EDGE));
+            let mut patch = Map::new();
+            patch.insert("width".into(), diameter.clone());
+            patch.insert("height".into(), diameter);
+            patch
+        }
         Named::ToggleItalic => {
             let mut patch = Map::new();
             patch.insert("italic".into(), Value::Bool(!data.get("italic").and_then(Value::as_bool).unwrap_or_default()));

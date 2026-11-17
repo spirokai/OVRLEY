@@ -17,6 +17,20 @@ use icu::decimal::input::Decimal;
 use icu::decimal::DecimalFormatter;
 use std::sync::OnceLock;
 
+/// `formatCacheBytes`: a cache size in binary units, whole megabytes below one gigabyte, otherwise
+/// gigabytes with one decimal ("512 MB", "1.5 GB").
+pub fn format_cache_bytes(bytes: u64) -> String {
+    const MIB: f64 = 1024.0 * 1024.0;
+    const GIB: f64 = 1024.0 * MIB;
+    let bytes = bytes as f64;
+    if bytes < GIB {
+        format!("{} MB", crate::js::round(bytes / MIB))
+    } else {
+        // `toFixed(1)` takes the larger neighbour on a tie, as `Math.round` does.
+        format!("{:.1} GB", crate::js::round(bytes / GIB * 10.0) / 10.0)
+    }
+}
+
 /// `formatClockDuration`: `MM:SS` below an hour, `H:MM:SS` from one, with a sign for negative
 /// durations. The time widget's `format_elapsed_time` differs (always `H:MM:SS`), so both exist.
 pub fn format_clock_duration(seconds: f64) -> String {
@@ -114,6 +128,9 @@ mod tests {
     #[test]
     fn seconds_clocks_show_up_to_three_decimals() {
         assert_eq!(format_seconds_clock(330.5), "05:30.5");
+        assert_eq!(format_cache_bytes(512 << 20), "512 MB");
+        assert_eq!(format_cache_bytes(1 << 30), "1.0 GB");
+        assert_eq!(format_cache_bytes(5 * (1 << 28)), "1.3 GB", "toFixed rounds a tie up");
         assert_eq!(format_seconds_clock(3700.0), "01:01:40");
         assert_eq!(format_seconds_clock(1.5), "00:01.5");
         assert_eq!(format_seconds_clock(-330.0), "-05:30");

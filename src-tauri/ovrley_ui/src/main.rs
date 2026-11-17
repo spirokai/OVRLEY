@@ -62,7 +62,9 @@ fn start() -> Result<(), String> {
     let gpu = ovrley_ui::platform::select_backend()?;
     let agent_socket = ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir);
     let paths = roots.app_paths()?;
-    ovrley_ui::app::run(store, paths, &roots.app_cache_dir, preferences, gpu, agent_socket)
+    // The installed map styles and the tile cache, as the Tauri shell opens them (phase 5 D9).
+    let maps = std::sync::Arc::new(ovrley_app::store::services::NativeMapServices::open(&roots, &preferences)?);
+    ovrley_ui::app::run(store, paths, &roots.app_cache_dir, preferences, maps, gpu, agent_socket)
 }
 
 /// The settings file. The debug snapshot tour (`OVRLEY_SNAPSHOT`) changes the language and the

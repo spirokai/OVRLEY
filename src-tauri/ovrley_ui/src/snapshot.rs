@@ -118,6 +118,16 @@ fn tour() -> Vec<Step> {
     tour.push(("editor-time", StepKind::Action(|store, _| show_editor(store, "time", "", serde_json::json!({})))));
     tour.push(("editor-elevation", StepKind::Action(|store, _| show_editor(store, "elevation", "", serde_json::json!({})))));
     tour.push(("editor-heart-zones", StepKind::Action(|store, _| show_editor(store, "heartrate", "heart_zones", serde_json::json!({"zone_calculation": "manual"})))));
+    // Maps (phase 5 step 9): a chase camera over the imported ride, then a top-down circle in its
+    // view mode (the dashed outline, the hint and Reset).
+    tour.push(("editor-map", StepKind::Action(|store, _| show_editor(store, "map", "", serde_json::json!({})))));
+    tour.push((
+        "editor-map-view",
+        StepKind::Action(|store, _| {
+            show_editor(store, "map", "", serde_json::json!({"camera_mode": "fixed", "shape": "circle", "width": 350, "height": 350}));
+            store.editor.set_map_view_widget_id(Some("editor"));
+        }),
+    ));
     tour.push((
         "agent-connected",
         StepKind::Action(|store, _| {

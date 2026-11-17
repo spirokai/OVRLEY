@@ -61,14 +61,14 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let dispatch = dispatcher.handle();
     window.global::<WidgetDrawer>().on_add(move |key, index| {
         let key = key.to_string();
-        dispatch.dispatch(move |store, _| {
+        dispatch.dispatch(move |store, services| {
             let view = drawer_view(store);
             let item = view.iter().flat_map(|group| &group.items).find(|item| item.key == key);
             let Some(option) = item.and_then(|item| item.options.get(index as usize)) else {
                 log::error!("widget drawer: no option {index} of {key}");
                 return;
             };
-            if let Err(error) = drawer::add_from_drawer(store, &option.selection.clone()) {
+            if let Err(error) = drawer::add_from_drawer(store, services, &option.selection.clone()) {
                 log::error!("widget drawer: {error}");
             }
         });

@@ -203,8 +203,21 @@ export component AppWindow inherits FluidWindow {
         unit-system: AppShell.unit-system;
         shortcut-groups: AppShell.shortcut-groups;
         allow-agent-edits: AppShell.allow-agent-edits;
+        map-tile-cache: AppShell.map-tile-cache;
         close => {
             AppShell.close-settings();
+        }
+        map-tile-cache-opened => {
+            AppShell.map-tile-cache-opened();
+        }
+        map-tile-cache-draft(mib) => {
+            AppShell.map-tile-cache-draft(mib);
+        }
+        map-tile-cache-commit(mib) => {
+            AppShell.map-tile-cache-commit(mib);
+        }
+        map-tile-cache-clear => {
+            AppShell.map-tile-cache-clear();
         }
         select-section(section) => {
             AppShell.select-settings-section(section);

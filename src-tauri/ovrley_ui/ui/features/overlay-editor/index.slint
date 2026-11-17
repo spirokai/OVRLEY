@@ -38,6 +38,13 @@ export struct BadgeView {
     y: length,
     rotation: angle,
     label: string,
+    id: string,
+    // A map's view hint, centred above the middle of its frame's bottom edge; a top-down map also
+    // shows the Reset button.
+    map: bool,
+    fixed: bool,
+    hint-x: length,
+    hint-y: length,
 }
 
 // The overlay-editor feature's global (D5), written by `src/features/overlay_editor.rs`.
@@ -75,6 +82,8 @@ export global OverlayEditor {
     // The selection (D12, D13), in stage pixels: outlines as path commands, the handles, the
     // rotation line, the guides by style, their labels, the marquee and the badges.
     in property <string> selection-commands;
+    // The map in view mode's outline, as dashes (Slint has no dashed stroke).
+    in property <string> selection-dashed-commands;
     in property <length> border-width: 1px;
     in property <[HandleView]> handles;
     in property <string> knob-line-commands;
@@ -103,6 +112,9 @@ export global OverlayEditor {
     callback pointer-move(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
     callback pointer-up(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
     callback pointer-leave();
+    // A double-click enters the view mode of the map under the pointer (phase 5 D10).
+    callback double-click(x: length, y: length);
+    callback reset-map-view(id: string);
     callback zoom-in();
     callback zoom-out();
     callback reset-zoom();

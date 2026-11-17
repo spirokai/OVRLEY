@@ -124,8 +124,8 @@ impl GpuPoolSizes {
             .zip(worst, |entries, _| entries.max(1))
     }
 
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn doubled(self) -> Self {
+    /// Twice the entries of each pool, for a renderer whose views outgrew these.
+    pub fn doubled(self) -> Self {
         self.zip(self, |a, b| a + b)
     }
 

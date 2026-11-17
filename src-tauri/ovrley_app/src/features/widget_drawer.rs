@@ -195,8 +195,8 @@ pub fn drawer_view(store: &Store) -> Vec<DrawerGroupView> {
 }
 
 /// `handleAddWidget`: adds the widget and dismisses an overlay drawer (a pinned one stays).
-pub fn add_from_drawer(store: &mut Store, selection: &WidgetSelection) -> Result<String, String> {
-    let id = crate::features::widget_editor::add_widget(store, selection)?;
+pub fn add_from_drawer(store: &mut Store, services: &mut crate::store::services::Services, selection: &WidgetSelection) -> Result<String, String> {
+    let id = crate::features::widget_editor::add_widget(store, services, selection)?;
     store.layout.dismiss_left_drawer_overlay();
     Ok(id)
 }
