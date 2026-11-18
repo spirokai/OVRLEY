@@ -142,7 +142,7 @@ pub fn video_batch_request(
         template,
         encoding,
         activity: BatchActivity::ExternalActivity {
-            activity: Box::new(activity),
+            activity: std::sync::Arc::new(activity),
             offsets: [(source.source_id.clone(), offset)].into(),
             disabled_laps: Vec::new(),
         },

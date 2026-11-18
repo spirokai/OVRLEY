@@ -34,13 +34,13 @@ use ovrley_core::activity::{build_dense_activity_report_validated, parse_activit
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::error::CoreError;
 use ovrley_core::normalize::parse_config_json;
-use ovrley_core::normalize::RenderConfig;
-use ovrley_widgets::widgets::raster::config::RasterConfig;
 use ovrley_core::normalize::validate_render_config;
+use ovrley_core::normalize::RenderConfig;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
+use ovrley_widgets::widgets::raster::config::RasterConfig;
 
 struct EmptyRasterResources;
 
@@ -71,7 +71,8 @@ fn app_render_retains_raster_until_worker_cleanup() {
     );
     impl ProgressSink for ReleaseOnAcceptance {
         fn emit_progress(&self, progress: &RenderProgress) {
-            if progress.status == "preparing" && progress.total == 0 {
+            if progress.status == ovrley_core::debug::RenderStatus::Preparing && progress.total == 0
+            {
                 self.0 .0.lock().unwrap().take();
                 let _ = self.1.lock().unwrap().as_ref().unwrap().cancel();
             }
@@ -126,7 +127,7 @@ fn app_render_retains_raster_until_worker_cleanup() {
     assert!(accepted.started);
     assert!(resources.0.lock().unwrap().is_none());
     let progress = wait_for_completed_progress(&service);
-    assert_eq!(progress.status, "cancelled");
+    assert_eq!(progress.status, ovrley_core::debug::RenderStatus::Cancelled);
     assert!(image_lifetime.upgrade().is_none());
     assert!(!output_path.exists());
 }
@@ -254,7 +255,10 @@ fn output_rejection_precedes_malformed_activity_processing() {
         .unwrap_err();
 
     assert!(matches!(error, CoreError::OutputExists(_)));
-    assert_eq!(controller.progress().status, "idle");
+    assert_eq!(
+        controller.progress().status,
+        ovrley_core::debug::RenderStatus::Idle
+    );
     std::fs::remove_file(output_path).unwrap();
 }
 
@@ -337,7 +341,12 @@ fn test_4_3_composite_branch_reaches_pipeline_shell() {
 
     assert!(result.started);
     let progress = wait_for_completed_progress(&controller);
-    assert_eq!(progress.status, "complete", "{}", progress.message);
+    assert_eq!(
+        progress.status,
+        ovrley_core::debug::RenderStatus::Complete,
+        "{}",
+        progress.message
+    );
     assert_eq!(progress.total, 6);
     assert_eq!(progress.encoded, 6);
     assert!(progress
@@ -643,4 +652,54 @@ fn render_output_path(name: &str) -> String {
         .join(format!("ovrley-command-{name}-{}.mp4", std::process::id()))
         .to_string_lossy()
         .into_owned()
+}
+
+/// The batch's JSON ingress normalizes its external activity once (the timezone `serde` skips),
+/// so submission only borrows the shared activity.
+#[test]
+fn batch_json_ingress_normalizes_the_external_activity() {
+    use ovrley_core::render_jobs::contracts::BatchActivity;
+    let activity: BatchActivity = serde_json::from_value(serde_json::json!({
+        "mode": "externalActivity",
+        "activity": {"metadata": {"timezone": "Europe/Prague"}, "sample_elapsed_seconds": [0, 10]},
+        "offsets": {},
+        "disabledLaps": [],
+    }))
+    .unwrap();
+    let BatchActivity::ExternalActivity { activity, .. } = activity else {
+        panic!("an external activity");
+    };
+    assert_eq!(activity.timezone, Some(chrono_tz::Europe::Prague));
+
+    let malformed = serde_json::from_value::<BatchActivity>(serde_json::json!({
+        "mode": "externalActivity",
+        "activity": {"metadata": {"timezone": "Not/AZone"}},
+        "offsets": {},
+        "disabledLaps": [],
+    }));
+    assert!(malformed.is_err(), "a malformed timezone fails at ingress");
+}
+
+/// The typed single entry rejects an existing output as the JSON entry does.
+#[test]
+fn the_typed_single_entry_rejects_an_existing_output() {
+    let paths = AppPaths::from_repo_root(PathBuf::from("."));
+    let service = RenderExecutionService::default();
+    let output_path =
+        std::env::temp_dir().join(format!("ovrley-typed-rejection-{}.mov", std::process::id()));
+    std::fs::write(&output_path, b"existing").unwrap();
+    let config = transparent_config(0.0, 10.0, 30.0);
+    let error = service
+        .submit_single_config(
+            &paths,
+            config,
+            std::sync::Arc::new(ParsedActivity::default()),
+            output_path.to_str().unwrap(),
+            false,
+            None,
+            None,
+        )
+        .unwrap_err();
+    assert!(matches!(error, CoreError::OutputExists(_)));
+    std::fs::remove_file(output_path).unwrap();
 }

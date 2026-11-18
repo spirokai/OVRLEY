@@ -39,7 +39,7 @@ fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse(
     }
     impl ProgressSink for Interrupt {
         fn emit_progress(&self, progress: &RenderProgress) {
-            if progress.status == "rendering"
+            if progress.status == ovrley_core::debug::RenderStatus::Rendering
                 && progress.current > 0
                 && progress.current < progress.total
                 && !self.fired.swap(true, Ordering::Relaxed)
@@ -117,12 +117,17 @@ fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse(
             .render(&paths, make_plan(1), &activity, &target)
             .unwrap();
         assert!(output.metadata().unwrap().len() > 0);
-        assert_eq!(service.progress().status, "complete");
+        assert_eq!(
+            service.progress().status,
+            ovrley_core::debug::RenderStatus::Complete
+        );
     }
 }
 
 #[test]
 fn single_and_batch_use_the_same_frame_work_and_native_fps() {
+    // Also covers the typed single entry: the composite single render goes through
+    // `submit_single_config` and must plan the same work as the JSON entry's batch.
     let paths = common::composite::test_paths_named("execution-parity");
     let binary =
         ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
@@ -194,26 +199,40 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
         let observed = Arc::new(Observations::default());
         let service = RenderExecutionService::with_sink(observed.clone());
         let started = Instant::now();
-        service
-            .submit_single(
+        let output = paths.downloads_dir.join(format!("single.{extension}"));
+        let output = output.to_str().unwrap();
+        // The JSON entry for one mode, the typed entry for the other: both match the batch.
+        match mode {
+            BatchExportMode::Transparent => service.submit_single(
                 &paths,
                 &single.to_string(),
                 &serde_json::to_string(&activity).unwrap(),
-                paths
-                    .downloads_dir
-                    .join(format!("single.{extension}"))
-                    .to_str()
-                    .unwrap(),
+                output,
                 true,
                 None,
                 None,
-            )
-            .unwrap();
+            ),
+            BatchExportMode::Composite => service.submit_single_config(
+                &paths,
+                ovrley_core::normalize::parse_config_value(&single).unwrap(),
+                Arc::new(activity.clone()),
+                output,
+                true,
+                None,
+                None,
+            ),
+        }
+        .unwrap();
         drop(service);
         let single_seconds = started.elapsed().as_secs_f64();
         let single = observed.single.lock().unwrap();
         let terminal = single.last().unwrap();
-        assert_eq!(terminal.status, "complete", "{}", terminal.message);
+        assert_eq!(
+            terminal.status,
+            ovrley_core::debug::RenderStatus::Complete,
+            "{}",
+            terminal.message
+        );
         let single_counts = (terminal.total, terminal.rendered, terminal.encoded);
         let single_fps = single
             .iter()

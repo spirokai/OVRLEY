@@ -20,7 +20,7 @@ use crate::debug::RenderProgress;
 use crate::encode::pipeline::{encode_video, VideoEncodingRequest};
 use crate::encode::progress::{ProgressSink, RenderController};
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::parse_config_json;
+use crate::normalize::{parse_config_json, RenderConfig};
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
@@ -116,8 +116,8 @@ impl RenderExecutionService {
         Ok(reservation)
     }
 
-    /// Validates config/activity and pins resources at submission ingress.
-    /// Dense activity, source probing and native rendering stay on the worker.
+    /// The JSON entry of the Tauri command: parses the config, and the activity once the output
+    /// is accepted, then submits as [`Self::submit_single_config`] does.
     #[allow(clippy::too_many_arguments)]
     pub fn submit_single(
         &self,
@@ -129,14 +129,61 @@ impl RenderExecutionService {
         resources: Option<&dyn RasterResourceResolver>,
         map_source: Option<MapSource>,
     ) -> CoreResult<RenderAccepted> {
-        let config = parse_config_json(config_json)?;
+        self.submit_single_with(
+            paths,
+            parse_config_json(config_json)?,
+            || parse_activity_json(parsed_activity_json).map(Arc::new),
+            output_path,
+            overwrite,
+            resources,
+            map_source,
+        )
+    }
+
+    /// Validates the config, the output and the activity's timeline and pins resources at
+    /// submission ingress. Dense activity, source probing and native rendering stay on the
+    /// worker. The activity is shared with the caller, never copied.
+    #[allow(clippy::too_many_arguments)]
+    pub fn submit_single_config(
+        &self,
+        paths: &AppPaths,
+        config: RenderConfig,
+        activity: Arc<ParsedActivity>,
+        output_path: &str,
+        overwrite: bool,
+        resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<MapSource>,
+    ) -> CoreResult<RenderAccepted> {
+        self.submit_single_with(
+            paths,
+            config,
+            || Ok(activity),
+            output_path,
+            overwrite,
+            resources,
+            map_source,
+        )
+    }
+
+    /// The output is rejected before the activity is read.
+    #[allow(clippy::too_many_arguments)]
+    fn submit_single_with(
+        &self,
+        paths: &AppPaths,
+        config: RenderConfig,
+        activity: impl FnOnce() -> CoreResult<Arc<ParsedActivity>>,
+        output_path: &str,
+        overwrite: bool,
+        resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<MapSource>,
+    ) -> CoreResult<RenderAccepted> {
         let kind = if config.scene.composite_video_path.is_some() {
             RenderOutputKind::Composite
         } else {
             RenderOutputKind::Transparent
         };
         let target = RenderOutputTarget::validate(output_path, kind, overwrite)?;
-        let activity = parse_activity_json(parsed_activity_json)?;
+        let activity = activity()?;
         let end = validate_render_activity(&activity)?;
         let plan = plan_single_render(config, end, resources, map_source)?;
         let reservation = self.reserve()?;

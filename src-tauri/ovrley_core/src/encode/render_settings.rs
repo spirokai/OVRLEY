@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 /// `QUALITY_DEFAULTS`: the default CRF of new projects and codec changes.
 pub const H264_QUALITY_DEFAULT: u8 = 21;
 pub const HEVC_QUALITY_DEFAULT: u8 = 26;
+/// `QUALITY_SLIDER_RANGE`: the CRFs the quality slider offers, best first.
+pub const QUALITY_SLIDER_MIN: u8 = 10;
+pub const QUALITY_SLIDER_MAX: u8 = 35;
 
 /// One combined file, or one file per video.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

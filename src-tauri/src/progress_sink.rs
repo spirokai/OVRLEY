@@ -16,7 +16,20 @@
 use ovrley_core::debug::RenderProgress;
 use ovrley_core::encode::progress::ProgressSink;
 use ovrley_core::render_jobs::contracts::BatchRenderEvent;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
+
+/// Core publishes every frame; the webview takes at most ~10 updates per second, as before core
+/// published every frame. Status changes and queue snapshots always pass.
+const IPC_PROGRESS_MIN_INTERVAL: Duration = Duration::from_millis(100);
+
+/// The last single progress forwarded (its render, status and time) and the last batch tick.
+#[derive(Debug, Default)]
+struct Forwarded {
+    single: Option<(u64, ovrley_core::debug::RenderStatus, Instant)>,
+    batch_tick: Option<Instant>,
+}
 
 /// Event name used for streamed render-progress updates. The frontend
 /// subscribes via `listen('render-progress', ...)` from `@tauri-apps/api/event`.
@@ -31,22 +44,50 @@ pub const RENDER_PROGRESS_EVENT: &str = "render-progress";
 #[derive(Debug, Clone)]
 pub(crate) struct TauriProgressSink {
     app: AppHandle,
+    forwarded: Arc<Mutex<Forwarded>>,
 }
 
 impl TauriProgressSink {
     pub(crate) fn new(app: AppHandle) -> Self {
-        Self { app }
+        Self {
+            app,
+            forwarded: Arc::default(),
+        }
     }
 }
 
 impl ProgressSink for TauriProgressSink {
     fn emit_batch_progress(&self, event: &BatchRenderEvent) {
+        if let BatchRenderEvent::Progress(_) = event {
+            let mut forwarded = self.forwarded.lock().expect("progress sink mutex poisoned");
+            let now = Instant::now();
+            if forwarded
+                .batch_tick
+                .is_some_and(|last| now.duration_since(last) < IPC_PROGRESS_MIN_INTERVAL)
+            {
+                return;
+            }
+            forwarded.batch_tick = Some(now);
+        }
         if let Err(error) = self.app.emit("batch-render-progress", event) {
             log::warn!("failed to emit batch-render-progress event: {error}");
         }
     }
 
     fn emit_progress(&self, progress: &RenderProgress) {
+        {
+            let mut forwarded = self.forwarded.lock().expect("progress sink mutex poisoned");
+            let now = Instant::now();
+            let unchanged = forwarded.single.is_some_and(|(render_id, status, last)| {
+                render_id == progress.render_id
+                    && status == progress.status
+                    && now.duration_since(last) < IPC_PROGRESS_MIN_INTERVAL
+            });
+            if unchanged {
+                return;
+            }
+            forwarded.single = Some((progress.render_id, progress.status, now));
+        }
         // `Emitter::emit` serializes the payload to the frontend. Failures are
         // non-fatal — e.g. no webview is listening yet during startup, or the
         // window has been torn down mid-render — so log-and-continue rather

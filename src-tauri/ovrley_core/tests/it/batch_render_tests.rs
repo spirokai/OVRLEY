@@ -130,7 +130,7 @@ impl Fixture {
             encoding,
             activity: if external {
                 BatchActivity::ExternalActivity {
-                    activity: Box::new(activity()),
+                    activity: std::sync::Arc::new(activity()),
                     offsets: sources
                         .iter()
                         .map(|source| (source.source_id.clone(), 0.0))
@@ -498,8 +498,14 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
     next.check_cancelled().unwrap(); // A terminal batch cannot cancel the new owner.
     next.complete(Ok("next.mov".to_owned())).unwrap();
     let single_progress = sink.single_progress.lock().unwrap();
-    assert_eq!(single_progress.first().unwrap().status, "preparing");
-    assert_eq!(single_progress.last().unwrap().status, "complete");
+    assert_eq!(
+        single_progress.first().unwrap().status,
+        ovrley_core::debug::RenderStatus::Preparing
+    );
+    assert_eq!(
+        single_progress.last().unwrap().status,
+        ovrley_core::debug::RenderStatus::Complete
+    );
 }
 
 #[test]
@@ -562,7 +568,14 @@ fn cancellation_waits_for_cleanup_retains_success_and_never_launches_later_jobs(
     let (release_tx, release_rx) = mpsc::channel();
     let (executor, entered, resume) = executor(Some((cleanup_tx, Mutex::new(release_rx))));
     let accepted = service
-        .submit_batch_with_executor(&fixture.paths, &fixture.inspection, request, None, None, executor)
+        .submit_batch_with_executor(
+            &fixture.paths,
+            &fixture.inspection,
+            request,
+            None,
+            None,
+            executor,
+        )
         .unwrap();
     entered.recv_timeout(WAIT).unwrap();
     resume.send(()).unwrap();

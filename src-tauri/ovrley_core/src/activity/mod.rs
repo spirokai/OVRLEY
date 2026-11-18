@@ -102,6 +102,17 @@ pub fn import_activity_path(
     Ok(response)
 }
 
+/// JSON ingress of an activity inside a request (batch submission): deserialized, then
+/// normalized once, and shared from there on.
+pub(crate) fn deserialize_parsed_activity<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<std::sync::Arc<ParsedActivity>, D::Error> {
+    let activity = <ParsedActivity as serde::Deserialize>::deserialize(deserializer)?;
+    normalize_parsed_activity(activity)
+        .map(std::sync::Arc::new)
+        .map_err(serde::de::Error::custom)
+}
+
 /// Shared ingress for already deserialized activity, including batch submission.
 pub fn normalize_parsed_activity(mut activity: ParsedActivity) -> CoreResult<ParsedActivity> {
     activity.timezone = parse_activity_timezone(&activity.metadata)?;

@@ -250,7 +250,7 @@ type PieceActivity = Option<(ParsedActivity, f64)>;
 fn execute_batch_item(
     paths: &AppPaths,
     template: &ValidatedBatchTemplate,
-    external_activity: Option<&(ParsedActivity, f64, Vec<usize>)>,
+    external_activity: Option<&(Arc<ParsedActivity>, f64, Vec<usize>)>,
     job: &AcceptedJob,
     executor: &dyn BatchJobExecutor,
     session: &RendererReservation,
@@ -287,7 +287,7 @@ fn execute_batch_item(
     // Embedded telemetry carries no editor lap selection.
     let disabled_laps = external_activity.map_or(&[][..], |(_, _, laps)| laps.as_slice());
     let activity_of = |piece: &PlannedPiece| match external_activity {
-        Some((activity, end, _)) => Some((activity, *end)),
+        Some((activity, end, _)) => Some((activity.as_ref(), *end)),
         None => embedded[piece.source.source_id.as_str()]
             .as_ref()
             .map(|(activity, end)| (activity, *end)),

@@ -205,10 +205,40 @@ pub fn backend_render_preview_frame(
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
+    let output_path = render_preview_frame_config(
+        paths,
+        config,
+        &parsed_activity,
+        second,
+        raster_resources,
+        map_source,
+    )?;
+    let filename = output_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .expect("the preview frame's file name is ASCII")
+        .to_string();
+    Ok(json!({
+        "filename": filename,
+        "path": output_path,
+        "second": second
+    }))
+}
+
+/// Renders the frame at `second` of a render config to a transparent PNG in Downloads and returns
+/// its path.
+pub fn render_preview_frame_config(
+    paths: &AppPaths,
+    config: crate::normalize::RenderConfig,
+    parsed_activity: &crate::activity::schema::ParsedActivity,
+    second: f64,
+    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
+    map_source: Option<&ovrley_map::MapSource>,
+) -> CoreResult<PathBuf> {
     let mut validated =
         crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
     validated.scene.narrow_to_frame(second);
-    let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
+    let dense_activity = build_dense_activity_report_validated(parsed_activity, &validated)?;
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|error| CoreError::Encode(format!("Failed to read system time: {error}")))?
@@ -219,18 +249,13 @@ pub fn backend_render_preview_frame(
     render_preview_frame(
         paths,
         &validated,
-        &parsed_activity,
+        parsed_activity,
         &dense_activity,
         second,
         &output_path,
         map_source,
     )?;
-
-    Ok(json!({
-        "filename": filename,
-        "path": output_path,
-        "second": second
-    }))
+    Ok(output_path)
 }
 
 /// Lists valid built-in and user templates.
@@ -313,6 +338,13 @@ pub fn backend_open_output_directory(
     paths: &AppPaths,
     directory: Option<&str>,
 ) -> CoreResult<Value> {
+    open_output_directory(paths, directory)?;
+    Ok(json!({ "message": "Folder opened" }))
+}
+
+/// Opens the render output folder in the system file browser: `directory` (absolute, existing),
+/// else Downloads.
+pub fn open_output_directory(paths: &AppPaths, directory: Option<&str>) -> CoreResult<()> {
     let target = match directory {
         None => paths.downloads_dir.clone(),
         Some(directory) => {
@@ -330,8 +362,7 @@ pub fn backend_open_output_directory(
             path.to_path_buf()
         }
     };
-    open_path_in_system(&target)?;
-    Ok(json!({ "message": "Folder opened" }))
+    open_path_in_system(&target)
 }
 
 /// Returns a fresh suggested render output path.
@@ -352,6 +383,12 @@ pub fn backend_open_templates(paths: &AppPaths) -> CoreResult<Value> {
 
 /// Opens a rendered video from its accepted absolute path.
 pub fn backend_open_video(output_path: &str) -> CoreResult<Value> {
+    open_rendered_video(output_path)?;
+    Ok(json!({ "message": "Video opened" }))
+}
+
+/// Opens a rendered file (a video, or the debug PNG frame) in the system player.
+pub fn open_rendered_video(output_path: &str) -> CoreResult<()> {
     let target = Path::new(output_path);
     if !target.is_absolute() || !target.is_file() {
         return Err(CoreError::Config(format!(
@@ -359,8 +396,7 @@ pub fn backend_open_video(output_path: &str) -> CoreResult<Value> {
         )));
     }
 
-    open_path_in_system(target)?;
-    Ok(json!({ "message": "Video opened" }))
+    open_path_in_system(target)
 }
 
 #[derive(Clone, Copy)]

@@ -13,6 +13,7 @@ use crate::error::{CoreError, CoreResult};
 use crate::raster::RasterResourceResolver;
 use ovrley_map::MapSource;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 pub(super) struct AcceptedJob {
     pub(super) id: String,
@@ -25,7 +26,7 @@ pub(super) struct AcceptedJob {
 pub(super) struct AcceptedBatch {
     pub(super) template: ValidatedBatchTemplate,
     /// External activity, its timeline end, and its disabled laps.
-    pub(super) external_activity: Option<(ParsedActivity, f64, Vec<usize>)>,
+    pub(super) external_activity: Option<(Arc<ParsedActivity>, f64, Vec<usize>)>,
     pub(super) jobs: Vec<AcceptedJob>,
 }
 
@@ -75,7 +76,6 @@ pub(super) fn accept_batch(
             disabled_laps,
             ..
         } => {
-            let activity = crate::activity::normalize_parsed_activity(*activity)?;
             let end = validate_render_activity(&activity)?;
             let disabled_laps =
                 crate::normalize::validate_disabled_laps(disabled_laps, "activity.disabledLaps")?;

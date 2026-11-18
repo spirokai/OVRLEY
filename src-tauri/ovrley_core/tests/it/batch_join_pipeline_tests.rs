@@ -143,7 +143,7 @@ impl Workspace {
                 qsv_full_init_args: None,
             },
             activity: BatchActivity::ExternalActivity {
-                activity: Box::new(activity),
+                activity: std::sync::Arc::new(activity),
                 offsets,
                 disabled_laps: Vec::new(),
             },

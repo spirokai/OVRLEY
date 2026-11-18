@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-use crate::debug::RenderProgress;
+use crate::debug::{RenderProgress, RenderStatus};
 use crate::error::{CoreError, CoreResult};
 
 /// Number of initial `record` calls to skip before reporting estimates.
@@ -32,8 +32,9 @@ const DEFAULT_ETA_SMOOTHING: f64 = 0.7;
 /// of the last emitted value before the display updates.
 const ETA_DEADBAND_FRACTION: f64 = 0.0002;
 
-/// Minimum spacing between `set_frame_progress` emits (~10 Hz).
-/// State still mutates on every call so `progress()` reads fresh data.
+/// Minimum spacing between updates of the render FPS and the time remaining (~10 Hz), and
+/// between preparing messages. Frame counts publish on every call; sinks that cannot take
+/// every frame (the Tauri IPC) throttle themselves.
 const PROGRESS_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Rolling-window throughput estimator.
@@ -294,7 +295,7 @@ impl RenderController {
             return false;
         }
         self.cancel_flag.store(true, Ordering::SeqCst);
-        progress.status = "cancelling".to_string();
+        progress.status = RenderStatus::Cancelling;
         progress.message = "Cancelling render...".to_string();
         self.publish_progress(session);
         true
@@ -320,7 +321,7 @@ impl RenderController {
             rendered: 0,
             total: 0,
             encoded: 0,
-            status: "preparing".to_string(),
+            status: RenderStatus::Preparing,
             message: "Preparing render...".to_string(),
             estimated_seconds_remaining: None,
             rendering_fps: None,
@@ -340,7 +341,7 @@ impl RenderController {
         progress.rendered = 0;
         progress.total = total_frames;
         progress.encoded = 0;
-        progress.status = "preparing".to_string();
+        progress.status = RenderStatus::Preparing;
         progress.message = message.to_string();
         progress.estimated_seconds_remaining = None;
         progress.rendering_fps = None;
@@ -398,13 +399,14 @@ impl RenderController {
         let mut session = self.session.lock().expect("render session mutex poisoned");
         let progress = &mut session.progress;
         self.check_cancelled()?;
-        progress.status = "rendering".to_string();
+        progress.status = RenderStatus::Rendering;
         progress.message = "Rendering frames...".to_string();
         self.publish_progress(session);
         self.check_cancelled()
     }
 
-    /// Updates counts and emits through sink. `rendering_fps` is ~10 Hz.
+    /// Updates counts and emits through the sink on every call; the FPS and the time remaining
+    /// change at ~10 Hz.
     pub fn set_frame_progress(
         &self,
         current: u32,
@@ -445,20 +447,18 @@ impl RenderController {
         progress.total = total;
         progress.rendered = rendered;
         progress.encoded = encoded;
-        progress.estimated_seconds_remaining = estimate;
         if due {
+            progress.estimated_seconds_remaining = estimate;
             progress.rendering_fps = rendering_fps;
         }
-        if progress.status == "rendering" {
+        if progress.status == RenderStatus::Rendering {
             progress.message = if current >= total {
                 "Encoding output file...".to_string()
             } else {
                 "Rendering frames...".to_string()
             };
         }
-        if due {
-            self.publish_progress(session);
-        }
+        self.publish_progress(session);
     }
 
     pub(crate) fn finish_success(&self, filename: Option<String>) {
@@ -466,7 +466,7 @@ impl RenderController {
         let progress = &mut session.progress;
         progress.current = progress.total;
         progress.encoded = progress.total;
-        progress.status = "complete".to_string();
+        progress.status = RenderStatus::Complete;
         progress.message = "Video rendered successfully".to_string();
         progress.estimated_seconds_remaining = Some(0);
         progress.rendering_fps = None;
@@ -479,9 +479,9 @@ impl RenderController {
         let mut session = self.session.lock().expect("render session mutex poisoned");
         let progress = &mut session.progress;
         progress.status = if cancelled {
-            "cancelled".to_string()
+            RenderStatus::Cancelled
         } else {
-            "error".to_string()
+            RenderStatus::Error
         };
         progress.message = if cancelled {
             "Rendering cancelled".to_string()

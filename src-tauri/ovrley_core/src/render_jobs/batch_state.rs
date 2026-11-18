@@ -3,7 +3,7 @@
 use super::batch::BatchServiceError;
 use super::contracts::*;
 use super::submission::AcceptedJob;
-use crate::debug::RenderProgress;
+use crate::debug::{RenderProgress, RenderStatus};
 use crate::encode::progress::ProgressSink;
 use crate::error::{CoreError, CoreResult};
 use crate::output::RenderOutputTarget;
@@ -217,13 +217,13 @@ impl BatchState {
                 progress.busy
                     && state.render_id == progress.render_id
                     && state.renderer_busy
-                    && (state.active.is_some() || progress.status == "cancelling")
+                    && (state.active.is_some() || progress.status == RenderStatus::Cancelling)
             })
         })?;
         let previous_phase = running.phase;
         let previous_item_phase = running.active.map(|(index, _)| running.items[index].phase);
         if let Some(progress) = progress {
-            if progress.status == "cancelling" {
+            if progress.status == RenderStatus::Cancelling {
                 running.phase = BatchPhase::Cancelling;
             }
             if let Some((index, _)) = running.active {
@@ -237,7 +237,7 @@ impl BatchState {
                 item.current_frames = u64::from(progress.current);
                 item.rendered_frames = u64::from(progress.rendered);
                 item.encoded_frames = u64::from(progress.encoded);
-                if progress.status == "rendering" {
+                if progress.status == RenderStatus::Rendering {
                     item.phase = BatchItemPhase::Rendering;
                     if running.phase != BatchPhase::Cancelling {
                         running.phase = BatchPhase::Rendering;

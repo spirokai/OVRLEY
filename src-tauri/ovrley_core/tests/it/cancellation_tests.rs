@@ -22,13 +22,19 @@ fn double_cancel_is_idempotent() {
     let _ = controller.cancel();
 
     let progress = controller.progress();
-    assert_eq!(progress.status, "cancelling");
+    assert_eq!(
+        progress.status,
+        ovrley_core::debug::RenderStatus::Cancelling
+    );
     assert!(progress.busy);
     assert!(matches!(
         session.complete::<String>(Err(CoreError::Cancelled)),
         Err(CoreError::Cancelled)
     ));
-    assert_eq!(controller.progress().status, "cancelled");
+    assert_eq!(
+        controller.progress().status,
+        ovrley_core::debug::RenderStatus::Cancelled
+    );
 }
 
 /// Cancellation and panics retain ownership through native cleanup.
@@ -53,8 +59,16 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
     }
 
     for cancel in [true, false] {
-        let pending = if cancel { "cancelling" } else { "preparing" };
-        let terminal = if cancel { "cancelled" } else { "error" };
+        let pending = if cancel {
+            ovrley_core::debug::RenderStatus::Cancelling
+        } else {
+            ovrley_core::debug::RenderStatus::Preparing
+        };
+        let terminal = if cancel {
+            ovrley_core::debug::RenderStatus::Cancelled
+        } else {
+            ovrley_core::debug::RenderStatus::Error
+        };
         let sink = Arc::new(RecordingSink::default());
         let controller = RenderController::with_sink(sink.clone());
         let service = RenderExecutionService::with_controller(controller.clone());
@@ -88,7 +102,10 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
             .unwrap();
 
         prepared_rx.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert_eq!(service.progress().status, "preparing");
+        assert_eq!(
+            service.progress().status,
+            ovrley_core::debug::RenderStatus::Preparing
+        );
         assert!(service.reserve().is_err());
         if cancel {
             assert!(service.cancel());
@@ -125,6 +142,9 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
         let next = service.reserve().unwrap();
         next.begin_item(1, "Next operation").unwrap();
         next.complete(Ok("next.mov".to_owned())).unwrap();
-        assert_eq!(service.progress().status, "complete");
+        assert_eq!(
+            service.progress().status,
+            ovrley_core::debug::RenderStatus::Complete
+        );
     }
 }

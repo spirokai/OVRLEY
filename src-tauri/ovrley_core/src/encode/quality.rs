@@ -7,16 +7,15 @@ use serde::{Deserialize, Serialize};
 const BITRATE_MAXRATE_MULTIPLIER: f64 = 1.5;
 const BITRATE_BUFSIZE_MULTIPLIER: f64 = 2.0;
 
-/// CRF at the best-quality end of the frontend quality slider
-/// (`QUALITY_SLIDER_RANGE.min`); it maps to VideoToolbox's maximum quality.
-const VIDEOTOOLBOX_MAX_QUALITY_CRF: f64 = 10.0;
+/// CRF at the best-quality end of the quality slider; it maps to VideoToolbox's maximum quality.
+const VIDEOTOOLBOX_MAX_QUALITY_CRF: f64 = super::render_settings::QUALITY_SLIDER_MIN as f64;
 const VIDEOTOOLBOX_MAX_QUALITY: f64 = 100.0;
 /// VideoToolbox quality lost per CRF step. Calibrated on 4K camera footage so
 /// the default CRFs land on comparable output: H.264 CRF 21 maps to quality 72
 /// (VMAF-matched to libx264 CRF 21) and HEVC CRF 26 maps to quality 70 (about
-/// the bitrate NVENC produces at CQ 26). The export dialog displays this scale
-/// from `VIDEOTOOLBOX_QUALITY_SCALE` in `app/.../data/qualityDefaults.js`;
-/// keep both in sync.
+/// the bitrate NVENC produces at CQ 26). The React export dialog displays this
+/// scale from `VIDEOTOOLBOX_QUALITY_SCALE` in `app/.../data/qualityDefaults.js`;
+/// keep both in sync. The native dialog calls [`videotoolbox_display_quality`].
 const VIDEOTOOLBOX_H264_QUALITY_PER_CRF: f64 = 28.0 / 11.0;
 const VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF: f64 = 30.0 / 16.0;
 
@@ -70,6 +69,24 @@ fn videotoolbox_quality(crf: u8, quality_per_crf: f64) -> u8 {
     quality.round().clamp(1.0, VIDEOTOOLBOX_MAX_QUALITY) as u8
 }
 
+/// The 1–100 quality a VideoToolbox composite codec receives for `crf`, or `None` for an encoder
+/// that takes the CRF itself. The export dialog labels its quality value with it.
+pub fn videotoolbox_display_quality(
+    codec: super::ffmpeg::catalog::CompositeCodecId,
+    crf: u8,
+) -> Option<u8> {
+    use super::ffmpeg::catalog::CompositeCodecId;
+    match codec {
+        CompositeCodecId::MacH264 => {
+            Some(videotoolbox_quality(crf, VIDEOTOOLBOX_H264_QUALITY_PER_CRF))
+        }
+        CompositeCodecId::MacHevc => {
+            Some(videotoolbox_quality(crf, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF))
+        }
+        _ => None,
+    }
+}
+
 /// Selects the validated setting's template and expands its value placeholders.
 pub(crate) fn rate_control_args(
     profile: &CompositeProfile,
@@ -109,20 +126,41 @@ mod tests {
 
     #[test]
     fn videotoolbox_slider_best_end_reaches_maximum_quality() {
-        assert_eq!(videotoolbox_quality(10, VIDEOTOOLBOX_H264_QUALITY_PER_CRF), 100);
-        assert_eq!(videotoolbox_quality(10, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF), 100);
+        assert_eq!(
+            videotoolbox_quality(10, VIDEOTOOLBOX_H264_QUALITY_PER_CRF),
+            100
+        );
+        assert_eq!(
+            videotoolbox_quality(10, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF),
+            100
+        );
     }
 
     #[test]
     fn videotoolbox_default_crfs_land_on_calibrated_quality() {
-        assert_eq!(videotoolbox_quality(21, VIDEOTOOLBOX_H264_QUALITY_PER_CRF), 72);
-        assert_eq!(videotoolbox_quality(26, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF), 70);
+        assert_eq!(
+            videotoolbox_quality(21, VIDEOTOOLBOX_H264_QUALITY_PER_CRF),
+            72
+        );
+        assert_eq!(
+            videotoolbox_quality(26, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF),
+            70
+        );
     }
 
     #[test]
     fn videotoolbox_quality_saturates_at_scale_limits() {
-        assert_eq!(videotoolbox_quality(1, VIDEOTOOLBOX_H264_QUALITY_PER_CRF), 100);
-        assert_eq!(videotoolbox_quality(51, VIDEOTOOLBOX_H264_QUALITY_PER_CRF), 1);
-        assert_eq!(videotoolbox_quality(51, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF), 23);
+        assert_eq!(
+            videotoolbox_quality(1, VIDEOTOOLBOX_H264_QUALITY_PER_CRF),
+            100
+        );
+        assert_eq!(
+            videotoolbox_quality(51, VIDEOTOOLBOX_H264_QUALITY_PER_CRF),
+            1
+        );
+        assert_eq!(
+            videotoolbox_quality(51, VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF),
+            23
+        );
     }
 }

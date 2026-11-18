@@ -8,6 +8,26 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use std::time::Instant;
 
+/// Where a render is in its lifecycle; serialized as the lowercase name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RenderStatus {
+    Idle,
+    Preparing,
+    Rendering,
+    Cancelling,
+    Complete,
+    Error,
+    Cancelled,
+}
+
+impl RenderStatus {
+    /// Complete, error or cancelled: the render ended and its cleanup finished.
+    pub fn is_terminal(self) -> bool {
+        matches!(self, Self::Complete | Self::Error | Self::Cancelled)
+    }
+}
+
 /// Serializable render progress snapshot.
 ///
 /// Instances are stored behind a mutex in `RenderController` and cloned for UI
@@ -27,8 +47,7 @@ pub struct RenderProgress {
     pub total: u32,
     /// Output frames confirmed by the encoder (zero until confirmed).
     pub encoded: u32,
-    /// `idle`, `preparing`, `rendering`, `cancelling`, `complete`, `error`, or `cancelled`.
-    pub status: String,
+    pub status: RenderStatus,
     /// Human-readable status message shown by the UI.
     pub message: String,
     /// Estimated remaining render seconds, when enough samples exist.
@@ -50,7 +69,7 @@ impl Default for RenderProgress {
             rendered: 0,
             total: 0,
             encoded: 0,
-            status: "idle".to_string(),
+            status: RenderStatus::Idle,
             message: String::new(),
             estimated_seconds_remaining: None,
             rendering_fps: None,

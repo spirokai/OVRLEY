@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
@@ -50,7 +51,9 @@ pub struct BatchEncodingSettings {
 pub enum BatchActivity {
     EmbeddedActivity {},
     ExternalActivity {
-        activity: Box<ParsedActivity>,
+        /// Normalized at JSON ingress; shared by the caller and the accepted batch.
+        #[serde(deserialize_with = "crate::activity::deserialize_parsed_activity")]
+        activity: Arc<ParsedActivity>,
         /// Committed offsets keyed by the queued source identities.
         offsets: HashMap<String, f64>,
         /// Editor-disabled lap IDs of `activity`, strictly increasing.
