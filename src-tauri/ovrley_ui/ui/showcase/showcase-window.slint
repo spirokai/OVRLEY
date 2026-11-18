@@ -14,7 +14,7 @@ import { ButtonGroup, ButtonGroupVertical, ButtonGroupText, ButtonGroupSeparator
 import { GroupPosition } from "../components/group-surface.slint";
 import { Toggle, ToggleVariant, ToggleSize } from "../components/toggle.slint";
 import { Input, InputVariant } from "../components/input.slint";
-import { Switch } from "../components/switch.slint";
+import { Switch, SwitchVariant } from "../components/switch.slint";
 import { Progress } from "../components/progress.slint";
 import { Slider } from "../components/slider.slint";
 import { SectionHeading, SectionHeadingVariant } from "../components/section-heading.slint";
@@ -344,6 +344,8 @@ export component ShowcaseWindow inherits FluidWindow {
                     Switch { checked: root.switch-a; checked-changed(c) => { root.switch-a = c; } }
                     Switch { checked: root.switch-b; checked-changed(c) => { root.switch-b = c; } }
                     Switch { checked: true; disabled: true; }
+                    Switch { variant: SwitchVariant.status; checked: root.switch-a; checked-changed(c) => { root.switch-a = c; } }
+                    Switch { variant: SwitchVariant.status; checked: root.switch-b; checked-changed(c) => { root.switch-b = c; } }
                 }
                 Row {
                     caption: "Progress";

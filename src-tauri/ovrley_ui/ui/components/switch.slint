@@ -1,13 +1,20 @@
 import { Theme } from "../theme/theme.slint";
 import { FocusRing } from "focus-ring.slint";
 import { Shadow, ShadowSize } from "shadow.slint";
+import { Icon, Icons } from "icons.slint";
+
+// switch.jsx's variants. `status` shows on as green with a tick and off as red with a cross.
+export enum SwitchVariant { default, status }
 
 // switch.jsx: a 1.15rem × 2rem track, fully rounded, `primary` when checked and `input` when not;
 // a 1rem thumb, `primary-foreground` when checked and `foreground` when not, travelling 100% of
-// its width minus 0.148rem. Space and Enter toggle it.
+// its width minus 0.148rem. Space and Enter toggle it. The `status` variant: the track green-500
+// at 80% when checked and red-400 at 80% when not; a white thumb holding a 0.75rem tick (green-600)
+// or cross (red-500), stroke 3.
 export component Switch {
     in property <bool> checked;
     in property <bool> disabled;
+    in property <SwitchVariant> variant: SwitchVariant.default;
     callback checked-changed(checked: bool);
 
     width: 2rem;
@@ -28,7 +35,7 @@ export component Switch {
     }
     Rectangle {
         border-radius: root.height / 2;
-        background: root.checked ? Theme.primary : Theme.input;
+        background: root.variant == SwitchVariant.status ? (root.checked ? #22c55ecc : #f87171cc) : (root.checked ? Theme.primary : Theme.input);
         border-width: 1px;
         border-color: focus.focus-visible ? Theme.ring : transparent;
         animate background { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
@@ -40,8 +47,17 @@ export component Switch {
             x: 1px + (root.checked ? self.width - 0.148rem : 0px);
             y: (parent.height - self.height) / 2;
             border-radius: self.width / 2;
-            background: root.checked ? Theme.primary-foreground : Theme.foreground;
+            background: root.variant == SwitchVariant.status ? #ffffff : (root.checked ? Theme.primary-foreground : Theme.foreground);
             animate x { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+
+            if root.variant == SwitchVariant.status: Icon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                size: 0.75rem;
+                stroke: 3;
+                glyph: root.checked ? Icons.check : Icons.x;
+                color: root.checked ? #16a34a : #ef4444;
+            }
         }
     }
     TouchArea {
