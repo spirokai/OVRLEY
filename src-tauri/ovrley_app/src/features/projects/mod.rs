@@ -371,7 +371,7 @@ fn proceed(store: &mut Store, services: &mut Services, continuation: UnsavedCont
         UnsavedContinuation::NewTemplate { .. } => unreachable!("template confirmations are answered by the template manager"),
         UnsavedContinuation::NewProject { reply } => create_project(store, services, reply),
         UnsavedContinuation::OpenProject { path, request } => load_project(store, services, path, request),
-        UnsavedContinuation::CloseWindow => services.window.close(),
+        UnsavedContinuation::CloseWindow => crate::features::render_video::close_window(store, services),
     }
 }
 

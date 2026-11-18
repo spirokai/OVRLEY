@@ -964,3 +964,46 @@ fn a_source_that_fails_inspection_blocks_one_combined_file_and_start() {
     assert_eq!(view.blockers, ["Some videos cannot be exported (a.mp4, b.mp4)."]);
     assert!(view.start_disabled);
 }
+
+#[test]
+fn closing_the_window_during_a_render_cancels_it_and_closes_after_cleanup() {
+    use crate::store::services::fakes::WindowCall;
+    use std::sync::atomic::Ordering;
+    let (dispatcher, fakes) = dispatcher();
+    open(&dispatcher);
+    start(&dispatcher);
+    wait_for(&dispatcher, &fakes, |store| store.media.rendering_video);
+    fakes.render.busy.store(true, Ordering::SeqCst);
+    dispatcher.dispatch(close_window);
+    assert!(fakes.render.calls().contains(&FakeRenderCall::Cancel), "the close cancels without asking");
+    assert!(fakes.window.calls.borrow().is_empty(), "the window waits for the cleanup");
+    fakes.render.busy.store(false, Ordering::SeqCst);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while fakes.window.calls.borrow().is_empty() {
+        fakes.ui_post.drain(&dispatcher);
+        assert!(Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(*fakes.window.calls.borrow(), [WindowCall::Close]);
+}
+
+#[test]
+fn the_png_frame_holds_the_renderer_and_opens_its_file() {
+    let (dispatcher, fakes) = dispatcher();
+    dispatcher.dispatch(|store, _| store.editor.set_selected_second(3.5));
+    dispatcher.dispatch(render_preview_frame);
+    assert_eq!(read(&dispatcher, |store| store.media.render_submission_target), Some(RenderTarget::Preview));
+    assert!(read(&dispatcher, crate::features::projects::is_busy));
+    wait_for(&dispatcher, &fakes, |store| store.media.render_submission_target.is_none());
+    assert_eq!(fakes.render.calls(), [FakeRenderCall::PreviewFrame { second: 3.5 }, FakeRenderCall::OpenFile("/downloads/preview_frame.png".into())]);
+}
+
+#[test]
+fn the_header_explains_why_start_is_disabled() {
+    let (dispatcher, _) = dispatcher();
+    assert_eq!(read(&dispatcher, header_actions_view).start_tooltip, "");
+    dispatcher.dispatch(|store, _| store.media.render_submission_target = Some(RenderTarget::Preview));
+    let view = read(&dispatcher, header_actions_view);
+    assert!(view.start_disabled);
+    assert_eq!(view.start_tooltip, "Rendering already in progress");
+}

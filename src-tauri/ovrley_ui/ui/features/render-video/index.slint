@@ -99,6 +99,15 @@ export global RenderVideo {
     in property <string> missing-title;
     in property <string> missing-description;
 
+    // The header's actions (`ActionButtons`).
+    in property <bool> header-start-disabled;
+    in property <string> header-start-tooltip;
+    in property <bool> rendering;
+    in property <bool> png-shown;
+    callback open-dialog();
+    callback open-output-folder();
+    callback render-png();
+
     callback close();
     callback dismiss-missing();
     callback set-composite(composite: bool);

@@ -664,6 +664,79 @@ pub fn cancel_dialog_render(store: &mut Store, services: &mut Services) {
     session::cancel_render(store, services, target);
 }
 
+/// The header's PNG button (debug builds): the playhead's frame, rendered on a worker to a
+/// transparent PNG in Downloads, then opened. It holds the renderer while it runs.
+pub fn render_preview_frame(store: &mut Store, services: &mut Services) {
+    if render_disabled_reason(store).is_some() || is_renderer_busy(store) {
+        return;
+    }
+    let request = match request::preview_render_request(store) {
+        Ok(request) => request,
+        Err(error) => {
+            store.media.set_error_message(error);
+            return;
+        }
+    };
+    store.media.render_submission_target = Some(RenderTarget::Preview);
+    let render = Arc::clone(&services.render);
+    let rasters = services.rasters.clone();
+    services.workers.spawn("render-preview-frame", move || {
+        let rendered = render.render_preview_frame(&rasters, request.config, &request.activity, request.second).and_then(|path| render.open_file(&path));
+        Box::new(move |store: &mut Store, _: &mut Services| {
+            store.media.render_submission_target = None;
+            if let Err(error) = rendered {
+                store.media.set_error_message(error);
+            }
+        })
+    });
+}
+
+/// The header's actions (`ActionButtons`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct HeaderActionsView {
+    pub start_disabled: bool,
+    /// Why Start Render is disabled; empty when it is not.
+    pub start_tooltip: String,
+    /// A single render runs: Start reads "Rendering frames...".
+    pub rendering: bool,
+    /// The PNG button, in debug builds.
+    pub png_shown: bool,
+}
+
+pub fn header_actions_view(store: &Store) -> HeaderActionsView {
+    let reason = render_disabled_reason(store);
+    HeaderActionsView {
+        start_disabled: reason.is_some(),
+        start_tooltip: reason.unwrap_or_default(),
+        rendering: store.media.rendering_video,
+        png_shown: store.editor_shell.debug_mode_enabled,
+    }
+}
+
+/// Closes the window. During a render (Q1: A, as React, without asking) the close cancels it and
+/// waits on a worker for core's cleanup (`ffmpeg` stopped, the partial output removed) before the
+/// window closes, so no hidden process outlives it.
+pub fn close_window(store: &mut Store, services: &mut Services) {
+    if !services.render.busy() {
+        services.window.close();
+        return;
+    }
+    if store.media.rendering_video {
+        session::cancel_render(store, services, RenderTarget::Single);
+    } else if store.batch_render.batch_snapshot.as_ref().is_some_and(|snapshot| snapshot.renderer_busy) {
+        session::cancel_render(store, services, RenderTarget::Batch);
+    } else {
+        services.render.cancel();
+    }
+    let render = Arc::clone(&services.render);
+    services.workers.spawn("render-close", move || {
+        while render.busy() {
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        Box::new(|_: &mut Store, services: &mut Services| services.window.close())
+    });
+}
+
 // --- the reconcile step -------------------------------------------------------------------------
 
 /// The `render_dialog` reconcile step: the progress phase ends with its render; the codec follows

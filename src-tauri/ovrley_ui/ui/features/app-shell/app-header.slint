@@ -4,6 +4,8 @@ import { Icon, Icons } from "../../components/icons.slint";
 import { Badge, BadgeVariant } from "../../components/badge.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Choice } from "../../components/logic.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { RenderVideo } from "../render-video/index.slint";
 import { FileMenu } from "file-menu.slint";
 import { TemplateSection } from "template-section.slint";
 
@@ -242,6 +244,64 @@ export component AppHeader inherits Rectangle {
                                     height: 0.5rem;
                                     border-radius: 0.25rem;
                                     background: Theme.success;
+                                }
+                            }
+                        }
+                    }
+                }
+                // `ActionButtons`: Overlays (Mod+Shift+E), PNG in debug builds, Start Render (Mod+E).
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 0.75rem;
+                    padding-right: 1rem;
+                    VerticalLayout {
+                        alignment: center;
+                        Button {
+                            height: 2.25rem;
+                            size: ButtonSize.sm;
+                            variant: ButtonVariant.outline;
+                            padding-x: 1rem;
+                            icon: Icons.folder-open;
+                            icon-size: 0.875rem;
+                            text: @tr("app-shell.overlays" => "Overlays");
+                            border-color: Theme.accent-border.transparentize(0.3);
+                            text-color: Theme.muted-foreground;
+                            clicked => {
+                                RenderVideo.open-output-folder();
+                            }
+                        }
+                    }
+                    if RenderVideo.png-shown: VerticalLayout {
+                        alignment: center;
+                        Button {
+                            height: 2.25rem;
+                            size: ButtonSize.sm;
+                            variant: ButtonVariant.outline;
+                            padding-x: 1rem;
+                            icon: Icons.image-down;
+                            icon-size: 0.875rem;
+                            text: "PNG";
+                            border-color: Theme.accent-border.transparentize(0.3);
+                            text-color: Theme.muted-foreground;
+                            disabled: RenderVideo.header-start-disabled;
+                            clicked => {
+                                RenderVideo.render-png();
+                            }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        SimpleTooltip {
+                            content: RenderVideo.header-start-tooltip;
+                            side: bottom;
+                            Button {
+                                height: 2.25rem;
+                                size: ButtonSize.sm;
+                                icon: Icons.play;
+                                text: RenderVideo.rendering ? @tr("render-video.renderingFrames" => "Rendering frames...") : @tr("render-video.startRender" => "Start Render");
+                                disabled: RenderVideo.header-start-disabled;
+                                clicked => {
+                                    RenderVideo.open-dialog();
                                 }
                             }
                         }

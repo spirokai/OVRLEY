@@ -76,6 +76,11 @@ fn same_progress(current: &RenderProgressView, next: &ProgressView) -> bool {
 
 pub fn project(window: &AppWindow, store: &Store) {
     let global = window.global::<RenderVideo>();
+    let header = render::header_actions_view(store);
+    set_if_changed(global.get_header_start_disabled(), header.start_disabled, |value| global.set_header_start_disabled(value));
+    set_if_changed(global.get_header_start_tooltip(), SharedString::from(header.start_tooltip.as_str()), |value| global.set_header_start_tooltip(value));
+    set_if_changed(global.get_rendering(), header.rendering, |value| global.set_rendering(value));
+    set_if_changed(global.get_png_shown(), header.png_shown, |value| global.set_png_shown(value));
     let notices = render_notices_view(store);
     set_if_changed(
         global.get_overwrite_open(),
@@ -355,6 +360,12 @@ pub fn project(window: &AppWindow, store: &Store) {
 
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let global = window.global::<RenderVideo>();
+    let d = dispatcher.handle();
+    global.on_open_dialog(move || d.dispatch(render::open_render_dialog));
+    let d = dispatcher.handle();
+    global.on_open_output_folder(move || d.dispatch(ovrley_app::features::app_shell::open_output_directory));
+    let d = dispatcher.handle();
+    global.on_render_png(move || d.dispatch(render::render_preview_frame));
     let d = dispatcher.handle();
     global.on_close(move || d.dispatch(|store, _| render::close_render_dialog(store)));
     let d = dispatcher.handle();
