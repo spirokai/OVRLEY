@@ -197,6 +197,8 @@ pub trait MapServices: Send + Sync {
     /// Applies and saves a new limit, evicting down to it.
     fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String>;
     fn clear_tile_cache(&self) -> Result<TileCacheUsage, String>;
+    /// The map data renders draw route maps with; `None` in tests.
+    fn map_source(&self) -> Option<ovrley_core::MapSource>;
 }
 
 /// The settings key of the map tile cache limit, shared with the Tauri app.
@@ -258,6 +260,141 @@ impl MapServices for NativeMapServices {
         self.data.tiles().clear()?;
         self.data.tiles().usage()
     }
+
+    fn map_source(&self) -> Option<ovrley_core::MapSource> {
+        Some(self.data.map_source())
+    }
+}
+
+pub use ovrley_core::render_jobs::batch::BatchServiceError;
+pub use ovrley_core::render_jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
+pub use ovrley_core::render_jobs::execution::RenderAccepted;
+
+/// The render services the Tauri app holds in `BackendState` (Phase 7 D1, D6): one execution
+/// service and one inspection service, called with typed values. Submission, inspection and the
+/// preview frame block, so they run on workers; progress arrives through the mailbox.
+pub trait RenderService: Send + Sync {
+    fn submit_single(
+        &self,
+        resources: &ovrley_services::raster_resources::RasterResources,
+        config: ovrley_core::normalize::RenderConfig,
+        activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
+        output_path: &str,
+        overwrite: bool,
+    ) -> ovrley_core::error::CoreResult<RenderAccepted>;
+    fn submit_batch(&self, resources: &ovrley_services::raster_resources::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError>;
+    /// Cancels the single render; whether one was active.
+    fn cancel(&self) -> bool;
+    fn cancel_batch(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError>;
+    /// Whether the renderer is reserved: a render, its preparation or its cleanup runs.
+    fn busy(&self) -> bool;
+    /// A new inspection session's id.
+    fn create_inspection(&self) -> String;
+    fn dispose_inspection(&self, inspection_id: &str);
+    /// Inspects one source in the session: its native source id, or why it failed. Blocking.
+    fn inspect_source(&self, inspection_id: &str, path: &str) -> Result<String, String>;
+    /// The debug PNG frame at `second`, in Downloads. Blocking.
+    fn render_preview_frame(
+        &self,
+        resources: &ovrley_services::raster_resources::RasterResources,
+        config: ovrley_core::normalize::RenderConfig,
+        activity: &ovrley_core::activity::schema::ParsedActivity,
+        second: f64,
+    ) -> Result<String, String>;
+    /// `suggestRenderOutputPath`: a fresh file name in `directory`, else Downloads.
+    fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String>;
+    fn open_output_directory(&self, directory: Option<&str>) -> Result<(), String>;
+    /// Opens a rendered file in the system player.
+    fn open_file(&self, path: &str) -> Result<(), String>;
+}
+
+/// The native render services, publishing progress through a [`RenderMailbox`].
+///
+/// [`RenderMailbox`]: crate::features::render_video::session::RenderMailbox
+pub struct NativeRenderService {
+    paths: Arc<ovrley_core::paths::AppPaths>,
+    execution: ovrley_core::render_jobs::execution::RenderExecutionService,
+    inspection: ovrley_core::render_jobs::inspection::VideoInspectionService,
+    map_source: Option<ovrley_core::MapSource>,
+}
+
+impl NativeRenderService {
+    pub fn new(paths: Arc<ovrley_core::paths::AppPaths>, map_source: Option<ovrley_core::MapSource>, ui_post: Arc<dyn UiPost>) -> Self {
+        let mailbox = crate::features::render_video::session::RenderMailbox::new(ui_post);
+        Self {
+            paths,
+            execution: ovrley_core::render_jobs::execution::RenderExecutionService::with_sink(mailbox),
+            inspection: ovrley_core::render_jobs::inspection::VideoInspectionService::default(),
+            map_source,
+        }
+    }
+}
+
+impl RenderService for NativeRenderService {
+    fn submit_single(
+        &self,
+        resources: &ovrley_services::raster_resources::RasterResources,
+        config: ovrley_core::normalize::RenderConfig,
+        activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
+        output_path: &str,
+        overwrite: bool,
+    ) -> ovrley_core::error::CoreResult<RenderAccepted> {
+        self.execution.submit_single_config(&self.paths, config, activity, output_path, overwrite, Some(resources), self.map_source.clone())
+    }
+
+    fn submit_batch(&self, resources: &ovrley_services::raster_resources::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError> {
+        self.execution.submit_batch(&self.paths, &self.inspection, request, Some(resources), self.map_source.clone())
+    }
+
+    fn cancel(&self) -> bool {
+        self.execution.cancel()
+    }
+
+    fn cancel_batch(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError> {
+        self.execution.cancel_batch(batch_id)
+    }
+
+    fn busy(&self) -> bool {
+        self.execution.progress().busy
+    }
+
+    fn create_inspection(&self) -> String {
+        self.inspection.create_session().inspection_id
+    }
+
+    fn dispose_inspection(&self, inspection_id: &str) {
+        self.inspection.dispose_session(inspection_id);
+    }
+
+    fn inspect_source(&self, inspection_id: &str, path: &str) -> Result<String, String> {
+        self.inspection.inspect_source(&self.paths, inspection_id, path).map(|source| source.source_id).map_err(|error| error.to_string())
+    }
+
+    fn render_preview_frame(
+        &self,
+        resources: &ovrley_services::raster_resources::RasterResources,
+        config: ovrley_core::normalize::RenderConfig,
+        activity: &ovrley_core::activity::schema::ParsedActivity,
+        second: f64,
+    ) -> Result<String, String> {
+        ovrley_core::commands::render_preview_frame_config(&self.paths, config, activity, second, Some(resources), self.map_source.as_ref())
+            .map(|path| path.display().to_string())
+            .map_err(|error| error.to_string())
+    }
+
+    fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String> {
+        ovrley_core::output::suggest_output_path(&self.paths, kind, directory.map(std::path::Path::new))
+            .map(|path| path.display().to_string())
+            .map_err(|error| error.to_string())
+    }
+
+    fn open_output_directory(&self, directory: Option<&str>) -> Result<(), String> {
+        ovrley_core::commands::open_output_directory(&self.paths, directory).map_err(|error| error.to_string())
+    }
+
+    fn open_file(&self, path: &str) -> Result<(), String> {
+        ovrley_core::commands::open_rendered_video(path).map_err(|error| error.to_string())
+    }
 }
 
 /// Everything an action may use besides the store.
@@ -274,6 +411,7 @@ pub struct Services {
     pub window: Box<dyn WindowControl>,
     pub video_tools: Arc<dyn VideoTools>,
     pub maps: Arc<dyn MapServices>,
+    pub render: Arc<dyn RenderService>,
     /// Dispatches later on the UI thread, for replies that arrive there (dialogs).
     pub dispatch: DispatchHandle,
 }
@@ -288,6 +426,7 @@ pub struct ServiceParts {
     pub window: Box<dyn WindowControl>,
     pub video_tools: Arc<dyn VideoTools>,
     pub maps: Arc<dyn MapServices>,
+    pub render: Arc<dyn RenderService>,
 }
 
 impl ServiceParts {
@@ -302,6 +441,7 @@ impl ServiceParts {
             clipboard: self.clipboard,
             video_tools: self.video_tools,
             maps: self.maps,
+            render: self.render,
             window: self.window,
             dispatch,
         }
@@ -413,6 +553,7 @@ pub mod fakes {
         pub window: FakeWindow,
         pub video_tools: Arc<FakeVideoTools>,
         pub maps: Arc<FakeMapServices>,
+        pub render: Arc<FakeRenderService>,
     }
 
     /// Maps over the checkout's bundled styles, with frames from a test's factory, a fixed adapter
@@ -505,6 +646,147 @@ pub mod fakes {
             usage.used_bytes = 0;
             Ok(*usage)
         }
+
+        fn map_source(&self) -> Option<ovrley_core::MapSource> {
+            None
+        }
+    }
+
+    /// A call the fake render service received.
+    #[derive(Clone, Debug, PartialEq)]
+    pub enum FakeRenderCall {
+        SubmitSingle { output_path: String, overwrite: bool },
+        SubmitBatch { inspection_id: String, outputs: usize },
+        Cancel,
+        CancelBatch(String),
+        CreateInspection(String),
+        DisposeInspection(String),
+        Inspect(String),
+        PreviewFrame { second: f64 },
+        OpenDirectory(Option<String>),
+        OpenFile(String),
+    }
+
+    /// Records each call and answers from its queues; the test sends progress through `mailbox`,
+    /// as core would.
+    pub struct FakeRenderService {
+        pub mailbox: Arc<crate::features::render_video::session::RenderMailbox>,
+        pub calls: Mutex<Vec<FakeRenderCall>>,
+        /// The single submissions' answers; an empty queue accepts with the next render id.
+        pub single_results: Mutex<std::collections::VecDeque<ovrley_core::error::CoreResult<RenderAccepted>>>,
+        pub batch_results: Mutex<std::collections::VecDeque<Result<BatchAcceptance, BatchServiceError>>>,
+        /// The submitted single configs and batch requests, newest last.
+        pub singles: Mutex<Vec<ovrley_core::normalize::RenderConfig>>,
+        pub batches: Mutex<Vec<BatchRenderRequest>>,
+        /// Inspections by path; an unknown path fails.
+        pub sources: Mutex<std::collections::HashMap<String, Result<String, String>>>,
+        pub cancel_snapshot: Mutex<Option<BatchSnapshot>>,
+        pub busy: std::sync::atomic::AtomicBool,
+        next_id: std::sync::atomic::AtomicU64,
+    }
+
+    impl FakeRenderService {
+        pub fn new(ui_post: Arc<dyn UiPost>) -> Self {
+            Self {
+                mailbox: crate::features::render_video::session::RenderMailbox::new(ui_post),
+                calls: Mutex::default(),
+                single_results: Mutex::default(),
+                batch_results: Mutex::default(),
+                singles: Mutex::default(),
+                batches: Mutex::default(),
+                sources: Mutex::default(),
+                cancel_snapshot: Mutex::default(),
+                busy: Default::default(),
+                next_id: std::sync::atomic::AtomicU64::new(1),
+            }
+        }
+
+        pub fn calls(&self) -> Vec<FakeRenderCall> {
+            self.calls.lock().unwrap().clone()
+        }
+
+        fn record(&self, call: FakeRenderCall) {
+            self.calls.lock().unwrap().push(call);
+        }
+    }
+
+    impl RenderService for FakeRenderService {
+        fn submit_single(
+            &self,
+            _resources: &ovrley_services::raster_resources::RasterResources,
+            config: ovrley_core::normalize::RenderConfig,
+            _activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
+            output_path: &str,
+            overwrite: bool,
+        ) -> ovrley_core::error::CoreResult<RenderAccepted> {
+            use std::sync::atomic::Ordering;
+            self.record(FakeRenderCall::SubmitSingle { output_path: output_path.into(), overwrite });
+            self.singles.lock().unwrap().push(config);
+            self.single_results.lock().unwrap().pop_front().unwrap_or_else(|| {
+                Ok(RenderAccepted { started: true, render_id: self.next_id.fetch_add(1, Ordering::SeqCst), output_path: output_path.into() })
+            })
+        }
+
+        fn submit_batch(&self, _resources: &ovrley_services::raster_resources::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError> {
+            self.record(FakeRenderCall::SubmitBatch { inspection_id: request.inspection_id.clone(), outputs: request.outputs.len() });
+            self.batches.lock().unwrap().push(request);
+            self.batch_results.lock().unwrap().pop_front().unwrap_or_else(|| Err(BatchServiceError::DispatchFailed { message: "no batch answer queued".into() }))
+        }
+
+        fn cancel(&self) -> bool {
+            self.record(FakeRenderCall::Cancel);
+            true
+        }
+
+        fn cancel_batch(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError> {
+            self.record(FakeRenderCall::CancelBatch(batch_id.into()));
+            self.cancel_snapshot.lock().unwrap().clone().ok_or_else(|| BatchServiceError::UnknownBatch { message: batch_id.into() })
+        }
+
+        fn busy(&self) -> bool {
+            self.busy.load(std::sync::atomic::Ordering::SeqCst)
+        }
+
+        fn create_inspection(&self) -> String {
+            use std::sync::atomic::Ordering;
+            let id = format!("inspection-{}", self.next_id.fetch_add(1, Ordering::SeqCst));
+            self.record(FakeRenderCall::CreateInspection(id.clone()));
+            id
+        }
+
+        fn dispose_inspection(&self, inspection_id: &str) {
+            self.record(FakeRenderCall::DisposeInspection(inspection_id.into()));
+        }
+
+        fn inspect_source(&self, _inspection_id: &str, path: &str) -> Result<String, String> {
+            self.record(FakeRenderCall::Inspect(path.into()));
+            self.sources.lock().unwrap().get(path).cloned().unwrap_or_else(|| Err(format!("Video path is not a file: {path}")))
+        }
+
+        fn render_preview_frame(
+            &self,
+            _resources: &ovrley_services::raster_resources::RasterResources,
+            _config: ovrley_core::normalize::RenderConfig,
+            _activity: &ovrley_core::activity::schema::ParsedActivity,
+            second: f64,
+        ) -> Result<String, String> {
+            self.record(FakeRenderCall::PreviewFrame { second });
+            Ok("/downloads/preview_frame.png".into())
+        }
+
+        fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String> {
+            Ok(format!("{}/{}_1.{}", directory.unwrap_or("/downloads"), kind.filename_prefix(), kind.extension()))
+        }
+
+        fn open_output_directory(&self, directory: Option<&str>) -> Result<(), String> {
+            self.record(FakeRenderCall::OpenDirectory(directory.map(str::to_string)));
+            Ok(())
+        }
+
+        fn open_file(&self, path: &str) -> Result<(), String> {
+            self.record(FakeRenderCall::OpenFile(path.into()));
+            Ok(())
+        }
     }
 
     /// Video tools answering from a table: a strip per window key (cached or decoded), the
@@ -581,14 +863,16 @@ pub mod fakes {
     /// Fake services over the given preferences object.
     pub fn fake_services(preferences: Value) -> (ServiceParts, Fakes) {
         let (preferences, sink) = PreferencesStore::in_memory(preferences);
+        let ui_post = FakeUiPost::default();
         let fakes = Fakes {
             preferences: sink,
             dialogs: FakeDialogs::default(),
-            ui_post: FakeUiPost::default(),
+            ui_post: ui_post.clone(),
             clipboard: FakeClipboard::default(),
             window: FakeWindow::default(),
             video_tools: Arc::new(FakeVideoTools::default()),
             maps: Arc::new(FakeMapServices::default()),
+            render: Arc::new(FakeRenderService::new(Arc::new(ui_post.clone()))),
         };
         let parts = ServiceParts {
             paths: Arc::new(repository_paths()),
@@ -599,6 +883,7 @@ pub mod fakes {
             window: Box::new(fakes.window.clone()),
             video_tools: fakes.video_tools.clone(),
             maps: fakes.maps.clone(),
+            render: fakes.render.clone(),
         };
         (parts, fakes)
     }

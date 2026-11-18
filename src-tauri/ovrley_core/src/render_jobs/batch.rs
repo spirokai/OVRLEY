@@ -56,6 +56,20 @@ pub enum BatchServiceError {
     },
 }
 
+impl std::fmt::Display for BatchServiceError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlreadyExists { message }
+            | Self::InvalidRequest { message }
+            | Self::ReinspectionRequired { message, .. }
+            | Self::RendererBusy { message }
+            | Self::UnknownBatch { message }
+            | Self::DispatchFailed { message } => formatter.write_str(message),
+            Self::OutputError { error } => write!(formatter, "{error}"),
+        }
+    }
+}
+
 impl From<CoreError> for BatchServiceError {
     fn from(error: CoreError) -> Self {
         match error {

@@ -222,10 +222,13 @@ fn report(store: &mut Store, key: &str, error: &str) {
     store.media.set_error_message(format!("{operation}: {error}"));
 }
 
-/// Busy: a project operation, an activity import or a quiet video import runs; Phase 7 adds the
-/// renderer. Project commands are ignored and their buttons disabled meanwhile.
+/// Busy: a project operation, an activity import, a quiet video import or the renderer runs. Project commands are ignored and their buttons disabled meanwhile.
 pub fn is_busy(store: &Store) -> bool {
-    store.projects.running || store.projects.loading || store.media.is_processing || store.media.importing_video
+    store.projects.running
+        || store.projects.loading
+        || store.media.is_processing
+        || store.media.importing_video
+        || crate::features::render_video::session::is_renderer_busy(store)
 }
 
 /// The user data root (the project and template folders' parent).

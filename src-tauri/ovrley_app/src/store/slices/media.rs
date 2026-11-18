@@ -132,7 +132,7 @@ impl ActivitySummary {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default)]
 pub struct MediaSlice {
     pub error_message: Option<String>,
     pub is_processing: bool,
@@ -146,6 +146,16 @@ pub struct MediaSlice {
     pub disabled_laps: Vec<usize>,
     /// The trimmed part of the activity, or `None` for the whole activity.
     pub activity_trim: Option<ActivityTrim>,
+    /// A single render runs (`renderingVideo`), from acceptance to its terminal progress.
+    pub rendering_video: bool,
+    /// A submission is pending (Phase 7 D6).
+    pub render_submission_target: Option<crate::features::render_video::session::RenderTarget>,
+    /// A cancellation runs until core's cleanup ends.
+    pub render_cancellation_target: Option<crate::features::render_video::session::RenderTarget>,
+    pub active_render_id: Option<u64>,
+    pub active_render_output_path: Option<String>,
+    /// The single render's progress: core's type, the panel derives its percentages.
+    pub render_progress: ovrley_core::debug::RenderProgress,
 }
 
 impl MediaSlice {
@@ -159,6 +169,23 @@ impl MediaSlice {
             end_time: summary.and_then(|summary| summary.end_time.clone()),
             timezone: summary.and_then(|summary| summary.timezone.clone()),
         })
+    }
+
+    /// `startRenderSession`: the accepted single render, `rendering` with its first message.
+    pub fn start_render_session(&mut self, render_id: u64, output_path: String, message: String) {
+        use ovrley_core::debug::{RenderProgress, RenderStatus};
+        self.active_render_id = Some(render_id);
+        self.active_render_output_path = Some(output_path);
+        self.rendering_video = true;
+        self.render_progress = RenderProgress { render_id, status: RenderStatus::Rendering, message, ..RenderProgress::default() };
+    }
+
+    /// `clearRenderSession`: keeps the last progress.
+    pub fn clear_render_session(&mut self) {
+        self.active_render_id = None;
+        self.active_render_output_path = None;
+        self.rendering_video = false;
+        self.render_cancellation_target = None;
     }
 
     pub fn set_error_message(&mut self, message: String) {

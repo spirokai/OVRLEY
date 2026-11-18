@@ -109,17 +109,19 @@ pub fn run(
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
     let paths = Arc::new(paths);
     let video_tools = Arc::new(ovrley_app::store::services::NativeVideoTools::open(Arc::clone(&paths), app_cache_dir, &preferences)?);
+    let ui_post: Arc<dyn ovrley_app::store::services::UiPost> = Arc::new(SlintUiPost);
     let dispatcher = compose(
         &window,
         store,
         ServiceParts {
-            paths,
+            paths: Arc::clone(&paths),
             preferences,
             dialogs: Box::new(NativeDialogs { window: window.as_weak() }),
-            ui_post: Arc::new(SlintUiPost),
+            ui_post: Arc::clone(&ui_post),
             clipboard: Box::new(SystemClipboard::default()),
             window: Box::new(SlintWindowControl { window: window.as_weak() }),
             video_tools,
+            render: Arc::new(ovrley_app::store::services::NativeRenderService::new(Arc::clone(&paths), maps.map_source(), ui_post)),
             maps,
         },
     );
@@ -164,6 +166,8 @@ pub fn run(
         startup.dispatch(|store, services| {
             ovrley_app::features::template_manager::fetch_templates(store, services, None);
             ovrley_app::features::widget_editor::load_font_catalog(store, services);
+            // `useAppBootstrap` detects the codecs once at startup (Phase 7 D8).
+            ovrley_app::features::video_preview::filmstrips::fetch_available_codecs(store, services);
             ovrley_app::features::maps::initialize(store, services);
             // Once startup is ready, the startup projects dialog lists the project folder (D11).
             ovrley_app::features::template_manager::restore_last_loaded_template(
