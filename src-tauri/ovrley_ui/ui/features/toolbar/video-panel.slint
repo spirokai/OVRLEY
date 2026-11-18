@@ -328,7 +328,9 @@ export component VideoPanel inherits Rectangle {
                     icon: Icons.film;
                     title: @tr("toolbar.importedVideos" => "Imported videos");
                     variant: SectionHeadingVariant.drawer;
+                    // `shrink-0`: the trailing action keeps its own width.
                     Button {
+                        horizontal-stretch: 0;
                         variant: ButtonVariant.ghost;
                         height: 1.75rem;
                         padding-x: 0.5rem;

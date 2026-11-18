@@ -44,6 +44,8 @@ export component SectionHeading inherits HorizontalLayout {
         }
 
         if root.help != "": HorizontalLayout {
+            // Its own width only: the separator takes the rest, as `flex-1` does.
+            horizontal-stretch: 0;
             padding-left: -0.25rem;
             alignment: center;
             VerticalLayout {
@@ -52,7 +54,9 @@ export component SectionHeading inherits HorizontalLayout {
             }
         }
 
-        Separator { }
+        Separator {
+            horizontal-stretch: 1;
+        }
     }
 
     @children
