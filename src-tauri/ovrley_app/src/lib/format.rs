@@ -149,6 +149,36 @@ pub fn compare_text(left: &str, right: &str, _language: Locale) -> std::cmp::Ord
     }
 }
 
+/// `formatTime`: `m:ss` with unbounded minutes (`75:03`), `--:--` without a value. The progress
+/// panel's time remaining; `format_clock_duration` shows hours, so both exist.
+pub fn format_minutes_seconds(seconds: Option<f64>) -> String {
+    let Some(seconds) = seconds else {
+        return "--:--".into();
+    };
+    let rounded = seconds.round() as i64;
+    format!("{}:{:02}", rounded.div_euclid(60), rounded.rem_euclid(60))
+}
+
+/// `formatFps`: the render rate to one decimal, `--` without one.
+pub fn format_render_fps(fps: Option<f64>) -> String {
+    match fps.filter(|fps| fps.is_finite()) {
+        Some(fps) => format!("{fps:.1}"),
+        None => "--".into(),
+    }
+}
+
+/// `formatDurationSummary`: `{m} min {s} sec`, or `{s} sec` under a minute.
+pub fn format_duration_summary(seconds: f64, language: Locale) -> String {
+    let rounded = seconds.round() as i64;
+    let (minutes, seconds) = (rounded.div_euclid(60), rounded.rem_euclid(60));
+    let catalog = crate::i18n::catalog();
+    if minutes > 0 {
+        catalog.t_with(language, "render-video.minutesMinSecondsSec", &[("minutes", &minutes.to_string()), ("seconds", &seconds.to_string())])
+    } else {
+        catalog.t_with(language, "render-video.secondsSec", &[("seconds", &seconds.to_string())])
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -220,5 +250,18 @@ mod tests {
         let fps = ovrley_core::encode::fps::Fps::new(30000, 1001).unwrap();
         let resolution = ovrley_core::media::video_edits::VideoResolution { width: 1920, height: 1080 };
         assert_eq!(format_video_details(resolution, fps, 330.5, Locale::En), "1920×1080 · 29.97 fps · 05:30.5");
+    }
+
+    #[test]
+    fn progress_panel_numbers() {
+        assert_eq!(format_minutes_seconds(None), "--:--");
+        assert_eq!(format_minutes_seconds(Some(330.0)), "5:30");
+        assert_eq!(format_minutes_seconds(Some(4503.4)), "75:03");
+        assert_eq!(format_minutes_seconds(Some(0.0)), "0:00");
+        assert_eq!(format_render_fps(None), "--");
+        assert_eq!(format_render_fps(Some(f64::NAN)), "--");
+        assert_eq!(format_render_fps(Some(23.456)), "23.5");
+        assert_eq!(format_duration_summary(125.4, Locale::En), "2 min 5 sec");
+        assert_eq!(format_duration_summary(42.0, Locale::En), "42 sec");
     }
 }

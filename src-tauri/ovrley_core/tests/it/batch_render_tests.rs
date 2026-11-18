@@ -86,7 +86,7 @@ impl Fixture {
             })
             .collect::<Vec<_>>();
         let encoding = BatchEncodingSettings {
-            export_mode: BatchExportMode::Transparent,
+            export_mode: ovrley_core::encode::render_settings::ExportMode::Transparent,
             export_codec: "qtrle".into(),
             fps: 30,
             update_rate: 2,
@@ -703,7 +703,7 @@ fn transparent_batch_follows_scene_size_and_composite_requires_matching_clips() 
         let mut request = fixture.request(&["1-size.mp4"], true);
         request.template.scene.width = Some(width);
         request.template.scene.height = Some(height);
-        if mode == BatchExportMode::Composite {
+        if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
             request.encoding.export_mode = mode;
             request.encoding.export_codec = "libx264".into();
         }
@@ -720,15 +720,15 @@ fn transparent_batch_follows_scene_size_and_composite_requires_matching_clips() 
         (scene.width, scene.height)
     };
     // The fixture clip is 64x32; a transparent overlay keeps the scene's size.
-    let transparent = plan(BatchExportMode::Transparent, 1280, 720).unwrap();
+    let transparent = plan(ovrley_core::encode::render_settings::ExportMode::Transparent, 1280, 720).unwrap();
     assert_eq!(size(&transparent), (1280, 720));
-    let Err(odd) = plan(BatchExportMode::Transparent, 1281, 720) else {
+    let Err(odd) = plan(ovrley_core::encode::render_settings::ExportMode::Transparent, 1281, 720) else {
         panic!("odd transparent scene accepted")
     };
     assert!(odd.to_string().contains("must be even"), "{odd}");
-    let composite = plan(BatchExportMode::Composite, 64, 32).unwrap();
+    let composite = plan(ovrley_core::encode::render_settings::ExportMode::Composite, 64, 32).unwrap();
     assert_eq!(size(&composite), (64, 32));
-    let Err(mismatched) = plan(BatchExportMode::Composite, 1280, 720) else {
+    let Err(mismatched) = plan(ovrley_core::encode::render_settings::ExportMode::Composite, 1280, 720) else {
         panic!("mismatched composite clip accepted")
     };
     let message = mismatched.to_string();
@@ -1069,7 +1069,7 @@ fn composite(mut request: BatchRenderRequest) -> BatchRenderRequest {
     // Composite clips must match the scene; the fixture clips are 64x32.
     request.template.scene.width = Some(64);
     request.template.scene.height = Some(32);
-    request.encoding.export_mode = BatchExportMode::Composite;
+    request.encoding.export_mode = ovrley_core::encode::render_settings::ExportMode::Composite;
     request.encoding.export_codec = "libx264".into();
     request.encoding.update_rate = 1;
     request

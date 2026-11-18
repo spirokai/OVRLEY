@@ -20,6 +20,16 @@ pub enum RenderOutputKind {
     Composite,
 }
 
+impl From<crate::encode::render_settings::ExportMode> for RenderOutputKind {
+    /// The container an export mode writes.
+    fn from(mode: crate::encode::render_settings::ExportMode) -> Self {
+        match mode {
+            crate::encode::render_settings::ExportMode::Transparent => Self::Transparent,
+            crate::encode::render_settings::ExportMode::Composite => Self::Composite,
+        }
+    }
+}
+
 impl RenderOutputKind {
     pub fn extension(self) -> &'static str {
         match self {

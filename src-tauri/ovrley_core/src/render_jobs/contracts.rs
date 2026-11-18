@@ -13,21 +13,15 @@ use std::sync::Arc;
 
 use crate::activity::schema::ParsedActivity;
 use crate::encode::quality::QualityType;
+use crate::encode::render_settings::ExportMode;
 pub use crate::media::prepared_video::{InspectedVideoSource, SourceFileStamp};
 use crate::normalize::RenderConfig;
 use ovrley_widgets::model::scene::ScenePresentationConfig;
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum BatchExportMode {
-    Composite,
-    Transparent,
-}
-
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchEncodingSettings {
-    pub export_mode: BatchExportMode,
+    pub export_mode: ExportMode,
     pub export_codec: String,
     /// Transparent layout FPS; composite uses each inspected source's FPS.
     pub fps: u32,
@@ -63,7 +57,7 @@ pub enum BatchActivity {
 
 /// A continuous range of one inspected source: frames `[start_frame, end_frame)`
 /// on the source's exact frame grid.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderPiece {
     pub source_id: String,
@@ -87,7 +81,7 @@ pub struct BatchTransition {
 /// One output file assembled from its pieces in order. Pieces of one output share
 /// their display resolution (and composite FPS) so they join without re-encoding
 /// their bodies.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BatchRenderOutput {
     pub id: String,

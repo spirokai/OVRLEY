@@ -167,10 +167,10 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
     )
     .unwrap();
 
-    for mode in [BatchExportMode::Transparent, BatchExportMode::Composite] {
+    for mode in [ovrley_core::encode::render_settings::ExportMode::Transparent, ovrley_core::encode::render_settings::ExportMode::Composite] {
         let (codec, extension) = match mode {
-            BatchExportMode::Transparent => ("qtrle", "mov"),
-            BatchExportMode::Composite => ("libx264", "mp4"),
+            ovrley_core::encode::render_settings::ExportMode::Transparent => ("qtrle", "mov"),
+            ovrley_core::encode::render_settings::ExportMode::Composite => ("libx264", "mp4"),
         };
         let mut template = common::builders::batch_template();
         template.scene.width = Some(1280);
@@ -184,7 +184,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
             }))
             .unwrap(),
         );
-        if mode == BatchExportMode::Composite {
+        if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
             scene.extend(
                 serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(json!({
                     "composite_video_path": source.metadata.path,
@@ -203,7 +203,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
         let output = output.to_str().unwrap();
         // The JSON entry for one mode, the typed entry for the other: both match the batch.
         match mode {
-            BatchExportMode::Transparent => service.submit_single(
+            ovrley_core::encode::render_settings::ExportMode::Transparent => service.submit_single(
                 &paths,
                 &single.to_string(),
                 &serde_json::to_string(&activity).unwrap(),
@@ -212,7 +212,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
                 None,
                 None,
             ),
-            BatchExportMode::Composite => service.submit_single_config(
+            ovrley_core::encode::render_settings::ExportMode::Composite => service.submit_single_config(
                 &paths,
                 ovrley_core::normalize::parse_config_value(&single).unwrap(),
                 Arc::new(activity.clone()),

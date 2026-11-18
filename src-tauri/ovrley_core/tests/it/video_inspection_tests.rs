@@ -14,7 +14,7 @@ use ovrley_core::media::prepared_video::{check_source_freshness, InspectedVideoS
 use ovrley_core::media::SourceVideoMetadata;
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render_jobs::contracts::{
-    BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
+    BatchDestination, BatchEncodingSettings, BatchOutputSelection,
     BatchRenderOutput,
 };
 use ovrley_core::render_jobs::inspection::{
@@ -26,10 +26,10 @@ use ovrley_core::render_jobs::planning::{
 };
 use serde_json::json;
 
-fn encoding(mode: BatchExportMode) -> BatchEncodingSettings {
+fn encoding(mode: ovrley_core::encode::render_settings::ExportMode) -> BatchEncodingSettings {
     BatchEncodingSettings {
         export_mode: mode,
-        export_codec: if mode == BatchExportMode::Composite {
+        export_codec: if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
             "libx264"
         } else {
             "qtrle"
@@ -66,13 +66,13 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     };
     for (mode, filename, frames, rate) in [
         (
-            BatchExportMode::Composite,
+            ovrley_core::encode::render_settings::ExportMode::Composite,
             "ride.朝 morning_video.mp4",
             600,
             (30000, 1001),
         ),
         (
-            BatchExportMode::Transparent,
+            ovrley_core::encode::render_settings::ExportMode::Transparent,
             "ride.朝 morning_overlay.mov",
             300,
             (15, 1),
@@ -97,7 +97,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     selection.outputs[0].pieces[0].start_frame = 60;
     selection.outputs[0].pieces[0].end_frame = 300;
     let BatchPlanningResponse::Planned { plans } =
-        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite))
+        plan_batch_configuration(&service, &selection, &encoding(ovrley_core::encode::render_settings::ExportMode::Composite))
             .unwrap()
     else {
         panic!("fresh plan")
@@ -112,7 +112,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
         assert!(plan_batch_configuration(
             &service,
             &invalid,
-            &encoding(BatchExportMode::Composite),
+            &encoding(ovrley_core::encode::render_settings::ExportMode::Composite),
         )
         .unwrap_err()
         .to_string()
@@ -125,7 +125,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     joined.outputs[0].pieces.push(later);
     joined.outputs[0].transitions = common::builders::hard_cuts(2);
     let BatchPlanningResponse::Planned { plans } =
-        plan_batch_configuration(&service, &joined, &encoding(BatchExportMode::Composite)).unwrap()
+        plan_batch_configuration(&service, &joined, &encoding(ovrley_core::encode::render_settings::ExportMode::Composite)).unwrap()
     else {
         panic!("fresh plan")
     };
@@ -136,7 +136,7 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
     let mut empty = selection.clone();
     empty.outputs[0].pieces.clear();
     assert!(
-        plan_batch_configuration(&service, &empty, &encoding(BatchExportMode::Composite))
+        plan_batch_configuration(&service, &empty, &encoding(ovrley_core::encode::render_settings::ExportMode::Composite))
             .unwrap_err()
             .to_string()
             .contains("at least one piece")
@@ -148,12 +148,12 @@ fn configuration_plans_native_names_and_exact_source_or_layout_work() {
         .unwrap();
     selection.outputs.push(output("ride-mov", &duplicate));
     let error =
-        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite))
+        plan_batch_configuration(&service, &selection, &encoding(ovrley_core::encode::render_settings::ExportMode::Composite))
             .unwrap_err();
     assert!(error.to_string().contains("conflicting destinations"));
     service.dispose_session(&session.inspection_id);
     assert!(matches!(
-        plan_batch_configuration(&service, &selection, &encoding(BatchExportMode::Composite),)
+        plan_batch_configuration(&service, &selection, &encoding(ovrley_core::encode::render_settings::ExportMode::Composite),)
             .unwrap(),
         BatchPlanningResponse::Rejected(_)
     ));
@@ -198,7 +198,7 @@ fn video_plans_sample_the_video_clock_and_show_only_rasters_in_padding() {
     template.scene.height = Some(64);
     let original_template = serde_json::to_value(&template).unwrap();
     let paths = common::composite::test_paths_named("batch-video-window");
-    for mode in [BatchExportMode::Transparent, BatchExportMode::Composite] {
+    for mode in [ovrley_core::encode::render_settings::ExportMode::Transparent, ovrley_core::encode::render_settings::ExportMode::Composite] {
         let prepare = |offset, skip_overlay| {
             common::builders::batch_video_plan(
                 &paths,
@@ -442,7 +442,7 @@ fn accepted_sources_survive_disposal_but_closed_and_foreign_sessions_reject() {
         },
     };
     let response = serde_json::to_value(
-        plan_batch_configuration(&service, &outputs, &encoding(BatchExportMode::Composite))
+        plan_batch_configuration(&service, &outputs, &encoding(ovrley_core::encode::render_settings::ExportMode::Composite))
             .unwrap(),
     )
     .unwrap();

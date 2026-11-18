@@ -63,7 +63,7 @@ use common::composite::{
 #[test]
 fn planned_video_pipelines_encode_padding_and_display_rotation() {
     use ovrley_core::output::{plan_batch_output_targets, RenderOutputKind};
-    use ovrley_core::render_jobs::contracts::{BatchEncodingSettings, BatchExportMode};
+    use ovrley_core::render_jobs::contracts::BatchEncodingSettings;
     use ovrley_core::render_jobs::inspection::VideoInspectionService;
     use serde_json::json;
     let paths = test_paths_named("batch-window-pipelines");
@@ -156,20 +156,20 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
     template.scene.width = Some(32);
     template.scene.height = Some(64);
     for (mode, offset) in [
-        (BatchExportMode::Transparent, -5.0),
-        (BatchExportMode::Transparent, 110.0),
-        (BatchExportMode::Composite, -5.0),
+        (ovrley_core::encode::render_settings::ExportMode::Transparent, -5.0),
+        (ovrley_core::encode::render_settings::ExportMode::Transparent, 110.0),
+        (ovrley_core::encode::render_settings::ExportMode::Composite, -5.0),
     ] {
         let encoding = BatchEncodingSettings {
             export_mode: mode,
-            export_codec: if mode == BatchExportMode::Composite {
+            export_codec: if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
                 "libx264"
             } else {
                 "qtrle"
             }
             .into(),
             fps: 30,
-            update_rate: if mode == BatchExportMode::Composite {
+            update_rate: if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
                 1
             } else {
                 2
@@ -189,11 +189,11 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
                 template.clone(),
                 activity.clone(),
                 offset,
-                mode == BatchExportMode::Composite,
+                mode == ovrley_core::encode::render_settings::ExportMode::Composite,
             ),
         )
         .unwrap();
-        let kind = if mode == BatchExportMode::Composite {
+        let kind = if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
             RenderOutputKind::Composite
         } else {
             RenderOutputKind::Transparent
@@ -218,13 +218,13 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
         assert!((metadata.duration.unwrap() - 20.0).abs() < 0.001);
         assert_eq!(
             metadata.fps,
-            Some(if mode == BatchExportMode::Composite {
+            Some(if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
                 30.0
             } else {
                 15.0
             })
         );
-        if mode == BatchExportMode::Transparent {
+        if mode == ovrley_core::encode::render_settings::ExportMode::Transparent {
             let (blank_second, covered_second) = if offset < 0.0 {
                 (0.0, 5.0)
             } else {

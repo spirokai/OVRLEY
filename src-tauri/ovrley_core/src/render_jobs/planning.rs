@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 
 use super::contracts::{
-    BatchDestination, BatchEncodingSettings, BatchExportMode, BatchOutputSelection,
+    BatchDestination, BatchEncodingSettings, BatchOutputSelection,
     BatchRenderOutput, BatchRenderPiece, BatchTransition,
 };
 use super::inspection::{verify_composite_source_resolution, CompositeSourceMetadata};
@@ -40,6 +40,7 @@ use crate::normalize::{
     validate_ffmpeg_config, validate_render_config_with_resources, validate_render_presentation,
     RenderConfig, ValidatedFfmpegConfig, ValidatedRenderConfig, ValidatedSceneConfig,
 };
+use crate::encode::render_settings::ExportMode;
 use crate::output::{plan_batch_output_targets, plan_file_output_target, RenderOutputKind};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
@@ -72,8 +73,8 @@ pub(crate) fn validate_batch_encoding(
     })?;
     if !matches!(
         (raw.export_mode, codec),
-        (BatchExportMode::Composite, CodecSelection::Composite(_))
-            | (BatchExportMode::Transparent, CodecSelection::Transparent(_))
+        (ExportMode::Composite, CodecSelection::Composite(_))
+            | (ExportMode::Transparent, CodecSelection::Transparent(_))
     ) {
         return Err(CoreError::Config(
             "Batch codec must match the selected export container".into(),
