@@ -87,7 +87,9 @@ export component PlayerToolbar {
     property <length> transport-width: transport.preferred-width;
     property <length> side-width: max(0px, (root.width - root.transport-width - 2 * 1rem) / 2);
     // The transport group: 1.75rem buttons, `p-0.5` and a 1px border.
-    property <length> row-height: 1.75rem + 0.25rem + 2px;
+    property <length> row-height: 1.75rem + 2 * root.inset;
+    // `p-0.5` and the 1px border around the transport's buttons.
+    property <length> inset: 0.125rem + 1px;
 
     height: root.row-height;
 
@@ -101,6 +103,9 @@ export component PlayerToolbar {
         cache-rendering-hint: true;
         spacing: 0.25rem;
         alignment: start;
+        // The transport group's inset, so the buttons share its centre line.
+        padding-top: root.inset;
+        padding-bottom: root.inset;
         PlayerToolButton {
             icon: Icons.zoom-out;
             label: @tr("player.zoomOut" => "Zoom out");
@@ -281,6 +286,8 @@ export component PlayerToolbar {
         width: min(12rem, root.side-width);
         spacing: 1rem;
         alignment: end;
+        padding-top: root.inset;
+        padding-bottom: root.inset;
         if Player.has-video: PlayerToolButton {
             tooltip: false;
             icon: Player.muted ? Icons.volume-x : Icons.volume-2;
