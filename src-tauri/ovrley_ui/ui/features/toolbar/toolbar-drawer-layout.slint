@@ -7,7 +7,7 @@ import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { DrawerTool, Toolbar } from "index.slint";
 import { ActivityDrawer } from "activity-drawer.slint";
 import { VideoDrawer } from "video-drawer.slint";
-import { AppShell, AreaReport } from "../app-shell/index.slint";
+import { AppShell } from "../app-shell/index.slint";
 import { WidgetButtonGrid } from "../widget-drawer/widget-drawer.slint";
 
 // The rail's tools: label and icon per `DrawerTool`.
@@ -99,7 +99,8 @@ export component VerticalToolbar inherits Rectangle {
 // `ToolbarDrawerLayout`: the rail, the drawer's allocation (22rem when pinned, its width animated
 // over 200 ms), then the children: the workspace and the control panel. The drawer slides in from
 // the left over 300 ms above the workspace. While it shows unpinned, a transparent backdrop covers
-// everything right of the rail, control panel included, and a press on it dismisses the drawer.
+// everything right of the rail, control panel included (but not the video panel, which sits above
+// it as `z-60` does in React), and a press on it dismisses the drawer.
 // While the pinned allocation animates, a blocker covers the workspace; Slint does not report
 // animation ends, so a 200 ms timer marks the animation (`allocationTransitioning`).
 export component ToolbarDrawerLayout {
@@ -108,6 +109,8 @@ export component ToolbarDrawerLayout {
     in property <bool> pinned;
     // The width of the children after the workspace (the control panel), which the blocker leaves.
     in property <length> trailing-width;
+    // The video panel in the control panel's place stays usable above the backdrop.
+    in property <bool> trailing-above-backdrop;
     callback select-tool(DrawerTool);
     callback set-pinned(bool);
     callback dismiss-overlay();
@@ -141,7 +144,7 @@ export component ToolbarDrawerLayout {
     // Below the drawer (z-55 under z-60 in React), above the workspace.
     if root.drawer-visible && !root.pinned: backdrop := TouchArea {
         x: root.rail-width;
-        width: root.width - root.rail-width;
+        width: root.width - root.rail-width - (root.trailing-above-backdrop ? root.trailing-width : 0px);
         clicked => {
             root.dismiss-overlay();
         }
@@ -159,6 +162,19 @@ export component ToolbarDrawerLayout {
         animate x { duration: Theme.duration-300; easing: ease-in-out; }
         // A still region: drawn from a cached layer, which also slides without being redrawn.
         cache-rendering-hint: true;
+        // The drawer's rectangle, for the kept areas of the clip selection (Phase 4 D10).
+        function report-area() {
+            AppShell.video-drawer-area = { x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height };
+        }
+        init => {
+            self.report-area();
+        }
+        changed x => {
+            self.report-area();
+        }
+        changed height => {
+            self.report-area();
+        }
 
         Shadow {
             size: ShadowSize.md;
@@ -233,11 +249,6 @@ export component ToolbarDrawerLayout {
             }
             if root.active-tool == DrawerTool.video: VideoDrawer {
                 vertical-stretch: 1;
-                AreaReport {
-                    report(area) => {
-                        AppShell.video-drawer-area = area;
-                    }
-                }
             }
             if root.active-tool == DrawerTool.widgets: WidgetButtonGrid {
                 vertical-stretch: 1;

@@ -99,6 +99,7 @@ export component AppWindow inherits FluidWindow {
             drawer-visible: Toolbar.visible;
             pinned: Toolbar.pinned;
             trailing-width: root.control-panel-width;
+            trailing-above-backdrop: Toolbar.video-panel-shown;
             select-tool(tool) => {
                 Toolbar.select-tool(tool);
             }
