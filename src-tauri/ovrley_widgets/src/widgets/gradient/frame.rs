@@ -12,7 +12,7 @@ use skia_safe::{paint::Style, Canvas, Paint, PaintCap, Path, PathBuilder, Point,
 
 const TRIANGLE_GAP: f32 = 8.0;
 const ZERO_EPSILON: f64 = 0.05;
-const MAX_GRADIENT: f64 = 25.0;
+const MAX_GRADIENT: f64 = 30.0;
 
 pub fn validated_gradient_style(
     widget: &ValidatedGradientWidget,
@@ -201,7 +201,8 @@ fn text_bounds(
     ))
 }
 
-/// Preserves the existing full-angle triangle mapping, capped at 25 percent.
+/// Draws the percentage as an angle in degrees, exaggerating the slope for
+/// readability, capped at 30. The text value is not capped.
 pub fn gradient_triangle_height(raw: Option<f64>, width: f32) -> f32 {
     let magnitude = raw.unwrap_or(0.0).abs().min(MAX_GRADIENT);
     if width <= 0.0 || magnitude <= ZERO_EPSILON {
