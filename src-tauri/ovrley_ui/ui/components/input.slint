@@ -16,6 +16,7 @@ export enum InputVariant { default, inline }
 // with a 0.8125rem line height, muted, no shadow; focused it shows `surface` and `foreground`.
 // Typed text keeps its case. A `number` input accepts only what `<input type="number">` lets the
 // user type. Its border is 0, as in React; `border-width` and `border-color` are overrides (D5).
+// Children are overlays drawn inside the field, positioned in its box.
 export component Input {
     in property <InputVariant> variant: InputVariant.default;
     in-out property <string> text;
@@ -157,6 +158,9 @@ export component Input {
                 root.focus-changed(self.has-focus);
             }
         }
+
+        // Overlays inside the field (step buttons, a unit): they rise with it while it is focused.
+        @children
 
         TouchArea {
             enabled: root.disabled;

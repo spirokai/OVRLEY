@@ -83,72 +83,72 @@ export component SecondsInput inherits VerticalLayout {
                     root.blurred();
                 }
             }
-        }
-        if root.step-buttons: Rectangle {
-            x: parent.width - self.width - 0.25rem;
-            y: 0.25rem;
-            width: 1.25rem;
-            height: parent.height - 0.5rem;
-            border-radius: 0.25rem;
-            background: Theme.surface-strong;
-            clip: true;
-            VerticalLayout {
-                for direction in [1, -1]: step-touch := TouchArea {
-                    enabled: !root.disabled;
-                    clicked => {
-                        root.step(direction);
-                    }
-                    Rectangle {
-                        background: step-touch.has-hover ? Theme.surface-accent-soft : transparent;
-                        Icon {
-                            glyph: direction > 0 ? Icons.chevron-up : Icons.chevron-down;
-                            size: 0.75rem;
-                            color: step-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+
+            if root.step-buttons: Rectangle {
+                x: parent.width - self.width - 0.25rem;
+                y: 0.25rem;
+                width: 1.25rem;
+                height: parent.height - 0.5rem;
+                border-radius: 0.25rem;
+                background: Theme.surface-strong;
+                clip: true;
+                VerticalLayout {
+                    for direction in [1, -1]: step-touch := TouchArea {
+                        enabled: !root.disabled;
+                        clicked => {
+                            root.step(direction);
+                        }
+                        Rectangle {
+                            background: step-touch.has-hover ? Theme.surface-accent-soft : transparent;
+                            Icon {
+                                glyph: direction > 0 ? Icons.chevron-up : Icons.chevron-down;
+                                size: 0.75rem;
+                                color: step-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+                            }
                         }
                     }
                 }
             }
-        }
-        if root.slot == SecondsSlot.manual: reset-touch := SimpleTooltip {
-            x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
-            y: 0.25rem;
-            width: 1.25rem;
-            height: parent.height - 0.5rem;
-            content: root.manual-hint;
-            accessible-role: AccessibleRole.button;
-            accessible-label: root.reset-label;
-            enabled: !root.disabled;
-            clicked => {
-                root.reset();
-            }
-            Rectangle {
-                border-radius: 0.25rem;
-                background: reset-touch.has-hover ? Theme.surface-accent-soft : transparent;
-                Icon {
-                    glyph: Icons.rotate-ccw;
-                    size: 0.75rem;
-                    color: reset-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+            if root.slot == SecondsSlot.manual: reset-touch := SimpleTooltip {
+                x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
+                y: 0.25rem;
+                width: 1.25rem;
+                height: parent.height - 0.5rem;
+                content: root.manual-hint;
+                accessible-role: AccessibleRole.button;
+                accessible-label: root.reset-label;
+                enabled: !root.disabled;
+                clicked => {
+                    root.reset();
+                }
+                Rectangle {
+                    border-radius: 0.25rem;
+                    background: reset-touch.has-hover ? Theme.surface-accent-soft : transparent;
+                    Icon {
+                        glyph: Icons.rotate-ccw;
+                        size: 0.75rem;
+                        color: reset-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+                    }
                 }
             }
-        }
-        if root.slot == SecondsSlot.auto: SimpleTooltip {
-            x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
-            y: 0.25rem;
-            width: 1.25rem;
-            height: parent.height - 0.5rem;
-            content: root.auto-hint;
-            opacity: root.disabled ? 0.5 : 1;
-            Icon {
-                glyph: Icons.clock;
-                size: 0.75rem;
-                color: Theme.muted-foreground.transparentize(0.5);
+            if root.slot == SecondsSlot.auto: SimpleTooltip {
+                x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
+                y: 0.25rem;
+                width: 1.25rem;
+                height: parent.height - 0.5rem;
+                content: root.auto-hint;
+                Icon {
+                    glyph: Icons.clock;
+                    size: 0.75rem;
+                    color: Theme.muted-foreground.transparentize(0.5);
+                }
             }
-        }
-        if root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none: AppText {
-            x: parent.width - self.width - 0.5rem;
-            content: @tr("components.secondsUnit" => "SEC");
-            font-size: Theme.text-xs * 1rem;
-            color: Theme.muted-foreground;
+            if root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none: AppText {
+                x: parent.width - self.width - 0.5rem;
+                content: @tr("components.secondsUnit" => "SEC");
+                font-size: Theme.text-xs * 1rem;
+                color: Theme.muted-foreground;
+            }
         }
     }
     if root.error != "": AppText {

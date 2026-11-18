@@ -1,6 +1,7 @@
 import { Theme } from "../theme/theme.slint";
 import { Icon, Icons } from "icons.slint";
 import { Input, InputVariant } from "input.slint";
+import { GroupPosition } from "group-surface.slint";
 import { NumberConstraints, NumberInputLogic, StepDirection } from "logic.slint";
 
 // One of the number mode's step buttons: it does not take focus from the field.
@@ -10,7 +11,6 @@ component StepButton inherits Rectangle {
     callback clicked();
 
     background: touch.has-hover && !root.disabled ? Theme.surface-accent-soft : transparent;
-    opacity: root.disabled ? 0.5 : 1;
     accessible-role: AccessibleRole.button;
     accessible-enabled: !root.disabled;
     accessible-action-default => {
@@ -54,6 +54,7 @@ export component BlurInput {
     in property <length> inset-right: root.number ? 2.75rem : 0.75rem;
     // `aria-label`: the field's accessible name.
     in property <string> label;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
     callback changed(value: string);
     callback blurred();
 
@@ -84,6 +85,8 @@ export component BlurInput {
         }
     }
 
+    // The field's ring draws above the group's neighbours, which are this element's siblings.
+    z: field.has-focus ? 1 : 0;
     min-height: field.min-height;
     max-height: field.max-height;
     horizontal-stretch: 1;
@@ -102,6 +105,7 @@ export component BlurInput {
         border-color: root.dirty ? Theme.accent-border : Theme.border.transparentize(0.3);
         inset-right: root.inset-right;
         label: root.label;
+        group-position: root.group-position;
 
         focus-changed(focused) => {
             if !focused {
@@ -125,40 +129,43 @@ export component BlurInput {
             }
             reject
         }
-    }
 
-    if root.number: Rectangle {
-        x: root.width - 0.25rem - self.width;
-        y: 0.25rem;
-        width: 1.25rem;
-        height: root.height - 0.5rem;
-        border-radius: Theme.rounded * 1rem;
-        background: Theme.surface-strong;
-        clip: true;
+        if root.number: Rectangle {
+            x: parent.width - 0.25rem - self.width;
+            y: 0.25rem;
+            width: 1.25rem;
+            height: parent.height - 0.5rem;
+            border-radius: Theme.rounded * 1rem;
+            background: Theme.surface-strong;
+            clip: true;
 
-        VerticalLayout {
-            StepButton {
-                vertical-stretch: 1;
-                glyph: Icons.chevron-up;
-                disabled: root.disabled;
-                accessible-label: @tr("components.increaseValue" => "Increase value");
-                clicked => {
-                    root.step(StepDirection.up);
+            VerticalLayout {
+                StepButton {
+                    vertical-stretch: 1;
+                    glyph: Icons.chevron-up;
+                    disabled: root.disabled;
+                    accessible-label: @tr("components.increaseValue" => "Increase value");
+                    clicked => {
+                        root.step(StepDirection.up);
+                    }
                 }
-            }
-            Rectangle {
-                height: Theme.hairline;
-                background: Theme.border.transparentize(0.4);
-            }
-            StepButton {
-                vertical-stretch: 1;
-                glyph: Icons.chevron-down;
-                disabled: root.disabled;
-                accessible-label: @tr("components.decreaseValue" => "Decrease value");
-                clicked => {
-                    root.step(StepDirection.down);
+                Rectangle {
+                    height: Theme.hairline;
+                    background: Theme.border.transparentize(0.4);
+                }
+                StepButton {
+                    vertical-stretch: 1;
+                    glyph: Icons.chevron-down;
+                    disabled: root.disabled;
+                    accessible-label: @tr("components.decreaseValue" => "Decrease value");
+                    clicked => {
+                        root.step(StepDirection.down);
+                    }
                 }
             }
         }
+
+        // The caller's overlays (a unit suffix).
+        @children
     }
 }

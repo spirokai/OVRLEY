@@ -335,6 +335,7 @@ export component RenderExportSettings inherits VerticalLayout {
                     value: RenderVideo.output-path;
                     font-size: Theme.text-xs * 1rem;
                     label: @tr("render-video.outputPath" => "Output path");
+                    group-position: GroupPosition.first;
                     changed(value) => {
                         RenderVideo.commit-output-path(value);
                     }

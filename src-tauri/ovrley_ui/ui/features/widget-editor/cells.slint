@@ -180,7 +180,7 @@ export component ChartSeriesRow inherits HorizontalLayout {
 }
 
 // The raster image picker (D5): a full-width `ButtonGroup` of the read-only path (`h-9 text-xs`,
-// square right corners; the input draws no border, as in React) under a wrapping tooltip of the path, and the outline
+// square right corners; the input draws no border, as in React) inside a wrapping tooltip of the path, and the outline
 // folder button, disabled while an image loads; the error below (`text-xs destructive`).
 export component RasterPicker inherits VerticalLayout {
     in property <string> path;
@@ -193,21 +193,21 @@ export component RasterPicker inherits VerticalLayout {
 
     spacing: 0.5rem;
     ButtonGroup {
-        Rectangle {
+        alignment: stretch;
+        // The path's tooltip wraps the field, as React's `title` sits on the input.
+        SimpleTooltip {
             horizontal-stretch: 1;
-            height: 2.25rem;
-            Input {
+            // The field's ring draws above the button, this element's sibling.
+            z: path-field.has-focus ? 1 : 0;
+            content: root.path;
+            wrap-text: true;
+            path-field := Input {
                 text: root.path;
                 placeholder: root.placeholder;
                 read-only: true;
                 label: root.label;
                 font-size: Theme.text-xs * 1rem;
                 group-position: GroupPosition.first;
-            }
-            // Over the read-only field, which takes no edits.
-            SimpleTooltip {
-                content: root.path;
-                wrap-text: true;
             }
         }
         Button {

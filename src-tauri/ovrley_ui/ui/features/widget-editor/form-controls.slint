@@ -108,15 +108,15 @@ export component NumberField inherits FieldBlock {
             changed(raw) => {
                 root.changed(raw);
             }
-        }
-        if root.suffix != "": AppText {
-            x: parent.width - 2rem - self.width;
-            content: root.suffix;
-            uppercase: false;
-            font-size: 0.741rem;
-            mono: true;
-            color: Theme.muted-foreground;
-            vertical-alignment: center;
+            if root.suffix != "": AppText {
+                x: parent.width - 2rem - self.width;
+                content: root.suffix;
+                uppercase: false;
+                font-size: 0.741rem;
+                mono: true;
+                color: Theme.muted-foreground;
+                vertical-alignment: center;
+            }
         }
     }
 }
