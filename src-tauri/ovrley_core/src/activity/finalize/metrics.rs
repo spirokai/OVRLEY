@@ -136,10 +136,10 @@ pub fn build_metric_coverage(
     coverage
 }
 
-/// Smooths elevation locally before gradient derivation.
+/// Smooths elevation locally before total ascent derivation.
 ///
-/// Gradient amplifies meter-level altitude noise, so the standard derivation
-/// averages neighboring elevation samples before computing slope over distance.
+/// Ascent accumulates meter-level altitude noise, so neighboring elevation
+/// samples are averaged before adjacent samples are compared.
 fn smooth_elevation_series(elevation_series: &[Option<f64>], radius: usize) -> NumericSeries {
     let mut smoothed = Vec::with_capacity(elevation_series.len());
     for index in 0..elevation_series.len() {
@@ -167,125 +167,144 @@ fn smooth_elevation_series(elevation_series: &[Option<f64>], radius: usize) -> N
     smoothed
 }
 
-// Finalization supplies nondecreasing cumulative distances. Retaining each
-// boundary makes stationary plateaus linear to process. Missing distances stop
-// a window; callers reset the lookback boundary at each missing current sample.
-fn advance_lookback_index(
-    distance_series: &NumericSeries,
-    index: usize,
-    current_distance: f64,
-    baseline_meters: f64,
-    lookback_index: &mut Option<usize>,
-) {
-    let mut next_index = lookback_index.map_or(0, |index| index + 1);
-    while next_index < index
-        && distance_series[next_index]
-            .is_some_and(|distance| current_distance - distance >= baseline_meters)
-    {
-        *lookback_index = Some(next_index);
-        next_index += 1;
+/// Speed below which a moving rider counts as stopped; heading and gradient hold.
+const STOPPED_BELOW_KMH: f64 = 2.0;
+/// Speed a stopped rider must exceed before heading and gradient update again.
+/// The gap to the stop threshold keeps GPS speed noise from toggling the state.
+const MOVING_ABOVE_KMH: f64 = 3.0;
+/// How far in time a heading baseline may reach on either side of a sample.
+const HEADING_BASELINE_WINDOW_SECONDS: f64 = 5.0;
+/// Distance on each side of the rider that the gradient line is fitted over.
+const GRADIENT_HALF_WINDOW_METERS: f64 = 15.0;
+/// How far in time the gradient window may reach on either side of a sample.
+/// When GPS distance stalls, the window would otherwise span minutes of
+/// altitude change over a few metres of recorded distance.
+const GRADIENT_HALF_WINDOW_SECONDS: f64 = 20.0;
+
+/// Stop/start state with hysteresis. Samples without speed keep the previous state.
+struct MotionState {
+    moving: bool,
+}
+
+impl MotionState {
+    fn new() -> Self {
+        Self { moving: true }
+    }
+
+    fn update(&mut self, speed_mps: Option<f64>) -> bool {
+        if let Some(speed_kmh) = speed_mps.and_then(finite_f64).map(|mps| mps * 3.6) {
+            if self.moving && speed_kmh < STOPPED_BELOW_KMH {
+                self.moving = false;
+            } else if !self.moving && speed_kmh > MOVING_ABOVE_KMH {
+                self.moving = true;
+            }
+        }
+        self.moving
     }
 }
 
-fn advance_lookahead_index(
-    distance_series: &NumericSeries,
-    index: usize,
-    current_distance: f64,
-    baseline_meters: f64,
-    lookahead_index: &mut usize,
-) {
-    *lookahead_index = (*lookahead_index).max(index + 1);
-    while *lookahead_index < distance_series.len()
-        && distance_series[*lookahead_index]
-            .is_some_and(|distance| distance - current_distance < baseline_meters)
-    {
-        *lookahead_index += 1;
+/// Least-squares accumulator for elevation against distance offset.
+struct SlopeFit {
+    count: f64,
+    sum_x: f64,
+    sum_y: f64,
+    sum_xx: f64,
+    sum_xy: f64,
+    min_x: f64,
+    max_x: f64,
+}
+
+impl SlopeFit {
+    fn new() -> Self {
+        Self {
+            count: 0.0,
+            sum_x: 0.0,
+            sum_y: 0.0,
+            sum_xx: 0.0,
+            sum_xy: 0.0,
+            min_x: f64::INFINITY,
+            max_x: f64::NEG_INFINITY,
+        }
+    }
+
+    fn add(&mut self, x: f64, y: f64) {
+        self.count += 1.0;
+        self.sum_x += x;
+        self.sum_y += y;
+        self.sum_xx += x * x;
+        self.sum_xy += x * y;
+        self.min_x = self.min_x.min(x);
+        self.max_x = self.max_x.max(x);
+    }
+
+    /// Percent grade once the points span at least one half window.
+    fn percent_grade(&self) -> Option<f64> {
+        if self.count < 3.0 || self.max_x - self.min_x < GRADIENT_HALF_WINDOW_METERS {
+            return None;
+        }
+        let variance = self.count * self.sum_xx - self.sum_x * self.sum_x;
+        let covariance = self.count * self.sum_xy - self.sum_x * self.sum_y;
+        Some(covariance / variance * 100.0)
     }
 }
 
-/// Derives percent grade over a roughly 5 meter distance window.
+/// Derives percent grade at each sample as the least-squares slope of
+/// elevation against cumulative distance over a centred distance window.
 ///
-/// A distance-window baseline is less sensitive to sample cadence than adjacent
-/// differences. The result is clamped to realistic display bounds and carries
-/// the last valid value through sparse elevation/distance holes.
+/// Filtering in the distance domain keeps the result independent of sample
+/// rate, and the centred window places the slope at the rider instead of
+/// lagging behind like a trailing bike-computer window. The window is also
+/// bounded in time, because stalled GPS distance would otherwise stretch it
+/// over minutes. The last valid grade holds while the rider is stopped, when
+/// the window cannot span enough distance, and across elevation holes.
+/// Missing distance samples stay missing and break the window.
 pub fn derive_gradient_series(
     elevation_series: &NumericSeries,
     distance_series: &NumericSeries,
+    speed_series: &NumericSeries,
+    elapsed_series: &[f64],
 ) -> NumericSeries {
-    let smoothed_elevation = smooth_elevation_series(elevation_series, 2);
     let mut gradient_series = Vec::with_capacity(distance_series.len());
     let mut last_gradient = 0.0;
-    let mut lookback_index = None;
-    let mut lookahead_index = 0;
+    let mut motion = MotionState::new();
 
     for index in 0..distance_series.len() {
-        let Some(current_distance) = distance_series[index].and_then(finite_f64) else {
-            lookback_index = Some(index);
+        let moving = motion.update(speed_series[index]);
+        let Some(current_distance) = distance_series[index] else {
             gradient_series.push(None);
             continue;
         };
 
-        advance_lookback_index(
-            distance_series,
-            index,
-            current_distance,
-            5.0,
-            &mut lookback_index,
-        );
-        advance_lookahead_index(
-            distance_series,
-            index,
-            current_distance,
-            5.0,
-            &mut lookahead_index,
-        );
-        // Gradient uses the endpoint when the full baseline is unavailable.
-        let left_index = lookback_index.unwrap_or(0);
-        let right_index = lookahead_index.min(distance_series.len() - 1);
-
-        let left_distance = distance_series[left_index].and_then(finite_f64);
-        let right_distance = distance_series[right_index].and_then(finite_f64);
-        let left_elevation = smoothed_elevation[left_index].and_then(finite_f64);
-        let right_elevation = smoothed_elevation[right_index].and_then(finite_f64);
-
-        let (
-            Some(left_distance),
-            Some(right_distance),
-            Some(left_elevation),
-            Some(right_elevation),
-        ) = (
-            left_distance,
-            right_distance,
-            left_elevation,
-            right_elevation,
-        )
-        else {
-            gradient_series.push(round_f64(last_gradient, 3));
-            continue;
-        };
-
-        let horizontal_distance = right_distance - left_distance;
-        if horizontal_distance < 1.0 {
-            gradient_series.push(round_f64(last_gradient, 3));
-            continue;
+        if moving {
+            let mut fit = SlopeFit::new();
+            let mut add_window = |candidates: &mut dyn Iterator<Item = usize>| {
+                for candidate in candidates {
+                    let Some(distance) = distance_series[candidate] else {
+                        break;
+                    };
+                    if (distance - current_distance).abs() > GRADIENT_HALF_WINDOW_METERS
+                        || (elapsed_series[candidate] - elapsed_series[index]).abs()
+                            > GRADIENT_HALF_WINDOW_SECONDS
+                    {
+                        break;
+                    }
+                    if let Some(elevation) = elevation_series[candidate] {
+                        fit.add(distance - current_distance, elevation);
+                    }
+                }
+            };
+            add_window(&mut (index..=index));
+            add_window(&mut (0..index).rev());
+            add_window(&mut (index + 1..distance_series.len()));
+            if let Some(gradient) = fit.percent_grade() {
+                last_gradient = gradient;
+            }
         }
-
-        let next_gradient =
-            (((right_elevation - left_elevation) / horizontal_distance) * 100.0).clamp(-30.0, 30.0);
-        last_gradient = next_gradient;
-        gradient_series.push(round_f64(next_gradient, 3));
+        gradient_series.push(round_f64(last_gradient, 3));
     }
 
     gradient_series
 }
-
-/// Speed below which a moving rider counts as stopped and heading holds.
-const HEADING_STOPPED_BELOW_KMH: f64 = 2.0;
-/// Speed a stopped rider must exceed before heading updates again. The gap to
-/// the stop threshold keeps GPS speed noise from toggling the state.
-const HEADING_MOVING_ABOVE_KMH: f64 = 3.0;
-/// How far in time a heading baseline may reach on either side of a sample.
-const HEADING_BASELINE_WINDOW_SECONDS: f64 = 5.0;
 
 /// Derives heading from course points using a straight-line baseline.
 ///
@@ -304,20 +323,11 @@ pub fn derive_heading_series(
 ) -> NumericSeries {
     let mut derived = Vec::with_capacity(course_series.len());
     let mut last_heading = None;
-    let mut moving = true;
+    let mut motion = MotionState::new();
     let half_baseline_meters = min_displacement_meters / 2.0;
 
     for index in 0..course_series.len() {
-        if let Some(speed_kmh) = speed_series[index]
-            .and_then(finite_f64)
-            .map(|mps| mps * 3.6)
-        {
-            if moving && speed_kmh < HEADING_STOPPED_BELOW_KMH {
-                moving = false;
-            } else if !moving && speed_kmh > HEADING_MOVING_ABOVE_KMH {
-                moving = true;
-            }
-        }
+        let moving = motion.update(speed_series[index]);
 
         let heading = present_gps_point(course_series[index])
             .filter(|_| moving)
@@ -685,16 +695,21 @@ pub fn derive_activity_metric_series(
         let window = smoothing_window_for_seconds(&timestamps_ms, 1.0);
         zero_phase_smooth(&derived_speed, window)
     };
-    let heading_speed: NumericSeries = direct["speed"]
+    let motion_speed: NumericSeries = direct["speed"]
         .iter()
         .zip(&derived_speed)
         .map(|(recorded, derived)| recorded.or(*derived))
         .collect();
-    let derived_heading = derive_heading_series(course_series, &heading_speed, elapsed_series, 8.0);
+    let derived_heading = derive_heading_series(course_series, &motion_speed, elapsed_series, 8.0);
     let derived_distance_to_home = derive_distance_to_home_series(course_series);
     let derived_total_ascent =
         derive_total_ascent_series(&direct["barometric_altitude"], &direct["elevation"]);
-    let derived_gradient = derive_gradient_series(&preferred_altitude, distance_series);
+    let derived_gradient = derive_gradient_series(
+        &preferred_altitude,
+        distance_series,
+        &motion_speed,
+        elapsed_series,
+    );
     let derived_vertical_speed = derive_numeric_rate_series(&preferred_altitude, elapsed_series);
     // Depth grows downwards, so its rate is negated to read positive while ascending.
     let derived_depth_vertical_speed: NumericSeries =
@@ -846,7 +861,7 @@ mod tests {
     };
 
     #[test]
-    fn distance_windows_preserve_thresholds_plateaus_holes_and_endpoints() {
+    fn heading_windows_preserve_thresholds_plateaus_holes_and_endpoints() {
         let distances = vec![
             None,
             Some(0.0),
@@ -862,21 +877,6 @@ mod tests {
             Some(20.0),
             Some(20.0),
         ];
-        let elevations = vec![
-            None,
-            Some(100.0),
-            Some(100.0),
-            Some(100.1),
-            Some(100.5),
-            Some(100.5),
-            Some(100.6),
-            Some(101.0),
-            None,
-            Some(101.5),
-            Some(101.6),
-            Some(102.0),
-            Some(102.0),
-        ];
         let course = distances
             .iter()
             .enumerate()
@@ -887,24 +887,6 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        assert_eq!(
-            derive_gradient_series(&elevations, &distances),
-            vec![
-                None,
-                Some(0.0),
-                Some(0.0),
-                Some(0.0),
-                Some(7.5),
-                Some(7.5),
-                Some(7.5),
-                Some(7.5),
-                None,
-                Some(7.5),
-                Some(7.5),
-                Some(6.84),
-                Some(6.84),
-            ]
-        );
         // Speeds are m/s. The rider stops at index 9 (1.8 km/h) and stays stopped at
         // index 10 (2.52 km/h, between the thresholds) until index 11 (7.2 km/h).
         let speeds = vec![
@@ -963,12 +945,107 @@ mod tests {
             .map(|index| index as f64 / 10.0)
             .collect::<Vec<_>>();
 
-        let gradients = derive_gradient_series(&elevations, &distances);
+        let gradients = derive_gradient_series(&elevations, &distances, &speeds, &elapsed);
         let headings = derive_heading_series(&course, &speeds, &elapsed, 5.0);
         assert_eq!(gradients.len(), sample_count);
         assert_eq!(headings.len(), sample_count);
         assert!(gradients.iter().all(|value| *value == Some(0.0)));
         assert!(headings.iter().all(Option::is_none));
+    }
+
+    fn seconds(count: usize) -> Vec<f64> {
+        (0..count).map(|second| second as f64).collect()
+    }
+
+    #[test]
+    fn gradient_fits_steady_slopes_without_clamping() {
+        // 1 Hz at 5 m/s on a 60% lift line: steep grades are real and pass through.
+        let distances: Vec<_> = (0..20).map(|index| Some(index as f64 * 5.0)).collect();
+        let elevations: Vec<_> = (0..20).map(|index| Some(index as f64 * 3.0)).collect();
+        let speeds = vec![Some(5.0); 20];
+
+        let gradients = derive_gradient_series(&elevations, &distances, &speeds, &seconds(20));
+        assert!(gradients.iter().all(|value| *value == Some(60.0)));
+    }
+
+    #[test]
+    fn gradient_least_squares_averages_altitude_steps() {
+        // Barometric altitude quantized to 0.2 m steps on an even 3% grade.
+        let distances: Vec<_> = (0..40).map(|index| Some(index as f64 * 5.0)).collect();
+        let elevations: Vec<_> = (0..40)
+            .map(|index| Some((index as f64 * 0.15 / 0.2).floor() * 0.2))
+            .collect();
+        let speeds = vec![Some(5.0); 40];
+
+        let gradients = derive_gradient_series(&elevations, &distances, &speeds, &seconds(40));
+        for value in &gradients[3..37] {
+            assert!((value.unwrap() - 3.0).abs() < 0.5, "{value:?}");
+        }
+    }
+
+    #[test]
+    fn gradient_holds_while_stopped_and_through_gps_stalls() {
+        // Riding up 10% at 5 m/s, then stopped for 30 s while barometric altitude
+        // drifts 2 m, then riding with GPS distance frozen for 60 s while the
+        // barometer records a real 10 m drop, then riding flat.
+        let mut distances = Vec::new();
+        let mut elevations = Vec::new();
+        let mut speeds = Vec::new();
+        for index in 0..10 {
+            distances.push(Some(index as f64 * 5.0));
+            elevations.push(Some(index as f64 * 0.5));
+            speeds.push(Some(5.0));
+        }
+        for index in 0..30 {
+            distances.push(Some(45.0));
+            elevations.push(Some(4.5 - index as f64 / 15.0));
+            speeds.push(Some(0.0));
+        }
+        for index in 0..60 {
+            distances.push(Some(45.0 + ((index + 1) / 20) as f64));
+            elevations.push(Some(2.5 - index as f64 / 6.0));
+            speeds.push(None);
+        }
+        let stalled_end = distances.len();
+        for index in 0..20 {
+            distances.push(Some(53.0 + index as f64 * 5.0));
+            elevations.push(Some(-7.5));
+            speeds.push(Some(5.0));
+        }
+
+        let gradients =
+            derive_gradient_series(&elevations, &distances, &speeds, &seconds(distances.len()));
+        // Stopped: the last moving grade holds instead of following altitude drift.
+        assert!(gradients[11..40]
+            .iter()
+            .all(|value| *value == gradients[10]));
+        // Stalled distance never turns 10 m over 1 m into a wall.
+        assert!(gradients[..stalled_end]
+            .iter()
+            .all(|value| value.unwrap().abs() <= 12.0));
+        assert_eq!(gradients.last().copied().flatten(), Some(0.0));
+    }
+
+    #[test]
+    fn gradient_preserves_missing_distance_and_breaks_the_window() {
+        let mut distances: Vec<_> = (0..20).map(|index| Some(index as f64 * 5.0)).collect();
+        let elevations: Vec<_> = (0..20)
+            .map(|index| {
+                Some(if index < 10 {
+                    0.0
+                } else {
+                    (index - 10) as f64 * 1.0
+                })
+            })
+            .collect();
+        distances[10] = None;
+        let speeds = vec![Some(5.0); 20];
+
+        let gradients = derive_gradient_series(&elevations, &distances, &speeds, &seconds(20));
+        assert_eq!(gradients[10], None);
+        // The flat side never leaks across the hole into the 20% side.
+        assert_eq!(gradients[9], Some(0.0));
+        assert_eq!(gradients[11], Some(20.0));
     }
 
     #[test]
