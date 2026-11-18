@@ -2,7 +2,7 @@
 //! `fitCutsToFrameCount` arrives with relinking in Phase 6.
 
 use super::Clip;
-use ovrley_core::media::video_edits::{SegmentEdits, FIRST_SEGMENT_KEY};
+use ovrley_core::media::video_edits::{SegmentEdits, VideoEdits, FIRST_SEGMENT_KEY};
 
 /// One segment of a clip in source order (`listVideoSegments`).
 #[derive(Clone, Debug, PartialEq)]
@@ -116,6 +116,19 @@ pub fn resolve_edit_clip<'a>(clips: &'a [Clip], preview_video_id: Option<&str>, 
     })
 }
 
+/// `fitCutsToFrameCount`: the edits fitted to a source file of `frame_count` frames: cuts at or
+/// past its end are dropped with the edits of the segments they start.
+pub fn fit_cuts_to_frame_count(edits: &VideoEdits, frame_count: i64) -> VideoEdits {
+    let cuts: Vec<_> = edits.cuts.iter().filter(|cut| cut.frame < frame_count).cloned().collect();
+    let segments = edits
+        .segments
+        .iter()
+        .filter(|(key, _)| key.as_str() == FIRST_SEGMENT_KEY || cuts.iter().any(|cut| &cut.id == *key))
+        .map(|(key, segment)| (key.clone(), *segment))
+        .collect();
+    VideoEdits { cuts, segments, ..edits.clone() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;
@@ -204,5 +217,15 @@ mod tests {
         assert_eq!(plan_video_trim(&ride(&[], SegmentEdits::INCLUDED), TrimSide::Start, 0), None);
         assert_eq!(plan_video_trim(&ride(&[], SegmentEdits::INCLUDED), TrimSide::End, 300), None);
         assert_eq!(plan_video_trim(&ride(&[], excluded()), TrimSide::Start, 90), None);
+    }
+
+    #[test]
+    fn fitting_drops_cuts_at_or_past_the_end_with_their_segments() {
+        let edits = cut_edits(&[cut("a", 100, SegmentEdits::INCLUDED), cut("b", 200, excluded()), cut("c", 300, SegmentEdits::INCLUDED)], excluded());
+        let fitted = fit_cuts_to_frame_count(&edits, 200);
+        assert_eq!(fitted.cuts.iter().map(|cut| cut.id.as_str()).collect::<Vec<_>>(), ["a"]);
+        assert_eq!(fitted.segments.keys().map(String::as_str).collect::<Vec<_>>(), ["a", "start"]);
+        assert!(fitted.segments["start"].excluded);
+        assert_eq!(fit_cuts_to_frame_count(&edits, 301), edits);
     }
 }

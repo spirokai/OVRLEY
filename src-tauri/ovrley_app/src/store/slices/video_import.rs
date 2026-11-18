@@ -14,6 +14,7 @@ use crate::lib::video_program::edits::{find_video, segment_before_cut, Collectio
 use crate::lib::video_program::segments::TrimSide;
 use crate::lib::video_program::{Clip, ImportedVideo, VideoEditsMap};
 use ovrley_core::media::video_edits::{Transition, FIRST_SEGMENT_KEY};
+use crate::lib::video_sync::SyncActivity;
 use crate::store::Store;
 use ovrley_core::encode::ffmpeg::transitions::{transition_defaults, TransitionDefaults};
 use std::rc::Rc;
@@ -110,11 +111,12 @@ impl VideoImportSlice {
         join_video_edits(&self.imported_videos, &self.video_edits)
     }
 
-    /// Applies an edit to copies of the collection and keeps them only when it succeeds.
-    fn edit_collection<R>(&mut self, edit: impl FnOnce(&mut CollectionDraft) -> Result<R, String>) -> Result<R, String> {
+    /// Applies an edit to copies of the collection, placed against `activity`, and keeps them only
+    /// when it succeeds.
+    pub fn edit_collection<R>(&mut self, activity: Option<&SyncActivity>, edit: impl FnOnce(&mut CollectionDraft) -> Result<R, String>) -> Result<R, String> {
         let mut videos = (*self.imported_videos).clone();
         let mut edits = (*self.video_edits).clone();
-        let result = edit(&mut CollectionDraft { videos: &mut videos, edits: &mut edits })?;
+        let result = edit(&mut CollectionDraft { videos: &mut videos, edits: &mut edits, activity })?;
         if videos != *self.imported_videos {
             self.imported_videos = Rc::new(videos);
         }
@@ -123,6 +125,12 @@ impl VideoImportSlice {
         }
         Ok(result)
     }
+}
+
+/// Applies an edit to the store's collection, placed against the store's activity.
+pub fn edit_collection<R>(store: &mut Store, edit: impl FnOnce(&mut CollectionDraft) -> Result<R, String>) -> Result<R, String> {
+    let activity = store.media.sync_activity();
+    store.video_import.edit_collection(activity.as_ref(), edit)
 }
 
 /// `clampPlayheadToVideos`: moves the playhead by `delta_seconds`, kept on the timeline.
@@ -149,7 +157,7 @@ pub fn select_clip(store: &mut Store, selection: Option<SelectedClip>) -> Result
 /// `removeImportedVideo`, without the history rebase (`change_video_collection` wraps it, D17).
 /// The playhead stays on the timeline; the clip's selection and cut question go with it.
 pub fn remove_imported_video(store: &mut Store, video_id: &str) -> Result<(), String> {
-    store.video_import.edit_collection(|draft| draft.remove_video(video_id))?;
+    edit_collection(store, |draft| draft.remove_video(video_id))?;
     store.video_import.video_drag_preview = None;
     if store.video_import.cut_removal_request.as_ref().is_some_and(|request| request.video_id == video_id) {
         store.video_import.cut_removal_request = None;
@@ -165,7 +173,7 @@ pub fn remove_imported_video(store: &mut Store, video_id: &str) -> Result<(), St
 /// the clip, as a dragged clip carries it.
 pub fn set_video_offset(store: &mut Store, video_id: &str, seconds: f64, compensate_playhead: bool) -> Result<(), String> {
     let previous = store.video_import.video_edits.get(video_id).map_or(0.0, |edits| edits.offset_seconds);
-    store.video_import.edit_collection(|draft| draft.set_video_offset(video_id, seconds))?;
+    edit_collection(store, |draft| draft.set_video_offset(video_id, seconds))?;
     store.video_import.video_drag_preview = None;
     if compensate_playhead {
         clamp_playhead_to_videos(store, seconds - previous);
@@ -175,7 +183,7 @@ pub fn set_video_offset(store: &mut Store, video_id: &str, seconds: f64, compens
 
 /// `shiftVideoOffsets`: every clip by the same amount.
 pub fn shift_video_offsets(store: &mut Store, delta_seconds: f64, compensate_playhead: bool) -> Result<(), String> {
-    store.video_import.edit_collection(|draft| draft.shift_video_offsets(delta_seconds))?;
+    edit_collection(store, |draft| draft.shift_video_offsets(delta_seconds))?;
     store.video_import.video_drag_preview = None;
     if compensate_playhead {
         clamp_playhead_to_videos(store, delta_seconds);
@@ -185,12 +193,12 @@ pub fn shift_video_offsets(store: &mut Store, delta_seconds: f64, compensate_pla
 
 /// `cutVideo`. Returns the new cut's id.
 pub fn cut_video(store: &mut Store, video_id: &str, frame: i64) -> Result<String, String> {
-    store.video_import.edit_collection(|draft| draft.cut_video(video_id, frame))
+    edit_collection(store, |draft| draft.cut_video(video_id, frame))
 }
 
 /// `trimVideo`: a start trim moves a selected first segment to the part it now starts.
 pub fn trim_video(store: &mut Store, video_id: &str, side: TrimSide, frame: i64) -> Result<String, String> {
-    let cut_id = store.video_import.edit_collection(|draft| draft.trim_video(video_id, side, frame))?;
+    let cut_id = edit_collection(store, |draft| draft.trim_video(video_id, side, frame))?;
     if side == TrimSide::Start {
         if let Some(selection) = selection_on(store, video_id).filter(|selection| selection.segment_key.as_deref() == Some(FIRST_SEGMENT_KEY)) {
             selection.segment_key = Some(cut_id.clone());
@@ -201,7 +209,7 @@ pub fn trim_video(store: &mut Store, video_id: &str, side: TrimSide, frame: i64)
 
 /// `moveCut`.
 pub fn move_cut(store: &mut Store, video_id: &str, cut_id: &str, frame: i64) -> Result<(), String> {
-    store.video_import.edit_collection(|draft| draft.move_cut(video_id, cut_id, frame))
+    edit_collection(store, |draft| draft.move_cut(video_id, cut_id, frame))
 }
 
 /// `applyCutRemoval`: removes a cut; a selected segment that goes with it stays selected as the
@@ -209,7 +217,7 @@ pub fn move_cut(store: &mut Store, video_id: &str, cut_id: &str, frame: i64) -> 
 fn apply_cut_removal(store: &mut Store, video_id: &str, cut_id: &str, excluded: bool, skip_overlay: bool) -> Result<(), String> {
     let edits = store.video_import.video_edits.get(video_id).ok_or_else(|| format!("Unknown imported video: {video_id}"))?;
     let merged_key = segment_before_cut(edits, cut_id)?;
-    store.video_import.edit_collection(|draft| draft.remove_cut(video_id, cut_id, excluded, skip_overlay))?;
+    edit_collection(store, |draft| draft.remove_cut(video_id, cut_id, excluded, skip_overlay))?;
     if let Some(selection) = selection_on(store, video_id).filter(|selection| selection.segment_key.as_deref() == Some(cut_id)) {
         selection.segment_key = Some(merged_key);
     }
@@ -265,13 +273,13 @@ pub fn dismiss_cut_removal(store: &mut Store) {
 
 /// `setVideoSegmentExcluded`.
 pub fn set_video_segment_excluded(store: &mut Store, video_id: &str, segment_key: &str, excluded: bool) -> Result<(), String> {
-    store.video_import.edit_collection(|draft| draft.set_segment_excluded(video_id, segment_key, excluded))
+    edit_collection(store, |draft| draft.set_segment_excluded(video_id, segment_key, excluded))
 }
 
 /// `setJoinTransition`: overrides the transition of a join (the segment it leads into), or with
 /// `None` returns it to the defaults.
 pub fn set_join_transition(store: &mut Store, video_id: &str, segment_key: &str, transition: Option<Transition>) -> Result<(), String> {
-    store.video_import.edit_collection(|draft| draft.set_segment_transition(video_id, segment_key, transition))
+    edit_collection(store, |draft| draft.set_segment_transition(video_id, segment_key, transition))
 }
 
 /// `setVideoDragPreview`.

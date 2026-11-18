@@ -117,6 +117,50 @@ pub fn derive_compatibility(clips: &[&Clip]) -> Compatibility {
     }
 }
 
+/// What keeps videos from being exported as one file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CombinedExportIssueKind {
+    Overlap,
+    Incompatible,
+    Rotation,
+}
+
+/// One issue and the videos it concerns, in clip order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CombinedExportIssue {
+    pub kind: CombinedExportIssueKind,
+    pub video_ids: Vec<String>,
+}
+
+/// `findCombinedExportIssues`: overlapping videos, videos whose resolution or frame rate differs
+/// from the others, and, when the encoder keeps the display rotation, videos rotated differently
+/// from the first piece's video. Empty when one file is possible.
+pub fn find_combined_export_issues(program: &Program, clips: &[&Clip], keeps_rotation: bool) -> Vec<CombinedExportIssue> {
+    let mut issues = Vec::new();
+    if !program.overlaps.is_empty() {
+        let overlapping: BTreeSet<&str> = program.overlaps.iter().flat_map(|overlap| [overlap.earlier_video_id.as_str(), overlap.later_video_id.as_str()]).collect();
+        issues.push(CombinedExportIssue {
+            kind: CombinedExportIssueKind::Overlap,
+            video_ids: clips.iter().filter(|clip| overlapping.contains(clip.id())).map(|clip| clip.id().to_string()).collect(),
+        });
+    }
+    let incompatible = derive_compatibility(clips).incompatible_ids;
+    if !incompatible.is_empty() {
+        issues.push(CombinedExportIssue {
+            kind: CombinedExportIssueKind::Incompatible,
+            video_ids: clips.iter().filter(|clip| incompatible.contains(clip.id())).map(|clip| clip.id().to_string()).collect(),
+        });
+    }
+    if let (true, Some(first)) = (keeps_rotation, program.pieces.first()) {
+        let rotation = clips.iter().find(|clip| clip.id() == first.video_id).expect("pieces come from the clips").video.rotation_degrees;
+        let rotated: Vec<String> = clips.iter().filter(|clip| clip.video.rotation_degrees != rotation).map(|clip| clip.id().to_string()).collect();
+        if !rotated.is_empty() {
+            issues.push(CombinedExportIssue { kind: CombinedExportIssueKind::Rotation, video_ids: std::iter::once(first.video_id.clone()).chain(rotated).collect() });
+        }
+    }
+    issues
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;

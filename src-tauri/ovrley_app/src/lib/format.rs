@@ -91,6 +91,34 @@ pub fn format_zoned_date_time(timestamp: &str, timezone: &str, language: Locale)
     Some(formatter.format(&datetime).to_string())
 }
 
+/// `formatVideoCreationTime`: GPS times, and camera or filename clocks read as UTC, in the
+/// recording timezone; other clocks as they read. `Unknown` without a time. A time that cannot be
+/// read shows as it is (external data; `Intl` would throw).
+pub fn format_video_creation_time(timestamp: Option<&str>, source: Option<&str>, timezone: Option<&str>, timezone_mode: Option<ovrley_core::media::video_edits::TimezoneMode>, language: Locale) -> String {
+    use ovrley_core::media::video_edits::TimezoneMode;
+    let Some(timestamp) = timestamp.filter(|timestamp| !timestamp.is_empty()) else {
+        return "Unknown".into();
+    };
+    let zoned = source == Some("gps") || (matches!(source, Some("ffprobe" | "filename")) && timezone_mode == Some(TimezoneMode::Utc));
+    // A clock without a zone is read as UTC, as placement reads it.
+    let as_utc = format!("{}Z", crate::lib::video_sync::strip_camera_clock(timestamp));
+    let formatted = match timezone.filter(|_| zoned) {
+        Some(timezone) => format_zoned_date_time(timestamp, timezone, language).or_else(|| format_zoned_date_time(&as_utc, timezone, language)),
+        None => format_zoned_date_time(&as_utc, "UTC", language),
+    };
+    formatted.unwrap_or_else(|| timestamp.to_string())
+}
+
+/// `formatVideoDetails`: `{width}×{height} · {fps} fps · {duration}`, the rate to two decimals.
+pub fn format_video_details(resolution: ovrley_core::media::video_edits::VideoResolution, fps: ovrley_core::encode::fps::Fps, duration_seconds: f64, language: Locale) -> String {
+    let template = crate::i18n::catalog().t_or(language, "video-preview.videoDetails", "{{width}}×{{height}} · {{fps}} fps · {{duration}}");
+    let rate = crate::js::number_to_string(crate::js::round(fps.as_f64() * 100.0) / 100.0);
+    crate::i18n::interpolate(
+        template,
+        &[("width", &resolution.width.to_string()), ("height", &resolution.height.to_string()), ("fps", &rate), ("duration", &format_seconds_clock(duration_seconds))],
+    )
+}
+
 /// `value.toLocaleString(undefined, {maximumFractionDigits})` in the system locale; the default
 /// maximum is 3, as `toLocaleString()`'s.
 pub fn format_locale_number(value: f64, maximum_fraction_digits: usize) -> String {
@@ -171,5 +199,26 @@ mod tests {
     #[test]
     fn text_compares_by_collation() {
         assert_eq!(compare_text("apple", "Banana", Locale::En), std::cmp::Ordering::Less);
+    }
+
+    #[test]
+    fn video_creation_times_follow_their_source() {
+        use ovrley_core::media::video_edits::TimezoneMode;
+        let en = Locale::En;
+        assert_eq!(format_video_creation_time(None, None, None, None, en), "Unknown");
+        // A camera clock shows as it reads, whatever its zone suffix.
+        let clock = format_video_creation_time(Some("2024-06-01T10:30:00.5Z"), Some("ffprobe"), Some("Europe/Berlin"), None, en);
+        assert_eq!(clock, format_zoned_date_time("2024-06-01T10:30:00Z", "UTC", en).unwrap());
+        // GPS, and a clock read as UTC, in the recording zone.
+        let gps = format_video_creation_time(Some("2024-06-01T08:30:00Z"), Some("gps"), Some("Europe/Berlin"), None, en);
+        assert_eq!(gps, clock);
+        assert_eq!(format_video_creation_time(Some("2024-06-01T08:30:00"), Some("filename"), Some("Europe/Berlin"), Some(TimezoneMode::Utc), en), clock);
+    }
+
+    #[test]
+    fn video_details_round_the_rate() {
+        let fps = ovrley_core::encode::fps::Fps::new(30000, 1001).unwrap();
+        let resolution = ovrley_core::media::video_edits::VideoResolution { width: 1920, height: 1080 };
+        assert_eq!(format_video_details(resolution, fps, 330.5, Locale::En), "1920×1080 · 29.97 fps · 05:30.5");
     }
 }

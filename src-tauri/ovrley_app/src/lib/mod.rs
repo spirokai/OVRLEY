@@ -17,4 +17,5 @@ pub mod template;
 pub mod update_rate;
 pub mod utils;
 pub mod video_program;
+pub mod video_sync;
 pub mod widget;

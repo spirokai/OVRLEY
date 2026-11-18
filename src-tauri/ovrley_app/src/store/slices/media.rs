@@ -53,6 +53,7 @@ pub struct ActivityLap {
 pub struct ActivitySummary {
     pub available_metrics: Vec<AvailableMetric>,
     pub duration_seconds: f64,
+    pub end_time: Option<String>,
     pub file_format: Option<String>,
     pub file_name: Option<String>,
     pub laps: Vec<ActivityLap>,
@@ -99,6 +100,7 @@ impl ActivitySummary {
         Self {
             available_metrics,
             duration_seconds: activity_duration_seconds(activity),
+            end_time: text("end_time"),
             file_format: activity.file_format.clone(),
             file_name: activity.file_name.clone(),
             laps: activity
@@ -136,6 +138,18 @@ pub struct MediaSlice {
 }
 
 impl MediaSlice {
+    /// The external activity videos are placed against (`parsedActivity` and its summary), or
+    /// `None` without one.
+    pub fn sync_activity(&self) -> Option<crate::lib::video_sync::SyncActivity> {
+        self.parsed_activity.as_ref()?;
+        let summary = self.activity_summary.as_ref();
+        Some(crate::lib::video_sync::SyncActivity {
+            sync_time: summary.and_then(|summary| summary.sync_time.clone()),
+            end_time: summary.and_then(|summary| summary.end_time.clone()),
+            timezone: summary.and_then(|summary| summary.timezone.clone()),
+        })
+    }
+
     pub fn set_error_message(&mut self, message: String) {
         self.error_message = Some(message);
     }

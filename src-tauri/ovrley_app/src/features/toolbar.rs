@@ -297,6 +297,7 @@ mod tests {
                 AvailableMetric { attribute: "gradient".into(), source: MetricSource::Mixed },
             ],
             duration_seconds: 3725.0,
+            end_time: None,
             file_format: Some("fit".into()),
             file_name: Some("x.fit".into()),
             laps: vec![ActivityLap { id: 0, start_seconds: 0.0, duration_seconds: 61.234 }, ActivityLap { id: 1, start_seconds: 61.2, duration_seconds: 3700.0 }],

@@ -22,7 +22,9 @@ pub mod warnings;
 
 use crate::store::slices::media::ImportedActivity;
 use ovrley_core::encode::fps::Fps;
-use ovrley_core::media::video_edits::{Cut, SegmentEdits, VideoEdits, VideoResolution};
+use crate::lib::video_sync::SyncWarning;
+use ovrley_core::media::video_edits::{Cut, SegmentEdits, VideoEdits, VideoMetadataSnapshot, VideoResolution};
+use std::sync::Arc;
 use ovrley_core::media::SourceVideoMetadata;
 use std::collections::BTreeMap;
 
@@ -99,10 +101,12 @@ pub struct ImportedVideo {
     pub detected_creation_time: Option<String>,
     pub detected_time_source: Option<String>,
     pub preview_warnings: Vec<String>,
-    /// A project video whose file cannot be found (Phase 6).
+    /// A project video whose file cannot be found.
     pub missing: bool,
-    pub sync_warning: Option<String>,
+    pub sync_warning: Option<SyncWarning>,
     pub telemetry: VideoTelemetry,
+    /// The first frame as PNG, when one could be read (`getVideoThumbnail`).
+    pub thumbnail: Option<Arc<[u8]>>,
 }
 
 /// The edits of every video, keyed by video id.
@@ -201,7 +205,58 @@ pub fn create_imported_video(metadata: &SourceVideoMetadata, id: String, import_
         missing: false,
         sync_warning: None,
         telemetry: VideoTelemetry::pending(),
+        thumbnail: None,
     })
+}
+
+/// `createMissingVideo`: the entity of a project video whose file cannot be found, from the
+/// metadata the project saved (validated when the project was read). It has no thumbnail, and no
+/// embedded telemetry can be read.
+pub fn create_missing_video(metadata: &VideoMetadataSnapshot, id: String, path: String, import_order: u32) -> ImportedVideo {
+    ImportedVideo {
+        id,
+        path,
+        import_order,
+        duration_seconds: metadata.fps.frames_to_seconds(metadata.frame_count),
+        frame_count: metadata.frame_count,
+        fps: metadata.fps,
+        resolution: metadata.resolution,
+        rotation_degrees: metadata.rotation_degrees,
+        has_audio: metadata.has_audio,
+        codec_name: metadata.codec_name.clone(),
+        codec_long_name: metadata.codec_long_name.clone(),
+        bit_rate: metadata.bit_rate.clone(),
+        camera_type: metadata.camera_type.clone(),
+        camera_model: metadata.camera_model.clone(),
+        creation_time: metadata.creation_time.clone(),
+        time_source: metadata.time_source.clone(),
+        detected_creation_time: metadata.creation_time.clone(),
+        detected_time_source: metadata.time_source.clone(),
+        preview_warnings: Vec::new(),
+        missing: true,
+        sync_warning: None,
+        telemetry: VideoTelemetry::without_activity(TelemetryStatus::Failed).expect("failed telemetry has no activity"),
+        thumbnail: None,
+    }
+}
+
+/// `createVideoMetadataSnapshot`: the video as a project saves it, with its *detected* recording
+/// time, so it can be shown and kept on the timeline when its file cannot be found.
+pub fn video_metadata_snapshot(video: &ImportedVideo) -> VideoMetadataSnapshot {
+    VideoMetadataSnapshot {
+        frame_count: video.frame_count,
+        fps: video.fps,
+        resolution: video.resolution,
+        rotation_degrees: video.rotation_degrees,
+        has_audio: video.has_audio,
+        codec_name: video.codec_name.clone(),
+        codec_long_name: video.codec_long_name.clone(),
+        bit_rate: video.bit_rate.clone(),
+        camera_type: video.camera_type.clone(),
+        camera_model: video.camera_model.clone(),
+        creation_time: video.detected_creation_time.clone(),
+        time_source: video.detected_time_source.clone(),
+    }
 }
 
 /// A new video or cut id, as `crypto.randomUUID`.
@@ -348,6 +403,24 @@ mod tests {
     fn telemetry_carries_an_activity_only_when_ready() {
         assert!(VideoTelemetry::without_activity(TelemetryStatus::Ready).is_err());
         assert_eq!(VideoTelemetry::without_activity(TelemetryStatus::Absent).unwrap().activity(), None);
+    }
+
+    #[test]
+    fn a_missing_video_keeps_its_saved_place_and_details_and_snapshots_its_detected_time() {
+        let mut probed = metadata("/videos/ride.mp4", 10.0, (30000, 1001), 1920, 1080);
+        probed.creation_time = Some("2024-01-01T10:00:00".into());
+        probed.time_source = Some("ffprobe".into());
+        let mut video = create_imported_video(&probed, "v".into(), 2, Vec::new()).unwrap();
+        video.creation_time = Some("2024-01-01T11:00:00".into());
+        video.time_source = Some("filename".into());
+        let snapshot = video_metadata_snapshot(&video);
+        assert_eq!((snapshot.creation_time.as_deref(), snapshot.time_source.as_deref()), (Some("2024-01-01T10:00:00"), Some("ffprobe")));
+        let missing = create_missing_video(&snapshot, "v".into(), "/gone/ride.mp4".into(), 2);
+        assert!(missing.missing);
+        assert_eq!(missing.telemetry.status(), TelemetryStatus::Failed);
+        assert_eq!((missing.frame_count, missing.fps, missing.duration_seconds), (video.frame_count, video.fps, video.duration_seconds));
+        assert_eq!((missing.creation_time.clone(), missing.detected_creation_time.clone()), (snapshot.creation_time.clone(), snapshot.creation_time.clone()));
+        assert_eq!(missing.thumbnail, None);
     }
 
     #[test]
