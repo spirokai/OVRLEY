@@ -41,6 +41,7 @@ impl Projections {
         features::app_shell::project(&window, store, language_changed);
         features::toolbar::project(&window, store);
         features::template_manager::project(&window, store);
+        features::video_preview::project(&window, store);
         features::undo_redo::project(&window, store);
         self.overlay.project(&window, store);
         self.player.project(&window, store);
@@ -75,6 +76,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     };
     features::app_shell::initialize(window);
     features::transitions::initialize(window);
+    features::transitions::bind(window, &dispatcher);
     features::app_shell::bind(window, &dispatcher);
     features::toolbar::bind(window, &dispatcher);
     features::template_manager::bind(window, &dispatcher);
@@ -84,6 +86,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::widget_editor::bind(window, &dispatcher);
     features::widget_drawer::bind(window, &dispatcher);
     features::scene_settings::bind(window, &dispatcher);
+    features::video_preview::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher
@@ -161,13 +164,6 @@ pub fn run(
             ovrley_app::features::widget_editor::load_font_catalog(store, services);
             ovrley_app::features::maps::initialize(store, services);
             ovrley_app::features::template_manager::restore_last_loaded_template(store, services, Box::new(|store, _| store.bootstrap.set_startup_ready()));
-            // Debug builds: the videos of `OVRLEY_DEV_VIDEOS`, after the template restore (D18).
-            if cfg!(debug_assertions) {
-                if let Some(paths) = std::env::var(ovrley_app::features::app_shell::DEV_VIDEOS_VARIABLE).ok().filter(|paths| !paths.is_empty()) {
-                    let paths = paths.split(';').map(str::to_string).filter(|path| !path.is_empty()).collect();
-                    ovrley_app::features::app_shell::load_dev_videos(store, services, paths);
-                }
-            }
         });
     });
 

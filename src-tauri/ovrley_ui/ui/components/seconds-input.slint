@@ -1,15 +1,30 @@
 import { Theme } from "../theme/theme.slint";
 import { AppText } from "app-text.slint";
 import { Input } from "input.slint";
+import { Icon, Icons } from "icons.slint";
+import { SimpleTooltip } from "simple-tooltip.slint";
+
+// The placement slot: none, a reset button for a value set by hand, or a clock for an automatic
+// one.
+export enum SecondsSlot { none, manual, auto }
 
 // seconds-input.jsx: the one input for times and durations, typed as a clock (`05:30`), as plain
 // seconds, or as a sum (`05:30+10`). Rust owns the field (`lib/seconds_input.rs`): it accepts or
 // refuses each edit, commits on Enter, blur and a step's key release, and discards on Escape. Below
 // the field: the error (0.65rem `destructive`) or the preview (0.65rem muted). With `show-unit` a
-// `SEC` unit sits inside the field's right edge. The step buttons and the placement slot arrive
-// with their first callers (scene settings, the video drawer).
+// `SEC` unit sits inside the field's right edge (without step buttons or a slot). With
+// `step-buttons` a 1.25rem column of up and down buttons on `surface-strong` sits at the right edge;
+// the placement slot (`slot`) sits left of it.
 export component SecondsInput inherits VerticalLayout {
     in property <string> text;
+    in property <bool> disabled;
+    in property <bool> step-buttons;
+    in property <SecondsSlot> slot: SecondsSlot.none;
+    in property <string> reset-label;
+    in property <string> manual-hint;
+    in property <string> auto-hint;
+    callback step(direction: int);
+    callback reset();
     in property <string> preview;
     in property <string> error;
     in property <string> label;
@@ -45,7 +60,10 @@ export component SecondsInput inherits VerticalLayout {
             font-size: root.font-size;
             border-width: 1px;
             border-color: Theme.border.transparentize(0.3);
-            inset-right: root.show-unit ? 2.25rem : 0.75rem;
+            disabled: root.disabled;
+            inset-right: root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none ? 2.25rem
+                : root.step-buttons && root.slot != SecondsSlot.none ? 3.25rem
+                : root.step-buttons || root.slot != SecondsSlot.none ? 1.75rem : 0.75rem;
             edited(text) => {
                 if !root.edited(text) {
                     root.draft = root.text;
@@ -66,7 +84,67 @@ export component SecondsInput inherits VerticalLayout {
                 }
             }
         }
-        if root.show-unit: AppText {
+        if root.step-buttons: Rectangle {
+            x: parent.width - self.width - 0.25rem;
+            y: 0.25rem;
+            width: 1.25rem;
+            height: parent.height - 0.5rem;
+            border-radius: 0.25rem;
+            background: Theme.surface-strong;
+            clip: true;
+            VerticalLayout {
+                for direction in [1, -1]: step-touch := TouchArea {
+                    enabled: !root.disabled;
+                    clicked => {
+                        root.step(direction);
+                    }
+                    Rectangle {
+                        background: step-touch.has-hover ? Theme.surface-accent-soft : transparent;
+                        Icon {
+                            glyph: direction > 0 ? Icons.chevron-up : Icons.chevron-down;
+                            size: 0.75rem;
+                            color: step-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+                        }
+                    }
+                }
+            }
+        }
+        if root.slot == SecondsSlot.manual: reset-touch := SimpleTooltip {
+            x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
+            y: 0.25rem;
+            width: 1.25rem;
+            height: parent.height - 0.5rem;
+            content: root.manual-hint;
+            accessible-role: AccessibleRole.button;
+            accessible-label: root.reset-label;
+            enabled: !root.disabled;
+            clicked => {
+                root.reset();
+            }
+            Rectangle {
+                border-radius: 0.25rem;
+                background: reset-touch.has-hover ? Theme.surface-accent-soft : transparent;
+                Icon {
+                    glyph: Icons.rotate-ccw;
+                    size: 0.75rem;
+                    color: reset-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+                }
+            }
+        }
+        if root.slot == SecondsSlot.auto: SimpleTooltip {
+            x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
+            y: 0.25rem;
+            width: 1.25rem;
+            height: parent.height - 0.5rem;
+            content: root.auto-hint;
+            opacity: root.disabled ? 0.5 : 1;
+            Icon {
+                glyph: Icons.clock;
+                size: 0.75rem;
+                color: Theme.muted-foreground.transparentize(0.5);
+            }
+        }
+        if root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none: AppText {
             x: parent.width - self.width - 0.5rem;
             content: @tr("components.secondsUnit" => "SEC");
             font-size: Theme.text-xs * 1rem;

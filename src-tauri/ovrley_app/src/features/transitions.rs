@@ -209,6 +209,52 @@ pub fn duration_options(fps: Fps) -> SecondsInputOptions {
     SecondsInputOptions { fps: Some(fps), mode: SecondsMode::Duration, signed: false, display: SecondsDisplay::Seconds }
 }
 
+/// What a `TransitionSelect` picks for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TransitionSelectTarget {
+    /// The import dialog's default transition.
+    ImportDefaults,
+}
+
+/// The open `TransitionSelect` popover (one at a time) and its filter.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TransitionSelectState {
+    pub target: TransitionSelectTarget,
+    pub filter: String,
+}
+
+pub fn open_transition_select(store: &mut Store, target: TransitionSelectTarget) {
+    store.transition_select = Some(TransitionSelectState { target, filter: String::new() });
+}
+
+pub fn close_transition_select(store: &mut Store) {
+    store.transition_select = None;
+}
+
+pub fn set_transition_select_filter(store: &mut Store, filter: String) {
+    if let Some(select) = store.transition_select.as_mut() {
+        select.filter = filter;
+    }
+}
+
+/// `choose`: closes the popover, then applies the choice to its target.
+pub fn choose_transition(store: &mut Store, value: &str) -> Result<(), String> {
+    let select = store.transition_select.take().ok_or("No transition picker is open")?;
+    TransitionKind::from_name(value)?;
+    match select.target {
+        TransitionSelectTarget::ImportDefaults => crate::features::video_preview::import::set_review_transition_defaults(store, |defaults| defaults.transition_type = value.to_string()),
+    }
+}
+
+/// The trigger's label of a default transition: its name, or "No transition".
+pub fn default_transition_label(transition_type: &str, locale: Locale) -> String {
+    if transition_type == ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION {
+        transition_label(Transition::HARD_CUT, locale)
+    } else {
+        transition_type.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

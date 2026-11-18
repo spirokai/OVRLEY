@@ -8,7 +8,11 @@
 //! loops. One decoded frame (960 × 544 RGBA) is held at a time, not all of them. When the last
 //! panel closes, the timer stops and the decoder is dropped.
 
-use crate::{AppWindow, TransitionPreviews};
+use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
+use crate::{AppWindow, TransitionOption, TransitionOptionKind, TransitionPreviews, TransitionSelect};
+use ovrley_app::features::transitions::{self as transitions, TransitionSelectTarget};
+use ovrley_app::store::Dispatcher;
+use slint::SharedString;
 use image::codecs::webp::WebPDecoder;
 use image::{AnimationDecoder, Frames};
 use ovrley_app::store::Store;
@@ -97,10 +101,11 @@ pub struct Projection {
 }
 
 impl Projection {
-    /// Runs the animation while a transition panel is open (the join panel now; the video drawer's
-    /// defaults picker joins it in Phase 6).
+    /// Runs the animation while a transition panel or a `TransitionSelect` popover is open, and
+    /// projects the open popover.
     pub fn project(&self, window: &AppWindow, store: &Store) {
-        let wanted = store.player.join_panel.is_some();
+        project_select(window, store);
+        let wanted = store.player.join_panel.is_some() || store.transition_select.is_some();
         let mut animation = self.animation.borrow_mut();
         match (wanted, animation.is_some()) {
             (true, false) => {
@@ -116,6 +121,71 @@ impl Projection {
             _ => {}
         }
     }
+}
+
+/// The key a `TransitionSelectTrigger` names its target by.
+pub fn target_key(target: &TransitionSelectTarget) -> &'static str {
+    match target {
+        TransitionSelectTarget::ImportDefaults => "import-defaults",
+    }
+}
+
+fn target_of(key: &str) -> Option<TransitionSelectTarget> {
+    match key {
+        "import-defaults" => Some(TransitionSelectTarget::ImportDefaults),
+        _ => None,
+    }
+}
+
+/// The selected value of a target: its default type.
+fn selected_value(store: &Store, target: &TransitionSelectTarget) -> String {
+    match target {
+        TransitionSelectTarget::ImportDefaults => store.video_import_review.review.as_ref().map(|review| review.transition_defaults.transition_type.clone()).unwrap_or_default(),
+    }
+}
+
+fn project_select(window: &AppWindow, store: &Store) {
+    let global = window.global::<TransitionSelect>();
+    let Some(select) = &store.transition_select else {
+        set_if_changed(global.get_open_target(), SharedString::new(), |value| global.set_open_target(value));
+        return;
+    };
+    let locale = store.i18n.language;
+    let none_label = ovrley_app::i18n::catalog().t_or(locale, "transitions.none", "No transition").to_string();
+    let options = std::iter::once(TransitionOption { kind: TransitionOptionKind::None, value: ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION.into(), label: none_label.into(), index: -1 })
+        .chain(transitions::filtered_transitions(&select.filter).into_iter().map(|name| TransitionOption {
+            kind: TransitionOptionKind::Xfade,
+            value: name.into(),
+            label: name.into(),
+            index: crate::features::video_preview::transition_index(Some(name)),
+        }))
+        .collect();
+    replace_if_changed(global.get_options(), options, |model| global.set_options(model));
+    set_if_changed(global.get_value(), SharedString::from(selected_value(store, &select.target)), |value| global.set_value(value));
+    set_if_changed(global.get_filter(), SharedString::from(select.filter.as_str()), |value| global.set_filter(value));
+    set_if_changed(global.get_open_target(), SharedString::from(target_key(&select.target)), |value| global.set_open_target(value));
+}
+
+pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
+    let global = window.global::<TransitionSelect>();
+    let handle = dispatcher.handle();
+    global.on_open(move |key| {
+        if let Some(target) = target_of(&key) {
+            handle.dispatch(move |store, _| transitions::open_transition_select(store, target));
+        }
+    });
+    let handle = dispatcher.handle();
+    global.on_close(move || handle.dispatch(|store, _| transitions::close_transition_select(store)));
+    let handle = dispatcher.handle();
+    global.on_filter_edited(move |text| handle.dispatch(move |store, _| transitions::set_transition_select_filter(store, text.to_string())));
+    let handle = dispatcher.handle();
+    global.on_chosen(move |value| {
+        handle.dispatch(move |store, _| {
+            if let Err(error) = transitions::choose_transition(store, &value) {
+                log::error!("transition select: {error}");
+            }
+        })
+    });
 }
 
 #[cfg(test)]

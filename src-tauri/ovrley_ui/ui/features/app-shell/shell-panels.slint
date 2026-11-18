@@ -59,7 +59,7 @@ export component ControlPanel inherits Rectangle {
 }
 
 // The 2rem spinner: a circle at 25% opacity and a quarter arc at 75%, turning once a second.
-component Spinner {
+export component Spinner {
     in property <length> size: 2rem;
     in property <color> color: Theme.muted-foreground;
     width: root.size;

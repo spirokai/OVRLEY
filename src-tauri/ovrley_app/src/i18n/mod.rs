@@ -86,6 +86,29 @@ impl Catalog {
             .map_or(default, String::as_str)
     }
 
+    /// `t(key, {count})`: i18next's plural keys (`key_one`, `key_few`, `key_other`…) chosen by the
+    /// language's cardinal rules, `{{count}}` filled; `default` when no form exists.
+    pub fn t_count(&self, locale: Locale, key: &str, count: usize, default: &str) -> String {
+        use icu::plurals::{PluralCategory, PluralRules};
+        let category = icu::locale::Locale::try_from_str(locale.code())
+            .ok()
+            .and_then(|language| PluralRules::try_new_cardinal(language.into()).ok())
+            .map_or(PluralCategory::Other, |rules| rules.category_for(count));
+        let suffix = match category {
+            PluralCategory::Zero => "zero",
+            PluralCategory::One => "one",
+            PluralCategory::Two => "two",
+            PluralCategory::Few => "few",
+            PluralCategory::Many => "many",
+            PluralCategory::Other => "other",
+        };
+        let template = [format!("{key}_{suffix}"), format!("{key}_other")]
+            .iter()
+            .find_map(|candidate| self.tables[locale.index()].get(candidate).or_else(|| self.tables[DEFAULT_LOCALE.index()].get(candidate)))
+            .map_or(default, String::as_str);
+        interpolate(template, &[("count", &count.to_string())])
+    }
+
     /// `t(key, {name: value, …})`.
     pub fn t_with(&self, locale: Locale, key: &str, values: &[(&str, &str)]) -> String {
         interpolate(self.t(locale, key), values)

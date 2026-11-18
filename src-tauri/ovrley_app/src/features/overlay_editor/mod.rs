@@ -16,11 +16,12 @@ use viewport::{next_wheel_zoom, EditorViewport, StageLayout, ViewportMetrics};
 /// A widget's data with its collection, as the editor's clipboard holds it.
 pub type PreviewWidgetData = (ovrley_widgets::model::document::Collection, ovrley_widgets::model::document::WidgetData);
 
-/// `CANVAS_BACKGROUND_COLORS`, for the modes Phase 3 has.
+/// `CANVAS_BACKGROUND_COLORS`. The image draws over its colour; the video's is the black Phase 6B
+/// draws the video over.
 pub fn canvas_background_color(mode: crate::features::app_shell::EditorBackgroundMode) -> &'static str {
     use crate::features::app_shell::EditorBackgroundMode;
     match mode {
-        EditorBackgroundMode::Checker | EditorBackgroundMode::Black => "#000000",
+        EditorBackgroundMode::Checker | EditorBackgroundMode::Black | EditorBackgroundMode::Image | EditorBackgroundMode::Video => "#000000",
         EditorBackgroundMode::White => "#f4ead2",
     }
 }

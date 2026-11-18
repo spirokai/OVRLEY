@@ -87,27 +87,58 @@ fn remembered_directory(
         .map(|path| path.to_string_lossy().into_owned()))
 }
 
+/// What to do with a multiple picker's answer: the selected paths, none when cancelled.
+pub type ThenMany = Box<dyn FnOnce(&mut Store, &mut Services, Vec<String>)>;
+
 fn show(
     services: &Services,
     request: FileDialogRequest,
     last_directory_key: Option<&'static str>,
     remember: fn(&str) -> String,
-    then: Then,
+    then: ThenMany,
 ) {
     let dispatch = services.dispatch.clone();
     services.dialogs.show(
         request,
         Box::new(move |selected| {
             dispatch.dispatch(move |store, services| {
-                if let (Some(selected), Some(key)) = (&selected, last_directory_key) {
+                if let (Some(first), Some(key)) = (selected.first(), last_directory_key) {
                     services
                         .preferences
-                        .set(key, Value::String(remember(selected)));
+                        .set(key, Value::String(remember(first)));
                 }
                 then(store, services, selected);
             });
         }),
     );
+}
+
+fn single(then: Then) -> ThenMany {
+    Box::new(move |store, services, selected| then(store, services, selected.into_iter().next()))
+}
+
+/// `openMultiplePaths`: one or more files of the given types; the directory of the first is
+/// remembered.
+pub fn open_multiple_paths(
+    services: &Services,
+    filters: &[DialogFilter],
+    options: DialogOptions,
+    then: ThenMany,
+) -> Result<(), String> {
+    let default_path = remembered_directory(services, options.last_directory_key)?
+        .or(options.default_path.map(str::to_string));
+    let request = FileDialogRequest::OpenFiles {
+        filters: case_insensitive_filters(filters),
+        default_path,
+    };
+    show(
+        services,
+        request,
+        options.last_directory_key,
+        |selected| directory_from_selected_path(selected).to_string(),
+        then,
+    );
+    Ok(())
 }
 
 /// `openSinglePath`: one file of the given types.
@@ -128,7 +159,7 @@ pub fn open_single_path(
         request,
         options.last_directory_key,
         |selected| directory_from_selected_path(selected).to_string(),
-        then,
+        single(then),
     );
     Ok(())
 }
@@ -146,7 +177,7 @@ pub fn open_directory_path(
         FileDialogRequest::OpenDirectory { default_path },
         options.last_directory_key,
         str::to_string,
-        then,
+        single(then),
     );
     Ok(())
 }
@@ -181,7 +212,7 @@ pub fn save_single_path(
         request,
         last_directory_key,
         |selected| directory_from_selected_path(selected).to_string(),
-        then,
+        single(then),
     );
     Ok(())
 }

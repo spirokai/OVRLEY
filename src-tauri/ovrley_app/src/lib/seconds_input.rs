@@ -228,6 +228,18 @@ impl SecondsInputState {
         true
     }
 
+    /// A step button (`onStep`): the draft or the value moved by `direction × step`, committed.
+    pub fn step(&mut self, options: SecondsInputOptions, value: f64, direction: f64, step: f64, locale: Locale, on_commit: impl FnOnce(f64) -> Option<String>) {
+        let seconds = self.draft_seconds().unwrap_or(value) + direction * step;
+        self.store(options, value, seconds, locale, on_commit);
+    }
+
+    /// The placement slot's reset (`onReset`): the draft and its error go before the reset runs.
+    pub fn clear(&mut self) {
+        self.draft = None;
+        self.error = None;
+    }
+
     /// A key release: the end of a step commits once. Matched by key alone, as a modifier may be
     /// released before the key it stepped with.
     pub fn key_up(&mut self, options: SecondsInputOptions, value: f64, key: &str, locale: Locale, on_commit: impl FnOnce(f64) -> Option<String>) -> bool {

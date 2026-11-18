@@ -158,10 +158,14 @@ pub fn reconcile_player(store: &mut Store) {
 }
 
 /// Removes a video clip (D17): playback pauses first, and the removal runs outside the history,
-/// which is rebased. Phase 6 adds releasing the video's decoders.
+/// which is rebased. Without videos the background returns to checker. Phase 6B adds releasing the
+/// video's decoders.
 pub fn remove_video(store: &mut Store, video_id: &str) -> Result<(), String> {
     playback::pause(store);
     crate::features::undo_redo::change_video_collection(store, &[], |store| crate::store::slices::video_import::remove_imported_video(store, video_id))?;
+    if !store.video_import.has_videos() {
+        store.editor_shell.set_editor_background_mode(crate::features::app_shell::EditorBackgroundMode::Checker);
+    }
     // Removing the video ends a cut question about it.
     if store.video_import.cut_removal_request.is_none() {
         if let Some(reply) = store.player.cut_removal_reply.take() {

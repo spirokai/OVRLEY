@@ -49,6 +49,8 @@ export global AppShell {
     in property <bool> file-drag-hovering;
     // `isProcessing`: an import or a template load runs; the workspace shows the loading overlay.
     in property <bool> processing;
+    // `importingVideo`: a quiet import runs.
+    in property <bool> importing-video;
     // `v<VITE_OVRLEY_VERSION>`, read at compile time.
     in property <string> version;
 
@@ -85,6 +87,7 @@ export global AppShell {
     callback map-tile-cache-clear();
     // The File menu's "Import Activity".
     callback import-activity();
+    callback import-videos();
 
     // Keys no focused control used (`key-pressed`) and the capture phase (`capture-key-pressed`),
     // as the window's root focus scope receives them. They answer whether the key was consumed.

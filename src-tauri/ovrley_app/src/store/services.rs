@@ -39,6 +39,11 @@ pub enum FileDialogRequest {
         filters: Vec<DialogFilter>,
         default_path: Option<String>,
     },
+    /// Several files at once.
+    OpenFiles {
+        filters: Vec<DialogFilter>,
+        default_path: Option<String>,
+    },
     OpenDirectory {
         default_path: Option<String>,
     },
@@ -48,8 +53,8 @@ pub enum FileDialogRequest {
     },
 }
 
-/// Receives the selected path, or `None` when the dialog was cancelled. Called on the UI thread.
-pub type DialogReply = Box<dyn FnOnce(Option<String>)>;
+/// Receives the selected paths, none when the dialog was cancelled. Called on the UI thread.
+pub type DialogReply = Box<dyn FnOnce(Vec<String>)>;
 
 /// Native file pickers.
 pub trait Dialogs {
@@ -104,6 +109,13 @@ pub trait VideoTools: Send + Sync {
     fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String>;
     /// `detectCodecs`: the encoders and decoders the bundled FFmpeg offers.
     fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String>;
+    /// `preparePreviewVideo`'s probe: the file check, then `probe_video_metadata` (D4). Blocking.
+    fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String>;
+    /// `getVideoThumbnail`: the first frame as a PNG, or `None` when FFmpeg reads no frame. Blocking;
+    /// each runs an FFmpeg process.
+    fn thumbnail(&self, path: &str) -> Option<Vec<u8>>;
+    /// `extractVideoTelemetry`: the video's embedded activity, `None` without one. Blocking.
+    fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String>;
 }
 
 pub use ovrley_services::video_filmstrip::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
@@ -144,6 +156,23 @@ impl VideoTools for NativeVideoTools {
 
     fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String> {
         ovrley_core::encode::ffmpeg::detect::detect_codecs(&self.paths.repo_root).map_err(|error| error.to_string())
+    }
+
+    fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String> {
+        let metadata = std::fs::metadata(path).map_err(|error| format!("Failed to read video file metadata: {error}"))?;
+        if !metadata.is_file() {
+            return Err(format!("Video path is not a file: {path}"));
+        }
+        ovrley_core::media::prepared_video::probe_video_metadata(&self.paths, path).map_err(|error| error.to_string())
+    }
+
+    fn thumbnail(&self, path: &str) -> Option<Vec<u8>> {
+        let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&self.paths.repo_root).ok()?;
+        ovrley_services::video_thumbnail::generate_thumbnail(&ffmpeg, std::path::Path::new(path))
+    }
+
+    fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
+        ovrley_core::commands::backend_extract_video_telemetry(&self.paths, path).map_err(|error| error.to_string())
     }
 }
 
@@ -302,8 +331,13 @@ pub mod fakes {
 
         /// Answers the oldest open dialog.
         pub fn answer(&self, selected: Option<&str>) {
+            self.answer_many(&selected.into_iter().collect::<Vec<_>>());
+        }
+
+        /// Answers the oldest open dialog with several paths.
+        pub fn answer_many(&self, selected: &[&str]) {
             let (_, reply) = self.pending.borrow_mut().remove(0);
-            reply(selected.map(str::to_string));
+            reply(selected.iter().map(|path| path.to_string()).collect());
         }
     }
 
@@ -473,14 +507,30 @@ pub mod fakes {
         }
     }
 
-    /// Video tools answering from a table: a strip per window key (cached or decoded), and
-    /// the codecs.
+    /// Video tools answering from a table: a strip per window key (cached or decoded), the
+    /// codecs, a probe per path (an unknown path is not a file), thumbnails and telemetry. The
+    /// thumbnails in flight are counted, and telemetry extractions recorded in order.
     #[derive(Default)]
     pub struct FakeVideoTools {
         pub cached: Mutex<std::collections::HashMap<String, Filmstrip>>,
         pub decoded: Mutex<std::collections::HashMap<String, Filmstrip>>,
         pub decodes: Mutex<Vec<(String, Option<FilmstripHwaccel>)>>,
         pub codecs: Mutex<ovrley_core::encode::ffmpeg::detect::AvailableCodecs>,
+        pub probes: Mutex<std::collections::HashMap<String, Result<ovrley_core::media::SourceVideoMetadata, String>>>,
+        pub thumbnails: Mutex<std::collections::HashMap<String, Vec<u8>>>,
+        /// How long a thumbnail takes, so a test sees them overlap.
+        pub thumbnail_delay: Mutex<std::time::Duration>,
+        pub thumbnails_running: std::sync::atomic::AtomicUsize,
+        pub thumbnails_peak: std::sync::atomic::AtomicUsize,
+        pub telemetry: Mutex<std::collections::HashMap<String, Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String>>>,
+        pub telemetry_calls: Mutex<Vec<String>>,
+    }
+
+    impl FakeVideoTools {
+        /// A probe of `path` that succeeds.
+        pub fn add_video(&self, path: &str, metadata: ovrley_core::media::SourceVideoMetadata) {
+            self.probes.lock().unwrap().insert(path.to_string(), Ok(metadata));
+        }
     }
 
     /// A strip's table key: its window as `crate::features::video_preview::filmstrips` keys it.
@@ -500,6 +550,25 @@ pub mod fakes {
 
         fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String> {
             Ok(self.codecs.lock().unwrap().clone())
+        }
+
+        fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String> {
+            self.probes.lock().unwrap().get(path).cloned().unwrap_or_else(|| Err(format!("Video path is not a file: {path}")))
+        }
+
+        fn thumbnail(&self, path: &str) -> Option<Vec<u8>> {
+            use std::sync::atomic::Ordering;
+            let running = self.thumbnails_running.fetch_add(1, Ordering::SeqCst) + 1;
+            self.thumbnails_peak.fetch_max(running, Ordering::SeqCst);
+            let delay = *self.thumbnail_delay.lock().unwrap();
+            std::thread::sleep(delay);
+            self.thumbnails_running.fetch_sub(1, Ordering::SeqCst);
+            self.thumbnails.lock().unwrap().get(path).cloned()
+        }
+
+        fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
+            self.telemetry_calls.lock().unwrap().push(path.to_string());
+            self.telemetry.lock().unwrap().get(path).cloned().unwrap_or(Ok(None))
         }
     }
 

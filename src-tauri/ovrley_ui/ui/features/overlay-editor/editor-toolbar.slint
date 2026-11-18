@@ -63,13 +63,16 @@ component ToolbarSeparator inherits HorizontalLayout {
     }
 }
 
-// `EditorToolbar`: undo and redo, the checker, black and white backgrounds, zoom out, the zoom
-// percentage, zoom in, reset zoom, grid and snap, in a `p-1 gap-1` row: `rounded-xs`, `border` at
-// 70%, `card` at 80%, `shadow-lg`.
+// `EditorToolbar`: undo and redo, the checker, black and white backgrounds, then with an image or
+// videos the image (while one is set) and video backgrounds, zoom out, the zoom percentage, zoom
+// in, reset zoom, grid and snap, in a `p-1 gap-1` row: `rounded-xs`, `border` at 70%, `card` at
+// 80%, `shadow-lg`.
 export component EditorToolbar {
     in property <bool> can-undo;
     in property <bool> can-redo;
     in property <BackgroundMode> background-mode;
+    in property <bool> has-background-image;
+    in property <bool> has-videos;
     in property <string> zoom-label;
     in property <bool> grid-visible;
     in property <bool> snap-to-grid;
@@ -133,6 +136,23 @@ export component EditorToolbar {
             active: root.background-mode == BackgroundMode.white;
             clicked => {
                 root.set-background-mode(BackgroundMode.white);
+            }
+        }
+        if root.has-background-image || root.has-videos: ToolbarSeparator { }
+        if root.has-background-image: ToolbarButton {
+            icon: Icons.image;
+            label: @tr("app-shell.imageBackground" => "Image background");
+            active: root.background-mode == BackgroundMode.image;
+            clicked => {
+                root.set-background-mode(BackgroundMode.image);
+            }
+        }
+        if root.has-background-image || root.has-videos: ToolbarButton {
+            icon: Icons.film;
+            label: @tr("app-shell.videoBackground" => "Video background");
+            active: root.background-mode == BackgroundMode.video;
+            clicked => {
+                root.set-background-mode(BackgroundMode.video);
             }
         }
         ToolbarSeparator { }

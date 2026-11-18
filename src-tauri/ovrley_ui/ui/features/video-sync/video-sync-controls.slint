@@ -1,0 +1,167 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
+import { Switch } from "../../components/switch.slint";
+import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import { Choice, ChoiceKind } from "../../components/logic.slint";
+import { FieldSecondsInput } from "../seconds-fields/index.slint";
+import { VideoSyncView } from "index.slint";
+
+// `VideoSyncControls`: the heading with the restore button (`h-6 w-6` ghost), then "Sync Offset"
+// (0.741rem bold muted uppercase) over a two-column grid of the shared offset (`h-9`, 0.1 s step
+// buttons) and "Auto-sync" (outline `sm`, `h-9`); "Creation Time" with the detected/filename tabs
+// (toolbar variant, `h-8`) and, with an activity timezone, "Apply Timezone" with its switch; then
+// the warning (amber-500 at 15%, amber-400, a 0.75rem bell, 0.65rem semibold) when there is one.
+export component VideoSyncControls inherits VerticalLayout {
+    in property <string> title: @tr("toolbar.videoSync" => "Sync Doctor");
+    in property <VideoSyncView> sync;
+    callback compute();
+    callback reset-creation-times();
+    callback filename-creation-times();
+    callback set-utc(utc: bool);
+
+    spacing: 1rem;
+    HorizontalLayout {
+        SectionHeading {
+            icon: Icons.clock-3;
+            title: root.title;
+            variant: SectionHeadingVariant.drawer;
+            horizontal-stretch: 1;
+        }
+        Button {
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            width: 1.5rem;
+            height: 1.5rem;
+            icon: Icons.rotate-ccw;
+            icon-size: 0.75rem;
+            disabled: !root.sync.can-reset-creation-time;
+            accessible-label: @tr("toolbar.restoreDetectedVideoCreationTime" => "Restore detected video creation time");
+            clicked => {
+                root.reset-creation-times();
+            }
+        }
+    }
+    VerticalLayout {
+        spacing: 0.75rem;
+        AppText {
+            content: @tr("toolbar.syncOffset" => "Sync Offset");
+            font-size: 0.741rem;
+            font-weight: Theme.font-weight-bold;
+            color: Theme.muted-foreground;
+            uppercase: true;
+        }
+        HorizontalLayout {
+            spacing: 1rem;
+            FieldSecondsInput {
+                horizontal-stretch: 1;
+                field: root.sync.shared-offset;
+                step-buttons: true;
+                font-size: Theme.text-xs * 1rem;
+                label: @tr("toolbar.syncOffset" => "Sync Offset");
+            }
+            Button {
+                variant: ButtonVariant.outline;
+                size: ButtonSize.sm;
+                horizontal-stretch: 1;
+                height: 2.25rem;
+                font-size: Theme.text-xs * 1rem;
+                text: @tr("toolbar.autosync" => "Auto-sync");
+                clicked => {
+                    root.compute();
+                }
+            }
+        }
+        VerticalLayout {
+            spacing: 1rem;
+            padding-top: 0.25rem;
+            HorizontalLayout {
+                spacing: 1rem;
+                AppText {
+                    horizontal-stretch: 1;
+                    preferred-width: 0px;
+                    min-width: 0px;
+                    content: @tr("toolbar.creationTime" => "Creation Time");
+                    font-size: 0.741rem;
+                    font-weight: Theme.font-weight-bold;
+                    color: Theme.muted-foreground;
+                    uppercase: true;
+                    vertical-alignment: center;
+                }
+                TabsList {
+                    horizontal-stretch: 1;
+                    preferred-width: 0px;
+                    min-width: 0px;
+                    variant: TabsListVariant.toolbar;
+                    trigger-variant: TabsTriggerVariant.toolbar;
+                    stretch: true;
+                    height: 2rem;
+                    value: root.sync.can-reset-creation-time ? "filename" : "detected";
+                    items: [
+                        { kind: ChoiceKind.item, value: "detected", label: @tr("toolbar.detected" => "Detected") },
+                        { kind: ChoiceKind.item, value: "filename", label: @tr("toolbar.filename" => "Filename"), disabled: !root.sync.filename-creation-time-available },
+                    ];
+                    value-changed(value) => {
+                        if value == "filename" {
+                            root.filename-creation-times();
+                        } else {
+                            root.reset-creation-times();
+                        }
+                    }
+                }
+            }
+            if root.sync.timezone-shown: HorizontalLayout {
+                spacing: 1rem;
+                AppText {
+                    horizontal-stretch: 1;
+                    preferred-width: 0px;
+                    min-width: 0px;
+                    content: @tr("toolbar.applyTimezone" => "Apply Timezone");
+                    font-size: 0.741rem;
+                    font-weight: Theme.font-weight-bold;
+                    color: Theme.muted-foreground;
+                    uppercase: true;
+                    vertical-alignment: center;
+                }
+                HorizontalLayout {
+                    horizontal-stretch: 1;
+                    preferred-width: 0px;
+                    min-width: 0px;
+                    alignment: start;
+                    Switch {
+                        checked: root.sync.utc;
+                        disabled: root.sync.timezone-disabled;
+                        accessible-label: @tr("toolbar.applyTimezone" => "Apply Timezone");
+                        checked-changed(checked) => {
+                            root.set-utc(checked);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if root.sync.warning != "": Rectangle {
+        border-radius: Theme.radius-sm * 1rem;
+        background: #f59e0b26;
+        HorizontalLayout {
+            padding: 0.5rem;
+            padding-left: 1rem;
+            spacing: 0.5rem;
+            Icon {
+                glyph: Icons.bell;
+                size: 0.75rem;
+                color: #fbbf24;
+            }
+            AppText {
+                content: root.sync.warning;
+                font-size: 0.65rem;
+                font-weight: Theme.font-weight-semibold;
+                color: #fbbf24;
+                wrap: word-wrap;
+                horizontal-stretch: 1;
+            }
+        }
+    }
+}

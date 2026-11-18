@@ -304,13 +304,19 @@ impl Dialogs for NativeDialogs {
                     if let Some(directory) = default_path {
                         dialog = dialog.set_directory(directory);
                     }
-                    add_filters(dialog, &filters).pick_file().await
+                    add_filters(dialog, &filters).pick_file().await.into_iter().collect()
+                }
+                FileDialogRequest::OpenFiles { filters, default_path } => {
+                    if let Some(directory) = default_path {
+                        dialog = dialog.set_directory(directory);
+                    }
+                    add_filters(dialog, &filters).pick_files().await.unwrap_or_default()
                 }
                 FileDialogRequest::OpenDirectory { default_path } => {
                     if let Some(directory) = default_path {
                         dialog = dialog.set_directory(directory);
                     }
-                    dialog.pick_folder().await
+                    dialog.pick_folder().await.into_iter().collect()
                 }
                 FileDialogRequest::Save { default_path, filters } => {
                     let path = std::path::Path::new(&default_path);
@@ -320,10 +326,11 @@ impl Dialogs for NativeDialogs {
                     if let Some(name) = path.file_name() {
                         dialog = dialog.set_file_name(name.to_string_lossy());
                     }
-                    add_filters(dialog, &filters).save_file().await
+                    add_filters(dialog, &filters).save_file().await.into_iter().collect()
                 }
             };
-            reply(selected.map(|handle| handle.path().to_string_lossy().into_owned()));
+            let selected: Vec<rfd::FileHandle> = selected;
+            reply(selected.iter().map(|handle| handle.path().to_string_lossy().into_owned()).collect());
         });
         if let Err(error) = spawned {
             log::error!("could not show a file dialog: {error}");

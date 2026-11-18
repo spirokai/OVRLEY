@@ -10,6 +10,8 @@ import { OverlayEditorView } from "../features/overlay-editor/overlay-editor.sli
 import { OverlayPlayer } from "../features/player/overlay-player.slint";
 import { Player } from "../features/player/index.slint";
 import { CutRemovalDialog } from "../features/player/cut-removal-dialog.slint";
+import { VideoImportDialog } from "../features/video-preview/video-import-dialog.slint";
+import { VideoImport } from "../features/video-preview/index.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 
@@ -62,6 +64,9 @@ export component AppWindow inherits FluidWindow {
             template-file-name: TemplateManager.file-name;
             can-save-template: TemplateManager.can-save;
             template-selector-open-serial: TemplateManager.selector-open-serial;
+            import-videos => {
+                AppShell.import-videos();
+            }
             import-activity => {
                 AppShell.import-activity();
             }
@@ -128,7 +133,9 @@ export component AppWindow inherits FluidWindow {
                         }
                     }
                 }
-                if AppShell.processing: LoadingOverlay { }
+                if AppShell.processing || AppShell.importing-video: LoadingOverlay {
+                    label: AppShell.importing-video ? @tr("app.importingYourVideo" => "Importing your video...") : @tr("app.processingYourActivity" => "Processing your activity...");
+                }
             }
             Rectangle {
                 width: root.control-panel-width;
@@ -187,6 +194,15 @@ export component AppWindow inherits FluidWindow {
     }
 
     CutRemovalDialog { }
+
+    VideoImportDialog { }
+
+    changed video-import-open => {
+        if !self.video-import-open {
+            keys.focus();
+        }
+    }
+    property <bool> video-import-open: VideoImport.open;
 
     changed cut-removal-open => {
         if !self.cut-removal-open {

@@ -108,6 +108,7 @@ export component AppHeader inherits Rectangle {
     callback toggle-maximize-window();
     callback close-window();
     callback import-activity();
+    callback import-videos();
     callback select-template(string);
     callback new-template();
     callback import-template();
@@ -186,6 +187,9 @@ export component AppHeader inherits Rectangle {
               VerticalLayout {
                   alignment: center;
                   FileMenu {
+                      import-videos => {
+                          root.import-videos();
+                      }
                       import-activity => {
                           root.import-activity();
                       }

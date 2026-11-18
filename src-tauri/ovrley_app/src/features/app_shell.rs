@@ -126,6 +126,10 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
             open_activity_dialog(store, services);
             true
         }
+        "video.import" => {
+            crate::features::video_preview::import::open_video_import_dialog(store, services);
+            true
+        }
         _ => false,
     }
 }
@@ -143,46 +147,6 @@ pub fn handle_window_key(store: &mut Store, services: &mut Services, input: &Key
 /// The capture phase (D14): the drawer's Escape rule, then an active gesture's cancel.
 pub fn handle_window_capture_key(store: &mut Store, input: &KeyInput) -> bool {
     crate::features::toolbar::handle_drawer_capture_key(store, input) || crate::features::overlay_editor::keyboard::handle_capture_key(store, input)
-}
-
-/// The debug video loader (phase 4 D18): `OVRLEY_DEV_VIDEOS` lists video paths separated by `;`.
-/// Each is probed on a worker, becomes an entity with default edits, and is placed end to end in
-/// import order, the first at 0, outside the history. There is no review dialog and no telemetry.
-/// Debug builds only, until Phase 6 brings the import; Phase 6 deletes it.
-pub const DEV_VIDEOS_VARIABLE: &str = "OVRLEY_DEV_VIDEOS";
-
-pub fn load_dev_videos(store: &mut Store, services: &mut Services, paths: Vec<String>) {
-    use crate::lib::video_program::{create_imported_video, new_id};
-    use ovrley_core::media::video_edits::VideoEdits;
-    let _ = store;
-    let app_paths = std::sync::Arc::clone(&services.paths);
-    services.workers.spawn("dev-videos", move || {
-        let probed: Result<Vec<_>, String> = paths
-            .iter()
-            .enumerate()
-            .map(|(order, path)| {
-                let metadata = ovrley_core::media::prepared_video::probe_video_metadata(&app_paths, path).map_err(|error| format!("{path}: {error}"))?;
-                create_imported_video(&metadata, new_id(), order as u32, Vec::new()).map_err(|error| format!("{path}: {error}"))
-            })
-            .collect();
-        Box::new(move |store: &mut Store, _: &mut Services| match probed {
-            Err(error) => store.media.set_error_message(format!("{DEV_VIDEOS_VARIABLE}: {error}")),
-            Ok(videos) => {
-                let mut edits = crate::lib::video_program::VideoEditsMap::new();
-                let mut offset = 0.0;
-                for video in &videos {
-                    edits.insert(video.id.clone(), VideoEdits { offset_seconds: offset, ..VideoEdits::default() });
-                    offset += video.duration_seconds;
-                }
-                crate::features::undo_redo::change_video_collection(store, &[], |store| {
-                    store.video_import.imported_videos = std::rc::Rc::new(videos);
-                    store.video_import.video_edits = std::rc::Rc::new(edits);
-                    store.video_import.selected_clip = None;
-                    crate::store::slices::video_import::clamp_playhead_to_videos(store, 0.0);
-                });
-            }
-        })
-    });
 }
 
 /// A rectangle in window coordinates, in logical pixels.
@@ -271,14 +235,15 @@ fn classify(dropped: &DroppedPath, debug: bool) -> Option<DropKind> {
 }
 
 /// `route_dropped_files` (Q1): the imports one drop runs, in order, or the one error it shows.
-/// At most one file of each kind; a project must be alone, because opening it replaces everything;
-/// a directory or any other file imports nothing. The wording is English, like today's drop errors.
+/// At most one template and one activity; several videos open one review; a project must be alone,
+/// because opening it replaces everything; a directory or any other file imports nothing. The
+/// wording is English, like today's drop errors.
 pub fn route_dropped_files(paths: &[DroppedPath], debug: bool) -> Result<Vec<DropImport>, String> {
     let mut imports: Vec<DropImport> = Vec::with_capacity(paths.len());
     for dropped in paths {
         let name = dropped.path.file_name().map_or_else(|| dropped.path.display().to_string(), |name| name.to_string_lossy().into_owned());
         let kind = classify(dropped, debug).ok_or_else(|| format!("Drop failed: {name} cannot be imported."))?;
-        if imports.iter().any(|import| import.kind == kind) {
+        if kind != DropKind::Video && imports.iter().any(|import| import.kind == kind) {
             return Err(format!("Drop failed: Drop at most one {} file.", kind.name()));
         }
         imports.push(DropImport {
@@ -309,9 +274,9 @@ pub fn set_file_drag_hovering(store: &mut Store, hovering: bool) {
     store.file_drop.hovering = hovering && accepts_file_drops(store);
 }
 
-/// One drop, however many files: each kind's import runs in order (a template, then the activity).
-/// The video and project arms arrive with Phase 6; until then those kinds report that they cannot
-/// be opened yet.
+/// One drop, however many files: each kind's import runs in order (a template, then the activity,
+/// then one review of the videos). The project arm arrives with the projects (step 8); until then
+/// it reports that it cannot be opened yet.
 pub fn drop_files(store: &mut Store, services: &mut Services, paths: &[DroppedPath]) {
     store.file_drop.hovering = false;
     if !accepts_file_drops(store) {
@@ -321,13 +286,29 @@ pub fn drop_files(store: &mut Store, services: &mut Services, paths: &[DroppedPa
         Err(message) => return store.media.set_error_message(message),
         Ok(imports) => imports,
     };
+    let mut videos = Vec::new();
     for import in imports {
         let path = import.path.to_string_lossy().into_owned();
         match import.kind {
             DropKind::Activity => import_activity(store, services, path, None),
             DropKind::Template => crate::features::template_manager::import_template(store, services, path, None),
-            kind => store.media.set_error_message(format!("Drop failed: {} files cannot be opened yet.", kind.name())),
+            DropKind::Video => videos.push(path),
+            DropKind::Project => store.media.set_error_message("Drop failed: project files cannot be opened yet.".into()),
         }
+    }
+    if !videos.is_empty() {
+        drop_video_files(store, services, videos);
+    }
+}
+
+/// `handleVideoFilesDrop`: a single image in debug builds sets the background, else the review.
+fn drop_video_files(store: &mut Store, services: &mut Services, paths: Vec<String>) {
+    use crate::features::video_preview::import::{apply_background_image, is_debug_image_path, start_import, ImportRequest};
+    if store.editor_shell.debug_mode_enabled && paths.len() == 1 && is_debug_image_path(&paths[0]) {
+        return apply_background_image(store, paths.into_iter().next().expect("one path"));
+    }
+    if let Err(error) = start_import(store, services, paths, ImportRequest::default()) {
+        store.media.set_error_message(format!("Video drop failed: {error}"));
     }
 }
 
@@ -367,13 +348,7 @@ pub fn import_activity(store: &mut Store, services: &mut Services, path: String,
     store.media.set_processing(true);
     let paths = std::sync::Arc::clone(&services.paths);
     services.workers.spawn("activity-import", move || {
-        let result = ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string()).and_then(|response| {
-            let preview_bytes = serde_json::to_vec(&response.parsed_activity).map_err(|error| error.to_string())?;
-            Ok(ImportedActivity {
-                activity: std::sync::Arc::new(response.parsed_activity),
-                preview_bytes: std::sync::Arc::new(preview_bytes),
-            })
-        });
+        let result = ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string()).and_then(ImportedActivity::from_response);
         Box::new(move |store: &mut Store, _: &mut Services| finish_activity_import(store, path, result, reply))
     });
 }
@@ -516,13 +491,16 @@ pub enum KeyboardWorkspace {
     Player,
 }
 
-/// The canvas background behind the scene. Image and video arrive with Phase 6.
+/// The canvas background behind the scene. `Image` is the debug background image; `Video` draws
+/// black until Phase 6B draws the video (D9).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum EditorBackgroundMode {
     #[default]
     Checker,
     Black,
     White,
+    Image,
+    Video,
 }
 
 /// `useEditorShellState`: editor presentation state, in memory only, with today's launch defaults.
@@ -950,8 +928,15 @@ mod tests {
 
     #[test]
     fn commands_of_later_phases_are_matched_but_not_consumed() {
-        let (answers, _, _) = press(Store::default(), vec![modified("s", true, false), modified("i", true, false)]);
-        assert_eq!(answers, [false, false]);
+        let (answers, _, _) = press(Store::default(), vec![modified("s", true, false)]);
+        assert_eq!(answers, [false]);
+    }
+
+    #[test]
+    fn mod_i_opens_the_video_dialog() {
+        let (answers, _, fakes) = press(Store::default(), vec![modified("i", true, false)]);
+        assert_eq!(answers, [true]);
+        assert!(matches!(fakes.dialogs.requests()[0], crate::store::services::FileDialogRequest::OpenFiles { .. }));
     }
 
     #[test]
@@ -1019,8 +1004,9 @@ mod tests {
     }
 
     #[test]
-    fn two_files_of_one_kind_import_nothing() {
+    fn two_files_of_one_kind_import_nothing_except_videos() {
         assert_eq!(kinds(&["/a/one.fit", "/a/two.gpx"], false), Err("Drop failed: Drop at most one activity file.".into()));
+        assert_eq!(kinds(&["/a/one.mp4", "/a/two.MOV", "/a/ride.fit"], false), Ok(vec![DropKind::Activity, DropKind::Video, DropKind::Video]));
     }
 
     #[test]
@@ -1057,8 +1043,9 @@ mod tests {
             assert_eq!(store.media.error_message, None);
             assert!(!store.file_drop.hovering);
             store.editor_shell.close_settings();
-            drop_files(store, services, &dropped(&["/a/clip.mp4"]));
-            assert_eq!(store.media.error_message.as_deref(), Some("Drop failed: video files cannot be opened yet."));
+            drop_files(store, services, &dropped(&["/a/clip.mp4", "/a/other.mp4"]));
+            assert_eq!(store.media.error_message, None);
+            assert_eq!(store.video_import_review.review.as_ref().unwrap().file_count, 2, "both videos open one review");
         });
     }
 

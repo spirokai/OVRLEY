@@ -381,6 +381,7 @@ pub fn tools() -> Vec<ToolDefinition> {
     tools.extend(crate::player::tools());
     tools.extend(crate::widgets::tools());
     tools.extend(crate::scene_settings::tools());
+    tools.extend(crate::videos::tools());
     tools
 }
 
@@ -598,6 +599,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             }
             other if crate::widgets::handles(other) => crate::widgets::call(other, arguments_value, store, services, reply),
             other if crate::scene_settings::handles(other) => crate::scene_settings::call(other, arguments_value, store, services, reply),
+            other if crate::videos::handles(other) => crate::videos::call(other, arguments_value, store, services, reply),
             other => crate::player::call(other, arguments_value, store, services, reply).unwrap_or_else(|| Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}")))),
         }
     };

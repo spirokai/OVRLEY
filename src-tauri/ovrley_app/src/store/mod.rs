@@ -49,6 +49,14 @@ pub struct Store {
     pub batch_render: slices::batch_render::BatchRenderSlice,
     /// The timeline filmstrips (phase 4 D12).
     pub video_filmstrip: slices::video_filmstrip::VideoFilmstripSlice,
+    /// `useVideoImportReview`'s state (Phase 6A D6).
+    pub video_import_review: crate::features::video_preview::import::VideoImportReviewState,
+    /// The seconds fields of the import dialog, the video drawer and the video panel.
+    pub seconds_fields: crate::features::seconds_fields::SecondsFieldsState,
+    /// The open `TransitionSelect` popover.
+    pub transition_select: Option<crate::features::transitions::TransitionSelectState>,
+    /// `queueTelemetryExtraction`'s queue (D7).
+    pub telemetry_queue: crate::features::video_preview::import::VideoTelemetryQueue,
     /// `useVideoFilmstripQueue`'s state.
     pub filmstrip_queue: crate::features::video_preview::filmstrips::FilmstripQueue,
     /// The player's hook state and cached timeline (phase 4 D3, D5).

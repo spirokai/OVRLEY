@@ -20,6 +20,15 @@ pub struct ImportedActivity {
     pub preview_bytes: Arc<Vec<u8>>,
 }
 
+impl ImportedActivity {
+    /// An activity from `ovrley_core`'s import or a video's embedded telemetry, with the preview's
+    /// serialized copy (D4, D7). Blocking: runs on a worker.
+    pub fn from_response(response: ovrley_core::activity::finalize::FinalizeActivityResponse) -> Result<Self, String> {
+        let preview_bytes = serde_json::to_vec(&response.parsed_activity).map_err(|error| error.to_string())?;
+        Ok(Self { activity: Arc::new(response.parsed_activity), preview_bytes: Arc::new(preview_bytes) })
+    }
+}
+
 impl PartialEq for ImportedActivity {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.activity, &other.activity)

@@ -20,6 +20,8 @@ fn to_slint(mode: EditorBackgroundMode) -> BackgroundMode {
         EditorBackgroundMode::Checker => BackgroundMode::Checker,
         EditorBackgroundMode::Black => BackgroundMode::Black,
         EditorBackgroundMode::White => BackgroundMode::White,
+        EditorBackgroundMode::Image => BackgroundMode::Image,
+        EditorBackgroundMode::Video => BackgroundMode::Video,
     }
 }
 
@@ -28,6 +30,8 @@ fn from_slint(mode: BackgroundMode) -> EditorBackgroundMode {
         BackgroundMode::Checker => EditorBackgroundMode::Checker,
         BackgroundMode::Black => EditorBackgroundMode::Black,
         BackgroundMode::White => EditorBackgroundMode::White,
+        BackgroundMode::Image => EditorBackgroundMode::Image,
+        BackgroundMode::Video => EditorBackgroundMode::Video,
     }
 }
 
@@ -41,6 +45,8 @@ fn color(hex: &str) -> slint::Color {
 /// scheduled.
 pub struct Projection {
     images: RefCell<HashMap<String, (u32, u32, Image)>>,
+    /// The background image's path, so the image loads once per path.
+    background_image_path: RefCell<Option<String>>,
     frame_scheduled: std::rc::Rc<Cell<bool>>,
     dispatch: DispatchHandle,
 }
@@ -49,6 +55,7 @@ impl Projection {
     pub fn new(dispatch: DispatchHandle) -> Self {
         Self {
             images: RefCell::new(HashMap::new()),
+            background_image_path: RefCell::new(None),
             frame_scheduled: std::rc::Rc::new(Cell::new(false)),
             dispatch,
         }
@@ -89,6 +96,15 @@ impl Projection {
         let shell = &store.editor_shell;
         set_if_changed(global.get_background_mode(), to_slint(shell.editor_background_mode), |value| global.set_background_mode(value));
         set_if_changed(global.get_background_color(), color(editor::canvas_background_color(shell.editor_background_mode)), |value| global.set_background_color(value));
+        let image_path = store.video_import.imported_background_image_path.as_deref();
+        set_if_changed(global.get_has_background_image(), image_path.is_some(), |value| global.set_has_background_image(value));
+        set_if_changed(global.get_has_videos(), store.video_import.has_videos(), |value| global.set_has_videos(value));
+        if self.background_image_path.borrow().as_deref() != image_path {
+            *self.background_image_path.borrow_mut() = image_path.map(str::to_string);
+            // A file that cannot be read shows the black background, as a broken `<img>` does.
+            let image = image_path.and_then(|path| Image::load_from_path(std::path::Path::new(path)).ok()).unwrap_or_default();
+            global.set_background_image(image);
+        }
         set_if_changed(global.get_grid_visible(), shell.editor_grid_visible, |value| global.set_grid_visible(value));
         if shell.editor_grid_visible {
             let commands = editor::grid_commands((scene_width, scene_height), display);

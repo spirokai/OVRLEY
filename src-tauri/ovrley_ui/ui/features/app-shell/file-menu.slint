@@ -3,6 +3,7 @@ import { Icons } from "../../components/icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
 import { Popover } from "../../components/popover.slint";
 import { PlacementAlign } from "../../components/logic.slint";
+import { Separator } from "../../components/separator.slint";
 
 // `ActivitySection`'s `MenuItem`: a full-width ghost row, 0.7rem semibold uppercase, a 0.875rem
 // icon 0.75rem from the label, 0.5rem side padding, hover `muted-foreground` at 10%. It fills the
@@ -34,10 +35,11 @@ component MenuItem inherits HorizontalLayout {
 
 // `ActivitySection`'s File menu: the File button, 2rem high like the template select's trigger (the
 // user's choice; React's is `h-9`), and a popover 13.75rem wide with `p-1`,
-// 6px below, aligned at the start. Phase 3 has "Import Activity"; the project and video items
-// arrive in Phase 6.
+// 6px below, aligned at the start: the project items (Phase 6A step 8), "Import Activity", then
+// "Import Videos", the groups `my-1.5` separators apart.
 export component FileMenu {
     callback import-activity();
+    callback import-videos();
 
     property <bool> open;
 
@@ -68,6 +70,18 @@ export component FileMenu {
             clicked => {
                 root.open = false;
                 root.import-activity();
+            }
+        }
+        Rectangle {
+            height: 0.75rem;
+            Separator { }
+        }
+        MenuItem {
+            icon: Icons.film;
+            label: @tr("app-shell.importVideo" => "Import Videos");
+            clicked => {
+                root.open = false;
+                root.import-videos();
             }
         }
     }

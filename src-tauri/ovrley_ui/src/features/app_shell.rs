@@ -92,6 +92,7 @@ pub fn project(window: &AppWindow, store: &Store, language_changed: bool) {
     set_if_changed(shell.get_agent_connected(), store.agent_session.shows_indicator(), |value| shell.set_agent_connected(value));
     set_if_changed(shell.get_file_drag_hovering(), store.file_drop.hovering, |value| shell.set_file_drag_hovering(value));
     set_if_changed(shell.get_processing(), store.media.is_processing, |value| shell.set_processing(value));
+    set_if_changed(shell.get_importing_video(), store.media.importing_video, |value| shell.set_importing_video(value));
 
     let editor_shell = &store.editor_shell;
     set_if_changed(shell.get_settings_open(), editor_shell.settings_open, |value| shell.set_settings_open(value));
@@ -176,6 +177,8 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
 
     let dispatch = dispatcher.handle();
     shell.on_import_activity(move || dispatch.dispatch(app_shell::open_activity_dialog));
+    let dispatch = dispatcher.handle();
+    shell.on_import_videos(move || dispatch.dispatch(ovrley_app::features::video_preview::import::open_video_import_dialog));
 
     let alert = window.global::<AlertLayer>();
     let dispatch = dispatcher.handle();

@@ -19,3 +19,16 @@ export struct TransitionOption {
     label: string,
     index: int,
 }
+
+// The open `TransitionSelect` popover (one at a time): its target, the options its filter keeps and
+// the selected value. Written by `src/features/transitions.rs`.
+export global TransitionSelect {
+    in property <string> open-target;
+    in property <[TransitionOption]> options;
+    in property <string> value;
+    in property <string> filter;
+    callback open(target: string);
+    callback close();
+    callback filter-edited(text: string);
+    callback chosen(value: string);
+}

@@ -1,0 +1,13 @@
+import { SecondsFieldView } from "../seconds-fields/index.slint";
+
+// `deriveVideoSyncControls` for one collection: the store's, or the import dialog's draft.
+export struct VideoSyncView {
+    can-reset-creation-time: bool,
+    filename-creation-time-available: bool,
+    // Apply Timezone shows only with an activity timezone.
+    timezone-shown: bool,
+    timezone-disabled: bool,
+    utc: bool,
+    warning: string,
+    shared-offset: SecondsFieldView,
+}
