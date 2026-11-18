@@ -33,9 +33,13 @@ const DEFAULT_ETA_SMOOTHING: f64 = 0.7;
 const ETA_DEADBAND_FRACTION: f64 = 0.0002;
 
 /// Minimum spacing between updates of the render FPS and the time remaining (~10 Hz), and
-/// between preparing messages. Frame counts publish on every call; sinks that cannot take
-/// every frame (the Tauri IPC) throttle themselves.
+/// between preparing messages.
 const PROGRESS_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(100);
+
+/// Minimum spacing between frame-count publications (~30 Hz): smooth for a progress bar, and far
+/// below a fast render's frame rate. Status changes publish at once; the Tauri sink throttles its
+/// IPC further, to 10 Hz.
+const FRAME_COUNT_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(33);
 
 /// Rolling-window throughput estimator.
 #[derive(Debug, Clone)]
@@ -222,6 +226,7 @@ struct RenderSession {
     next_render_id: u64,
     sink: Arc<dyn ProgressSink>,
     last_fps_emit_at: Option<Instant>,
+    last_count_emit_at: Option<Instant>,
     /// Set while one piece of a multi-piece item renders: item frames before it.
     piece_start: Option<u32>,
 }
@@ -255,6 +260,7 @@ impl RenderController {
                 next_render_id: 0,
                 sink: progress_sink.clone(),
                 last_fps_emit_at: None,
+                last_count_emit_at: None,
                 piece_start: None,
             })),
             cancel_flag: Arc::new(AtomicBool::new(false)),
@@ -347,6 +353,7 @@ impl RenderController {
         progress.rendering_fps = None;
         progress.filename = None;
         session.last_fps_emit_at = None;
+        session.last_count_emit_at = None;
         session.piece_start = None;
         self.publish_progress(session);
         Ok(())
@@ -359,6 +366,7 @@ impl RenderController {
         let mut session = self.session.lock().expect("render session mutex poisoned");
         session.piece_start = Some(item_frames_before);
         session.last_fps_emit_at = None;
+        session.last_count_emit_at = None;
     }
 
     /// Publishes an item phase after its frames, such as joining pieces.
@@ -424,6 +432,10 @@ impl RenderController {
         if due {
             session.last_fps_emit_at = Some(now);
         }
+        let count_due = due
+            || session
+                .last_count_emit_at
+                .is_none_or(|previous| now.duration_since(previous) >= FRAME_COUNT_EMIT_MIN_INTERVAL);
         let piece_start = session.piece_start;
         let progress = &mut session.progress;
         let (current, total, rendered, encoded, estimate) = match piece_start {
@@ -443,6 +455,7 @@ impl RenderController {
                 )
             }
         };
+        let reached_end = current >= total && progress.current < total;
         progress.current = current;
         progress.total = total;
         progress.rendered = rendered;
@@ -458,7 +471,12 @@ impl RenderController {
                 "Rendering frames...".to_string()
             };
         }
-        self.publish_progress(session);
+        // The counts change on every call; publishing waits for the next ~30 Hz slot, except
+        // when the last frame is reached (the panel turns to "Finalizing").
+        if count_due || reached_end {
+            session.last_count_emit_at = Some(now);
+            self.publish_progress(session);
+        }
     }
 
     pub(crate) fn finish_success(&self, filename: Option<String>) {
