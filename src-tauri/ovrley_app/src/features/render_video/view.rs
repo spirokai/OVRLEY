@@ -728,17 +728,7 @@ pub fn render_dialog_view(store: &Store) -> Option<RenderDialogView> {
     let blocked = start_blocked(store, draft);
     let submission_pending = store.media.render_submission_target == Some(RenderTarget::Single);
     let review = dialog.review();
-    let scene = &store.editor.config.scene;
-    let mismatch = resolution_mismatch(store).then(|| {
-        let (resolution, _) = video_format(store).expect("a mismatch has a video format");
-        let overlay = format!("{}x{}", scene.get("width").and_then(serde_json::Value::as_u64).unwrap_or(0), scene.get("height").and_then(serde_json::Value::as_u64).unwrap_or(0));
-        t_with(
-            store,
-            "render-video.videoResolutionMismatchMessage",
-            "Overlay resolution ({{overlayResolution}}) must match imported video ({{videoResolution}}).",
-            &[("overlayResolution", &overlay), ("videoResolution", &format!("{}x{}", resolution.width, resolution.height))],
-        )
-    });
+    let mismatch = resolution_mismatch(store).then(|| render_dialog_view_mismatch_text(store));
     Some(RenderDialogView {
         phase: dialog.phase,
         dismissable: dialog.phase != DialogPhase::Progress && !submission_pending && !batch_running,
@@ -783,4 +773,17 @@ pub fn render_dialog_view(store: &Store) -> Option<RenderDialogView> {
             blocked || submission_pending || draft.output_path.is_empty()
         } || is_renderer_busy(store),
     })
+}
+
+/// The mismatch screen's message.
+pub fn render_dialog_view_mismatch_text(store: &Store) -> String {
+    let scene = &store.editor.config.scene;
+    let (resolution, _) = video_format(store).expect("a mismatch has a video format");
+    let overlay = format!("{}x{}", scene.get("width").and_then(serde_json::Value::as_u64).unwrap_or(0), scene.get("height").and_then(serde_json::Value::as_u64).unwrap_or(0));
+    t_with(
+        store,
+        "render-video.videoResolutionMismatchMessage",
+        "Overlay resolution ({{overlayResolution}}) must match imported video ({{videoResolution}}).",
+        &[("overlayResolution", &overlay), ("videoResolution", &format!("{}x{}", resolution.width, resolution.height))],
+    )
 }

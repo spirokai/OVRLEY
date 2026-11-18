@@ -7,6 +7,7 @@ pub mod link;
 pub mod player;
 pub mod projects;
 pub mod protocol;
+pub mod render;
 pub mod scene_settings;
 pub mod videos;
 pub mod widgets;

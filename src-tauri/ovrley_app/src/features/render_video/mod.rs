@@ -5,6 +5,7 @@
 //! The dialog's hook state is [`RenderDialogState`]; its effects are the `render_dialog`
 //! reconcile step ([`reconcile_render_dialog`]); its presentation is [`view::render_dialog_view`].
 
+pub mod agent;
 pub mod codecs;
 pub mod request;
 pub mod review;
@@ -98,6 +99,8 @@ pub struct RenderDialogState {
     pub fps_mode: FpsMode,
     pub inspection: RenderInspection,
     review: Option<(ReviewKey, ExportReview)>,
+    /// Agents' starts and progress waits (D10).
+    pub agent: agent::AgentRequests,
 }
 
 impl RenderDialogState {
@@ -310,6 +313,9 @@ pub fn close_render_dialog(store: &mut Store) {
     dialog.draft = None;
     dialog.path_error = None;
     dialog.pending_overwrite = None;
+    // An agent's start the window closed before acceptance ends with the dialog.
+    dialog.agent.start = None;
+    dialog.agent.reply = None;
 }
 
 pub fn dismiss_missing_videos(store: &mut Store) {
@@ -613,24 +619,40 @@ fn finish_submission(store: &mut Store, services: &mut Services, outcome: Submit
             remember_accepted_render_output(services, &path);
             commit(store);
             store.render_dialog.phase = DialogPhase::Progress;
+            agent::answer_submission(store, Some(serde_json::json!({"started": true, "target": "single", "renderId": accepted_render.render_id, "outputPath": path})), None);
             // Progress published before the session existed in the store was dropped; read it.
             let progress = services.render.progress();
             session::apply_render_progress(store, services, progress);
         }
         SubmitOutcome::Batch(acceptance) => {
             let batch_id = acceptance.batch_id.clone();
+            let answer = serde_json::json!({
+                "started": true,
+                "target": "batch",
+                "batchId": batch_id,
+                "plannedFrames": acceptance.snapshot.planned_frames,
+                "outputs": acceptance.snapshot.items.iter().map(|item| item.id.clone()).collect::<Vec<_>>(),
+            });
             store.batch_render.accept_batch_snapshot(acceptance.snapshot);
+            agent::answer_submission(store, Some(answer), None);
             commit(store);
             if let Ok(snapshot) = services.render.batch_snapshot(&batch_id) {
                 session::apply_batch_snapshot(store, snapshot);
             }
         }
+        // An agent's start waits for the user's answer to the overwrite question.
         SubmitOutcome::Exists if writes_file => store.render_dialog.pending_overwrite = Some(output_path),
-        SubmitOutcome::PathError(error) if writes_file => store.render_dialog.path_error = Some(error),
+        SubmitOutcome::PathError(error) if writes_file => {
+            let message = format_render_path_error(store, &error);
+            store.render_dialog.path_error = Some(error);
+            agent::answer_submission(store, None, Some(message));
+        }
         SubmitOutcome::Stale(source_ids) if !single => {
             let inspection = &mut store.render_dialog.inspection;
             inspection.stale.extend(source_ids);
             inspection.revision += 1;
+            let message = text(store, "render-video.reinspectionRequired", "Sources changed or inspection expired. Inspect again before starting.");
+            agent::answer_submission(store, None, Some(message));
         }
         SubmitOutcome::Exists => store.media.set_error_message(text(store, "render-video.overwriteExistingFile", "Overwrite existing file?")),
         SubmitOutcome::PathError(error) => {
@@ -642,6 +664,7 @@ fn finish_submission(store: &mut Store, services: &mut Services, outcome: Submit
             if single {
                 store.render_dialog.phase = DialogPhase::Closed;
             }
+            agent::answer_submission(store, None, Some(message.clone()));
             store.media.set_error_message(message);
         }
     }
@@ -656,6 +679,7 @@ pub fn confirm_overwrite(store: &mut Store, services: &mut Services) {
 
 pub fn cancel_overwrite(store: &mut Store) {
     store.render_dialog.pending_overwrite = None;
+    agent::answer_overwrite_cancelled(store);
 }
 
 /// The dialog's Cancel during a render (`handleCancel`).
@@ -750,6 +774,7 @@ pub fn reconcile_render_dialog(store: &mut Store, services: &mut Services) {
     reconcile_draft(store);
     reconcile_inspection(store, services);
     reconcile_review(store);
+    agent::reconcile_agent_requests(store, services);
 }
 
 fn reconcile_draft(store: &mut Store) {

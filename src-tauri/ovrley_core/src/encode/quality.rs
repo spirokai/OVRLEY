@@ -20,6 +20,7 @@ const VIDEOTOOLBOX_H264_QUALITY_PER_CRF: f64 = 28.0 / 11.0;
 const VIDEOTOOLBOX_HEVC_QUALITY_PER_CRF: f64 = 30.0 / 16.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum QualityType {
     Quality,

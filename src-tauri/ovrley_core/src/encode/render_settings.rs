@@ -14,6 +14,7 @@ pub const QUALITY_SLIDER_MAX: u8 = 35;
 
 /// One combined file, or one file per video.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum OutputMode {
     Combined,
@@ -22,6 +23,7 @@ pub enum OutputMode {
 
 /// The overlay over the video, or the overlay alone.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum ExportMode {
     Transparent,
