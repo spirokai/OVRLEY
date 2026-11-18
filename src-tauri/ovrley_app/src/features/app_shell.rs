@@ -42,21 +42,18 @@ impl AppBootstrapState {
     }
 }
 
-/// `useWindowCloseGuard`: a close request is handled once, and asks the guards before the window
-/// closes. Phase 2 has no guard that objects; Phase 6 adds the unsaved-project check.
+/// `useWindowCloseGuard`: a close request is handled once, and asks the unsaved-project check
+/// before the window closes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct WindowCloseGuardState {
-    /// `handlingClose`: a second request while one is handled is ignored.
+    /// `handlingClose`: a second request while one is handled is ignored; it ends when the user
+    /// cancels the unsaved question.
     pub handling_close: bool,
 }
 
 /// The close request of the window's close button, the title bar or the OS.
 pub fn request_close(store: &mut Store, services: &mut Services) {
-    if store.close_guard.handling_close {
-        return;
-    }
-    store.close_guard.handling_close = true;
-    services.window.close();
+    crate::features::projects::request_close(store, services);
 }
 
 /// `useTrafficLightInset`: on macOS, the header leaves room for the traffic lights while the title
@@ -83,8 +80,8 @@ impl TrafficLightInsetState {
 /// - Open overlays block app shortcuts (`hasOpenOverlay`): the settings dialog, and the unpinned
 ///   drawer's backdrop, except `drawer.toggle` while the drawer is that overlay. Keys do not reach
 ///   the window while a select, popover or dialog popup has focus, so those block by themselves.
-/// - Commands whose features have not arrived (projects, video, render, output, sync) are matched
-///   but not consumed, so they do not swallow the key.
+/// - Commands whose features have not arrived (render, output) are matched but not consumed, so
+///   they do not swallow the key.
 pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
     if input.repeat {
         return false;
@@ -128,6 +125,27 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
         }
         "video.import" => {
             crate::features::video_preview::import::open_video_import_dialog(store, services);
+            true
+        }
+        "project.new" => {
+            crate::features::projects::new_project(store, services, None, None);
+            true
+        }
+        "project.open" => {
+            crate::features::projects::open_project_dialog(store, services);
+            true
+        }
+        "project.save" | "project.saveAs" => {
+            crate::features::projects::save_project(store, services, command == "project.saveAs", None, Box::new(|_, _, _| {}));
+            true
+        }
+        "sync.auto" => {
+            if !store.video_import.has_videos() || store.media.activity_summary.is_none() {
+                return false;
+            }
+            if let Err(error) = crate::store::slices::video_import::compute_video_sync(store) {
+                log::error!("video sync: {error}");
+            }
             true
         }
         _ => false,
@@ -267,7 +285,10 @@ pub struct WindowFileDropState {
 /// Drops are ignored, and the overlay does not show, while a modal dialog is open or the startup
 /// screen shows.
 pub fn accepts_file_drops(store: &Store) -> bool {
-    !store.editor_shell.settings_open && !AppBootstrapState::shows_startup_screen(store)
+    !store.editor_shell.settings_open
+        && !store.unsaved_confirm.is_open()
+        && !crate::features::projects::has_open_dialog(store)
+        && !AppBootstrapState::shows_startup_screen(store)
 }
 
 pub fn set_file_drag_hovering(store: &mut Store, hovering: bool) {
@@ -275,8 +296,7 @@ pub fn set_file_drag_hovering(store: &mut Store, hovering: bool) {
 }
 
 /// One drop, however many files: each kind's import runs in order (a template, then the activity,
-/// then one review of the videos). The project arm arrives with the projects (step 8); until then
-/// it reports that it cannot be opened yet.
+/// then one review of the videos). A project opens as Load Project does.
 pub fn drop_files(store: &mut Store, services: &mut Services, paths: &[DroppedPath]) {
     store.file_drop.hovering = false;
     if !accepts_file_drops(store) {
@@ -293,7 +313,7 @@ pub fn drop_files(store: &mut Store, services: &mut Services, paths: &[DroppedPa
             DropKind::Activity => import_activity(store, services, path, None),
             DropKind::Template => crate::features::template_manager::import_template(store, services, path, None),
             DropKind::Video => videos.push(path),
-            DropKind::Project => store.media.set_error_message("Drop failed: project files cannot be opened yet.".into()),
+            DropKind::Project => crate::features::projects::open_project(store, services, path, None, Default::default()),
         }
     }
     if !videos.is_empty() {
@@ -415,10 +435,18 @@ pub fn delete_activity(store: &mut Store) -> Result<(), String> {
     if store.media.parsed_activity.is_none() {
         return Err("No activity file is loaded.".into());
     }
+    clear_activity_file(store);
+    Ok(())
+}
+
+/// `clearActivityFile`: the external activity and its source go, and the videos are placed again.
+pub fn clear_activity_file(store: &mut Store) {
+    if store.media.parsed_activity.is_none() {
+        return;
+    }
     store.media.clear_activity_file(true);
     clear_activity_lane_selection(store);
     crate::store::slices::video_import::place_videos_for_activity(store);
-    Ok(())
 }
 
 /// `activateActivityFile` and `clearActivityFile`: the activity lane's selection belongs to the
@@ -596,11 +624,17 @@ pub enum UnsavedAnswer {
     Cancel,
 }
 
-/// What runs once the user answers the unsaved-changes dialog. Phase 6 adds the project cases.
+/// What runs once the user answers the unsaved-changes dialog.
 #[derive(Debug)]
 pub enum UnsavedContinuation {
     /// `handleCreateNewTemplate`; an agent's `template_new` waits on its reply.
     NewTemplate { reply: Option<crate::store::agent::AgentReply> },
+    /// `handleNewProject`; an agent's `project_new` waits on its reply.
+    NewProject { reply: Option<crate::store::agent::AgentReply> },
+    /// Opening the project at `path` (Q4).
+    OpenProject { path: String, request: crate::features::projects::ProjectOpenRequest },
+    /// The window's close request.
+    CloseWindow,
 }
 
 /// `useUnsavedChangesConfirm`: one pending confirmation (D15).
@@ -772,6 +806,7 @@ mod tests {
     fn a_close_request_closes_the_window_once() {
         let (parts, fakes) = fake_services(json!({}));
         let dispatcher = Dispatcher::new(Store::default(), parts);
+        dispatcher.dispatch(|store, _| crate::features::projects::dismiss_startup_dialog(store));
         dispatcher.dispatch(request_close);
         dispatcher.dispatch(request_close);
         assert_eq!(*fakes.window.calls.borrow(), [WindowCall::Close]);
@@ -927,9 +962,9 @@ mod tests {
     }
 
     #[test]
-    fn commands_of_later_phases_are_matched_but_not_consumed() {
-        let (answers, _, _) = press(Store::default(), vec![modified("s", true, false)]);
-        assert_eq!(answers, [false]);
+    fn sync_auto_needs_videos_and_an_activity() {
+        let (answers, _, _) = press(Store::default(), vec![modified("a", true, true)]);
+        assert_eq!(answers, [false], "without videos the key is not consumed");
     }
 
     #[test]

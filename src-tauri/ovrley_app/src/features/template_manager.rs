@@ -151,20 +151,24 @@ pub fn reconcile_durable_state(store: &mut Store) {
 /// logged) counts as modified.
 pub fn save_status(store: &Store) -> SaveStatus {
     let Some(saved) = &store.template.last_saved_template_state else { return SaveStatus::Draft };
+    match durable_template_state(store) {
+        Ok(current) if *current == *saved => SaveStatus::Saved,
+        _ => SaveStatus::Modified,
+    }
+}
+
+/// The durable state of the document on screen (`createDurableEditorState`): the cached one when
+/// it matches the document, computed otherwise (inside an action, before the reconcile step
+/// refreshed the cache). Templates and projects both save it.
+pub fn durable_template_state(store: &Store) -> Result<std::borrow::Cow<'_, DurableTemplateState>, String> {
     let cache = &store.template_manager.durable;
     let fresh = cache.config.as_ref().is_some_and(|config| Rc::ptr_eq(config, &store.editor.config))
         && cache.global_defaults.as_ref().is_some_and(|globals| Rc::ptr_eq(globals, &store.template.global_defaults));
-    let computed;
-    let current = match (&cache.state, fresh) {
-        (Some(state), true) => state.as_ref().ok(),
-        _ => {
-            computed = create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults)).ok();
-            computed.as_ref()
-        }
-    };
-    match current {
-        Some(current) if current == saved => SaveStatus::Saved,
-        _ => SaveStatus::Modified,
+    match (&cache.state, fresh) {
+        (Some(state), true) => state.as_ref().map(std::borrow::Cow::Borrowed).map_err(Clone::clone),
+        _ => create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults))
+            .map(std::borrow::Cow::Owned)
+            .map_err(|error| error.to_string()),
     }
 }
 
@@ -373,17 +377,21 @@ fn prepare_template(
             ),
         };
     }
-    let fonts = collect_font_ids(
-        &json!({ "config": config.to_value(), "settings": { "globalDefaults": document.global_defaults } }),
-    );
-    for font in fonts {
-        ovrley_core::fonts::font_capabilities(&paths.font_dirs, &font)
-            .map_err(|error| error.to_string())?;
-    }
+    check_document_fonts(paths, &config, &document.global_defaults)?;
     Ok(PreparedTemplate {
         config,
         global_defaults: document.global_defaults,
     })
+}
+
+/// `prepareDocumentFonts`: every font a document names must be known; an unknown font fails the
+/// load of a template or a project.
+pub fn check_document_fonts(paths: &AppPaths, config: &OverlayConfig, global_defaults: &Map<String, Value>) -> Result<(), String> {
+    let fonts = collect_font_ids(&json!({ "config": config.to_value(), "settings": { "globalDefaults": global_defaults } }));
+    for font in fonts {
+        ovrley_core::fonts::font_capabilities(&paths.font_dirs, &font).map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 /// `applyLoadedTemplateState` under `replaceEditorDocument`: the document replaces the history.
@@ -594,8 +602,11 @@ pub fn create_new_template_request(
 /// The unsaved-changes dialog's answer. Save runs the save first (in the UI, its dialog); a
 /// cancelled save abandons the new template.
 pub fn answer_unsaved_confirm(store: &mut Store, services: &mut Services, answer: UnsavedAnswer) {
-    let Some(UnsavedContinuation::NewTemplate { reply }) = store.unsaved_confirm.take() else {
+    if !matches!(store.unsaved_confirm.continuation(), Some(UnsavedContinuation::NewTemplate { .. })) {
         return;
+    }
+    let Some(UnsavedContinuation::NewTemplate { reply }) = store.unsaved_confirm.take() else {
+        unreachable!("the pending continuation is a new template");
     };
     match answer {
         UnsavedAnswer::Cancel => {

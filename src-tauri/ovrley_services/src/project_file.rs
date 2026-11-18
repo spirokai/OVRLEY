@@ -140,7 +140,7 @@ pub struct ProjectDocument {
 }
 
 /// The activity's lap selection; stale IDs never survive an activity change in the editor.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectLaps {
     /// Strictly increasing canonical lap IDs excluded from lap widgets.
@@ -190,7 +190,7 @@ struct ProjectDocumentV1 {
 
 /// The editor's durable state. The template ingress (`ovrley_core::normalize::template`)
 /// normalizes it when the project is applied.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProjectEditor {
     pub config: Value,
@@ -234,7 +234,7 @@ pub enum PathLocator {
     Absolute(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectSources {
     pub activity: Option<ProjectSource>,
@@ -249,7 +249,7 @@ struct ProjectSourcesV5 {
     video: Option<ProjectSource>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProjectSource {
     pub path: PathLocator,
@@ -257,7 +257,7 @@ pub struct ProjectSource {
 
 /// One imported video: its identity, where its file is, the user's edits, and the video as last
 /// loaded. In the file the edits sit beside the identity, flat.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProjectVideo {
     pub id: String,
     pub path: PathLocator,
@@ -327,7 +327,7 @@ impl<'de> Deserialize<'de> for ProjectVideo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProjectSync {
     pub manual: ManualVideoSync,
@@ -380,7 +380,7 @@ where
 /// The render settings and the batch output folder. `outputMode: combined` renders the whole
 /// program to one file; `separate` renders every project video to its own file in
 /// `batchOutputFolder`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProjectRender {
     pub settings: RenderSettings,
     pub batch_output_folder: Option<String>,
@@ -500,7 +500,7 @@ enum RangeType {
     Custom,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProjectTimeline {
     pub playhead_second: f64,
@@ -999,7 +999,6 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         turn_threshold_degrees: manual.turn_threshold_degrees,
     };
     manual.validate()?;
-    let activity_trim = migrate_render_range(&render.range, project.sources.activity.is_some());
     let quality = validate_quality(render.quality_type, render.quality_value)
         .map_err(|error| format!("render.{error}"))?;
     let document = ProjectDocument {
@@ -1013,7 +1012,10 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
             videos: video.into_iter().collect(),
         },
         laps: project.laps,
-        activity_trim,
+        // Versions 1 to 5 kept a custom export range that limited only the render; the editor
+        // showed the whole activity. It is dropped rather than turned into the activity trim,
+        // so an old project opens as the user last saw it.
+        activity_trim: None,
         transition_defaults: transition_defaults().clone(),
         render: ProjectRender {
             settings: RenderSettings {
@@ -1037,22 +1039,6 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         document,
         legacy_batch_video_folder,
     })
-}
-
-/// Versions 1 to 5 saved a custom export range in timeline seconds, which are
-/// activity seconds; it becomes the activity trim. The editor fits it to the
-/// loaded activity, and a range without an activity is dropped.
-fn migrate_render_range(range: &ProjectRange, has_activity: bool) -> Option<ActivityTrim> {
-    let start_second = range.from.max(0.0);
-    (matches!(range.range_type, RangeType::Custom)
-        && has_activity
-        && range.from.is_finite()
-        && range.to.is_finite()
-        && start_second < range.to)
-        .then_some(ActivityTrim {
-            start_second,
-            end_second: range.to,
-        })
 }
 
 fn migrate_legacy_render(render: LegacyProjectRender) -> Result<ProjectRenderV5, String> {
@@ -2420,27 +2406,14 @@ mod tests {
     }
 
     #[test]
-    fn legacy_custom_export_range_becomes_the_activity_trim() {
+    fn legacy_custom_export_range_is_dropped() {
         let mut custom: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
         custom["render"]["range"] =
             serde_json::json!({ "type": "custom", "from": -4.0, "to": 30.5 });
         let parsed =
             serde_json::to_value(parse_project(&custom.to_string()).unwrap().document).unwrap();
-        assert_eq!(
-            parsed["activityTrim"],
-            serde_json::json!({ "startSecond": 0.0, "endSecond": 30.5 })
-        );
+        assert!(parsed["activityTrim"].is_null(), "the export range limited only the render");
         assert!(parsed["render"].get("range").is_none());
-
-        let mut without_activity = custom.clone();
-        without_activity["sources"]["activity"] = Value::Null;
-        let parsed = parse_project(&without_activity.to_string())
-            .unwrap()
-            .document;
-        assert!(parsed.activity_trim.is_none());
-
-        let parsed = parse_project(&valid_v5_project_json()).unwrap().document;
-        assert!(parsed.activity_trim.is_none());
     }
 
     #[test]

@@ -3,6 +3,7 @@ pub mod app_shell;
 pub mod maps;
 pub mod overlay_editor;
 pub mod player;
+pub mod projects;
 pub mod scene_settings;
 pub mod seconds_fields;
 pub mod template_manager;

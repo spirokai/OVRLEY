@@ -25,6 +25,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     crate::features::scene_settings::apply_pending_font_edit(store);
     // 4. The durable template state behind the save status, cached by pointers.
     crate::features::template_manager::reconcile_durable_state(store);
+    //    The project status, from the durable state and the project-owned state (Phase 6A D11).
+    crate::features::projects::reconcile_project_status(store);
     // 5. The player: the cached timeline, the playback effects and the viewport rules (phase 4).
     crate::features::player::reconcile_player(store);
     //    The filmstrips of the clips and the zoom windows the view wants (phase 4 D12).

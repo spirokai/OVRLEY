@@ -4,6 +4,7 @@ import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint
 import { Popover } from "../../components/popover.slint";
 import { PlacementAlign } from "../../components/logic.slint";
 import { Separator } from "../../components/separator.slint";
+import { Projects } from "../projects/index.slint";
 
 // `ActivitySection`'s `MenuItem`: a full-width ghost row, 0.7rem semibold uppercase, a 0.875rem
 // icon 0.75rem from the label, 0.5rem side padding, hover `muted-foreground` at 10%. It fills the
@@ -35,8 +36,8 @@ component MenuItem inherits HorizontalLayout {
 
 // `ActivitySection`'s File menu: the File button, 2rem high like the template select's trigger (the
 // user's choice; React's is `h-9`), and a popover 13.75rem wide with `p-1`,
-// 6px below, aligned at the start: the project items (Phase 6A step 8), "Import Activity", then
-// "Import Videos", the groups `my-1.5` separators apart.
+// 6px below, aligned at the start: the project items (Save Project disabled while saved), "Import
+// Activity", then "Import Videos", the groups `my-1.5` separators apart.
 export component FileMenu {
     callback import-activity();
     callback import-videos();
@@ -63,6 +64,43 @@ export component FileMenu {
         content-padding: 0.25rem;
         open-changed(open) => {
             root.open = open;
+        }
+        MenuItem {
+            icon: Icons.file-plus-2;
+            label: @tr("app-shell.newProject" => "New Project");
+            clicked => {
+                root.open = false;
+                Projects.new-project();
+            }
+        }
+        MenuItem {
+            icon: Icons.folder-open;
+            label: @tr("app-shell.loadProject" => "Load Project");
+            clicked => {
+                root.open = false;
+                Projects.open-project();
+            }
+        }
+        MenuItem {
+            icon: Icons.save;
+            label: @tr("app-shell.saveProject" => "Save Project");
+            disabled: Projects.save-disabled;
+            clicked => {
+                root.open = false;
+                Projects.save-project();
+            }
+        }
+        MenuItem {
+            icon: Icons.save;
+            label: @tr("app-shell.saveProjectAs" => "Save Project As");
+            clicked => {
+                root.open = false;
+                Projects.save-project-as();
+            }
+        }
+        Rectangle {
+            height: 0.75rem;
+            Separator { }
         }
         MenuItem {
             icon: Icons.activity;

@@ -958,8 +958,8 @@ pub fn probe_video(
     Ok(video)
 }
 
-/// Every file probed in parallel; results in selection order.
-fn probe_videos(
+/// Every file probed in parallel (`path`, `id`, `import_order`); results in selection order.
+pub fn probe_videos(
     tools: &dyn crate::store::services::VideoTools,
     candidates: Vec<(String, String, u32)>,
     unsupported: &str,
@@ -1092,31 +1092,26 @@ fn commit_listed(store: &mut Store, services: &mut Services, include: Vec<String
         }
         return;
     }
-    for video in &review.collection.videos {
-        if review.selection.new_ids.contains(&video.id) {
-            review
-                .selection
-                .switch_overrides
-                .insert(video.id.clone(), include.contains(&video.path));
+    // Each new video is switched as its row's switch would be, so a waiting video switched on is
+    // placed where it waited.
+    let switches: Vec<(String, String, bool)> = review
+        .collection
+        .videos
+        .iter()
+        .filter(|video| review.selection.new_ids.contains(&video.id))
+        .map(|video| (video.id.clone(), video.path.clone(), include.contains(&video.path)))
+        .collect();
+    for (video_id, path, included) in switches {
+        if let Err(error) = set_review_row_included(store, &video_id, included) {
+            let reply = store.video_import_review.review.as_mut().and_then(|review| review.request.reply.take());
+            store.video_import_review.review = None;
+            if let Some(reply) = reply {
+                reply.send(Err(format!("{path}: {error}")));
+            }
+            return;
         }
     }
-    let derived = review.derived();
-    if let Some(path) =
-        include.iter().find(|path| {
-            review.collection.videos.iter().any(|video| {
-                &video.path == *path && derived.switches.blocked_ids.contains(&video.id)
-            })
-        })
-    {
-        let reply = review.request.reply.take();
-        store.video_import_review.review = None;
-        if let Some(reply) = reply {
-            reply.send(Err(format!(
-                "{path}: has another resolution than the overlay"
-            )));
-        }
-        return;
-    }
+    let derived = store.video_import_review.review.as_ref().expect("the review is open").derived();
     commit(store, services, derived.model.included);
 }
 

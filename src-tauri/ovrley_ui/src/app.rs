@@ -41,6 +41,7 @@ impl Projections {
         features::app_shell::project(&window, store, language_changed);
         features::toolbar::project(&window, store);
         features::template_manager::project(&window, store);
+        features::projects::project(&window, store);
         features::video_preview::project(&window, store);
         features::undo_redo::project(&window, store);
         self.overlay.project(&window, store);
@@ -80,6 +81,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::app_shell::bind(window, &dispatcher);
     features::toolbar::bind(window, &dispatcher);
     features::template_manager::bind(window, &dispatcher);
+    features::projects::bind(window, &dispatcher);
     features::overlay_editor::bind(window, &dispatcher);
     features::player::bind(window, &dispatcher);
     features::undo_redo::bind(window, &dispatcher);
@@ -163,7 +165,15 @@ pub fn run(
             ovrley_app::features::template_manager::fetch_templates(store, services, None);
             ovrley_app::features::widget_editor::load_font_catalog(store, services);
             ovrley_app::features::maps::initialize(store, services);
-            ovrley_app::features::template_manager::restore_last_loaded_template(store, services, Box::new(|store, _| store.bootstrap.set_startup_ready()));
+            // Once startup is ready, the startup projects dialog lists the project folder (D11).
+            ovrley_app::features::template_manager::restore_last_loaded_template(
+                store,
+                services,
+                Box::new(|store, services| {
+                    store.bootstrap.set_startup_ready();
+                    ovrley_app::features::projects::load_startup_projects(store, services);
+                }),
+            );
         });
     });
 

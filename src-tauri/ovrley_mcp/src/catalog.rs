@@ -382,6 +382,7 @@ pub fn tools() -> Vec<ToolDefinition> {
     tools.extend(crate::widgets::tools());
     tools.extend(crate::scene_settings::tools());
     tools.extend(crate::videos::tools());
+    tools.extend(crate::projects::tools());
     tools
 }
 
@@ -412,7 +413,7 @@ fn summary(store: &Store) -> Value {
         "language": store.i18n.language,
         "unitSystem": store.editor.unit_system,
         "drawer": drawer_state(store),
-        "project": null,
+        "project": ovrley_app::features::projects::describe_project(store),
         "template": describe_template(store),
         "activity": describe_activity(store),
         "videos": crate::player::describe_videos(store),
@@ -600,6 +601,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             other if crate::widgets::handles(other) => crate::widgets::call(other, arguments_value, store, services, reply),
             other if crate::scene_settings::handles(other) => crate::scene_settings::call(other, arguments_value, store, services, reply),
             other if crate::videos::handles(other) => crate::videos::call(other, arguments_value, store, services, reply),
+            other if crate::projects::handles(other) => crate::projects::call(other, arguments_value, store, services, reply),
             other => crate::player::call(other, arguments_value, store, services, reply).unwrap_or_else(|| Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}")))),
         }
     };
@@ -779,7 +781,7 @@ mod tests {
         assert_eq!(summary["language"], "en");
         assert_eq!(summary["drawer"], json!({"visible": false, "pinned": false, "activeTool": "widgets"}));
         assert!(summary["widgets"].is_array());
-        assert!(summary["project"].is_null());
+        assert_eq!(summary["project"], json!({"name": null, "path": null, "status": "Unsaved"}));
         assert!(summary["activity"].is_null());
         assert_eq!(summary["template"]["saveStatus"], "Draft");
         assert_eq!(summary["history"], json!({"canUndo": false, "canRedo": false}));

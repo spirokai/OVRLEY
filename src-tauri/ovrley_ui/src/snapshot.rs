@@ -28,12 +28,18 @@ fn tour() -> Vec<Step> {
     use ovrley_app::i18n::{change_language_preference, Locale};
     use ovrley_app::store::slices::layout::LeftDrawerTool;
     let steps: Vec<(&'static str, StepAction)> = vec![
+        // The startup projects dialog opens once its listing arrives; the tour shows it, then
+        // dismisses it as the user would (D14).
+        ("startup-projects", |store, _| store.projects.startup.open = true),
         ("shell", |store, _| {
+            ovrley_app::features::projects::dismiss_startup_dialog(store);
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
         }),
         ("drawer-overlay", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Activity)),
         ("drawer-pinned", |store, _| store.layout.set_left_drawer_pinned(true)),
+        ("projects-drawer", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Projects)),
+        ("projects-drawer-back", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Activity)),
         ("activity-imported", |store, services| {
             let ride = ovrley_services::runtime_paths::source_repo_root().join("src-tauri/ovrley_core/tests/fixtures/activity/test-ride.fit");
             ovrley_app::features::app_shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);

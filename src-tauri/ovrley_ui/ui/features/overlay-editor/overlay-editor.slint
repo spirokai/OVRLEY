@@ -1,3 +1,4 @@
+import { Projects } from "../projects/index.slint";
 import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Checkerboard } from "../../components/checkerboard.slint";
@@ -342,6 +343,33 @@ export component OverlayEditorView inherits Rectangle {
                 width: parent.width;
                 height: parent.height;
             }
+        }
+    }
+
+    // The project status badge (`showProjectStatus`), 0.5rem left of the scene size chip, while
+    // there are unsaved changes: 1.5rem high, `rounded-xs`, 0.741rem, `shadow-lg`; Modified is
+    // `accent-border` on `surface-accent-soft` at 20% in `primary`, Unsaved an outline on `card` at
+    // 85%.
+    if Projects.status-shown: status := Rectangle {
+        x: chip.x - 0.5rem - self.width;
+        y: 1rem + (chip.height - self.height) / 2;
+        width: status-text.preferred-width + 1rem;
+        height: 1.5rem;
+        Shadow {
+            size: ShadowSize.lg;
+            radius: Theme.radius-xs * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.radius-xs * 1rem;
+            border-width: 1px;
+            border-color: Projects.status-modified ? Theme.accent-border : Theme.border;
+            background: Projects.status-modified ? Theme.surface-accent-soft.transparentize(0.8) : Theme.card.transparentize(0.15);
+        }
+        status-text := AppText {
+            content: Projects.status-modified ? @tr("overlay-editor.statusModified" => "Modified") : @tr("overlay-editor.statusUnsaved" => "Unsaved");
+            font-size: 0.741rem;
+            font-weight: Theme.font-weight-medium;
+            color: Projects.status-modified ? Theme.primary : Theme.foreground;
         }
     }
 
