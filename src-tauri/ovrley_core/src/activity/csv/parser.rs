@@ -376,6 +376,37 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
         "torque" | "estimated torque" | "pedaltorquenm" => {
             (Metric::Torque, SourcePriority::Direct, None, None, None)
         }
+        "coolant temperature"
+        | "coolant temp"
+        | "coolant"
+        | "engine coolant temperature"
+        | "engine coolant temp"
+        | "watertemp"
+        | "water temp" => (
+            Metric::CoolantTemperature,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "coolant temperature c" | "coolant temp c" => (
+            Metric::CoolantTemperature,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
+        "boost"
+        | "boost pressure"
+        | "turbo boost"
+        | "turbo boost pressure"
+        | "turbo boost & vacuum gauge" => (
+            Metric::BoostPressure,
+            SourcePriority::Direct,
+            None,
+            None,
+            None,
+        ),
         "engine load" | "engine load absolute" | "absolute engine load" => (
             Metric::EngineLoad,
             SourcePriority::Direct,
@@ -474,6 +505,7 @@ fn parse_header(index: usize, value: &str, profile: HeaderProfile) -> Option<Hea
         "altitudemeters" => Some(Unit::Metres),
         "coursedegrees" => Some(Unit::Degrees),
         "motorrpm" | "cadencerpm" => Some(Unit::RevolutionsPerMinute),
+        "coolant temperature c" | "coolant temp c" => Some(Unit::Celsius),
         "humanpowerw" | "motorinputpowerw" => Some(Unit::Watts),
         "pedaltorquenm" => Some(Unit::NewtonMetres),
         _ => None,

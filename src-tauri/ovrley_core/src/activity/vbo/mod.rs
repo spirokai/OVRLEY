@@ -402,6 +402,8 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         throttle_position: series(layout.throttle_position, identity),
         brake_position: series(layout.brake_position, identity),
         engine_load: series(layout.engine_load, identity),
+        coolant_temperature: empty(),
+        boost_pressure: empty(),
         lean_angle,
         vertical_speed: selected_series(&sections.data, layout.vertical_speed, |value| {
             layout.vertical_speed_to_meters_per_second(value)

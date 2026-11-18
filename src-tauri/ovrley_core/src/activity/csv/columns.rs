@@ -273,6 +273,8 @@ pub(super) fn build_activity_columns(
     let (power, _) = series(Metric::Power);
     let (engine_power, _) = series(Metric::EnginePower);
     let (engine_load, _) = series(Metric::EngineLoad);
+    let (coolant_temperature, _) = series(Metric::CoolantTemperature);
+    let (boost_pressure, _) = series(Metric::BoostPressure);
     let (torque, _) = series(Metric::Torque);
     let (throttle_position, _) = series(Metric::ThrottlePosition);
     let (brake_position, _) = series(Metric::BrakePosition);
@@ -406,6 +408,8 @@ pub(super) fn build_activity_columns(
         power,
         engine_power,
         engine_load,
+        coolant_temperature,
+        boost_pressure,
         temperature: empty(),
         depth: series(Metric::Depth).0,
         first_stop_depth: series(Metric::FirstStopDepth).0,

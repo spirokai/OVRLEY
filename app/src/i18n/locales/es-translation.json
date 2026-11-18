@@ -598,6 +598,8 @@
       "distance_to_home": { "name": "Distancia hasta casa", "shortName": "Casa" },
       "elevation": { "name": "Elevación", "shortName": "Elevación" },
       "engine_load": { "name": "Carga del motor", "shortName": "Carga mot." },
+      "coolant_temperature": { "name": "Temperatura del refrigerante", "shortName": "Refrig." },
+      "boost_pressure": { "name": "Presión de sobrealimentación", "shortName": "Turbo" },
       "engine_power": { "name": "Potencia del motor", "shortName": "Potencia" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Distancia focal", "shortName": "Focal" },

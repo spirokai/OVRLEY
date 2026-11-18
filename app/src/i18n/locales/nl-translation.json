@@ -598,6 +598,8 @@
       "distance_to_home": { "name": "Afstand tot huis", "shortName": "Thuis" },
       "elevation": { "name": "Hoogteprofiel", "shortName": "Profiel" },
       "engine_load": { "name": "Motorbelasting", "shortName": "Motorlast" },
+      "coolant_temperature": { "name": "Koelvloeistoftemperatuur", "shortName": "Koelwater" },
+      "boost_pressure": { "name": "Turbodruk", "shortName": "Turbodruk" },
       "engine_power": { "name": "Motorvermogen", "shortName": "Motorverm." },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Brandpuntsafstand", "shortName": "Brandpunt" },

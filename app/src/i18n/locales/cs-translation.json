@@ -598,6 +598,8 @@
       "distance_to_home": { "name": "Vzdálenost domů", "shortName": "Domů" },
       "elevation": { "name": "Výškový profil", "shortName": "Profil" },
       "engine_load": { "name": "Zátěž motoru", "shortName": "Zat. motoru" },
+      "coolant_temperature": { "name": "Teplota chladicí kapaliny", "shortName": "Chladivo" },
+      "boost_pressure": { "name": "Plnicí tlak", "shortName": "Pl. tlak" },
       "engine_power": { "name": "Výkon motoru", "shortName": "Výk. motoru" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Ohnisková vzdálenost", "shortName": "Ohnisko" },
