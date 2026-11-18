@@ -24,6 +24,14 @@ pub enum SecondsField {
     ImportSharedOffset,
     /// The import dialog's default transition duration.
     ImportTransitionDuration,
+    /// The selected video's start on the timeline, in the video drawer.
+    DrawerVideoStart(String),
+    /// A join's duration, in the video drawer.
+    JoinDuration(String),
+    /// The panel's default transition duration.
+    PanelTransitionDuration,
+    /// The panel's continuity threshold.
+    PanelContinuityThreshold,
 }
 
 impl SecondsField {
@@ -33,6 +41,10 @@ impl SecondsField {
             Self::ImportRowOffset(video_id) => format!("import-row:{video_id}"),
             Self::ImportSharedOffset => "import-shared".into(),
             Self::ImportTransitionDuration => "import-transition".into(),
+            Self::DrawerVideoStart(video_id) => format!("drawer-start:{video_id}"),
+            Self::JoinDuration(join_key) => format!("join:{join_key}"),
+            Self::PanelTransitionDuration => "panel-transition".into(),
+            Self::PanelContinuityThreshold => "panel-threshold".into(),
         }
     }
 
@@ -130,6 +142,25 @@ pub fn field_target(store: &Store, field: &SecondsField) -> Option<FieldTarget> 
                 step: None,
             })
         }
+        SecondsField::DrawerVideoStart(video_id) => {
+            let timeline = store.player.timeline.timeline();
+            let clip = timeline.committed.clips.iter().find(|clip| clip.id() == video_id)?;
+            Some(FieldTarget { options: start_options(Some(clip.fps())), value: clip.offset_seconds(), step: None })
+        }
+        SecondsField::JoinDuration(join_key) => {
+            let model = crate::features::transitions::join_models(&store.player.timeline.timeline().committed, store.i18n.language).into_iter().find(|model| &model.key == join_key)?;
+            Some(FieldTarget { options: crate::features::transitions::duration_options(model.duration_fps), value: model.duration_seconds?, step: None })
+        }
+        SecondsField::PanelTransitionDuration => Some(FieldTarget {
+            options: SecondsInputOptions { fps: render_frame_rate(store.render_settings.fps), mode: SecondsMode::Duration, signed: false, display: SecondsDisplay::Seconds },
+            value: store.video_import.transition_defaults.duration_seconds,
+            step: None,
+        }),
+        SecondsField::PanelContinuityThreshold => Some(FieldTarget {
+            options: SecondsInputOptions { fps: None, mode: SecondsMode::Time, signed: false, display: SecondsDisplay::Clock },
+            value: store.video_import.transition_defaults.split_gap_threshold_seconds,
+            step: None,
+        }),
     }
 }
 
@@ -141,7 +172,18 @@ fn commit(store: &mut Store, field: &SecondsField, seconds: f64) -> Result<(), S
         SecondsField::ImportTransitionDuration => {
             set_review_transition_defaults(store, |defaults| defaults.duration_seconds = seconds)
         }
+        SecondsField::DrawerVideoStart(video_id) => crate::store::slices::video_import::set_video_offset(store, video_id, seconds, false),
+        SecondsField::JoinDuration(join_key) => crate::features::transitions::commit_join_duration(store, join_key, seconds),
+        SecondsField::PanelTransitionDuration => set_panel_defaults(store, |defaults| defaults.duration_seconds = seconds),
+        SecondsField::PanelContinuityThreshold => set_panel_defaults(store, |defaults| defaults.split_gap_threshold_seconds = seconds),
     }
+}
+
+/// `useTransitionDefaultsSection`'s commit: the store's defaults with one change.
+pub fn set_panel_defaults(store: &mut Store, change: impl FnOnce(&mut ovrley_core::encode::ffmpeg::transitions::TransitionDefaults)) -> Result<(), String> {
+    let mut defaults = store.video_import.transition_defaults.clone();
+    change(&mut defaults);
+    crate::store::slices::video_import::set_transition_defaults(store, defaults)
 }
 
 /// What the field shows.

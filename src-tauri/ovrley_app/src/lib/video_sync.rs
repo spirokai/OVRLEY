@@ -70,6 +70,12 @@ pub struct Placement {
     pub timezone_mode: Option<TimezoneMode>,
 }
 
+/// How far from the activity (or from the earliest video, without one) a detected start may lie:
+/// a start further away is silently clamped to this distance, so videos recorded far from the
+/// activity stay workable on the timeline. A deliberate difference from React (user decision,
+/// 2026-11-18); starts set by hand are not limited.
+pub const MAX_SYNC_DISTANCE_SECONDS: f64 = 2.0 * 3600.0;
+
 /// `videoOverlapsActivity`: the half-open intervals overlap.
 pub fn video_overlaps_activity(video_start: f64, video_duration: f64, activity_end: f64) -> bool {
     video_start < activity_end && video_start + video_duration > 0.0
@@ -208,7 +214,7 @@ pub fn resolve_video_sync(
     } else {
         vec![timezone_mode.unwrap_or(TimezoneMode::Local)]
     };
-    let candidates: Result<Vec<(TimezoneMode, f64, bool)>, SyncWarning> = modes
+    let candidates: Result<Vec<(TimezoneMode, f64, bool, f64)>, SyncWarning> = modes
         .iter()
         .map(|mode| {
             automatic_offset(video, activity, *mode).map(|(offset, activity_duration)| {
@@ -216,6 +222,7 @@ pub fn resolve_video_sync(
                     *mode,
                     offset,
                     video_overlaps_activity(offset, video.duration_seconds, activity_duration),
+                    activity_duration,
                 )
             })
         })
@@ -230,13 +237,14 @@ pub fn resolve_video_sync(
         Ok(candidates) => {
             let matches: Vec<_> = candidates
                 .iter()
-                .filter(|(_, _, overlaps)| *overlaps)
+                .filter(|(_, _, overlaps, _)| *overlaps)
                 .collect();
             let selected = matches.first().copied().unwrap_or(&candidates[0]);
             let inferred_local_only =
                 infer && matches.len() == 1 && selected.0 == TimezoneMode::Local;
             Placement {
-                offset_seconds: selected.1,
+                // A start far from the activity is kept within reach (user decision, Phase 6A).
+                offset_seconds: selected.1.clamp(-MAX_SYNC_DISTANCE_SECONDS, selected.3 + MAX_SYNC_DISTANCE_SECONDS),
                 determined: true,
                 sync_warning: (!selected.2).then_some(SyncWarning::OutsideActivity),
                 timezone_mode: (ambiguous && !inferred_local_only).then_some(selected.0),
@@ -267,7 +275,8 @@ pub fn place_videos_by_creation_time(videos: &[RecordingTime]) -> Vec<Placement>
         .into_iter()
         .map(|start| match (start, origin) {
             (Some(start), Some(origin)) => Placement {
-                offset_seconds: (start - origin) as f64 / 1000.0,
+                // Kept within reach of the earliest video (user decision, Phase 6A).
+                offset_seconds: ((start - origin) as f64 / 1000.0).min(MAX_SYNC_DISTANCE_SECONDS),
                 determined: true,
                 sync_warning: None,
                 timezone_mode: None,
@@ -475,7 +484,8 @@ mod tests {
             .iter()
             .map(|placement| placement.offset_seconds)
             .collect();
-        assert_eq!(offsets, [7230.0, 0.0, 0.0, 7200.0]);
+        // The first is 7230 s after the earliest, clamped to two hours.
+        assert_eq!(offsets, [MAX_SYNC_DISTANCE_SECONDS, 0.0, 0.0, 7200.0]);
         assert!(!placements[2].determined);
         assert_eq!(
             placements[2].sync_warning,
@@ -520,5 +530,15 @@ mod tests {
         assert!(video_overlaps_activity(-5.0, 10.0, 100.0));
         assert!(!video_overlaps_activity(-10.0, 10.0, 100.0));
         assert!(!video_overlaps_activity(100.0, 10.0, 100.0));
+    }
+
+    #[test]
+    fn detected_starts_are_clamped_to_two_hours_from_the_activity_or_the_earliest_video() {
+        let far = resolve_video_sync(&video("2024-06-03T08:00:00Z", "gps", 60.0), &activity("UTC"), None);
+        assert_eq!((far.offset_seconds, far.sync_warning), (7200.0 + MAX_SYNC_DISTANCE_SECONDS, Some(SyncWarning::OutsideActivity)));
+        let before = resolve_video_sync(&video("2024-05-30T08:00:00Z", "gps", 60.0), &activity("UTC"), None);
+        assert_eq!(before.offset_seconds, -MAX_SYNC_DISTANCE_SECONDS);
+        let placements = place_videos_by_creation_time(&[video("2024-06-01T08:00:00Z", "gps", 1.0), video("2024-06-05T08:00:00Z", "gps", 1.0)]);
+        assert_eq!(placements[1].offset_seconds, MAX_SYNC_DISTANCE_SECONDS);
     }
 }

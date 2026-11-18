@@ -1840,7 +1840,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn without_a_reference_the_largest_group_of_new_videos_within_12_hours_is_switched_on() {
+    fn without_a_reference_every_clamped_new_video_is_within_the_12_hour_group() {
         let videos = vec![
             timed("a", Some("2026-07-18T08:00:00Z"), 60.0, 0),
             timed("b", Some("2026-07-18T09:00:00Z"), 60.0, 1),
@@ -1852,7 +1852,8 @@ pub(crate) mod tests {
             .filter(|row| row.is_included)
             .map(|row| row.id)
             .collect();
-        assert_eq!(included, ["a", "b"]);
+        // Detected starts lie within two hours of the earliest video, so the 12-hour rule keeps them all.
+        assert_eq!(included, ["a", "b", "c"]);
     }
 
     #[test]
@@ -2119,37 +2120,25 @@ pub(crate) mod tests {
     fn a_far_video_switched_on_asks_first_and_import_anyway_commits() {
         let (dispatcher, fakes) = dispatcher();
         add_probe(&fakes, "/videos/a.mp4", Some("2026-07-18T08:00:00Z"));
+        start(&dispatcher, &["/videos/a.mp4"]);
+        settle(&dispatcher, &fakes, |store| store.video_import.has_videos());
+        // Two days later: clamped to two hours after a, still more than an hour from it.
         add_probe(&fakes, "/videos/b.mp4", Some("2026-07-20T08:00:00Z"));
-        start(&dispatcher, &["/videos/a.mp4", "/videos/b.mp4"]);
+        start(&dispatcher, &["/videos/b.mp4"]);
         settle(&dispatcher, &fakes, reviewing);
-        let far_id = dispatcher.with_store(|store| {
-            store
-                .video_import_review
-                .review
-                .as_ref()
-                .unwrap()
-                .collection
-                .videos[1]
-                .id
-                .clone()
-        });
+        let far_id = dispatcher.with_store(|store| store.video_import_review.review.as_ref().unwrap().collection.videos[1].id.clone());
         let id = far_id.clone();
         dispatcher.dispatch(move |store, _| set_review_row_included(store, &id, true).unwrap());
         dispatcher.dispatch(confirm_import_review);
-        assert_eq!(
-            dispatcher.with_store(|store| store.video_import_review.review.as_ref().unwrap().phase),
-            ReviewPhase::Confirming
-        );
+        assert_eq!(dispatcher.with_store(|store| store.video_import_review.review.as_ref().unwrap().phase), ReviewPhase::Confirming);
         dispatcher.dispatch(|store, _| back_to_import_review(store));
-        assert_eq!(
-            dispatcher.with_store(|store| store.video_import_review.review.as_ref().unwrap().phase),
-            ReviewPhase::Reviewing
-        );
+        assert_eq!(dispatcher.with_store(|store| store.video_import_review.review.as_ref().unwrap().phase), ReviewPhase::Reviewing);
         dispatcher.dispatch(confirm_import_review);
         dispatcher.dispatch(confirm_import_review);
         dispatcher.with_store(|store| {
             assert!(store.video_import_review.review.is_none());
             assert_eq!(store.video_import.imported_videos.len(), 2);
+            assert_eq!(store.video_import.video_edits[&far_id].offset_seconds, crate::lib::video_sync::MAX_SYNC_DISTANCE_SECONDS);
         });
     }
 

@@ -26,7 +26,9 @@ pub struct CollectionDraft<'a> {
 }
 
 /// Where a clip's recording time comes from.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "lowercase")]
 pub enum CreationTimeSource {
     /// The time the probe detected.
     Detected,

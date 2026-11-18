@@ -1,6 +1,8 @@
 //! The toolbar feature's hooks: `useDrawerPreference` (hydrating and persisting the shared drawer
 //! preference) and `useToolbarDrawer`'s Escape rule.
 
+pub mod video_drawer;
+
 use crate::i18n::catalog;
 use crate::lib::file_dialog::filename_from_selected_path;
 use crate::lib::format::{compare_text, format_clock_duration, format_locale_number, format_zoned_date_time};

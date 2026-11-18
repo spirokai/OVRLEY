@@ -14,6 +14,7 @@ import { VideoImportDialog } from "../features/video-preview/video-import-dialog
 import { VideoImport } from "../features/video-preview/index.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
+import { VideoPanel } from "../features/toolbar/video-panel.slint";
 
 // The composition root that `App.jsx` is (D5): the header, then the drawer layout with the
 // workspace and the control panel, then the dialogs. Window chrome per platform (D9): on macOS the
@@ -142,7 +143,11 @@ export component AppWindow inherits FluidWindow {
                 // A still region: drawn from a cached layer (see `AppHeader`).
                 cache-rendering-hint: true;
                 background: Theme.card.transparentize(0.4);
-                ControlPanel { }
+                if !Toolbar.video-panel-shown: ControlPanel { }
+                if Toolbar.video-panel-shown: VideoPanel {
+                    width: parent.width;
+                    height: parent.height;
+                }
                 AreaReport {
                     report(area) => {
                         AppShell.control-panel-area = area;

@@ -124,7 +124,17 @@ fn select_workspace(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<f64>
     // A press outside the player clears the clip selection (D10); the player's own popovers and
     // dialogs keep it.
     if !player.is_some_and(|player| player.contains(point)) {
-        let keeps = APP_WINDOW.with(|slot| slot.borrow().as_ref().and_then(|window| window.upgrade()).is_some_and(|window| window.global::<Player>().get_keeps_clip_selection()));
+        let keeps = APP_WINDOW.with(|slot| {
+            slot.borrow().as_ref().and_then(|window| window.upgrade()).is_some_and(|window| {
+                let shell = window.global::<AppShell>();
+                let toolbar = window.global::<crate::Toolbar>();
+                let area = |rect: crate::PlacementRect| app_shell::Area { x: rect.x.into(), y: rect.y.into(), width: rect.width.into(), height: rect.height.into() };
+                // The video drawer and the video panel are kept areas (D10), as are open popovers.
+                let drawer = toolbar.get_visible() && toolbar.get_active_tool() == crate::DrawerTool::Video && area(shell.get_video_drawer_area()).contains(point);
+                let panel = toolbar.get_video_panel_shown() && area(shell.get_control_panel_area()).contains(point);
+                window.global::<Player>().get_keeps_clip_selection() || drawer || panel || !window.global::<crate::TransitionSelect>().get_open_target().is_empty()
+            })
+        });
         if !keeps {
             dispatch_ui(|store, _| {
                 if store.video_import.selected_clip.is_some() {

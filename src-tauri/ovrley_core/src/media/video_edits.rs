@@ -190,6 +190,7 @@ pub struct PlacementAnchor {
 
 /// How a clip's camera clock is read against the activity: local time or UTC.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "lowercase")]
 pub enum TimezoneMode {
     Local,

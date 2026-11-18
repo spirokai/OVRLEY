@@ -5847,6 +5847,7 @@ dependencies = [
  "regex",
  "roxmltree",
  "same-file",
+ "schemars 1.2.0",
  "serde",
  "serde_json",
  "skia-safe",

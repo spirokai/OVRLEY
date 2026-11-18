@@ -27,6 +27,7 @@ skia-safe = { version = "=0.157.0", features = ["binary-cache", "no-compile"] }
 tzf-rs = { version = "1.3.7", default-features = false, features = ["bundled"] }
 telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "7743443" }
 fitparser = "0.12"
+schemars = { version = "1", optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.3"
@@ -34,6 +35,8 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = ["s
 
 [features]
 canvas-parity = []
+# JSON schemas of the state types tools take (`ovrley_mcp`).
+schema = ["dep:schemars"]
 
 [dev-dependencies]
 anyhow = "1.0"

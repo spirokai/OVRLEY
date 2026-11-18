@@ -13,79 +13,8 @@ import {
 } from "../../components/section-heading.slint";
 import { Switch } from "../../components/switch.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
-import { ActivityRowView, ActivityLapView } from "index.slint";
-
-// A table or grid cell's text with `px-2`.
-component Cell inherits HorizontalLayout {
-    in property <string> content;
-    in property <int> weight: Theme.font-weight-medium;
-    in property <length> size: Theme.text-xs * 1rem;
-    in property <color> color: Theme.foreground.transparentize(0.1);
-    // Header cells keep their whole label, as the table's header does.
-    in property <bool> elide: true;
-
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-    AppText {
-        content: root.content;
-        font-size: root.size;
-        font-weight: root.weight;
-        color: root.color;
-        horizontal-alignment: left;
-        vertical-alignment: center;
-        overflow: root.elide ? TextOverflow.elide : TextOverflow.clip;
-        max-lines: 1;
-    }
-}
-
-// `FileDropZone`: at least 6rem high, 1rem below the button, `rounded-xs`, a 1px `border` at 80%
-// on `surface`, a 1.25rem FileUp, the bold label and the format list. Slint has no dashed borders,
-// so the border is solid (as the window's drop overlay). Native drops land on the whole window
-// (Phase 2 D10), whose overlay covers the drawer while a file hovers, so the zone shows no hover
-// state of its own.
-component FileDropZone inherits Rectangle {
-    in property <string> label;
-    in property <string> sublabel;
-
-    min-height: 6rem;
-    vertical-stretch: 0;
-    border-radius: Theme.radius-xs * 1rem;
-    border-width: 1px;
-    border-color: Theme.border.transparentize(0.2);
-    background: Theme.surface;
-    VerticalLayout {
-        alignment: center;
-        padding-left: 1rem;
-        padding-right: 1rem;
-        HorizontalLayout {
-            alignment: center;
-            padding-bottom: 0.5rem;
-            Icon {
-                glyph: Icons.file-up;
-                size: 1.25rem;
-                color: Theme.muted-foreground;
-            }
-        }
-
-        AppText {
-            content: root.label;
-            horizontal-alignment: center;
-            font-size: Theme.text-xs * 1rem;
-            font-weight: Theme.font-weight-extrabold;
-        }
-
-        Rectangle {
-            height: 0.25rem;
-        }
-
-        AppText {
-            content: root.sublabel;
-            horizontal-alignment: center;
-            font-size: 0.75rem;
-            color: Theme.muted-foreground;
-        }
-    }
-}
+import { DrawerRowView, ActivityLapView } from "index.slint";
+import { Cell, FileDropZone, DrawerFileHeader, DetailRows } from "drawer-parts.slint";
 
 // `MetricGrid`: two columns 0.375rem apart of outline badges without border, `text-[0.7rem]`
 // medium; an empty list shows its label.
@@ -197,7 +126,7 @@ export component ActivityDrawer inherits ScrollArea {
     in property <string> file-name;
     in property <bool> can-delete;
     in property <string> format-label;
-    in property <[ActivityRowView]> metadata;
+    in property <[DrawerRowView]> metadata;
     in property <[string]> extracted;
     in property <[string]> derived;
     in property <[ActivityLapView]> laps;
@@ -240,35 +169,12 @@ export component ActivityDrawer inherits ScrollArea {
                 spacing: 2rem;
                 VerticalLayout {
                     spacing: 1rem;
-                    HorizontalLayout {
-                        padding-top: 1rem;
-                        padding-bottom: 0.5rem;
-                        padding-left: 0.25rem;
-                        AppText {
-                            horizontal-stretch: 1;
-                            content: root.file-name;
-                            horizontal-alignment: left;
-                            font-size: Theme.text-sm * 0.95rem;
-                            font-weight: Theme.font-weight-extrabold;
-                            overflow: elide;
-                            max-lines: 1;
-                            vertical-alignment: center;
-                        }
-
-                        if root.can-delete: Button {
-                            variant: ButtonVariant.ghost;
-                            size: ButtonSize.icon;
-                            width: 1.75rem;
-                            height: 1.75rem;
-                            icon: Icons.trash-2;
-                            icon-size: 0.875rem;
-                            text-color: Theme.muted-foreground;
-                            hover-background: Theme.surface-accent-soft;
-                            hover-text-color: Theme.primary;
-                            accessible-label: @tr("toolbar.deleteActivity" => "Delete activity");
-                            clicked => {
-                                root.delete-activity();
-                            }
+                    DrawerFileHeader {
+                        name: root.file-name;
+                        can-remove: root.can-delete;
+                        remove-label: @tr("toolbar.deleteActivity" => "Delete activity");
+                        remove => {
+                            root.delete-activity();
                         }
                     }
 
@@ -290,32 +196,8 @@ export component ActivityDrawer inherits ScrollArea {
                         }
                     }
 
-                    VerticalLayout {
-                        padding-left: 0.5rem;
-                        padding-right: 0.5rem;
-                        spacing: 0.375rem;
-                        for row in root.metadata: HorizontalLayout {
-                            spacing: 1.125rem;
-                            AppText {
-                                // Equal columns, as `grid-cols-2`.
-                                width: (parent.width - parent.spacing) / 2;
-                                content: row.label;
-                                horizontal-alignment: left;
-                                font-size: Theme.text-xs * 1rem;
-                                font-weight: Theme.font-weight-bold;
-                                color: Theme.muted-foreground;
-                            }
-
-                            AppText {
-                                width: (parent.width - parent.spacing) / 2;
-                                content: row.value;
-                                horizontal-alignment: left;
-                                font-size: Theme.text-xs * 1rem;
-                                font-weight: Theme.font-weight-medium;
-                                color: Theme.foreground.transparentize(0.1);
-                                wrap: word-wrap;
-                            }
-                        }
+                    DetailRows {
+                        rows: root.metadata;
                     }
                 }
 

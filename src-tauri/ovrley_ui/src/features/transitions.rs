@@ -124,23 +124,33 @@ impl Projection {
 }
 
 /// The key a `TransitionSelectTrigger` names its target by.
-pub fn target_key(target: &TransitionSelectTarget) -> &'static str {
+pub fn target_key(target: &TransitionSelectTarget) -> String {
     match target {
-        TransitionSelectTarget::ImportDefaults => "import-defaults",
+        TransitionSelectTarget::ImportDefaults => "import-defaults".into(),
+        TransitionSelectTarget::PanelDefaults => "panel-defaults".into(),
+        TransitionSelectTarget::Join(key) => format!("join:{key}"),
     }
 }
 
 fn target_of(key: &str) -> Option<TransitionSelectTarget> {
     match key {
         "import-defaults" => Some(TransitionSelectTarget::ImportDefaults),
-        _ => None,
+        "panel-defaults" => Some(TransitionSelectTarget::PanelDefaults),
+        _ => key.strip_prefix("join:").map(|join| TransitionSelectTarget::Join(join.to_string())),
     }
 }
 
-/// The selected value of a target: its default type.
+/// The join model of a join target.
+fn join_of(store: &Store, key: &str) -> Option<transitions::JoinModel> {
+    transitions::join_models(&store.player.timeline.timeline().committed, store.i18n.language).into_iter().find(|model| model.key == key)
+}
+
+/// The selected value of a target: its default type, or the join's option.
 fn selected_value(store: &Store, target: &TransitionSelectTarget) -> String {
     match target {
         TransitionSelectTarget::ImportDefaults => store.video_import_review.review.as_ref().map(|review| review.transition_defaults.transition_type.clone()).unwrap_or_default(),
+        TransitionSelectTarget::PanelDefaults => store.video_import.transition_defaults.transition_type.clone(),
+        TransitionSelectTarget::Join(key) => join_of(store, key).map(|model| model.value).unwrap_or_default(),
     }
 }
 
@@ -152,18 +162,27 @@ fn project_select(window: &AppWindow, store: &Store) {
     };
     let locale = store.i18n.language;
     let none_label = ovrley_app::i18n::catalog().t_or(locale, "transitions.none", "No transition").to_string();
-    let options = std::iter::once(TransitionOption { kind: TransitionOptionKind::None, value: ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION.into(), label: none_label.into(), index: -1 })
+    let default_option = match &select.target {
+        TransitionSelectTarget::Join(key) => join_of(store, key).map(|model| TransitionOption {
+            kind: TransitionOptionKind::Default,
+            value: transitions::DEFAULT_TRANSITION_OPTION.into(),
+            label: model.default_label.as_str().into(),
+            index: -1,
+        }),
+        _ => None,
+    };
+    let options = default_option.into_iter().chain(std::iter::once(TransitionOption { kind: TransitionOptionKind::None, value: ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION.into(), label: none_label.into(), index: -1 })
         .chain(transitions::filtered_transitions(&select.filter).into_iter().map(|name| TransitionOption {
             kind: TransitionOptionKind::Xfade,
             value: name.into(),
             label: name.into(),
             index: crate::features::video_preview::transition_index(Some(name)),
-        }))
+        })))
         .collect();
     replace_if_changed(global.get_options(), options, |model| global.set_options(model));
     set_if_changed(global.get_value(), SharedString::from(selected_value(store, &select.target)), |value| global.set_value(value));
     set_if_changed(global.get_filter(), SharedString::from(select.filter.as_str()), |value| global.set_filter(value));
-    set_if_changed(global.get_open_target(), SharedString::from(target_key(&select.target)), |value| global.set_open_target(value));
+    set_if_changed(global.get_open_target(), SharedString::from(target_key(&select.target).as_str()), |value| global.set_open_target(value));
 }
 
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {

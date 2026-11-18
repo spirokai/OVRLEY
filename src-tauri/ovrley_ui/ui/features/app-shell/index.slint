@@ -69,6 +69,9 @@ export global AppShell {
     in-out property <PlacementRect> editor-area;
     in-out property <PlacementRect> control-panel-area;
     in-out property <PlacementRect> player-area;
+    // The video drawer's rectangle while it shows; presses on it (and on the video panel) keep the
+    // clip selection (Phase 4 D10).
+    in-out property <PlacementRect> video-drawer-area;
 
     // MCP (D13): the user allows agent edits; an agent is connected and allowed (the badge).
     in property <bool> allow-agent-edits;

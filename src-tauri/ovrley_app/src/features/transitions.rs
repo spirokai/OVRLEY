@@ -214,6 +214,10 @@ pub fn duration_options(fps: Fps) -> SecondsInputOptions {
 pub enum TransitionSelectTarget {
     /// The import dialog's default transition.
     ImportDefaults,
+    /// The video panel's default transition.
+    PanelDefaults,
+    /// A join's transition, by key, in the video drawer.
+    Join(String),
 }
 
 /// The open `TransitionSelect` popover (one at a time) and its filter.
@@ -240,9 +244,13 @@ pub fn set_transition_select_filter(store: &mut Store, filter: String) {
 /// `choose`: closes the popover, then applies the choice to its target.
 pub fn choose_transition(store: &mut Store, value: &str) -> Result<(), String> {
     let select = store.transition_select.take().ok_or("No transition picker is open")?;
-    TransitionKind::from_name(value)?;
+    if !matches!(select.target, TransitionSelectTarget::Join(_)) {
+        TransitionKind::from_name(value)?;
+    }
     match select.target {
         TransitionSelectTarget::ImportDefaults => crate::features::video_preview::import::set_review_transition_defaults(store, |defaults| defaults.transition_type = value.to_string()),
+        TransitionSelectTarget::PanelDefaults => crate::features::seconds_fields::set_panel_defaults(store, |defaults| defaults.transition_type = value.to_string()),
+        TransitionSelectTarget::Join(key) => select_join_transition(store, &key, value),
     }
 }
 

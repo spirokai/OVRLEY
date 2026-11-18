@@ -6,6 +6,8 @@ import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { DrawerTool, Toolbar } from "index.slint";
 import { ActivityDrawer } from "activity-drawer.slint";
+import { VideoDrawer } from "video-drawer.slint";
+import { AppShell, AreaReport } from "../app-shell/index.slint";
 import { WidgetButtonGrid } from "../widget-drawer/widget-drawer.slint";
 
 // The rail's tools: label and icon per `DrawerTool`.
@@ -229,10 +231,18 @@ export component ToolbarDrawerLayout {
                     Toolbar.set-lap-enabled(id, enabled);
                 }
             }
+            if root.active-tool == DrawerTool.video: VideoDrawer {
+                vertical-stretch: 1;
+                AreaReport {
+                    report(area) => {
+                        AppShell.video-drawer-area = area;
+                    }
+                }
+            }
             if root.active-tool == DrawerTool.widgets: WidgetButtonGrid {
                 vertical-stretch: 1;
             }
-            if root.active-tool != DrawerTool.activity && root.active-tool != DrawerTool.widgets: Rectangle {
+            if root.active-tool != DrawerTool.activity && root.active-tool != DrawerTool.widgets && root.active-tool != DrawerTool.video: Rectangle {
                 vertical-stretch: 1;
             }
         }

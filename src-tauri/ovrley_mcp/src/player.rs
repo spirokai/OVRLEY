@@ -391,6 +391,13 @@ pub fn describe_video(store: &Store, video_id: &str) -> Result<Value, ToolOutcom
         .get(video_id)
         .map(|warnings| warnings.iter().map(|warning| ovrley_app::lib::video_program::warnings::format_video_warning(warning, ovrley_app::i18n::DEFAULT_LOCALE)).collect())
         .unwrap_or_default();
+    // The drawer's details, in English: duration, frame rate, resolution, created at, time source,
+    // codec, bit rate, camera and telemetry.
+    let timezone = store.media.sync_activity().and_then(|activity| activity.timezone);
+    let details: serde_json::Map<String, Value> = ovrley_app::features::toolbar::video_drawer::metadata_rows(clip, timezone.as_deref(), ovrley_app::i18n::DEFAULT_LOCALE)
+        .into_iter()
+        .map(|row| (row.label, Value::String(row.value)))
+        .collect();
     Ok(json!({
         "id": clip.id(),
         "path": clip.video.path,
@@ -400,6 +407,11 @@ pub fn describe_video(store: &Store, video_id: &str) -> Result<Value, ToolOutcom
         "frameRate": format!("{num}/{den}"),
         "frameCount": clip.frame_count(),
         "missing": clip.video.missing,
+        "offsetSource": clip.edits.offset_source,
+        "timezoneMode": clip.edits.timezone_mode,
+        "creationTime": clip.video.creation_time,
+        "timeSource": clip.video.time_source,
+        "details": details,
         "cuts": clip.cuts().iter().map(|cut| json!({ "id": cut.id, "frame": cut.frame, "second": fps.frames_to_seconds(cut.frame) })).collect::<Vec<_>>(),
         "segments": segments,
         "joins": joins,

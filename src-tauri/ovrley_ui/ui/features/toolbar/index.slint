@@ -1,8 +1,11 @@
+import { SecondsFieldView } from "../seconds-fields/index.slint";
+import { VideoSyncView } from "../video-sync/index.slint";
+
 // The drawer's tools, in the rail's order.
 export enum DrawerTool { projects, activity, video, video-sync, widgets }
 
 // One metadata row of the activity drawer's details.
-export struct ActivityRowView {
+export struct DrawerRowView {
     label: string,
     value: string,
 }
@@ -16,6 +19,68 @@ export struct ActivityLapView {
     enabled: bool,
 }
 
+// A join's transition control in the video drawer (`JoinTransitionControl`).
+export struct JoinControlView {
+    // The `TransitionSelect` target of the join.
+    target: string,
+    type-label: string,
+    preview-index: int,
+    has-duration: bool,
+    duration: SecondsFieldView,
+    error: string,
+}
+
+// One part of the selected video.
+export struct VideoSegmentView {
+    key: string,
+    range: string,
+    included: bool,
+    shows-overlay: bool,
+    overlay-label: string,
+    include-label: string,
+    has-join: bool,
+    join: JoinControlView,
+    removable: bool,
+    remove-label: string,
+}
+
+// A join out of the selected video into the next one.
+export struct VideoExitView {
+    next-filename: string,
+    join: JoinControlView,
+}
+
+// The video drawer's selected video (`useSelectedVideoRow`).
+export struct SelectedVideoView {
+    id: string,
+    filename: string,
+    path: string,
+    missing: bool,
+    remove-label: string,
+    warnings: [string],
+    metadata: [DrawerRowView],
+    start: SecondsFieldView,
+    creation-source: string,
+    filename-available: bool,
+    timezone-shown: bool,
+    applies-timezone: bool,
+    timezone-disabled: bool,
+    segments: [VideoSegmentView],
+    exits: [VideoExitView],
+}
+
+// A card of the video panel.
+export struct VideoCardView {
+    id: string,
+    filename: string,
+    duration: string,
+    thumbnail: image,
+    has-thumbnail: bool,
+    missing: bool,
+    selected: bool,
+    remove-label: string,
+}
+
 // The toolbar feature's global (D5), written by `src/features/toolbar.rs`.
 export global Toolbar {
     in property <DrawerTool> active-tool: DrawerTool.widgets;
@@ -27,12 +92,40 @@ export global Toolbar {
     in property <string> activity-file-name;
     in property <bool> can-delete-activity;
     in property <string> activity-format;
-    in property <[ActivityRowView]> activity-metadata;
+    in property <[DrawerRowView]> activity-metadata;
     in property <[string]> activity-extracted;
     in property <[string]> activity-derived;
     in property <[ActivityLapView]> activity-laps;
 
+    // The video drawer and the video panel (D10).
+    in property <bool> has-videos;
+    in property <bool> has-selected-video;
+    in property <SelectedVideoView> selected-video;
+    in property <bool> video-panel-shown;
+    in property <[VideoCardView]> video-cards;
+    in property <VideoSyncView> panel-sync;
+    in property <string> panel-transition-label;
+    in property <int> panel-transition-preview-index: -1;
+    in property <SecondsFieldView> panel-transition-duration;
+    in property <SecondsFieldView> panel-continuity-threshold;
+
     callback select-tool(DrawerTool);
+    callback load-videos();
+    callback remove-video(id: string);
+    callback locate-video(id: string);
+    callback sync-video(id: string);
+    callback set-creation-source(id: string, source: string);
+    callback set-applies-timezone(id: string, applies: bool);
+    callback set-segment-included(id: string, key: string, included: bool);
+    callback set-segment-overlay(id: string, key: string, shows: bool);
+    callback remove-segment(id: string, key: string);
+    callback seek-segment(id: string, key: string);
+    callback sync-all-videos();
+    callback panel-reset-creation-times();
+    callback panel-filename-creation-times();
+    callback panel-set-utc(utc: bool);
+    callback remove-all-videos();
+    callback select-card(id: string);
     callback set-pinned(bool);
     callback dismiss-overlay();
     callback load-activity();
