@@ -127,6 +127,8 @@ impl ActivitySummary {
 pub struct MediaSlice {
     pub error_message: Option<String>,
     pub is_processing: bool,
+    /// `importingVideo`: a quiet import (one video into an empty collection) runs.
+    pub importing_video: bool,
     pub activity_source: Option<ActivitySource>,
     pub activity_summary: Option<ActivitySummary>,
     /// The external activity file; embedded video telemetry stays on each imported video (Phase 6).

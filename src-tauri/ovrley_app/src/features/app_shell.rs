@@ -398,27 +398,34 @@ fn finish_activity_import(store: &mut Store, path: String, result: Result<Import
 }
 
 /// `activateParsedActivity`: the activity, its whole-second duration as the timeline (an oddity
-/// kept: the video telemetry path does not floor), and course widgets sized to the route.
+/// kept: the video telemetry path does not floor), and course widgets sized to the route. The
+/// videos are placed against it (`activateActivityFile`).
 pub fn activate_parsed_activity(store: &mut Store, source: ActivitySource, imported: ImportedActivity) {
     let activity = std::sync::Arc::clone(&imported.activity);
     store.media.set_activity_source(Some(source));
     store.media.activate_activity_file(imported);
     clear_activity_lane_selection(store);
+    crate::store::slices::video_import::place_videos_for_activity(store);
     let duration = activity.metadata.get("duration_seconds").and_then(serde_json::Value::as_f64).unwrap_or_default();
     if !(duration.is_finite() && duration > 0.0) {
         return;
     }
     let whole = duration.floor();
-    let editor = &mut store.editor;
-    editor.set_fallback_duration_seconds(whole);
-    editor.set_selected_second(0.0);
+    store.editor.set_fallback_duration_seconds(whole);
+    store.editor.set_selected_second(0.0);
+    apply_course_plot_dimensions(store, &activity.sample_course_points);
+}
+
+/// `applyCoursePlotDimensions`: course widgets sized to a route.
+pub fn apply_course_plot_dimensions(store: &mut Store, course_points: &[(Option<f64>, Option<f64>)]) {
     let sizing = ovrley_widgets::model::catalog::catalog()
         .require_widget("course")
         .expect("the catalog defines course")
         .course_sizing
         .expect("course declares its sizing");
+    let editor = &mut store.editor;
     if editor.config.plots.iter().any(|plot| plot.get("value").and_then(serde_json::Value::as_str) == Some("course")) {
-        if let Some((width, height)) = course_widget_dimensions(&activity.sample_course_points, sizing.max_dimension, sizing.min_dimension) {
+        if let Some((width, height)) = course_widget_dimensions(course_points, sizing.max_dimension, sizing.min_dimension) {
             let config = std::rc::Rc::make_mut(&mut editor.config);
             for plot in config.plots.iter_mut().filter(|plot| plot.get("value").and_then(serde_json::Value::as_str) == Some("course")) {
                 plot.insert("width".into(), number(width));
@@ -435,11 +442,12 @@ pub fn delete_activity(store: &mut Store) -> Result<(), String> {
     }
     store.media.clear_activity_file(true);
     clear_activity_lane_selection(store);
+    crate::store::slices::video_import::place_videos_for_activity(store);
     Ok(())
 }
 
 /// `activateActivityFile` and `clearActivityFile`: the activity lane's selection belongs to the
-/// replaced activity. Placing the videos again (`computeVideoSync`) arrives with Phase 6.
+/// replaced activity.
 fn clear_activity_lane_selection(store: &mut Store) {
     use crate::store::slices::video_import::ClipLane;
     if store.video_import.selected_clip.as_ref().is_some_and(|selection| selection.lane == ClipLane::Activity) {

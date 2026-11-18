@@ -43,6 +43,8 @@ pub struct Store {
     pub video_import: VideoImportSlice,
     /// `createRenderSettingsSlice`'s state (phase 4 D15).
     pub render_settings: RenderSettings,
+    /// `createManualVideoSyncSlice`'s durable state; Phase 8 adds the rest.
+    pub manual_video_sync: ovrley_core::media::manual_video_sync::ManualVideoSync,
     /// `createBatchRenderSlice`'s output folder, which projects save.
     pub batch_render: slices::batch_render::BatchRenderSlice,
     /// The timeline filmstrips (phase 4 D12).
