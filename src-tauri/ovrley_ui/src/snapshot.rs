@@ -84,6 +84,40 @@ fn tour() -> Vec<Step> {
             store.layout.dismiss_left_drawer_overlay();
             change_language_preference(store, services, Locale::En);
         }),
+        // The render dialog (Phase 7): the settings without videos, a single render's progress
+        // (a session set as acceptance sets it), the settings with two videos, the mismatch screen.
+        ("render-settings", |store, services| ovrley_app::features::render_video::open_render_dialog(store, services)),
+        ("render-progress", |store, _| {
+            store.render_dialog.phase = ovrley_app::features::render_video::DialogPhase::Progress;
+            store.media.start_render_session(999, "/tmp/overlay.mov".into(), "Starting render...".into());
+            store.media.render_progress = ovrley_core::debug::RenderProgress {
+                render_id: 999,
+                busy: true,
+                current: 1234,
+                total: 3000,
+                rendered: 1234,
+                status: ovrley_core::debug::RenderStatus::Rendering,
+                rendering_fps: Some(47.3),
+                estimated_seconds_remaining: Some(125),
+                ..Default::default()
+            };
+        }),
+        ("render-videos", |store, services| {
+            store.media.clear_render_session();
+            store.render_dialog.phase = ovrley_app::features::render_video::DialogPhase::Closed;
+            ovrley_app::features::render_video::close_render_dialog(store);
+            snapshot_videos(store, &[(3840, 2160, 0.0), (3840, 2160, 90.0)]);
+            ovrley_app::features::render_video::open_render_dialog(store, services);
+        }),
+        ("render-mismatch", |store, services| {
+            ovrley_app::features::render_video::close_render_dialog(store);
+            snapshot_videos(store, &[(1920, 1080, 0.0)]);
+            ovrley_app::features::render_video::open_render_dialog(store, services);
+        }),
+        ("render-closed", |store, _| {
+            ovrley_app::features::render_video::close_render_dialog(store);
+            snapshot_videos(store, &[]);
+        }),
     ];
     let mut tour: Vec<Step> = steps.into_iter().map(|(name, action)| (name, StepKind::Action(action))).collect();
     tour.push(("widgets-tab", StepKind::WidgetsTab));
@@ -141,6 +175,29 @@ fn tour() -> Vec<Step> {
     tour.push(("fullscreen", StepKind::Fullscreen));
     tour.push(("fullscreen-left", StepKind::Fullscreen));
     tour
+}
+
+/// Videos of the given display size and offset, on the timeline without files: the render dialog
+/// shows them; their inspection fails, as for a moved file.
+fn snapshot_videos(store: &mut Store, videos: &[(u32, u32, f64)]) {
+    use ovrley_core::media::video_edits::VideoEdits;
+    let mut imported = Vec::new();
+    let mut edits = std::collections::BTreeMap::new();
+    for (index, (width, height, offset)) in videos.iter().enumerate() {
+        let metadata = ovrley_core::media::SourceVideoMetadata {
+            path: format!("/snapshot/clip-{index}.mp4"),
+            duration: Some(60.0),
+            fps_num: Some(30),
+            fps_den: Some(1),
+            resolution: Some(ovrley_core::media::Resolution { width: (*width).into(), height: (*height).into() }),
+            ..Default::default()
+        };
+        let video = ovrley_app::lib::video_program::create_imported_video(&metadata, format!("clip-{index}"), index as u32, Vec::new()).expect("snapshot videos are valid");
+        edits.insert(video.id.clone(), VideoEdits { offset_seconds: *offset, ..VideoEdits::default() });
+        imported.push(video);
+    }
+    store.video_import.video_edits = std::rc::Rc::new(edits);
+    store.video_import.imported_videos = std::rc::Rc::new(imported);
 }
 
 /// Replaces the document with one `kind` widget in `display`, its variant patched with `variant`,

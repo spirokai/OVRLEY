@@ -17,6 +17,8 @@ import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.s
 import { VideoPanel } from "../features/toolbar/video-panel.slint";
 import { Projects, ProjectNoticeKind } from "../features/projects/index.slint";
 import { StartupProjectsDialog, MissingSourceDialog, ProjectNoticeDialog, ProjectUnsavedDialog } from "../features/projects/project-dialogs.slint";
+import { RenderVideo } from "../features/render-video/index.slint";
+import { RenderVideoDialog, RenderOverwriteDialog, RenderMissingVideosNotice } from "../features/render-video/render-video-dialog.slint";
 
 // The composition root that `App.jsx` is (D5): the header, then the drawer layout with the
 // workspace and the control panel, then the dialogs. Window chrome per platform (D9): on macOS the
@@ -215,6 +217,18 @@ export component AppWindow inherits FluidWindow {
     property <bool> project-dialog-open: Projects.confirm-open || Projects.startup-open || Projects.missing-open || Projects.notice != ProjectNoticeKind.none;
 
     CutRemovalDialog { }
+
+    // The render dialog, its overwrite question and the missing-videos notice (Phase 7 D4).
+    RenderVideoDialog { }
+    RenderOverwriteDialog { }
+    RenderMissingVideosNotice { }
+
+    changed render-dialog-open => {
+        if !self.render-dialog-open {
+            keys.focus();
+        }
+    }
+    property <bool> render-dialog-open: RenderVideo.open || RenderVideo.overwrite-open || RenderVideo.missing-open;
 
     VideoImportDialog { }
 

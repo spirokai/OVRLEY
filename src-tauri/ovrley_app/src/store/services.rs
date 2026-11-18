@@ -288,6 +288,11 @@ pub trait RenderService: Send + Sync {
     fn cancel_batch(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError>;
     /// Whether the renderer is reserved: a render, its preparation or its cleanup runs.
     fn busy(&self) -> bool;
+    /// The single render's latest progress, read once after acceptance: events published before
+    /// the session started in the store were dropped as another render's.
+    fn progress(&self) -> ovrley_core::debug::RenderProgress;
+    /// A batch's latest snapshot, read once after acceptance for the same reason.
+    fn batch_snapshot(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError>;
     /// A new inspection session's id.
     fn create_inspection(&self) -> String;
     fn dispose_inspection(&self, inspection_id: &str);
@@ -356,6 +361,14 @@ impl RenderService for NativeRenderService {
 
     fn busy(&self) -> bool {
         self.execution.progress().busy
+    }
+
+    fn progress(&self) -> ovrley_core::debug::RenderProgress {
+        self.execution.progress()
+    }
+
+    fn batch_snapshot(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError> {
+        self.execution.batch_snapshot(batch_id)
     }
 
     fn create_inspection(&self) -> String {
@@ -682,6 +695,9 @@ pub mod fakes {
         pub sources: Mutex<std::collections::HashMap<String, Result<String, String>>>,
         pub cancel_snapshot: Mutex<Option<BatchSnapshot>>,
         pub busy: std::sync::atomic::AtomicBool,
+        /// What `progress` and `batch_snapshot` read.
+        pub progress: Mutex<ovrley_core::debug::RenderProgress>,
+        pub batch_snapshots: Mutex<std::collections::HashMap<String, BatchSnapshot>>,
         next_id: std::sync::atomic::AtomicU64,
     }
 
@@ -697,6 +713,8 @@ pub mod fakes {
                 sources: Mutex::default(),
                 cancel_snapshot: Mutex::default(),
                 busy: Default::default(),
+                progress: Mutex::default(),
+                batch_snapshots: Mutex::default(),
                 next_id: std::sync::atomic::AtomicU64::new(1),
             }
         }
@@ -745,6 +763,14 @@ pub mod fakes {
 
         fn busy(&self) -> bool {
             self.busy.load(std::sync::atomic::Ordering::SeqCst)
+        }
+
+        fn progress(&self) -> ovrley_core::debug::RenderProgress {
+            self.progress.lock().unwrap().clone()
+        }
+
+        fn batch_snapshot(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError> {
+            self.batch_snapshots.lock().unwrap().get(batch_id).cloned().ok_or_else(|| BatchServiceError::UnknownBatch { message: batch_id.into() })
         }
 
         fn create_inspection(&self) -> String {

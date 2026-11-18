@@ -17,10 +17,7 @@ use crate::features::widget_editor::blocks::{
 use crate::features::widget_editor::rules::{js_number, Input};
 use crate::features::widget_editor::{font_options, request_font_capabilities};
 use crate::i18n::{catalog as translations, Locale};
-use crate::lib::update_rate::{
-    fps_mode_value, normalize_update_rate_for_fps, sanitize_integer_fps, update_rate_options,
-    PRESET_FPS_VALUES,
-};
+use crate::lib::update_rate::{normalize_update_rate_for_fps, update_rate_options};
 use crate::lib::video_program::collection::derive_compatibility;
 use crate::store::services::Services;
 use crate::store::slices::template::{
@@ -127,8 +124,8 @@ impl std::fmt::Debug for PendingFontEdit {
 pub struct SceneSettingsState {
     /// The scene size the user picked Custom resolution at (`customResolutionAnchor`).
     custom_resolution_anchor: Option<(u64, u64)>,
-    /// The frame rate the user picked Custom fps at (`customFpsAnchor`).
-    custom_fps_anchor: Option<u32>,
+    /// `useFpsMode`: the frame rate the user picked Custom fps at.
+    fps_mode: crate::lib::update_rate::FpsMode,
     /// The newest label-font edit, until its family's capabilities arrive.
     pending_font: Option<PendingFontEdit>,
 }
@@ -182,11 +179,7 @@ fn resolution_id(store: &Store) -> String {
 
 /// `useFpsMode`'s mode.
 fn fps_mode(store: &Store) -> String {
-    let fps = store.render_settings.fps;
-    match store.scene_settings.custom_fps_anchor {
-        Some(anchor) if f64::from(anchor) == fps => "custom".into(),
-        _ => fps_mode_value(fps),
-    }
+    store.scene_settings.fps_mode.value(store.render_settings.fps)
 }
 
 fn select(id: &str, label: String, value: String, options: Vec<OptionView>) -> Cell {
@@ -855,18 +848,13 @@ pub fn edit(
         }
         "framerate" => {
             let mode = text(&input)?;
-            if mode == "custom" {
-                store.scene_settings.custom_fps_anchor =
-                    Some(sanitize_integer_fps(store.render_settings.fps));
-                return Ok(());
+            match store.scene_settings.fps_mode.select(&mode, store.render_settings.fps) {
+                Some(fps) => set_fps(store, fps),
+                None => Ok(()),
             }
-            store.scene_settings.custom_fps_anchor = None;
-            set_fps(store, sanitize_integer_fps(js_number(&mode)))
         }
         "custom_fps" => {
-            let fps = sanitize_integer_fps(js_number(&text(&input)?));
-            store.scene_settings.custom_fps_anchor =
-                (!PRESET_FPS_VALUES.contains(&fps)).then_some(fps);
+            let fps = store.scene_settings.fps_mode.custom(js_number(&text(&input)?));
             set_fps(store, fps)
         }
         "update_rate" => {

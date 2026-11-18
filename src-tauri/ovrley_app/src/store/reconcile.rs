@@ -33,6 +33,9 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     crate::features::video_preview::filmstrips::reconcile_filmstrips(store, services);
     // 6. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame (D9).
     crate::features::widget_preview::reconcile_widget_preview(store);
+    // 7. The render dialog: its codec and update-rate rules, the inspection and the export review
+    //    (Phase 7 D4, D5).
+    crate::features::render_video::reconcile_render_dialog(store, services);
     // The plan's language step is not needed: `change_language_preference` validates, applies and
     // persists `lng` itself, as React's does, and every path (Settings, MCP) goes through it.
 }

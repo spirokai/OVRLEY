@@ -150,9 +150,9 @@ pub fn change_video_collection<R>(store: &mut Store, replaced_video_ids: &[&str]
 }
 
 /// Whether history commands are available: not while a confirmation dialog or the cut removal
-/// question is open (`useUndoRedo({disabled})`). The render dialog joins in Phase 7.
+/// question or the render dialog is open (`useUndoRedo({disabled})`).
 pub fn history_enabled(store: &Store) -> bool {
-    !store.unsaved_confirm.is_open() && store.video_import.cut_removal_request.is_none()
+    !store.unsaved_confirm.is_open() && store.video_import.cut_removal_request.is_none() && store.render_dialog.phase == crate::features::render_video::DialogPhase::Closed
 }
 
 /// `undoHistory`. Returns whether a state was restored.

@@ -27,6 +27,42 @@ pub fn fps_mode_value(fps: f64) -> String {
     PRESET_FPS_VALUES.iter().find(|preset| **preset as f64 == fps).map_or_else(|| "custom".to_string(), u32::to_string)
 }
 
+/// `useFpsMode`'s state: the rate a user typed as custom, kept while the fps stays at it, so a
+/// custom rate equal to a preset still shows as custom. The scene settings and the render dialog
+/// each hold one.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FpsMode {
+    custom_anchor: Option<u32>,
+}
+
+impl FpsMode {
+    /// The select's value: `custom` while the anchor holds, else the preset or `custom`.
+    pub fn value(self, fps: f64) -> String {
+        match self.custom_anchor {
+            Some(anchor) if f64::from(anchor) == fps => "custom".into(),
+            _ => fps_mode_value(fps),
+        }
+    }
+
+    /// The select changed: `custom` anchors the current rate and keeps it; a preset clears the
+    /// anchor and is the new rate.
+    pub fn select(&mut self, mode: &str, current_fps: f64) -> Option<u32> {
+        if mode == "custom" {
+            self.custom_anchor = Some(sanitize_integer_fps(current_fps));
+            return None;
+        }
+        self.custom_anchor = None;
+        Some(sanitize_integer_fps(mode.parse::<f64>().unwrap_or(f64::NAN)))
+    }
+
+    /// The custom field changed: the typed rate, anchored unless it is a preset.
+    pub fn custom(&mut self, typed: f64) -> u32 {
+        let fps = sanitize_integer_fps(typed);
+        self.custom_anchor = (!PRESET_FPS_VALUES.contains(&fps)).then_some(fps);
+        fps
+    }
+}
+
 /// `getUpdateRateOptions`: the update-rate divisors of a frame rate, full rate included.
 pub fn update_rate_options(fps: f64) -> Vec<u32> {
     let fps = sanitize_integer_fps(fps);

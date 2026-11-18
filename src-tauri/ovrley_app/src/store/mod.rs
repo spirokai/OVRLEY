@@ -63,6 +63,8 @@ pub struct Store {
     pub player: crate::features::player::PlayerState,
     /// The editor history (D6).
     pub history: EditorHistory,
+    /// `useRenderWorkflow` and the render dialog's hooks (Phase 7 D4, D5).
+    pub render_dialog: crate::features::render_video::RenderDialogState,
     /// `useProjectLifecycle` and `useProjectDocumentState` (Phase 6A D11).
     pub projects: crate::features::projects::ProjectLifecycleState,
     /// `useUnsavedChangesConfirm` (D15).

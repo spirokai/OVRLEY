@@ -1,0 +1,250 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant } from "../../components/button.slint";
+import { Dialog, DialogTitle, DialogDescription } from "../../components/dialog.slint";
+import { DialogPanel } from "../app-shell/dialogs.slint";
+import { RenderVideo } from "index.slint";
+import { RenderExportSettings } from "render-export-settings.slint";
+import { RenderProgressPanel, BatchRenderQueue, SpinningLoader } from "render-progress-panel.slint";
+
+// `BatchReviewAlerts`: why one combined file cannot be rendered, then the inspection's error, as
+// `text-xs` `red-700` lines.
+component ReviewAlerts inherits VerticalLayout {
+    spacing: 0.25rem;
+    for blocker in RenderVideo.blockers: AppText {
+        content: blocker;
+        font-size: Theme.text-xs * 1rem;
+        color: #b91c1c;
+        wrap: word-wrap;
+    }
+    if RenderVideo.review-error != "": AppText {
+        content: RenderVideo.review-error;
+        font-size: Theme.text-xs * 1rem;
+        color: #b91c1c;
+        wrap: word-wrap;
+    }
+}
+
+// The resolution mismatch screen: the triangle (`h-10`, `red-500`), the message in bold red, the
+// instructions in muted text (left-aligned: Slint has no justified text), and Cancel.
+component MismatchScreen inherits VerticalLayout {
+    padding: 0.75rem;
+    spacing: 3rem;
+    VerticalLayout {
+        spacing: 2rem;
+        HorizontalLayout {
+            spacing: 0.75rem;
+            alignment: start;
+            Icon {
+                glyph: Icons.triangle-alert;
+                size: 2.5rem;
+                color: #ef4444;
+            }
+            AppText {
+                horizontal-stretch: 1;
+                content: RenderVideo.mismatch;
+                font-size: Theme.text-sm * 1rem;
+                font-weight: Theme.font-weight-bold;
+                color: #ef4444;
+                wrap: word-wrap;
+            }
+        }
+        AppText {
+            content: @tr("render-video.resolutionMismatchInstructions" => "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template.");
+            font-size: Theme.text-sm * 1rem;
+            color: Theme.muted-foreground;
+            wrap: word-wrap;
+        }
+    }
+    HorizontalLayout {
+        alignment: end;
+        Button {
+            variant: ButtonVariant.outline;
+            text: @tr("render-video.cancel" => "Cancel");
+            clicked => {
+                RenderVideo.close();
+            }
+        }
+    }
+}
+
+// A video export's footer: Close or Cancel ("Cancelling..."), and Start Render or "Rendering..."
+// with a spinner, hidden once the export finished.
+component VideoFooter inherits HorizontalLayout {
+    spacing: 0.75rem;
+    alignment: end;
+    Button {
+        variant: ButtonVariant.outline;
+        text: RenderVideo.close-text;
+        disabled: RenderVideo.close-disabled;
+        clicked => {
+            if RenderVideo.start-running {
+                RenderVideo.cancel-render();
+            } else {
+                RenderVideo.close();
+            }
+        }
+    }
+    if RenderVideo.show-start: Button {
+        icon: RenderVideo.start-running ? "" : Icons.play;
+        text: RenderVideo.start-running ? @tr("render-video.rendering" => "Rendering...") : @tr("render-video.startRender" => "Start Render");
+        disabled: RenderVideo.start-disabled;
+        clicked => {
+            RenderVideo.start();
+        }
+        if RenderVideo.start-running: SpinningLoader {
+            color: Theme.primary-foreground;
+        }
+    }
+}
+
+// `RenderVideoDialog`: `max-w-xl`, or `max-w-6xl` while the video list shows beside the progress;
+// the card with a 80% accent border and 1.5rem padding. A single render's progress, the mismatch
+// screen, or the settings (with videos: their alerts and footer). Escape and the scrim close it
+// unless a render runs or a submission is pending.
+export component RenderVideoDialog {
+    Dialog {
+        open: RenderVideo.open;
+        title: RenderVideo.progress-phase ? @tr("render-video.exportingOverlay" => "Exporting Overlay") : @tr("render-video.exportSettings" => "Export Settings");
+        open-changed(open) => {
+            if !open && RenderVideo.dismissable {
+                RenderVideo.close();
+            }
+        }
+        DialogPanel {
+            max-width: RenderVideo.wide ? 72rem : 36rem;
+            preferred-width: RenderVideo.wide ? 72rem : 36rem;
+            VerticalLayout {
+                padding: 1.5rem;
+                if RenderVideo.progress-phase: RenderProgressPanel {
+                    view: RenderVideo.progress;
+                }
+                if !RenderVideo.progress-phase && RenderVideo.mismatch != "": MismatchScreen { }
+                if !RenderVideo.progress-phase && RenderVideo.mismatch == "": VerticalLayout {
+                    spacing: 3rem;
+                    HorizontalLayout {
+                        spacing: 3rem;
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            min-height: RenderVideo.show-batch-progress && RenderVideo.wide ? 37.5rem : 0px;
+                            alignment: center;
+                            if RenderVideo.show-batch-progress: RenderProgressPanel {
+                                view: RenderVideo.progress;
+                            }
+                            if !RenderVideo.show-batch-progress: RenderExportSettings { }
+                        }
+                        if RenderVideo.wide: VerticalLayout {
+                            horizontal-stretch: 1;
+                            padding-top: 1rem;
+                            BatchRenderQueue {
+                                vertical-stretch: 1;
+                            }
+                        }
+                    }
+                    if RenderVideo.has-videos && !RenderVideo.show-batch-progress: ReviewAlerts { }
+                    if RenderVideo.has-videos: VideoFooter { }
+                }
+            }
+        }
+    }
+}
+
+// The overwrite question: `max-w-md`, the title `text-sm` semibold, the path `text-xs` muted
+// (wrapping anywhere), Cancel (outline) and Overwrite.
+export component RenderOverwriteDialog {
+    Dialog {
+        open: RenderVideo.overwrite-open;
+        title: @tr("render-video.overwriteExistingFile" => "Overwrite existing file?");
+        description: RenderVideo.overwrite-path;
+        open-changed(open) => {
+            if !open {
+                RenderVideo.cancel-overwrite();
+            }
+        }
+        DialogPanel {
+            max-width: 28rem;
+            preferred-width: 28rem;
+            VerticalLayout {
+                padding: 1.5rem;
+                DialogTitle {
+                    content: @tr("render-video.overwriteExistingFile" => "Overwrite existing file?");
+                    font-size: Theme.text-sm * 1rem;
+                    font-weight: Theme.font-weight-semibold;
+                }
+                HorizontalLayout {
+                    padding-top: 0.75rem;
+                    AppText {
+                        content: RenderVideo.overwrite-path;
+                        font-size: Theme.text-xs * 1rem;
+                        color: Theme.muted-foreground;
+                        wrap: char-wrap;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 1.5rem;
+                    spacing: 0.75rem;
+                    alignment: end;
+                    Button {
+                        variant: ButtonVariant.outline;
+                        text: @tr("render-video.cancel" => "Cancel");
+                        clicked => {
+                            RenderVideo.cancel-overwrite();
+                        }
+                    }
+                    Button {
+                        text: @tr("render-video.overwrite" => "Overwrite");
+                        clicked => {
+                            RenderVideo.confirm-overwrite();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The missing-videos notice, laid out as the projects' notice: the title (`text-lg` bold), the
+// description (`text-sm` muted) and OK.
+export component RenderMissingVideosNotice {
+    Dialog {
+        open: RenderVideo.missing-open;
+        title: RenderVideo.missing-title;
+        description: RenderVideo.missing-description;
+        open-changed(open) => {
+            if !open {
+                RenderVideo.dismiss-missing();
+            }
+        }
+        DialogPanel {
+            max-width: 32rem;
+            preferred-width: 32rem;
+            VerticalLayout {
+                padding: 1.5rem;
+                DialogTitle {
+                    content: RenderVideo.missing-title;
+                    font-size: Theme.text-lg * 1rem;
+                    font-weight: Theme.font-weight-bold;
+                }
+                HorizontalLayout {
+                    padding-top: 0.5rem;
+                    DialogDescription {
+                        content: RenderVideo.missing-description;
+                            font-size: Theme.text-sm * 1rem;
+                        color: Theme.muted-foreground;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 1.5rem;
+                    alignment: end;
+                    Button {
+                        text: @tr("projects.ok" => "OK");
+                        clicked => {
+                            RenderVideo.dismiss-missing();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

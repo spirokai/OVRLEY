@@ -1,0 +1,385 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant } from "../../components/button.slint";
+import { BlurInput } from "../../components/blur-input.slint";
+import { Select } from "../../components/select.slint";
+import { Slider } from "../../components/slider.slint";
+import { Switch } from "../../components/switch.slint";
+import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import { GroupPosition } from "../../components/group-surface.slint";
+import { ChoiceKind } from "../../components/logic.slint";
+import { DialogTitle } from "../../components/dialog.slint";
+import { RenderVideo } from "index.slint";
+
+// A field label: 0.741rem bold uppercase, wide tracking, muted.
+component FieldLabel inherits AppText {
+    uppercase: true;
+    font-size: 0.741rem;
+    font-weight: Theme.font-weight-bold;
+    color: Theme.muted-foreground;
+}
+
+// `RenderExportSettings`, `space-y-8`.
+export component RenderExportSettings inherits VerticalLayout {
+    spacing: 2rem;
+
+    // The title row: the video icon, "Export Settings", and with videos Transparent / Full Video.
+    HorizontalLayout {
+        spacing: 1rem;
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            spacing: 0.75rem;
+            alignment: start;
+            Icon {
+                glyph: Icons.video;
+                size: 1rem;
+                color: Theme.primary;
+            }
+            DialogTitle {
+                content: @tr("render-video.exportSettings" => "Export Settings");
+                vertical-alignment: center;
+                font-size: Theme.text-sm * 1rem;
+                font-weight: Theme.font-weight-semibold;
+            }
+        }
+        if RenderVideo.show-export-mode: TabsList {
+            height: 1.75rem;
+            variant: TabsListVariant.toolbar;
+            trigger-variant: TabsTriggerVariant.toolbar;
+            background: Theme.surface;
+            trigger-font-size: 0.741rem;
+            items: [
+                { kind: ChoiceKind.item, value: "transparent", label: @tr("render-video.transparent" => "Transparent"), disabled: RenderVideo.locked },
+                { kind: ChoiceKind.item, value: "composite", label: @tr("render-video.fullVideo" => "Full Video"), disabled: RenderVideo.locked },
+            ];
+            value: RenderVideo.composite ? "composite" : "transparent";
+            value-changed(value) => {
+                RenderVideo.set-composite(value == "composite");
+            }
+        }
+    }
+
+    // With more than one video: one combined file or one file per video.
+    if RenderVideo.show-output-modes: TabsList {
+        height: 2rem;
+        stretch: true;
+        background: Theme.surface;
+        list-padding: 0.125rem;
+        trigger-font-size: 0.741rem;
+        items: [
+            { kind: ChoiceKind.item, value: "combined", label: @tr("render-video.combinedOutput" => "One video file"), disabled: RenderVideo.locked },
+            { kind: ChoiceKind.item, value: "separate", label: @tr("render-video.separateOutputs" => "Separate files"), disabled: RenderVideo.locked },
+        ];
+        value: RenderVideo.separate ? "separate" : "combined";
+        value-changed(value) => {
+            RenderVideo.set-separate(value == "separate");
+        }
+    }
+
+    VerticalLayout {
+        spacing: 2rem;
+
+        // Framerate: the select, or the locked box.
+        VerticalLayout {
+            spacing: 0.5rem;
+            FieldLabel {
+                content: @tr("render-video.framerate" => "Framerate");
+            }
+            if RenderVideo.fps-locked-text != "": Rectangle {
+                height: 2.25rem;
+                border-radius: Theme.radius-sm * 1rem;
+                border-width: 1px;
+                border-color: Theme.border.transparentize(0.3);
+                background: Theme.surface-elevated;
+                HorizontalLayout {
+                    padding-left: 0.75rem;
+                    padding-right: 0.75rem;
+                    AppText {
+                        vertical-alignment: center;
+                        content: RenderVideo.fps-locked-text;
+                        font-size: Theme.text-xs * 1rem;
+                        color: Theme.muted-foreground;
+                    }
+                }
+            }
+            if RenderVideo.fps-locked-text == "": Select {
+                font-size: Theme.text-xs * 1rem;
+                disabled: RenderVideo.locked;
+                items: [
+                    { kind: ChoiceKind.item, value: "24", label: "24 fps" },
+                    { kind: ChoiceKind.item, value: "30", label: "30 fps" },
+                    { kind: ChoiceKind.item, value: "60", label: "60 fps" },
+                    { kind: ChoiceKind.item, value: "custom", label: @tr("render-video.custom" => "Custom") },
+                ];
+                value: RenderVideo.fps-mode;
+                value-changed(value) => {
+                    RenderVideo.select-fps-mode(value);
+                }
+            }
+        }
+
+        if RenderVideo.fps-locked-text == "" && RenderVideo.fps-mode == "custom": VerticalLayout {
+            spacing: 0.5rem;
+            FieldLabel {
+                content: @tr("render-video.customFps" => "Custom FPS");
+            }
+            BlurInput {
+                height: 2.25rem;
+                number: true;
+                constraints: { has-min: true, min: 1, step: "1" };
+                value: RenderVideo.fps;
+                font-size: Theme.text-xs * 1rem;
+                disabled: RenderVideo.locked;
+                changed(value) => {
+                    RenderVideo.set-custom-fps(value);
+                }
+            }
+        }
+
+        // Widget Update Rate: a tab per option, the container rate below.
+        VerticalLayout {
+            spacing: 0.75rem;
+            AppText {
+                content: @tr("render-video.widgetUpdateRate" => "Widget Update Rate");
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-semibold;
+            }
+            TabsList {
+                height: 2rem;
+                stretch: true;
+                background: Theme.surface;
+                list-padding: 0.125rem;
+                trigger-font-size: 0.741rem;
+                items: RenderVideo.update-rates;
+                value: RenderVideo.update-rate;
+                value-changed(value) => {
+                    RenderVideo.set-update-rate(value);
+                }
+            }
+            if RenderVideo.container-fps-text != "": AppText {
+                content: RenderVideo.container-fps-text;
+                font-size: 0.741rem;
+                color: Theme.muted-foreground;
+            }
+        }
+
+        // Codec / Output Format and Hardware Acceleration, in two columns.
+        HorizontalLayout {
+            spacing: 1rem;
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 0.5rem;
+                FieldLabel {
+                    content: @tr("render-video.codecOutputFormat" => "Codec / Output Format");
+                }
+                Select {
+                    font-size: Theme.text-xs * 1rem;
+                    disabled: RenderVideo.locked;
+                    items: RenderVideo.formats;
+                    value: RenderVideo.format;
+                    value-changed(value) => {
+                        RenderVideo.select-format(value);
+                    }
+                }
+            }
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 0.5rem;
+                FieldLabel {
+                    content: @tr("render-video.hardwareAcceleration" => "Hardware Acceleration");
+                }
+                Select {
+                    font-size: Theme.text-xs * 1rem;
+                    disabled: RenderVideo.locked;
+                    items: RenderVideo.accelerations;
+                    value: RenderVideo.acceleration;
+                    value-changed(value) => {
+                        RenderVideo.select-acceleration(value);
+                    }
+                }
+            }
+        }
+
+        // With an MP4 codec: Quality / Bitrate, the value chip, the ends and the slider.
+        if RenderVideo.show-quality: VerticalLayout {
+            spacing: 0.75rem;
+            HorizontalLayout {
+                TabsList {
+                    height: 1.75rem;
+                    variant: TabsListVariant.toolbar;
+                    trigger-variant: TabsTriggerVariant.toolbar;
+                    background: Theme.surface;
+                    trigger-font-size: 0.741rem;
+                    items: [
+                        { kind: ChoiceKind.item, value: "quality", label: @tr("render-video.quality" => "Quality") },
+                        { kind: ChoiceKind.item, value: "bitrate", label: @tr("render-video.bitrate" => "Bitrate") },
+                    ];
+                    value: RenderVideo.bitrate ? "bitrate" : "quality";
+                    value-changed(value) => {
+                        RenderVideo.set-bitrate(value == "bitrate");
+                    }
+                }
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        border-radius: Theme.radius-xs * 1rem;
+                        background: Theme.surface-strong;
+                        HorizontalLayout {
+                            padding-left: 0.5rem;
+                            padding-right: 0.5rem;
+                            padding-top: 0.125rem;
+                            padding-bottom: 0.125rem;
+                            AppText {
+                                content: RenderVideo.quality-label;
+                                font-size: 0.741rem;
+                                font-weight: Theme.font-weight-semibold;
+                                color: Theme.muted-foreground;
+                            }
+                        }
+                    }
+                }
+            }
+            HorizontalLayout {
+                AppText {
+                    horizontal-stretch: 1;
+                    content: RenderVideo.bitrate ? @tr("render-video.smallerFile" => "Smaller file") : @tr("render-video.worse" => "Worse");
+                    font-size: 0.741rem;
+                    color: Theme.muted-foreground.transparentize(0.3);
+                }
+                AppText {
+                    content: RenderVideo.bitrate ? @tr("render-video.largerFile" => "Larger file") : @tr("render-video.better" => "Better");
+                    font-size: 0.741rem;
+                    color: Theme.muted-foreground.transparentize(0.3);
+                }
+            }
+            Slider {
+                minimum: RenderVideo.slider-minimum;
+                maximum: RenderVideo.slider-maximum;
+                step: RenderVideo.slider-step;
+                value: RenderVideo.slider-value;
+                disabled: RenderVideo.locked;
+                value-changed(value) => {
+                    RenderVideo.set-quality(value);
+                }
+            }
+        }
+
+        // "Render full activity", in half the width.
+        if RenderVideo.show-full-activity: HorizontalLayout {
+            spacing: 1rem;
+            HorizontalLayout {
+                horizontal-stretch: 1;
+                spacing: 1rem;
+                AppText {
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                    content: @tr("render-video.renderFullActivity" => "Render full activity");
+                    font-size: Theme.text-xs * 1rem;
+                    font-weight: Theme.font-weight-medium;
+                }
+                Switch {
+                    checked: RenderVideo.full-activity;
+                    disabled: RenderVideo.locked;
+                    checked-changed(checked) => {
+                        RenderVideo.set-full-activity(checked);
+                    }
+                }
+            }
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+        }
+
+        // The output: the folder for separate files, else the file and its browse button.
+        if RenderVideo.show-folder: VerticalLayout {
+            spacing: 0.5rem;
+            FieldLabel {
+                content: @tr("render-video.outputFolder" => "Output folder");
+            }
+            Button {
+                height: 2.25rem;
+                variant: ButtonVariant.outline;
+                icon: Icons.folder-open;
+                icon-size: 0.875rem;
+                text: RenderVideo.folder-text;
+                alignment: LayoutAlignment.start;
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-normal;
+                disabled: RenderVideo.locked;
+                clicked => {
+                    RenderVideo.pick-folder();
+                }
+            }
+            if RenderVideo.path-error != "": AppText {
+                content: RenderVideo.path-error;
+                font-size: Theme.text-xs * 1rem;
+                color: #b91c1c;
+                wrap: word-wrap;
+            }
+        }
+        if !RenderVideo.show-folder: VerticalLayout {
+            spacing: 0.5rem;
+            FieldLabel {
+                content: @tr("render-video.outputFile" => "Output file");
+            }
+            HorizontalLayout {
+                BlurInput {
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                    preferred-width: 100%;
+                    height: 2.25rem;
+                    value: RenderVideo.output-path;
+                    font-size: Theme.text-xs * 1rem;
+                    label: @tr("render-video.outputPath" => "Output path");
+                    changed(value) => {
+                        RenderVideo.commit-output-path(value);
+                    }
+                }
+                Button {
+                    height: 2.25rem;
+                    horizontal-stretch: 0;
+                    variant: ButtonVariant.outline;
+                    icon: Icons.folder-open;
+                    group-position: GroupPosition.last;
+                    disabled: RenderVideo.browse-disabled;
+                    clicked => {
+                        RenderVideo.browse();
+                    }
+                }
+            }
+            if RenderVideo.path-error != "": AppText {
+                content: RenderVideo.path-error;
+                font-size: Theme.text-xs * 1rem;
+                color: #ef4444;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    // Without videos: Cancel and Start Render.
+    if RenderVideo.show-footer: HorizontalLayout {
+        padding-top: 0.5rem;
+        spacing: 0.75rem;
+        alignment: end;
+        Button {
+            variant: ButtonVariant.outline;
+            text: @tr("render-video.cancel" => "Cancel");
+            disabled: RenderVideo.cancel-disabled;
+            clicked => {
+                RenderVideo.close();
+            }
+        }
+        Button {
+            icon: Icons.play;
+            text: @tr("render-video.startRender" => "Start Render");
+            disabled: RenderVideo.settings-start-disabled;
+            clicked => {
+                RenderVideo.start();
+            }
+        }
+    }
+}

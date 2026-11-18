@@ -200,7 +200,7 @@ pub fn cancel_render(store: &mut Store, services: &mut Services, target: RenderT
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::store::services::fakes::{fake_services, FakeRenderCall};
     use crate::store::Dispatcher;

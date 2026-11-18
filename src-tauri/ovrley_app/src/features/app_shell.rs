@@ -80,8 +80,7 @@ impl TrafficLightInsetState {
 /// - Open overlays block app shortcuts (`hasOpenOverlay`): the settings dialog, and the unpinned
 ///   drawer's backdrop, except `drawer.toggle` while the drawer is that overlay. Keys do not reach
 ///   the window while a select, popover or dialog popup has focus, so those block by themselves.
-/// - Commands whose features have not arrived (render, output) are matched but not consumed, so
-///   they do not swallow the key.
+/// - The render dialog and its questions are overlays too (a Radix dialog in React).
 pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
     if input.repeat {
         return false;
@@ -90,7 +89,7 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
         return false;
     };
     let drawer_overlay = store.layout.is_unpinned_overlay();
-    let overlay_open = store.editor_shell.settings_open || drawer_overlay;
+    let overlay_open = store.editor_shell.settings_open || drawer_overlay || store.render_dialog.is_open();
     let command = found.command.id.as_str();
     if overlay_open && !(command == "drawer.toggle" && drawer_overlay && !store.editor_shell.settings_open) {
         return false;
@@ -139,6 +138,17 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
             crate::features::projects::save_project(store, services, command == "project.saveAs", None, Box::new(|_, _, _| {}));
             true
         }
+        "render.open" => {
+            if crate::features::render_video::render_disabled_reason(store).is_some() {
+                return false;
+            }
+            crate::features::render_video::open_render_dialog(store, services);
+            true
+        }
+        "output.open" => {
+            open_output_directory(store, services);
+            true
+        }
         "sync.auto" => {
             if !store.video_import.has_videos() || store.media.activity_summary.is_none() {
                 return false;
@@ -149,6 +159,16 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
             true
         }
         _ => false,
+    }
+}
+
+/// `handleOpenOutputDirectory`: the remembered render folder, else Downloads. A failure reports
+/// in English, as React does.
+pub fn open_output_directory(store: &mut Store, services: &mut Services) {
+    let opened = crate::lib::file_dialog::load_remembered_render_directory(services).and_then(|directory| services.render.open_output_directory(directory.as_deref()));
+    if let Err(error) = opened {
+        log::error!("Error opening render output directory: {error}");
+        store.media.set_error_message(format!("Failed to open render output folder: {error}"));
     }
 }
 
@@ -288,6 +308,7 @@ pub fn accepts_file_drops(store: &Store) -> bool {
     !store.editor_shell.settings_open
         && !store.unsaved_confirm.is_open()
         && !crate::features::projects::has_open_dialog(store)
+        && !store.render_dialog.is_open()
         && !AppBootstrapState::shows_startup_screen(store)
 }
 

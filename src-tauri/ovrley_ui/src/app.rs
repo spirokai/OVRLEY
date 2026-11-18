@@ -42,6 +42,7 @@ impl Projections {
         features::toolbar::project(&window, store);
         features::template_manager::project(&window, store);
         features::projects::project(&window, store);
+        features::render_video::project(&window, store);
         features::video_preview::project(&window, store);
         features::undo_redo::project(&window, store);
         self.overlay.project(&window, store);
@@ -82,6 +83,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::toolbar::bind(window, &dispatcher);
     features::template_manager::bind(window, &dispatcher);
     features::projects::bind(window, &dispatcher);
+    features::render_video::bind(window, &dispatcher);
     features::overlay_editor::bind(window, &dispatcher);
     features::player::bind(window, &dispatcher);
     features::undo_redo::bind(window, &dispatcher);
