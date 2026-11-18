@@ -5,6 +5,7 @@ import { FocusRing } from "focus-ring.slint";
 import { Shadow, ShadowSize } from "shadow.slint";
 import { GroupPosition, GroupSurface } from "group-surface.slint";
 import { OverlayMotion } from "overlay-motion.slint";
+import { HelpTooltip } from "help-tooltip.slint";
 import { Choice, ChoiceKind, ChoiceListLogic, ChoiceListMetrics, ItemAlignedPlacement, Placement, PlacementAlign, PlacementLogic, PlacementSide } from "logic.slint";
 
 export enum SelectSize { default, sm }
@@ -22,8 +23,10 @@ export enum SelectPosition { item-aligned, popper }
 // trigger; `popper` opens below, 0.25rem away. Items: 0.375rem vertical, 2rem right and 0.5rem
 // left padding, `text-xs`, uppercase (inherited in React), `rounded-xs`; highlighted
 // (hover or keyboard) in `accent` with `accent-foreground`; the selected item shows a 1rem check;
-// disabled items are 50%. Labels: 0.5rem × 0.375rem, `text-xs`, `primary`. Separators: 1px of
-// `border` reaching 0.25rem past each side, 0.25rem margins.
+// disabled items are 50%; an item's `trailing` text is muted at 0.741rem after its label, and its
+// `help` puts a help tooltip (25rem wide) after the label. Labels: 0.5rem × 0.375rem, `text-xs`,
+// `primary`, with `trailing` as a badge at the end. Separators: 1px of `border` reaching 0.25rem
+// past each side, 0.25rem margins.
 // Keyboard (Radix): the trigger opens on click, Enter, Space, ↑ and ↓; in the list ↑ and ↓ move,
 // Home and End jump, typing selects by label prefix, Enter and Space choose, Escape and Tab close;
 // focus returns to the trigger. The trigger style properties are the call sites' overrides (D5).
@@ -301,39 +304,48 @@ export component Select {
                                     height: Theme.hairline;
                                     background: Theme.border;
                                 }
-                                if item.kind == ChoiceKind.label: AppText {
-                                    x: 0.5rem;
-                                    width: parent.width - 1rem;
-                                    content: item.label;
-                                    uppercase: true;
-                                    font-size: Theme.text-xs * 1rem;
-                                    line-height: Theme.text-xs-line-height;
-                                    color: Theme.primary;
-                                    max-lines: 1;
-                                    overflow: elide;
+                                if item.kind == ChoiceKind.label: HorizontalLayout {
+                                    padding-left: 0.5rem;
+                                    padding-right: 0.5rem;
+                                    spacing: 0.75rem;
+                                    AppText {
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                        content: item.label;
+                                        uppercase: true;
+                                        font-size: Theme.text-xs * 1rem;
+                                        line-height: Theme.text-xs-line-height;
+                                        color: Theme.primary;
+                                        max-lines: 1;
+                                        overflow: elide;
+                                    }
+                                    // A badge: `rounded bg-primary/10 px-1.5 py-0.5 text-[0.667rem]`, in its own case.
+                                    if item.trailing != "": VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            border-radius: Theme.radius-xs * 1rem;
+                                            background: Theme.primary.transparentize(0.9);
+                                            HorizontalLayout {
+                                                padding-left: 0.375rem;
+                                                padding-right: 0.375rem;
+                                                padding-top: 0.125rem;
+                                                padding-bottom: 0.125rem;
+                                                AppText {
+                                                    content: item.trailing;
+                                                    font-size: 0.667rem;
+                                                    color: Theme.primary;
+                                                    max-lines: 1;
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 if item.kind == ChoiceKind.item: Rectangle {
                                     border-radius: Theme.radius-xs * 1rem;
                                     background: row.highlighted ? Theme.accent : transparent;
                                     opacity: item.disabled ? 0.5 : 1;
 
-                                    AppText {
-                                        x: 0.5rem;
-                                        width: parent.width - 2.5rem;
-                                        content: item.label;
-                                        uppercase: true;
-                                        font-size: Theme.text-xs * 1rem;
-                                        line-height: Theme.text-xs-line-height;
-                                        color: row.highlighted ? Theme.accent-foreground : Theme.popover-foreground;
-                                        max-lines: 1;
-                                        overflow: elide;
-                                    }
-                                    if index == root.selected-index: Icon {
-                                        x: parent.width - 0.5rem - 0.875rem + (0.875rem - self.width) / 2;
-                                        glyph: Icons.check;
-                                        size: 1rem;
-                                        color: Theme.muted-foreground;
-                                    }
+                                    // Under the label row, so an item's help icon takes its own pointer.
                                     TouchArea {
                                         enabled: row.selectable;
                                         mouse-cursor: MouseCursor.pointer;
@@ -345,6 +357,50 @@ export component Select {
                                         clicked => {
                                             root.choose(index);
                                         }
+                                    }
+                                    HorizontalLayout {
+                                        x: 0.5rem;
+                                        width: parent.width - 2.5rem;
+                                        spacing: 0.75rem;
+                                        HorizontalLayout {
+                                            horizontal-stretch: 1;
+                                            spacing: 0.25rem;
+                                            AppText {
+                                                horizontal-stretch: item.help == "" ? 1 : 0;
+                                                vertical-alignment: center;
+                                                content: item.label;
+                                                uppercase: true;
+                                                font-size: Theme.text-xs * 1rem;
+                                                line-height: Theme.text-xs-line-height;
+                                                color: row.highlighted ? Theme.accent-foreground : Theme.popover-foreground;
+                                                max-lines: 1;
+                                                overflow: elide;
+                                            }
+                                            // The help stays usable on a disabled item (`pointer-events-auto`).
+                                            if item.help != "": VerticalLayout {
+                                                alignment: center;
+                                                HelpTooltip {
+                                                    content: item.help;
+                                                    content-width: 25rem;
+                                                }
+                                            }
+                                            if item.help != "": Rectangle {
+                                                horizontal-stretch: 1;
+                                            }
+                                        }
+                                        if item.trailing != "": AppText {
+                                            vertical-alignment: center;
+                                            content: item.trailing;
+                                            font-size: 0.741rem;
+                                            color: Theme.muted-foreground;
+                                            max-lines: 1;
+                                        }
+                                    }
+                                    if index == root.selected-index: Icon {
+                                        x: parent.width - 0.5rem - 0.875rem + (0.875rem - self.width) / 2;
+                                        glyph: Icons.check;
+                                        size: 1rem;
+                                        color: Theme.muted-foreground;
                                     }
                                 }
                             }

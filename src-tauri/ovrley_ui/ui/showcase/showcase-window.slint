@@ -122,10 +122,10 @@ export component ShowcaseWindow inherits FluidWindow {
         { value: "mp4", label: "MP4 (H.264)" },
         { value: "hevc", label: "MP4 (HEVC)" },
         { kind: separator },
-        { kind: label, label: "Alpha" },
-        { value: "prores", label: "ProRes 4444" },
+        { kind: label, label: "Alpha", trailing: "Video imported" },
+        { value: "prores", label: "ProRes 4444", help: "Trailing help on an item." },
         { value: "png", label: "PNG sequence" },
-        { value: "webm", label: "WebM (disabled)", disabled: true },
+        { value: "webm", label: "WebM (disabled)", disabled: true, trailing: "Unavailable" },
     ];
     property <[Choice]> recommended-fonts: [
         { value: "Inter", label: "Inter" }, { value: "Bebas Neue", label: "Bebas Neue" }, { value: "Roboto Mono", label: "Roboto Mono" },

@@ -185,6 +185,11 @@ export struct Choice {
     accessible-label: string,
     disabled: bool,
     pressed: bool,
+    // A select item's muted text at its end ("Unavailable"), or a select label's badge; empty
+    // for none.
+    trailing: string,
+    // A select item's help tooltip, shown by an info icon after its label; empty for none.
+    help: string,
 }
 
 export struct ChoiceListMetrics {
