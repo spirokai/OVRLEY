@@ -605,6 +605,8 @@
       "distance_to_home": { "name": "距家距离", "shortName": "家" },
       "elevation": { "name": "海拔", "shortName": "海拔" },
       "engine_load": { "name": "发动机负载", "shortName": "发动机负载" },
+      "coolant_temperature": { "name": "冷却液温度", "shortName": "冷却液" },
+      "boost_pressure": { "name": "增压压力", "shortName": "增压" },
       "engine_power": { "name": "发动机功率", "shortName": "发动机功率" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "焦距", "shortName": "焦距" },

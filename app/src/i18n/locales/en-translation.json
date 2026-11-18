@@ -605,6 +605,8 @@
       "distance_to_home": { "name": "Distance to Home", "shortName": "Home" },
       "elevation": { "name": "Elevation", "shortName": "Elev." },
       "engine_load": { "name": "Engine Load", "shortName": "Eng. Load" },
+      "coolant_temperature": { "name": "Coolant Temperature", "shortName": "Coolant" },
+      "boost_pressure": { "name": "Boost Pressure", "shortName": "Boost" },
       "engine_power": { "name": "Engine Power", "shortName": "Eng. Power" },
       "ev": { "name": "EV", "shortName": "EV" },
       "focal_length": { "name": "Focal Length", "shortName": "Focal L." },

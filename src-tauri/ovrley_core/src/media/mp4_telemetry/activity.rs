@@ -219,6 +219,8 @@ pub fn build_activity_columns(
         power: none(),
         engine_power: none(),
         engine_load: none(),
+        coolant_temperature: none(),
+        boost_pressure: none(),
         temperature: none(),
         depth: none(),
         first_stop_depth: none(),
