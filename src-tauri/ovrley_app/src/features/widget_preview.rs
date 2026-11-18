@@ -15,7 +15,8 @@
 //!   repeat across documents.
 
 use crate::features::overlay_editor::{raster_scale, scene_size};
-use crate::lib::activity::{has_activity_coverage, resolve_activity_clip_id, resolve_activity_context, ActivityContext, ActivityTrim};
+use crate::lib::activity::{has_activity_coverage, resolve_activity_clip_id, resolve_activity_context, ActivityContext};
+use ovrley_core::activity::trim::ActivityTrim;
 use crate::store::slices::media::ImportedActivity;
 use crate::lib::template::{effective_widget_data, ThemeColors};
 use crate::lib::utils::clamp;

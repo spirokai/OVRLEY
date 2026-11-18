@@ -26,7 +26,7 @@ use services::{ServiceParts, Services};
 use slices::editor::EditorSlice;
 use slices::layout::LayoutSlice;
 use slices::media::MediaSlice;
-use slices::render_settings::RenderSettings;
+use ovrley_core::encode::render_settings::RenderSettings;
 use slices::template::TemplateSlice;
 use slices::video_import::VideoImportSlice;
 use std::cell::{Cell, RefCell};
@@ -43,6 +43,8 @@ pub struct Store {
     pub video_import: VideoImportSlice,
     /// `createRenderSettingsSlice`'s state (phase 4 D15).
     pub render_settings: RenderSettings,
+    /// `createBatchRenderSlice`'s output folder, which projects save.
+    pub batch_render: slices::batch_render::BatchRenderSlice,
     /// The timeline filmstrips (phase 4 D12).
     pub video_filmstrip: slices::video_filmstrip::VideoFilmstripSlice,
     /// `useVideoFilmstripQueue`'s state.

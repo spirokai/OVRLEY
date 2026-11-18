@@ -1,7 +1,8 @@
 //! Port of `video-segments.js`: the segments of a clip, and where cuts and trims can go.
 //! `fitCutsToFrameCount` arrives with relinking in Phase 6.
 
-use super::{Clip, SegmentEdits, FIRST_SEGMENT_KEY};
+use super::Clip;
+use ovrley_core::media::video_edits::{SegmentEdits, FIRST_SEGMENT_KEY};
 
 /// One segment of a clip in source order (`listVideoSegments`).
 #[derive(Clone, Debug, PartialEq)]

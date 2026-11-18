@@ -2,7 +2,8 @@
 //! pure helpers over the clips of the collection.
 
 use super::program::{build_program, Program};
-use super::{Clip, ImportedVideo, Resolution, SecondsRange, VideoEditsMap};
+use super::{Clip, ImportedVideo, SecondsRange, VideoEditsMap};
+use ovrley_core::media::video_edits::VideoResolution;
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
 use ovrley_core::encode::fps::Fps;
 use std::collections::BTreeSet;
@@ -85,7 +86,7 @@ pub fn build_timeline_program(videos: &[ImportedVideo], edits: &VideoEditsMap, p
 /// `deriveCompatibility`'s result.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Compatibility {
-    pub reference: Option<(Resolution, Fps)>,
+    pub reference: Option<(VideoResolution, Fps)>,
     pub incompatible_ids: BTreeSet<String>,
 }
 

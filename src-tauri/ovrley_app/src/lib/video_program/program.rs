@@ -13,7 +13,8 @@
 
 use super::collection::sort_clips_by_timeline;
 use super::segments::{list_video_segments, segment_join_key};
-use super::{Clip, Transition, TransitionKind};
+use super::Clip;
+use ovrley_core::media::video_edits::{Transition, TransitionKind};
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
 use ovrley_core::encode::fps::Fps;
 use std::collections::HashMap;
@@ -401,7 +402,7 @@ pub fn resolve_playback_start(program: &Program, second: f64) -> PlaybackStart {
 mod tests {
     use super::super::collection::build_timeline_program;
     use super::super::fixtures::*;
-    use super::super::{SegmentEdits, VideoEdits};
+    use ovrley_core::media::video_edits::{SegmentEdits, VideoEdits};
     use super::*;
     use ovrley_core::encode::ffmpeg::transitions::transition_defaults;
 

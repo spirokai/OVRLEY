@@ -7,7 +7,8 @@
 
 use super::playback::{commit_scrub, player_timing, scrub_to};
 use super::viewport::pan_by;
-use crate::lib::activity::{resolve_activity_window, trim_activity_edge, ActivityTrim, TrimEdge};
+use crate::lib::activity::{resolve_activity_window, trim_activity_edge, TrimEdge};
+use ovrley_core::activity::trim::ActivityTrim;
 use crate::lib::utils::clamp;
 use crate::store::slices::video_import::{ClipLane, SelectedClip};
 use crate::store::Store;
@@ -355,7 +356,8 @@ pub fn commit_nudge(store: &mut Store) {
 use super::lanes::{EDGE_END, EDGE_START};
 use crate::lib::video_program::edits::segment_before_cut;
 use crate::lib::video_program::segments::TrimSide;
-use crate::lib::video_program::{Clip, Cut, SegmentEdits, FIRST_SEGMENT_KEY};
+use crate::lib::video_program::Clip;
+use ovrley_core::media::video_edits::{Cut, SegmentEdits, FIRST_SEGMENT_KEY};
 
 /// `edgeCutSide`: which end an edge cut trims; `None` for a real cut.
 pub fn edge_cut_side(cut_id: &str) -> Option<TrimSide> {
@@ -801,7 +803,7 @@ mod tests {
         assert_eq!(segment_kept_by_dropped_cut(&twice, "last", 100).as_deref(), Some("last"));
         assert_eq!(segment_kept_by_dropped_cut(&twice, "last", 300).as_deref(), Some("first"));
         assert_eq!(segment_kept_by_dropped_cut(&twice, "first", 150), None);
-        let other = clip(simple("other", 5.0, 1), crate::lib::video_program::VideoEdits { offset_seconds: 120.0, ..Default::default() });
+        let other = clip(simple("other", 5.0, 1), ovrley_core::media::video_edits::VideoEdits { offset_seconds: 120.0, ..Default::default() });
         let clips = [twice.clone(), other];
         assert_eq!(cut_snap_edges(&twice, "first", &clips, 300.0), [100.0, 110.0, 100.0 + 200.0 / 30.0, 120.0, 125.0, 0.0, 300.0]);
         assert_eq!(cut_snap_edges(&twice, EDGE_START, &clips, 0.0), [100.0, 110.0, 120.0, 125.0]);

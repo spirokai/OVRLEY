@@ -2,7 +2,7 @@
 //! (Phase 3). Video telemetry, render progress and video import arrive with Phases 6 and 7.
 
 use ovrley_core::activity::schema::ParsedActivity;
-use crate::lib::activity::ActivityTrim;
+use ovrley_core::activity::trim::ActivityTrim;
 use serde_json::Value;
 use std::sync::Arc;
 

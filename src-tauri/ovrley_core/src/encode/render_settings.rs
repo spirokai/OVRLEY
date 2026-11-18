@@ -1,23 +1,25 @@
-//! Port of `store/slices/createRenderSettingsSlice.js`'s state, defaults and validation (plan D15).
-//! The player steps its clock at the render fps divided by the widget update rate, and the history
-//! records the settings. Scene settings set the frame rate and update rate (Phase 5); the render
-//! dialog's setters arrive in Phase 7. Rate control reuses `ovrley_core`'s validated quality.
+//! The editor's render settings (`createRenderSettingsSlice`): the store holds them, the player
+//! steps its clock with them, and projects save them. Rate control is the validated
+//! [`EncodingQuality`].
 
-use ovrley_core::encode::quality::{validate_quality, EncodingQuality, QualityType};
+use super::quality::{validate_quality, EncodingQuality, QualityType};
+use serde::{Deserialize, Serialize};
 
 /// `QUALITY_DEFAULTS`: the default CRF of new projects and codec changes.
 pub const H264_QUALITY_DEFAULT: u8 = 21;
 pub const HEVC_QUALITY_DEFAULT: u8 = 26;
 
 /// One combined file, or one file per video.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum OutputMode {
     Combined,
     Separate,
 }
 
 /// The overlay over the video, or the overlay alone.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum ExportMode {
     Transparent,
     Composite,
@@ -49,8 +51,8 @@ impl Default for RenderSettings {
 }
 
 impl RenderSettings {
-    /// `validateRenderSettings`, at store or submission ingress. The enums and the quality
-    /// (validated by `ovrley_core` when it was built) leave the numbers and the codec to check.
+    /// `validateRenderSettings`. The enums and the quality (validated when it was built) leave
+    /// the numbers and the codec to check.
     pub fn validate(&self) -> Result<(), String> {
         if !(self.fps.is_finite() && self.fps > 0.0) {
             return Err("Render FPS must be a positive finite number".into());
@@ -58,14 +60,12 @@ impl RenderSettings {
         if self.widget_update_rate == 0 {
             return Err("Widget update rate must be a positive integer".into());
         }
-        if self.codec.is_empty() {
+        if self.codec.trim().is_empty() {
             return Err("Render codec is required".into());
         }
         Ok(())
     }
-}
 
-impl RenderSettings {
     /// `setRenderFpsAndUpdateRate`: both, or neither when the result is invalid.
     pub fn set_fps_and_update_rate(&mut self, fps: f64, widget_update_rate: u32) -> Result<(), String> {
         let next = Self { fps, widget_update_rate, ..self.clone() };
@@ -94,7 +94,7 @@ mod tests {
         assert_eq!(RenderSettings::default().validate(), Ok(()));
         assert!(RenderSettings { fps: 0.0, ..RenderSettings::default() }.validate().is_err());
         assert!(RenderSettings { widget_update_rate: 0, ..RenderSettings::default() }.validate().is_err());
-        assert!(RenderSettings { codec: String::new(), ..RenderSettings::default() }.validate().is_err());
+        assert!(RenderSettings { codec: " ".into(), ..RenderSettings::default() }.validate().is_err());
         assert!(render_quality(QualityType::Quality, 52.0).is_err());
         assert_eq!(render_quality(QualityType::Bitrate, 8.5), Ok(EncodingQuality::Bitrate(8.5)));
     }

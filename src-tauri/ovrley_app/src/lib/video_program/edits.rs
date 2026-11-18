@@ -5,7 +5,8 @@
 //! An edit that the UI never asks for with bad arguments fails with an error, as React throws.
 
 use super::segments::TrimSide;
-use super::{new_id, Cut, ImportedVideo, OffsetSource, SegmentEdits, Transition, VideoEdits, VideoEditsMap, FIRST_SEGMENT_KEY};
+use super::{new_id, ImportedVideo, VideoEditsMap};
+use ovrley_core::media::video_edits::{Cut, OffsetSource, SegmentEdits, Transition, VideoEdits, FIRST_SEGMENT_KEY};
 
 /// The collection an edit changes: the videos and their edits, kept in step.
 pub struct CollectionDraft<'a> {
@@ -190,7 +191,7 @@ pub fn segment_before_cut(edits: &VideoEdits, cut_id: &str) -> Result<String, St
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;
-    use super::super::{AnchorSide, PlacementAnchor, TransitionKind};
+    use ovrley_core::media::video_edits::{AnchorSide, PlacementAnchor, TransitionKind};
     use super::*;
 
     struct Owned {

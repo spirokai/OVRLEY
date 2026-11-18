@@ -7,7 +7,7 @@ use crate::js::{number_to_string, to_fixed};
 use crate::lib::seconds_input::{SecondsDisplay, SecondsInputOptions, SecondsInputState, SecondsMode};
 use crate::lib::video_program::collection::TimelineProgram;
 use crate::lib::video_program::program::{find_invalid_transitions, JoinSide, SkippedDefault};
-use crate::lib::video_program::{Transition, TransitionKind};
+use ovrley_core::media::video_edits::{Transition, TransitionKind};
 use crate::store::slices::video_import::set_join_transition;
 use crate::store::Store;
 use ovrley_core::encode::ffmpeg::transitions::xfade_transitions;
@@ -214,7 +214,7 @@ mod tests {
     use super::*;
     use crate::features::player::reconcile_player;
     use crate::lib::video_program::fixtures::*;
-    use crate::lib::video_program::SegmentEdits;
+    use ovrley_core::media::video_edits::SegmentEdits;
     use crate::store::slices::video_import::tests::store_with;
     use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
     use std::rc::Rc;

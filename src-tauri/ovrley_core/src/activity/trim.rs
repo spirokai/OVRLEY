@@ -21,6 +21,30 @@ use ovrley_widgets::interpolation::{
 use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
 use ovrley_widgets::model::types::MetricKind;
 use ovrley_widgets::widgets::value::format::resolve_metric_display_value;
+use serde::{Deserialize, Serialize};
+
+/// The part of the external activity the user kept, in activity seconds (which are timeline
+/// seconds): what an overlay renders when no video decides it. The editor's store holds it and
+/// projects save it.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ActivityTrim {
+    pub start_second: f64,
+    pub end_second: f64,
+}
+
+impl ActivityTrim {
+    /// Finite bounds with `0 <= start < end`.
+    pub fn validate(&self) -> Result<(), String> {
+        if !self.start_second.is_finite() || !self.end_second.is_finite() {
+            return Err("activityTrim bounds must be finite".into());
+        }
+        if self.start_second < 0.0 || self.start_second >= self.end_second {
+            return Err("activityTrim requires 0 <= startSecond < endSecond".into());
+        }
+        Ok(())
+    }
+}
 
 // Validates that the requested scene window fits inside activity duration.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {

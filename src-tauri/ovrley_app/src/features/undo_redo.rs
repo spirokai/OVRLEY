@@ -4,9 +4,9 @@
 //! action. It compares the undoable projection (`partializeUndoableState`) before and after the
 //! action and its reconcile steps: pointers first (D1), then values.
 
-use crate::lib::activity::ActivityTrim;
+use ovrley_core::activity::trim::ActivityTrim;
 use crate::lib::video_program::VideoEditsMap;
-use crate::store::slices::render_settings::RenderSettings;
+use ovrley_core::encode::render_settings::RenderSettings;
 use crate::store::Store;
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};

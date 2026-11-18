@@ -16,14 +16,6 @@ use std::collections::HashMap;
 
 use crate::error::{CoreError, CoreResult};
 
-/// How a video timestamp without a zone is read when resolving automatic baselines.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum VideoSyncTimezoneMode {
-    Local,
-    Utc,
-}
-
 /// A video whose committed editor offset calibrates the automatic baselines.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]

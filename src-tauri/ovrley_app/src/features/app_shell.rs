@@ -152,7 +152,8 @@ pub fn handle_window_capture_key(store: &mut Store, input: &KeyInput) -> bool {
 pub const DEV_VIDEOS_VARIABLE: &str = "OVRLEY_DEV_VIDEOS";
 
 pub fn load_dev_videos(store: &mut Store, services: &mut Services, paths: Vec<String>) {
-    use crate::lib::video_program::{create_imported_video, new_id, VideoEdits};
+    use crate::lib::video_program::{create_imported_video, new_id};
+    use ovrley_core::media::video_edits::VideoEdits;
     let _ = store;
     let app_paths = std::sync::Arc::clone(&services.paths);
     services.workers.spawn("dev-videos", move || {

@@ -11,8 +11,8 @@
 //! [`FIRST_SEGMENT_KEY`] for the first one. A video without cuts is one segment, so excluding a
 //! whole video and excluding a part of it are the same edit.
 //!
-//! Not ported yet: the preview registration and thumbnail (Phase 6, with import), missing-video
-//! entities from projects (Phase 6), and placement by recording time (Phase 6).
+//! The edits themselves (`VideoEdits` and its parts) are `ovrley_core::media::video_edits`, which
+//! projects read and write.
 
 pub mod collection;
 pub mod edits;
@@ -21,26 +21,16 @@ pub mod segments;
 pub mod warnings;
 
 use crate::store::slices::media::ImportedActivity;
-use ovrley_core::encode::ffmpeg::transitions::{is_xfade_transition, xfade_transitions, NO_TRANSITION};
 use ovrley_core::encode::fps::Fps;
+use ovrley_core::media::video_edits::{Cut, SegmentEdits, VideoEdits, VideoResolution};
 use ovrley_core::media::SourceVideoMetadata;
 use std::collections::BTreeMap;
-
-/// The key of a video's first segment.
-pub const FIRST_SEGMENT_KEY: &str = "start";
 
 /// A timeline interval, in seconds.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SecondsRange {
     pub start_second: f64,
     pub end_second: f64,
-}
-
-/// A display-oriented resolution.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Resolution {
-    pub width: u32,
-    pub height: u32,
 }
 
 /// Where a clip's embedded telemetry stands.
@@ -96,7 +86,7 @@ pub struct ImportedVideo {
     pub duration_seconds: f64,
     pub frame_count: i64,
     pub fps: Fps,
-    pub resolution: Resolution,
+    pub resolution: VideoResolution,
     pub rotation_degrees: u16,
     pub has_audio: bool,
     pub codec_name: Option<String>,
@@ -113,151 +103,6 @@ pub struct ImportedVideo {
     pub missing: bool,
     pub sync_warning: Option<String>,
     pub telemetry: VideoTelemetry,
-}
-
-/// A transition into a segment: a hard cut, or an `xfade` from the core catalogue.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum TransitionKind {
-    HardCut,
-    Xfade(&'static str),
-}
-
-impl TransitionKind {
-    /// Validates a transition type name against the catalogue (`requireTransitionType`).
-    pub fn from_name(name: &str) -> Result<Self, String> {
-        if name == NO_TRANSITION {
-            return Ok(Self::HardCut);
-        }
-        xfade_transitions()
-            .iter()
-            .find(|candidate| candidate.as_str() == name)
-            .map(|candidate| Self::Xfade(candidate.as_str()))
-            .ok_or_else(|| format!("Unknown transition type: {name}"))
-    }
-
-    /// The name stored in projects: `none` or the `xfade` name.
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::HardCut => NO_TRANSITION,
-            Self::Xfade(name) => name,
-        }
-    }
-}
-
-/// `{type, durationSeconds}`. A hard cut lasts 0 s; an `xfade` a positive number of seconds.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Transition {
-    kind: TransitionKind,
-    duration_seconds: f64,
-}
-
-impl Transition {
-    /// `HARD_CUT`.
-    pub const HARD_CUT: Transition = Transition { kind: TransitionKind::HardCut, duration_seconds: 0.0 };
-
-    /// `requireTransition`: validates a stored override.
-    pub fn new(kind: TransitionKind, duration_seconds: f64) -> Result<Self, String> {
-        match kind {
-            TransitionKind::HardCut if duration_seconds != 0.0 => Err("No transition has a duration of 0 seconds".into()),
-            TransitionKind::Xfade(_) if !(duration_seconds.is_finite() && duration_seconds > 0.0) => {
-                Err("Transition duration must be a positive number of seconds".into())
-            }
-            _ => Ok(Self { kind, duration_seconds }),
-        }
-    }
-
-    /// An `xfade` of a duration already known to be positive (snapped to frames).
-    pub fn xfade(name: &'static str, duration_seconds: f64) -> Self {
-        debug_assert!(is_xfade_transition(name) && duration_seconds > 0.0);
-        Self { kind: TransitionKind::Xfade(name), duration_seconds }
-    }
-
-    pub fn kind(&self) -> TransitionKind {
-        self.kind
-    }
-
-    pub fn duration_seconds(&self) -> f64 {
-        self.duration_seconds
-    }
-
-    pub fn is_hard_cut(&self) -> bool {
-        self.kind == TransitionKind::HardCut
-    }
-}
-
-/// The edits of one segment.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SegmentEdits {
-    /// Left out of the export; it stays on the timeline and in the preview.
-    pub excluded: bool,
-    /// The transition of the join into the segment; `None` follows the project defaults.
-    pub transition_in: Option<Transition>,
-    /// Hides the activity widgets over the segment, in the preview and the render.
-    pub skip_overlay: bool,
-}
-
-impl SegmentEdits {
-    pub const INCLUDED: SegmentEdits = SegmentEdits { excluded: false, transition_in: None, skip_overlay: false };
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Cut {
-    pub id: String,
-    pub frame: i64,
-}
-
-/// Whether a clip's start follows its detected recording time or was set by hand.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum OffsetSource {
-    Auto,
-    Manual,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AnchorSide {
-    Before,
-    After,
-}
-
-/// Places a clip whose time cannot be determined directly before or after another clip.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct PlacementAnchor {
-    pub video_id: String,
-    pub side: AnchorSide,
-}
-
-/// How a clip's camera clock is read against the activity.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TimezoneMode {
-    Local,
-    Utc,
-}
-
-/// The user's edits of one video (`createVideoEdits`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct VideoEdits {
-    /// The committed timeline start.
-    pub offset_seconds: f64,
-    pub offset_source: OffsetSource,
-    pub cuts: Vec<Cut>,
-    pub segments: BTreeMap<String, SegmentEdits>,
-    pub placement_anchor: Option<PlacementAnchor>,
-    /// `None` until inferred or chosen.
-    pub timezone_mode: Option<TimezoneMode>,
-}
-
-impl Default for VideoEdits {
-    /// `createVideoEdits`.
-    fn default() -> Self {
-        Self {
-            offset_seconds: 0.0,
-            offset_source: OffsetSource::Auto,
-            cuts: Vec::new(),
-            segments: BTreeMap::from([(FIRST_SEGMENT_KEY.to_string(), SegmentEdits::INCLUDED)]),
-            placement_anchor: None,
-            timezone_mode: None,
-        }
-    }
 }
 
 /// The edits of every video, keyed by video id.
@@ -332,7 +177,7 @@ pub fn create_imported_video(metadata: &SourceVideoMetadata, id: String, import_
     if width == 0 || height == 0 {
         return Err(invalid());
     }
-    let resolution = if rotation_degrees == 90 || rotation_degrees == 270 { Resolution { width: height, height: width } } else { Resolution { width, height } };
+    let resolution = if rotation_degrees == 90 || rotation_degrees == 270 { VideoResolution { width: height, height: width } } else { VideoResolution { width, height } };
     Ok(ImportedVideo {
         id,
         path: metadata.path.clone(),
@@ -374,6 +219,7 @@ pub(crate) mod fixtures {
     //! `tests/helpers/videoFixtures.js`.
     use super::*;
     use ovrley_core::media::Resolution as ProbedResolution;
+    use ovrley_core::media::video_edits::FIRST_SEGMENT_KEY;
 
     pub struct TestVideo {
         pub id: &'static str,
@@ -464,7 +310,7 @@ mod tests {
         // 300.09 frames: the partial last frame counts, as in the native renderer.
         assert_eq!(video.frame_count, 301);
         assert!((video.duration_seconds - 301.0 * 1001.0 / 30000.0).abs() < 1e-12);
-        assert_eq!(video.resolution, Resolution { width: 1080, height: 1920 });
+        assert_eq!(video.resolution, VideoResolution { width: 1080, height: 1920 });
         assert_eq!((video.import_order, video.preview_warnings.clone(), video.sync_warning.clone()), (3, vec!["slow seeking".to_string()], None));
         assert_eq!(video.telemetry.status(), TelemetryStatus::Pending);
     }
@@ -502,16 +348,6 @@ mod tests {
     fn telemetry_carries_an_activity_only_when_ready() {
         assert!(VideoTelemetry::without_activity(TelemetryStatus::Ready).is_err());
         assert_eq!(VideoTelemetry::without_activity(TelemetryStatus::Absent).unwrap().activity(), None);
-    }
-
-    #[test]
-    fn transitions_are_checked_against_the_catalogue() {
-        assert_eq!(TransitionKind::from_name("spin").unwrap_err(), "Unknown transition type: spin");
-        assert_eq!(TransitionKind::from_name("none").unwrap(), TransitionKind::HardCut);
-        let fade = TransitionKind::from_name("fade").unwrap();
-        assert!(Transition::new(TransitionKind::HardCut, 1.0).unwrap_err().contains("duration of 0"));
-        assert!(Transition::new(fade, 0.0).unwrap_err().contains("positive"));
-        assert_eq!(Transition::new(fade, 1.0).unwrap().kind().name(), "fade");
     }
 
     #[test]

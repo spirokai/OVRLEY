@@ -9,7 +9,8 @@
 //!
 //! The grid itself (spacings, windows, sampling) is `ovrley_services::video_filmstrip`'s.
 
-use crate::lib::video_program::{Clip, Resolution};
+use crate::lib::video_program::Clip;
+use ovrley_core::media::video_edits::VideoResolution;
 use crate::store::services::{FilmstripHwaccel, FilmstripRequest, FilmstripWindow, Services};
 use crate::store::slices::video_filmstrip::{ReadyStrip, StripState};
 use crate::store::Store;
@@ -30,7 +31,7 @@ pub const FILMSTRIP_WINDOWS_KEPT: usize = 96;
 pub const FILMSTRIP_WINDOW_SETTLE: Duration = Duration::from_millis(200);
 
 /// `filmstripFrameSize`: 96 px tall at the video's display aspect ratio.
-pub fn filmstrip_frame_size(resolution: Resolution) -> (u32, u32) {
+pub fn filmstrip_frame_size(resolution: VideoResolution) -> (u32, u32) {
     let width = crate::js::round(f64::from(FILMSTRIP_FRAME_HEIGHT_PX) * f64::from(resolution.width) / f64::from(resolution.height));
     (width as u32, FILMSTRIP_FRAME_HEIGHT_PX)
 }
@@ -93,7 +94,7 @@ pub fn filmstrip_hwaccel(codecs: Option<&AvailableCodecs>) -> Option<FilmstripHw
 }
 
 /// `filmstripTileWidthPx`: the clip height at the video's aspect ratio, in whole pixels.
-pub fn tile_width_px(resolution: Resolution, tile_height_px: f64) -> f64 {
+pub fn tile_width_px(resolution: VideoResolution, tile_height_px: f64) -> f64 {
     crate::js::round(tile_height_px * f64::from(resolution.width) / f64::from(resolution.height))
 }
 
@@ -426,8 +427,8 @@ mod tests {
 
     #[test]
     fn frames_are_96_px_tall_at_the_aspect_ratio() {
-        assert_eq!(filmstrip_frame_size(Resolution { width: 3840, height: 2160 }), (171, 96));
-        assert_eq!(filmstrip_frame_size(Resolution { width: 1080, height: 1920 }), (54, 96));
+        assert_eq!(filmstrip_frame_size(VideoResolution { width: 3840, height: 2160 }), (171, 96));
+        assert_eq!(filmstrip_frame_size(VideoResolution { width: 1080, height: 1920 }), (54, 96));
     }
 
     #[test]
@@ -504,12 +505,12 @@ mod tests {
     fn long_clip(offset: f64, path: &'static str, missing: bool) -> Clip {
         let mut video = video(TestVideo { id: "long", path, duration_seconds: 7200.0, ..TestVideo::default() });
         video.missing = missing;
-        clip(video, crate::lib::video_program::VideoEdits { offset_seconds: offset, ..Default::default() })
+        clip(video, ovrley_core::media::video_edits::VideoEdits { offset_seconds: offset, ..Default::default() })
     }
 
     #[test]
     fn the_timeline_wants_windows_only_zoomed_in() {
-        assert_eq!(tile_width_px(Resolution { width: 1920, height: 1080 }, 48.0), 85.0);
+        assert_eq!(tile_width_px(VideoResolution { width: 1920, height: 1080 }, 48.0), 85.0);
         let clips = [long_clip(0.0, "/v/long.mp4", false)];
         assert!(list_wanted_windows(&clips, 0.0, 7200.0, 1000.0, 48.0).is_empty());
         let keys = |wanted: BTreeMap<String, Vec<FilmstripWindow>>| wanted.into_iter().map(|(path, windows)| (path, windows.into_iter().map(window_key).collect::<Vec<_>>())).collect::<Vec<_>>();

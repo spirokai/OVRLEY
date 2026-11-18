@@ -5,6 +5,8 @@
 
 /// DJI Action AC004 metadata fallback extraction.
 pub mod dji_ac004;
+/// The manual video sync's durable state.
+pub mod manual_video_sync;
 /// MP4 embedded telemetry and telemetry-first metadata extraction.
 pub mod mp4_telemetry;
 /// Intermediate telemetry sample shape and payload checks.
@@ -19,6 +21,8 @@ pub mod telemetry_math;
 pub mod time;
 /// GPS-coordinate timezone lookup for media telemetry.
 pub mod timezone;
+/// The user's edits of a video and the metadata a project saves about it.
+pub mod video_edits;
 /// MP4/MOV metadata extraction via ffprobe.
 pub mod video_probe;
 

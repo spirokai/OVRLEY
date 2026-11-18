@@ -9,17 +9,12 @@
 use crate::lib::utils::clamp;
 use crate::lib::video_program::program::{resolve_preview_target, Program};
 use crate::lib::video_program::Clip;
+use ovrley_core::activity::trim::ActivityTrim;
 use crate::store::slices::media::{activity_duration_seconds, ActivitySummary, AvailableMetric, ImportedActivity};
 
 /// `MIN_ACTIVITY_TRIM_SECONDS`: the shortest trimmed activity.
 pub const MIN_ACTIVITY_TRIM_SECONDS: f64 = 1.0;
 
-/// The trimmed part of the external activity, in activity seconds (which are timeline seconds).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct ActivityTrim {
-    pub start_second: f64,
-    pub end_second: f64,
-}
 
 /// `resolveActivityWindow`: the rendered activity window.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -207,7 +202,7 @@ mod tests {
         assert_eq!((context.origin_second, context.video_id), (0.0, None));
         let mut video = simple("video-1", 60.0, 0);
         video.telemetry = VideoTelemetry::ready(telemetry(120.0));
-        let clip_with = clip(video, crate::lib::video_program::VideoEdits { offset_seconds: 300.0, ..Default::default() });
+        let clip_with = clip(video, ovrley_core::media::video_edits::VideoEdits { offset_seconds: 300.0, ..Default::default() });
         let context = resolve_activity_context(None, None, Some(&clip_with)).unwrap();
         assert_eq!((context.origin_second, context.video_id.as_deref()), (300.0, Some("video-1")));
         assert_eq!(context.summary.unwrap().available_metrics.len(), 1);

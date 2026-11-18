@@ -12,7 +12,8 @@ use crate::lib::utils::clamp;
 use crate::lib::video_program::collection::{join_video_edits, timeline_bounds, VideoDragPreview};
 use crate::lib::video_program::edits::{find_video, segment_before_cut, CollectionDraft};
 use crate::lib::video_program::segments::TrimSide;
-use crate::lib::video_program::{Clip, ImportedVideo, Transition, VideoEditsMap, FIRST_SEGMENT_KEY};
+use crate::lib::video_program::{Clip, ImportedVideo, VideoEditsMap};
+use ovrley_core::media::video_edits::{Transition, FIRST_SEGMENT_KEY};
 use crate::store::Store;
 use ovrley_core::encode::ffmpeg::transitions::{transition_defaults, TransitionDefaults};
 use std::rc::Rc;
@@ -292,7 +293,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::features::undo_redo::undo;
     use crate::lib::video_program::fixtures::*;
-    use crate::lib::video_program::TransitionKind;
+    use ovrley_core::media::video_edits::TransitionKind;
     use crate::store::services::fakes::fake_services;
     use crate::store::Dispatcher;
     use serde_json::json;
@@ -310,7 +311,7 @@ pub(crate) mod tests {
         Dispatcher::new(store_with(vec![simple("ride", 10.0, 0)], &[]), parts)
     }
 
-    fn edits(dispatcher: &Dispatcher) -> crate::lib::video_program::VideoEdits {
+    fn edits(dispatcher: &Dispatcher) -> ovrley_core::media::video_edits::VideoEdits {
         dispatcher.with_store(|store| store.video_import.video_edits["ride"].clone())
     }
 

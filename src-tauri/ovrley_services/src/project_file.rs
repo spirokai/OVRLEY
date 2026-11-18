@@ -5,13 +5,21 @@
 //! archive and platform-path details do not leak into application state.
 
 use crate::raster_resources::RasterResources;
-use crate::video_thumbnail::{generate_thumbnail, png_data_url, MAX_THUMBNAIL_SIZE};
+use crate::video_thumbnail::{generate_thumbnail, MAX_THUMBNAIL_SIZE};
 use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
-use ovrley_core::encode::ffmpeg::transitions::{
-    is_xfade_transition, transition_defaults, NO_TRANSITION,
+use ovrley_core::activity::trim::ActivityTrim;
+use ovrley_core::encode::ffmpeg::transitions::{transition_defaults, TransitionDefaults};
+use ovrley_core::encode::quality::{validate_quality, EncodingQuality, QualityType};
+use ovrley_core::encode::render_settings::{ExportMode, OutputMode, RenderSettings};
+use ovrley_core::media::manual_video_sync::{
+    Landmark, ManualVideoSync, DEFAULT_MANUAL_SPEED_THRESHOLD_KMH,
+    DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES,
 };
-use ovrley_core::encode::quality::{validate_quality, QualityType};
+use ovrley_core::media::video_edits::{
+    Cut, OffsetSource, PlacementAnchor, SegmentEdits, TimezoneMode, VideoEdits,
+    VideoMetadataSnapshot,
+};
 use ovrley_core::normalize::validate_template_rasters;
 use ovrley_widgets::widgets::raster::config::RasterConfig;
 use ovrley_core::raster::{
@@ -29,23 +37,13 @@ use uuid::Uuid;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter};
 
-const PROJECT_FORMAT: &str = "ovrley-project";
-const PROJECT_VERSION: u32 = 6;
-/// Key of the virtual clip at the start of a video, which no cut begins.
-const FIRST_SEGMENT_KEY: &str = "start";
+pub const PROJECT_FORMAT: &str = "ovrley-project";
+pub const PROJECT_VERSION: u32 = 6;
 const PROJECT_VERSION_V1: u32 = 1;
 const PROJECT_VERSION_V2: u32 = 2;
 const PROJECT_VERSION_V3: u32 = 3;
 const PROJECT_VERSION_V4: u32 = 4;
 const PROJECT_VERSION_V5: u32 = 5;
-const MAX_MANUAL_LANDMARKS: usize = 5;
-const MAX_MANUAL_LOCATION_LANDMARKS: usize = 1;
-const DEFAULT_MANUAL_SPEED_THRESHOLD_KMH: f64 = 5.0;
-const MIN_MANUAL_SPEED_THRESHOLD_KMH: f64 = 1.0;
-const MAX_MANUAL_SPEED_THRESHOLD_KMH: f64 = 10.0;
-const DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 80.0;
-const MIN_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 70.0;
-const MAX_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 160.0;
 const PROJECT_JSON_ENTRY: &str = "project.json";
 const THUMBNAIL_ENTRY: &str = "thumbnail.png";
 const RASTER_ASSET_NAMESPACE: &str = "rasters/";
@@ -59,15 +57,15 @@ pub fn default_project_directory(user_data_root: &Path) -> Result<String, String
     Ok(path_string(directory))
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+/// A project of a folder: its name (the file stem), its path, and its archived thumbnail (PNG).
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProjectFileSummary {
-    name: String,
-    path: String,
-    thumbnail_data_url: Option<String>,
+    pub name: String,
+    pub path: String,
+    pub thumbnail: Option<Vec<u8>>,
 }
 
-fn read_thumbnail_data_url(path: &Path) -> Option<String> {
+fn read_thumbnail(path: &Path) -> Option<Vec<u8>> {
     let file = File::open(path).ok()?;
     let mut archive = ZipArchive::new(file).ok()?;
     let mut entry = archive.by_name(THUMBNAIL_ENTRY).ok()?;
@@ -76,7 +74,7 @@ fn read_thumbnail_data_url(path: &Path) -> Option<String> {
     }
     let mut bytes = Vec::with_capacity(entry.size() as usize);
     entry.read_to_end(&mut bytes).ok()?;
-    Some(png_data_url(&bytes))
+    Some(bytes)
 }
 
 pub fn list_project_files(directory: String) -> Result<Vec<ProjectFileSummary>, String> {
@@ -107,7 +105,7 @@ pub fn list_project_files(directory: String) -> Result<Vec<ProjectFileSummary>, 
             .ok_or_else(|| "Project filename must be valid UTF-8".to_string())?;
         projects.push(ProjectFileSummary {
             name: name.to_string(),
-            thumbnail_data_url: read_thumbnail_data_url(&path),
+            thumbnail: read_thumbnail(&path),
             path: path_string(path),
         });
     }
@@ -121,39 +119,32 @@ pub fn list_project_files(directory: String) -> Result<Vec<ProjectFileSummary>, 
     Ok(projects)
 }
 
+/// A project in the current format: the envelope around the editor's own state types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ProjectDocument {
-    format: String,
-    version: u32,
-    saved_at: String,
-    editor: ProjectEditor,
-    sources: ProjectSources,
-    sync: ProjectSync,
-    laps: ProjectLaps,
+    pub format: String,
+    pub version: u32,
+    pub saved_at: String,
+    pub editor: ProjectEditor,
+    pub sources: ProjectSources,
+    pub sync: ProjectSync,
+    pub laps: ProjectLaps,
     /// Trimmed part of the activity, or null for the whole activity.
     #[serde(deserialize_with = "deserialize_required_option")]
-    activity_trim: Option<ProjectActivityTrim>,
-    transition_defaults: ProjectTransitionDefaults,
-    render: ProjectRender,
-    timeline: ProjectTimeline,
-    raster_assets: BTreeMap<String, String>,
-}
-
-/// The part of the activity an overlay renders when no video decides it, in activity seconds.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectActivityTrim {
-    start_second: f64,
-    end_second: f64,
+    pub activity_trim: Option<ActivityTrim>,
+    pub transition_defaults: TransitionDefaults,
+    pub render: ProjectRender,
+    pub timeline: ProjectTimeline,
+    pub raster_assets: BTreeMap<String, String>,
 }
 
 /// The activity's lap selection; stale IDs never survive an activity change in the editor.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ProjectLaps {
+pub struct ProjectLaps {
     /// Strictly increasing canonical lap IDs excluded from lap widgets.
-    disabled: Vec<usize>,
+    pub disabled: Vec<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,14 +188,19 @@ struct ProjectDocumentV1 {
     timeline: ProjectTimeline,
 }
 
+/// The editor's durable state. The template ingress (`ovrley_core::normalize::template`)
+/// normalizes it when the project is applied.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectEditor {
-    config: Value,
-    global_defaults: GlobalDefaults,
+pub struct ProjectEditor {
+    pub config: Value,
+    /// The store's global defaults; [`GlobalDefaults`] checks their shape.
+    pub global_defaults: serde_json::Map<String, Value>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// The shape the archive requires of the global defaults: exactly the template manifest's keys,
+/// typed. The template ingress normalizes the values when the project is applied.
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct GlobalDefaults {
     border_color: String,
@@ -221,27 +217,29 @@ struct GlobalDefaults {
     font_size: f64,
     opacity: f64,
     scale: f64,
+    #[allow(dead_code)]
     fixed_width_digits: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Where a source file is: relative to the project's folder, or absolute.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(
     tag = "kind",
     content = "value",
     rename_all = "kebab-case",
     deny_unknown_fields
 )]
-enum PathLocator {
+pub enum PathLocator {
     ProjectRelative(String),
     Absolute(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ProjectSources {
-    activity: Option<ProjectSource>,
+pub struct ProjectSources {
+    pub activity: Option<ProjectSource>,
     /// Imported videos in import order.
-    videos: Vec<ProjectVideo>,
+    pub videos: Vec<ProjectVideo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -253,158 +251,93 @@ struct ProjectSourcesV5 {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ProjectSource {
-    path: PathLocator,
+pub struct ProjectSource {
+    pub path: PathLocator,
 }
 
-/// One imported video with its user edits.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One imported video: its identity, where its file is, the user's edits, and the video as last
+/// loaded. In the file the edits sit beside the identity, flat.
+#[derive(Debug, Clone)]
+pub struct ProjectVideo {
+    pub id: String,
+    pub path: PathLocator,
+    pub edits: VideoEdits,
+    /// Required in version 6; `None` only for a video migrated from an older version, which did
+    /// not store it.
+    pub metadata: Option<VideoMetadataSnapshot>,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectVideo {
+struct ProjectVideoFields {
     id: String,
     path: PathLocator,
     offset_seconds: f64,
     /// Whether the start was set by hand; detecting times again keeps a manual start.
     offset_source: OffsetSource,
     /// Where the video is split, by source frame in increasing order.
-    cuts: Vec<ProjectCut>,
+    cuts: Vec<Cut>,
     /// The edits of each virtual clip, keyed by the cut it starts at (`start` for the first).
-    segments: BTreeMap<String, ProjectSegment>,
+    segments: BTreeMap<String, SegmentEdits>,
     /// Places a video whose time cannot be determined next to another video.
     #[serde(deserialize_with = "deserialize_required_option")]
-    placement_anchor: Option<ProjectPlacementAnchor>,
-    /// How the video's camera clock time is read against the activity: local time
-    /// or UTC; `None` until it is inferred or chosen.
+    placement_anchor: Option<PlacementAnchor>,
+    /// How the video's camera clock time is read against the activity; `None` until it is
+    /// inferred or chosen.
     #[serde(deserialize_with = "deserialize_required_option")]
-    timezone_mode: Option<VideoTimezoneMode>,
-    /// The video as last loaded. Required in version 6; `None` only for a video
-    /// migrated from an older version, which did not store it.
+    timezone_mode: Option<TimezoneMode>,
     #[serde(deserialize_with = "deserialize_present")]
-    metadata: Option<ProjectVideoMetadata>,
+    metadata: Option<VideoMetadataSnapshot>,
 }
 
-/// What a video was when it was last loaded, so a file that cannot be found keeps
-/// its place, length, and details. A found file's probe replaces it.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectVideoMetadata {
-    frame_count: u64,
-    fps: ProjectFrameRate,
-    /// Display-oriented dimensions.
-    resolution: ProjectResolution,
-    rotation_degrees: u16,
-    has_audio: bool,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    codec_name: Option<String>,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    codec_long_name: Option<String>,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    bit_rate: Option<String>,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    camera_type: Option<String>,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    camera_model: Option<String>,
-    /// Detected recording time, before any change made in the editor.
-    #[serde(deserialize_with = "deserialize_required_option")]
-    creation_time: Option<String>,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    time_source: Option<String>,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ProjectFrameRate {
-    num: u32,
-    den: u32,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct ProjectResolution {
-    width: u32,
-    height: u32,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum OffsetSource {
-    Auto,
-    Manual,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectPlacementAnchor {
-    video_id: String,
-    side: PlacementSide,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum PlacementSide {
-    Before,
-    After,
-}
-
-/// A split of a video at a source frame.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectCut {
-    id: String,
-    frame: u64,
-}
-
-/// One virtual clip: whether it is exported, the transition of the join into it,
-/// and whether its activity widgets are hidden. A `null` transition follows the
-/// project transition defaults; a present one is a user override.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectSegment {
-    excluded: bool,
-    #[serde(deserialize_with = "deserialize_required_option")]
-    transition_in: Option<ProjectTransition>,
-    skip_overlay: bool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectTransition {
-    #[serde(rename = "type")]
-    transition_type: String,
-    duration_seconds: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectTransitionDefaults {
-    #[serde(rename = "type")]
-    transition_type: String,
-    duration_seconds: f64,
-    split_gap_threshold_seconds: f64,
-}
-
-impl Default for ProjectTransitionDefaults {
-    fn default() -> Self {
-        let defaults = transition_defaults();
-        Self {
-            transition_type: defaults.transition_type.clone(),
-            duration_seconds: defaults.duration_seconds,
-            split_gap_threshold_seconds: defaults.split_gap_threshold_seconds,
+impl Serialize for ProjectVideo {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let edits = self.edits.clone();
+        ProjectVideoFields {
+            id: self.id.clone(),
+            path: self.path.clone(),
+            offset_seconds: edits.offset_seconds,
+            offset_source: edits.offset_source,
+            cuts: edits.cuts,
+            segments: edits.segments,
+            placement_anchor: edits.placement_anchor,
+            timezone_mode: edits.timezone_mode,
+            metadata: self.metadata.clone(),
         }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectVideo {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fields = ProjectVideoFields::deserialize(deserializer)?;
+        Ok(Self {
+            id: fields.id,
+            path: fields.path,
+            edits: VideoEdits {
+                offset_seconds: fields.offset_seconds,
+                offset_source: fields.offset_source,
+                cuts: fields.cuts,
+                segments: fields.segments,
+                placement_anchor: fields.placement_anchor,
+                timezone_mode: fields.timezone_mode,
+            },
+            metadata: fields.metadata,
+        })
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectSync {
-    manual: ProjectManualVideoSync,
+pub struct ProjectSync {
+    pub manual: ManualVideoSync,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectSyncV5 {
     video_offset_seconds: f64,
-    video_timezone_mode: Option<VideoTimezoneMode>,
+    video_timezone_mode: Option<TimezoneMode>,
     manual: ProjectManualVideoSyncV5,
 }
 
@@ -412,64 +345,17 @@ struct ProjectSyncV5 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectSyncV1 {
     video_offset_seconds: f64,
-    video_timezone_mode: Option<VideoTimezoneMode>,
-}
-
-/// Landmarks belong to the video whose manual sync workspace is selected.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectManualVideoSync {
-    #[serde(deserialize_with = "deserialize_required_option")]
-    video_id: Option<String>,
-    landmarks: Vec<ProjectLandmark>,
-    #[serde(default)]
-    detected_location_second: Option<f64>,
-    speed_threshold_kmh: f64,
-    turn_threshold_degrees: f64,
+    video_timezone_mode: Option<TimezoneMode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ProjectManualVideoSyncV5 {
-    landmarks: Vec<ProjectLandmark>,
+    landmarks: Vec<Landmark>,
     #[serde(default)]
     detected_location_second: Option<f64>,
     speed_threshold_kmh: f64,
     turn_threshold_degrees: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", deny_unknown_fields)]
-enum ProjectLandmark {
-    #[serde(rename = "stop")]
-    Stop {
-        id: String,
-        #[serde(rename = "videoSecond")]
-        video_second: f64,
-    },
-    #[serde(rename = "leftTurn")]
-    LeftTurn {
-        id: String,
-        #[serde(rename = "videoSecond")]
-        video_second: f64,
-    },
-    #[serde(rename = "rightTurn")]
-    RightTurn {
-        id: String,
-        #[serde(rename = "videoSecond")]
-        video_second: f64,
-    },
-    #[serde(rename = "location")]
-    Location {
-        id: String,
-        #[serde(rename = "videoSecond")]
-        video_second: f64,
-        #[serde(
-            rename = "activitySecond",
-            deserialize_with = "deserialize_required_option"
-        )]
-        activity_second: Option<f64>,
-    },
 }
 
 /// Deserializes a nullable field that must be present.
@@ -491,26 +377,73 @@ where
     T::deserialize(deserializer).map(Some)
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum VideoTimezoneMode {
-    Local,
-    Utc,
+/// The render settings and the batch output folder. `outputMode: combined` renders the whole
+/// program to one file; `separate` renders every project video to its own file in
+/// `batchOutputFolder`.
+#[derive(Debug, Clone)]
+pub struct ProjectRender {
+    pub settings: RenderSettings,
+    pub batch_output_folder: Option<String>,
 }
 
-/// `outputMode: combined` renders the whole program to one file; `separate`
-/// renders every project video to its own file in `batchOutputFolder`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectRender {
+struct ProjectRenderFields {
     output_mode: OutputMode,
     batch_output_folder: Option<String>,
     fps: f64,
     widget_update_rate: u32,
     export_mode: ExportMode,
     codec: String,
+    #[serde(flatten)]
+    quality: QualityFields,
+}
+
+/// Rate control as the file stores it: `qualityType` and `qualityValue`.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct QualityFields {
     quality_type: QualityType,
     quality_value: f64,
+}
+
+impl Serialize for ProjectRender {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let settings = &self.settings;
+        let (quality_type, quality_value) = match settings.quality {
+            EncodingQuality::Quality(value) => (QualityType::Quality, f64::from(value)),
+            EncodingQuality::Bitrate(value) => (QualityType::Bitrate, value),
+        };
+        ProjectRenderFields {
+            output_mode: settings.output_mode,
+            batch_output_folder: self.batch_output_folder.clone(),
+            fps: settings.fps,
+            widget_update_rate: settings.widget_update_rate,
+            export_mode: settings.export_mode,
+            codec: settings.codec.clone(),
+            quality: QualityFields { quality_type, quality_value },
+        }
+        .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for ProjectRender {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let fields = ProjectRenderFields::deserialize(deserializer)?;
+        let quality = validate_quality(fields.quality.quality_type, fields.quality.quality_value)
+            .map_err(|error| serde::de::Error::custom(format!("render.{error}")))?;
+        Ok(Self {
+            settings: RenderSettings {
+                output_mode: fields.output_mode,
+                fps: fields.fps,
+                widget_update_rate: fields.widget_update_rate,
+                export_mode: fields.export_mode,
+                codec: fields.codec,
+                quality,
+            },
+            batch_output_folder: fields.batch_output_folder,
+        })
+    }
 }
 
 /// Versions 3 to 5 rendered batches from a video folder.
@@ -542,20 +475,6 @@ struct LegacyProjectRender {
     range: ProjectRange,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum ExportMode {
-    Transparent,
-    Composite,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum OutputMode {
-    Combined,
-    Separate,
-}
-
 /// Versions 3 to 5 render target: the current video or a batch of a video folder.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -583,33 +502,37 @@ enum RangeType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct ProjectTimeline {
-    playhead_second: f64,
-    view_start: f64,
-    view_end: f64,
+pub struct ProjectTimeline {
+    pub playhead_second: f64,
+    pub view_start: f64,
+    pub view_end: f64,
 }
 
-#[derive(Serialize)]
+/// The project's source files, resolved to absolute paths.
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct ResolvedSources {
-    activity_path: Option<String>,
+pub struct ResolvedSources {
+    pub activity_path: Option<String>,
     /// Absolute paths in `sources.videos` order.
-    video_paths: Vec<String>,
+    pub video_paths: Vec<String>,
 }
 
-#[derive(Serialize)]
+/// A read project, typed: the validated document, its resolved sources, each populated raster's
+/// load result, and the video folder of a version 3 to 5 batch project.
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadProjectResult {
-    project: ProjectDocument,
-    resolved_sources: ResolvedSources,
-    raster_load_results: HashMap<String, RasterLoadResult>,
-    /// Video folder of a version 3 to 5 batch project; the frontend tells the user it is no longer imported.
-    legacy_batch_video_folder: Option<String>,
+    pub project: ProjectDocument,
+    pub resolved_sources: ResolvedSources,
+    pub raster_load_results: HashMap<String, RasterLoadResult>,
+    /// Video folder of a version 3 to 5 batch project; the editor tells the user it is no longer imported.
+    pub legacy_batch_video_folder: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+/// A populated raster widget's embedded image: registered as a resource, or why it failed.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(tag = "status", rename_all = "lowercase")]
-enum RasterLoadResult {
+pub enum RasterLoadResult {
     Ready {
         #[serde(rename = "resourceId")]
         resource_id: String,
@@ -731,12 +654,13 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         validate_locator(&source.path)?;
     }
     validate_videos(&project.sources.videos)?;
-    validate_transition_defaults(&project.transition_defaults)?;
+    project.transition_defaults.validate()?;
     if let Some(folder) = &project.render.batch_output_folder {
         validate_folder(folder)?;
     }
+    let render = &project.render.settings;
     for (label, value) in [
-        ("render.fps", project.render.fps),
+        ("render.fps", render.fps),
         ("timeline.playheadSecond", project.timeline.playhead_second),
         ("timeline.viewStart", project.timeline.view_start),
         ("timeline.viewEnd", project.timeline.view_end),
@@ -745,27 +669,20 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
             return Err(format!("{label} must be finite"));
         }
     }
-    if project.render.fps <= 0.0 || project.render.widget_update_rate == 0 {
+    if render.fps <= 0.0 || render.widget_update_rate == 0 {
         return Err("Render fps and widgetUpdateRate must be positive".into());
     }
-    validate_quality(project.render.quality_type, project.render.quality_value)
-        .map_err(|error| format!("render.{error}"))?;
-    if project.render.codec.trim().is_empty() {
+    if render.codec.trim().is_empty() {
         return Err("render.codec must not be empty".into());
     }
-    if matches!(project.render.export_mode, ExportMode::Composite)
-        && matches!(project.render.output_mode, OutputMode::Combined)
+    if matches!(render.export_mode, ExportMode::Composite)
+        && matches!(render.output_mode, OutputMode::Combined)
         && project.sources.videos.is_empty()
     {
         return Err("Composite export mode requires a video source".into());
     }
     if let Some(trim) = &project.activity_trim {
-        if !trim.start_second.is_finite() || !trim.end_second.is_finite() {
-            return Err("activityTrim bounds must be finite".into());
-        }
-        if trim.start_second < 0.0 || trim.start_second >= trim.end_second {
-            return Err("activityTrim requires 0 <= startSecond < endSecond".into());
-        }
+        trim.validate()?;
         if project.sources.activity.is_none() {
             return Err("activityTrim requires an activity source".into());
         }
@@ -779,126 +696,23 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
     if !project.laps.disabled.is_empty() && project.sources.activity.is_none() {
         return Err("laps.disabled requires an activity source".into());
     }
-    match &project.sync.manual.video_id {
-        Some(video_id)
-            if !project
-                .sources
-                .videos
-                .iter()
-                .any(|video| &video.id == video_id) =>
-        {
+    let manual = &project.sync.manual;
+    if let Some(video_id) = &manual.video_id {
+        if !project.sources.videos.iter().any(|video| &video.id == video_id) {
             return Err(format!(
                 "sync.manual.videoId does not reference a project video: {video_id}"
             ));
         }
-        None if !project.sync.manual.landmarks.is_empty() => {
-            return Err("sync.manual.landmarks require sync.manual.videoId".into());
-        }
-        _ => {}
     }
-    if project.sync.manual.detected_location_second.is_some() && project.sources.activity.is_none()
-    {
+    if manual.detected_location_second.is_some() && project.sources.activity.is_none() {
         return Err("sync.manual.detectedLocationSecond requires an activity source".into());
     }
-    validate_manual_video_sync(&project.sync.manual)?;
     validate_editor(&project.editor)?;
     validate_project_rasters(&project.editor.config, &project.raster_assets)
 }
 
-fn validate_transition_type(transition_type: &str) -> Result<(), String> {
-    if transition_type != NO_TRANSITION && !is_xfade_transition(transition_type) {
-        return Err(format!("unknown transition type: {transition_type}"));
-    }
-    Ok(())
-}
-
-fn validate_transition(transition: &ProjectTransition) -> Result<(), String> {
-    validate_transition_type(&transition.transition_type)?;
-    let duration = transition.duration_seconds;
-    if transition.transition_type == NO_TRANSITION {
-        if duration != 0.0 {
-            return Err("durationSeconds of no transition must be 0".into());
-        }
-    } else if !duration.is_finite() || duration <= 0.0 {
-        return Err("durationSeconds must be a positive finite number".into());
-    }
-    Ok(())
-}
-
-fn validate_transition_defaults(defaults: &ProjectTransitionDefaults) -> Result<(), String> {
-    validate_transition_type(&defaults.transition_type)
-        .map_err(|error| format!("transitionDefaults {error}"))?;
-    // The duration stays positive for "no transition" so that choosing a type later keeps it.
-    if !defaults.duration_seconds.is_finite() || defaults.duration_seconds <= 0.0 {
-        return Err("transitionDefaults.durationSeconds must be a positive finite number".into());
-    }
-    if !defaults.split_gap_threshold_seconds.is_finite()
-        || defaults.split_gap_threshold_seconds < 0.0
-    {
-        return Err(
-            "transitionDefaults.splitGapThresholdSeconds must be a finite non-negative number"
-                .into(),
-        );
-    }
-    Ok(())
-}
-
-/// Cuts lie at strictly increasing frames after the first, and every virtual clip
-/// has exactly one entry in `segments`, keyed by the cut it starts at.
-fn validate_cuts_and_segments(video: &ProjectVideo) -> Result<(), String> {
-    let mut expected_keys = HashSet::from([FIRST_SEGMENT_KEY]);
-    let mut previous_frame = 0;
-    for cut in &video.cuts {
-        if cut.id.trim().is_empty() || cut.id == FIRST_SEGMENT_KEY {
-            return Err(format!("sources.videos cuts id is not valid: {:?}", cut.id));
-        }
-        if !expected_keys.insert(cut.id.as_str()) {
-            return Err(format!("sources.videos cuts id is duplicated: {}", cut.id));
-        }
-        if cut.frame <= previous_frame {
-            return Err("sources.videos cuts require strictly increasing frames above 0".into());
-        }
-        previous_frame = cut.frame;
-    }
-    if let Some(metadata) = &video.metadata {
-        if previous_frame >= metadata.frame_count {
-            return Err("sources.videos cuts must lie inside the video".into());
-        }
-    }
-    let keys: HashSet<&str> = video.segments.keys().map(String::as_str).collect();
-    if keys != expected_keys {
-        return Err(format!(
-            "sources.videos segments of {} must have one entry per cut and one for {FIRST_SEGMENT_KEY}",
-            video.id
-        ));
-    }
-    for segment in video.segments.values() {
-        if let Some(transition) = &segment.transition_in {
-            validate_transition(transition)
-                .map_err(|error| format!("sources.videos segments transitionIn {error}"))?;
-        }
-    }
-    Ok(())
-}
-
-fn validate_video_metadata(metadata: &ProjectVideoMetadata) -> Result<(), String> {
-    if metadata.frame_count == 0 {
-        return Err("sources.videos metadata frameCount must be positive".into());
-    }
-    if metadata.fps.num == 0 || metadata.fps.den == 0 {
-        return Err("sources.videos metadata fps must be positive".into());
-    }
-    if metadata.resolution.width == 0 || metadata.resolution.height == 0 {
-        return Err("sources.videos metadata resolution must be positive".into());
-    }
-    if ![0, 90, 180, 270].contains(&metadata.rotation_degrees) {
-        return Err("sources.videos metadata rotationDegrees must be 0, 90, 180 or 270".into());
-    }
-    Ok(())
-}
-
-/// Validates the video collection. Cuts are checked against the saved frame count;
-/// the frontend checks the saved edits again against the probe of a found file.
+/// Validates the video collection: ids, locators, and each video's edits against its saved
+/// frame count. The editor checks the saved edits again against the probe of a found file.
 fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
     let mut video_ids = HashSet::new();
     for video in videos {
@@ -909,13 +723,10 @@ fn validate_videos(videos: &[ProjectVideo]) -> Result<(), String> {
             return Err(format!("sources.videos id is duplicated: {}", video.id));
         }
         validate_locator(&video.path)?;
-        if !video.offset_seconds.is_finite() {
-            return Err("sources.videos offsetSeconds must be finite".into());
-        }
-        if let Some(metadata) = &video.metadata {
-            validate_video_metadata(metadata)?;
-        }
-        validate_cuts_and_segments(video)?;
+        video.edits.validate(
+            &video.id,
+            video.metadata.as_ref().map(|metadata| metadata.frame_count),
+        )?;
     }
     validate_placement_anchors(videos)
 }
@@ -926,6 +737,7 @@ fn validate_placement_anchors(videos: &[ProjectVideo]) -> Result<(), String> {
         .iter()
         .filter_map(|video| {
             video
+                .edits
                 .placement_anchor
                 .as_ref()
                 .map(|anchor| (video.id.as_str(), anchor.video_id.as_str()))
@@ -981,91 +793,12 @@ fn validate_project_rasters(
     Ok(populated)
 }
 
-fn validate_manual_video_sync(manual: &ProjectManualVideoSync) -> Result<(), String> {
-    if let Some(activity_second) = manual.detected_location_second {
-        if !activity_second.is_finite() || activity_second < 0.0 {
-            return Err(
-                "sync.manual.detectedLocationSecond must be a finite non-negative number or null"
-                    .into(),
-            );
-        }
-    }
-    if manual.landmarks.len() > MAX_MANUAL_LANDMARKS {
-        return Err(format!(
-            "sync.manual.landmarks must contain at most {MAX_MANUAL_LANDMARKS} landmarks"
-        ));
-    }
-    if !manual.speed_threshold_kmh.is_finite()
-        || !(MIN_MANUAL_SPEED_THRESHOLD_KMH..=MAX_MANUAL_SPEED_THRESHOLD_KMH)
-            .contains(&manual.speed_threshold_kmh)
-    {
-        return Err(format!(
-            "sync.manual.speedThresholdKmh must be finite and between {MIN_MANUAL_SPEED_THRESHOLD_KMH} and {MAX_MANUAL_SPEED_THRESHOLD_KMH}"
-        ));
-    }
-    if !manual.turn_threshold_degrees.is_finite()
-        || !(MIN_MANUAL_TURN_THRESHOLD_DEGREES..=MAX_MANUAL_TURN_THRESHOLD_DEGREES)
-            .contains(&manual.turn_threshold_degrees)
-    {
-        return Err(format!(
-            "sync.manual.turnThresholdDegrees must be finite and between {MIN_MANUAL_TURN_THRESHOLD_DEGREES} and {MAX_MANUAL_TURN_THRESHOLD_DEGREES}"
-        ));
-    }
-
-    let mut ids = Vec::with_capacity(manual.landmarks.len());
-    let mut location_count = 0;
-    for landmark in &manual.landmarks {
-        let (id, video_second, activity_second) = match landmark {
-            ProjectLandmark::Stop {
-                id, video_second, ..
-            }
-            | ProjectLandmark::LeftTurn {
-                id, video_second, ..
-            }
-            | ProjectLandmark::RightTurn {
-                id, video_second, ..
-            } => (id, *video_second, None),
-            ProjectLandmark::Location {
-                id,
-                video_second,
-                activity_second,
-            } => {
-                location_count += 1;
-                (id, *video_second, *activity_second)
-            }
-        };
-        if id.trim().is_empty() {
-            return Err("sync.manual.landmark id must not be empty".into());
-        }
-        if ids.contains(&id) {
-            return Err(format!("sync.manual.landmark id is duplicated: {id}"));
-        }
-        ids.push(id);
-        if !video_second.is_finite() || video_second < 0.0 {
-            return Err(
-                "sync.manual.landmark videoSecond must be a finite non-negative number".into(),
-            );
-        }
-        if let Some(activity_second) = activity_second {
-            if !activity_second.is_finite() {
-                return Err(
-                    "sync.manual.location landmark activitySecond must be finite or null".into(),
-                );
-            }
-        }
-    }
-    if location_count > MAX_MANUAL_LOCATION_LANDMARKS {
-        return Err(format!(
-            "sync.manual.landmarks must contain at most {MAX_MANUAL_LOCATION_LANDMARKS} location landmark"
-        ));
-    }
-    Ok(())
-}
-
 fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
     ovrley_core::normalize::validate_saved_label_typography(&editor.config)
         .map_err(|error| error.to_string())?;
-    let globals = &editor.global_defaults;
+    let globals: GlobalDefaults =
+        serde_json::from_value(Value::Object(editor.global_defaults.clone()))
+            .map_err(|error| format!("editor.globalDefaults: {error}"))?;
     for (label, value) in [
         (
             "editor.globalDefaults.borderThickness",
@@ -1250,57 +983,52 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
     let video = project.sources.video.map(|source| ProjectVideo {
         id: Uuid::new_v4().to_string(),
         path: source.path,
-        offset_seconds: project.sync.video_offset_seconds,
-        offset_source: OffsetSource::Auto,
-        cuts: Vec::new(),
-        segments: BTreeMap::from([(
-            FIRST_SEGMENT_KEY.to_string(),
-            ProjectSegment {
-                excluded: false,
-                transition_in: None,
-                skip_overlay: false,
-            },
-        )]),
-        placement_anchor: None,
-        timezone_mode: project.sync.video_timezone_mode,
+        edits: VideoEdits {
+            offset_seconds: project.sync.video_offset_seconds,
+            timezone_mode: project.sync.video_timezone_mode,
+            ..VideoEdits::default()
+        },
         metadata: None,
     });
     let manual = project.sync.manual;
+    let manual = ManualVideoSync {
+        video_id: video.as_ref().map(|video| video.id.clone()),
+        landmarks: manual.landmarks,
+        detected_location_second: manual.detected_location_second,
+        speed_threshold_kmh: manual.speed_threshold_kmh,
+        turn_threshold_degrees: manual.turn_threshold_degrees,
+    };
+    manual.validate()?;
     let activity_trim = migrate_render_range(&render.range, project.sources.activity.is_some());
+    let quality = validate_quality(render.quality_type, render.quality_value)
+        .map_err(|error| format!("render.{error}"))?;
     let document = ProjectDocument {
         format: project.format,
         version: PROJECT_VERSION,
         saved_at: project.saved_at,
         editor: project.editor,
-        sync: ProjectSync {
-            manual: ProjectManualVideoSync {
-                video_id: video.as_ref().map(|video| video.id.clone()),
-                landmarks: manual.landmarks,
-                detected_location_second: manual.detected_location_second,
-                speed_threshold_kmh: manual.speed_threshold_kmh,
-                turn_threshold_degrees: manual.turn_threshold_degrees,
-            },
-        },
+        sync: ProjectSync { manual },
         sources: ProjectSources {
             activity: project.sources.activity,
             videos: video.into_iter().collect(),
         },
         laps: project.laps,
         activity_trim,
-        transition_defaults: ProjectTransitionDefaults::default(),
+        transition_defaults: transition_defaults().clone(),
         render: ProjectRender {
-            output_mode: if renders_video_folder {
-                OutputMode::Separate
-            } else {
-                OutputMode::Combined
+            settings: RenderSettings {
+                output_mode: if renders_video_folder {
+                    OutputMode::Separate
+                } else {
+                    OutputMode::Combined
+                },
+                fps: render.fps,
+                widget_update_rate: render.widget_update_rate,
+                export_mode: render.export_mode,
+                codec: render.codec,
+                quality,
             },
             batch_output_folder: render.batch_output_folder,
-            fps: render.fps,
-            widget_update_rate: render.widget_update_rate,
-            export_mode: render.export_mode,
-            codec: render.codec,
-            quality_type: render.quality_type,
-            quality_value: render.quality_value,
         },
         timeline: project.timeline,
         raster_assets: project.raster_assets,
@@ -1314,14 +1042,14 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
 /// Versions 1 to 5 saved a custom export range in timeline seconds, which are
 /// activity seconds; it becomes the activity trim. The editor fits it to the
 /// loaded activity, and a range without an activity is dropped.
-fn migrate_render_range(range: &ProjectRange, has_activity: bool) -> Option<ProjectActivityTrim> {
+fn migrate_render_range(range: &ProjectRange, has_activity: bool) -> Option<ActivityTrim> {
     let start_second = range.from.max(0.0);
     (matches!(range.range_type, RangeType::Custom)
         && has_activity
         && range.from.is_finite()
         && range.to.is_finite()
         && start_second < range.to)
-        .then_some(ProjectActivityTrim {
+        .then_some(ActivityTrim {
             start_second,
             end_second: range.to,
         })
@@ -1382,30 +1110,41 @@ fn parse_project_header(input: &str) -> Result<(String, u32, Value), String> {
     Ok((format, version, value))
 }
 
-fn parse_project(input: &str) -> Result<ValidatedProject, String> {
+/// The current-format document of a project JSON of any supported version.
+fn migrate_project_json(input: &str) -> Result<MigratedProject, String> {
     let (format, version, value) = parse_project_header(input)?;
     if format != PROJECT_FORMAT {
         return Err(format!("Unsupported project format: {format}"));
     }
-    let MigratedProject {
-        document: mut project,
-        legacy_batch_video_folder,
-    } = migrate_project(version, value)?;
+    migrate_project(version, value)
+}
+
+/// The one validation of a document, and the editor's render mirrors: the scene's fps and update
+/// rate are the render settings'.
+fn validate_document(mut project: ProjectDocument) -> Result<(ProjectDocument, HashSet<String>), String> {
     let populated_rasters = validate_project(&project)?;
+    let render = &project.render.settings;
+    let (fps, widget_update_rate) = (render.fps, render.widget_update_rate);
     let scene = project
         .editor
         .config
         .get_mut("scene")
         .and_then(Value::as_object_mut)
         .ok_or_else(|| "editor.config.scene must be an object".to_string())?;
-    scene.insert("fps".into(), Value::from(project.render.fps));
-    scene.insert(
-        "updateRate".into(),
-        Value::from(project.render.widget_update_rate),
-    );
+    scene.insert("fps".into(), Value::from(fps));
+    scene.insert("updateRate".into(), Value::from(widget_update_rate));
     scene.remove("update_rate");
+    Ok((project, populated_rasters))
+}
+
+fn parse_project(input: &str) -> Result<ValidatedProject, String> {
+    let MigratedProject {
+        document,
+        legacy_batch_video_folder,
+    } = migrate_project_json(input)?;
+    let (document, populated_rasters) = validate_document(document)?;
     Ok(ValidatedProject {
-        document: project,
+        document,
         populated_rasters,
         legacy_batch_video_folder,
     })
@@ -1421,6 +1160,38 @@ fn resolve_locator(project_path: &Path, locator: &PathLocator) -> Result<PathBuf
             .join(value),
     };
     Ok(path)
+}
+
+/// `createPathLocator`: a source inside the project's folder is stored relative to it, with `/`
+/// separators; any other source is absolute. On Windows paths the comparison ignores case.
+pub fn create_path_locator(source_path: &str, project_path: &str) -> Result<PathLocator, String> {
+    if source_path.is_empty() || project_path.is_empty() {
+        return Err("Source and project paths are required".into());
+    }
+    fn split(path: &str) -> Vec<&str> {
+        path.split(['/', '\\']).filter(|part| !part.is_empty()).collect()
+    }
+    fn is_windows_path(path: &str) -> bool {
+        let bytes = path.as_bytes();
+        bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && matches!(bytes[2], b'/' | b'\\')
+    }
+    let project_parts = split(project_path);
+    let directory_parts = &project_parts[..project_parts.len().saturating_sub(1)];
+    let source_parts = split(source_path);
+    let case_insensitive = is_windows_path(source_path) || is_windows_path(project_path);
+    let matches = directory_parts.iter().enumerate().all(|(index, part)| {
+        source_parts.get(index).is_some_and(|source| {
+            if case_insensitive {
+                source.to_lowercase() == part.to_lowercase()
+            } else {
+                source == part
+            }
+        })
+    });
+    if matches && source_parts.len() > directory_parts.len() {
+        return Ok(PathLocator::ProjectRelative(source_parts[directory_parts.len()..].join("/")));
+    }
+    Ok(PathLocator::Absolute(source_path.to_string()))
 }
 
 fn path_string(path: PathBuf) -> String {
@@ -1596,14 +1367,19 @@ fn load_raster_asset(
     })
 }
 
-/// Reads and validates a `.oly` archive, registering its embedded rasters.
-pub fn read_project_file(resources: &RasterResources, path: String) -> Result<ReadProjectResult, String> {
-    read_project_file_sync(resources, path).map_err(|error| error.command_error("invalid_archive"))
+/// Reads, migrates and validates a `.oly` archive, registering its embedded rasters.
+pub fn read_project(resources: &RasterResources, path: &str) -> Result<ReadProjectResult, String> {
+    read_project_sync(resources, path).map_err(|error| error.command_error("invalid_archive"))
 }
 
-fn read_project_file_sync(
+/// The JSON entry of the Tauri command: [`read_project`].
+pub fn read_project_file(resources: &RasterResources, path: String) -> Result<ReadProjectResult, String> {
+    read_project(resources, &path)
+}
+
+fn read_project_sync(
     resources: &RasterResources,
-    path: String,
+    path: &str,
 ) -> Result<ReadProjectResult, ProjectFileError> {
     let project_path = PathBuf::from(path);
     let LoadedArchive {
@@ -1812,22 +1588,18 @@ fn backup_legacy_project(target: &Path) -> Result<Option<PathBuf>, String> {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WriteProjectResult {
-    path: String,
+    pub path: String,
     /// Set when this save replaced an older-format project and kept its backup.
-    backup_path: Option<String>,
+    pub backup_path: Option<String>,
 }
 
-fn write_project_file_sync(
-    path: String,
-    project_json: String,
+fn write_project_sync(
+    path: &str,
+    document: ProjectDocument,
     ffmpeg: Option<&Path>,
     images: HashMap<String, Arc<SelectedRaster>>,
 ) -> Result<WriteProjectResult, ProjectFileError> {
-    let ValidatedProject {
-        document: mut project,
-        populated_rasters,
-        ..
-    } = parse_project(&project_json)?;
+    let (mut project, populated_rasters) = validate_document(document)?;
     let assets = prepare_raster_assets(&populated_rasters, images)?;
     project.raster_assets = assets
         .iter()
@@ -1840,7 +1612,7 @@ fn write_project_file_sync(
             .to_string()
             .into());
     }
-    let target = PathBuf::from(&path);
+    let target = PathBuf::from(path);
     let parent = target
         .parent()
         .ok_or_else(|| "Project target has no parent directory".to_string())?;
@@ -1848,7 +1620,11 @@ fn write_project_file_sync(
     // The thumbnail shows the first video on the timeline whose file gives a frame,
     // so a missing first video does not leave the project without one.
     let mut videos: Vec<&ProjectVideo> = project.sources.videos.iter().collect();
-    videos.sort_by(|left, right| left.offset_seconds.total_cmp(&right.offset_seconds));
+    videos.sort_by(|left, right| {
+        left.edits
+            .offset_seconds
+            .total_cmp(&right.edits.offset_seconds)
+    });
     let thumbnail = ffmpeg.and_then(|ffmpeg| {
         videos.into_iter().find_map(|video| {
             let video_path = resolve_locator(&target, &video.path).ok()?;
@@ -1865,25 +1641,59 @@ fn write_project_file_sync(
     let backup = backup_legacy_project(&target)?;
     temporary.commit(&target)?;
     Ok(WriteProjectResult {
-        path,
+        path: path.to_string(),
         backup_path: backup.map(path_string),
     })
 }
 
-/// Writes a `.oly` archive atomically. Blocking: it encodes the thumbnail with `ffmpeg` when one
-/// is available.
+/// Validates `document` and writes it as a `.oly` archive atomically, with the populated rasters'
+/// `images` and, when `ffmpeg` is available, a thumbnail of the first video that gives a frame.
+/// Blocking. A replaced older-format project is kept as a backup first.
+pub fn write_project(
+    path: &str,
+    document: ProjectDocument,
+    ffmpeg: Option<&Path>,
+    images: HashMap<String, Arc<SelectedRaster>>,
+) -> Result<WriteProjectResult, String> {
+    write_project_sync(path, document, ffmpeg, images).map_err(|error| error.command_error("save_failed"))
+}
+
+/// The JSON entry of the Tauri command: the JSON is migrated to the current format and parsed,
+/// then [`write_project`].
 pub fn write_project_file(
     path: String,
     project_json: String,
     ffmpeg: Option<&Path>,
     images: HashMap<String, Arc<SelectedRaster>>,
 ) -> Result<WriteProjectResult, String> {
-    write_project_file_sync(path, project_json, ffmpeg, images).map_err(|error| error.command_error("save_failed"))
+    let document = migrate_project_json(&project_json)
+        .map_err(|error| ProjectFileError::from(error).command_error("save_failed"))?
+        .document;
+    write_project(&path, document, ffmpeg, images)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ovrley_core::media::video_edits::FIRST_SEGMENT_KEY;
+
+    fn read_project_file_sync(
+        resources: &RasterResources,
+        path: String,
+    ) -> Result<ReadProjectResult, ProjectFileError> {
+        read_project_sync(resources, &path)
+    }
+
+    /// The JSON entry, keeping the coded error.
+    fn write_project_file_sync(
+        path: String,
+        project_json: String,
+        ffmpeg: Option<&Path>,
+        images: HashMap<String, Arc<SelectedRaster>>,
+    ) -> Result<WriteProjectResult, ProjectFileError> {
+        let document = migrate_project_json(&project_json)?.document;
+        write_project_sync(&path, document, ffmpeg, images)
+    }
     use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
     use ovrley_core::raster::RasterResourceResolver;
 
@@ -2036,7 +1846,7 @@ mod tests {
                         weight.unwrap_or(400)
                     );
                     assert_eq!(loaded.editor.config["labels"][0]["font"], "Inter.ttf");
-                    assert_eq!(loaded.editor.global_defaults.font_text, "Inter.ttf");
+                    assert_eq!(loaded.editor.global_defaults["font_text"], "Inter.ttf");
                     assert_eq!(fs::read(&path).unwrap(), original);
                     let saved = serde_json::to_string(&loaded).unwrap();
                     write_project_file_sync(
@@ -2182,6 +1992,51 @@ mod tests {
         project
     }
 
+    /// Numbers compared as numbers: the file's `18` and `18.0` are the same value.
+    fn canonical(value: Value) -> Value {
+        match value {
+            Value::Number(number) => Value::from(number.as_f64().unwrap()),
+            Value::Array(items) => Value::Array(items.into_iter().map(canonical).collect()),
+            Value::Object(map) => {
+                Value::Object(map.into_iter().map(|(key, value)| (key, canonical(value))).collect())
+            }
+            other => other,
+        }
+    }
+
+    #[test]
+    fn typed_documents_write_what_they_read() {
+        let mut project = multi_video_project_json();
+        // A video whose file was missing keeps its saved metadata; a manual sync on its video.
+        project["sources"]["videos"][1]["timezoneMode"] = Value::from("utc");
+        project["activityTrim"] = serde_json::json!({ "startSecond": 2.0, "endSecond": 9.5 });
+        project["render"]["outputMode"] = Value::from("separate");
+        project["render"]["batchOutputFolder"] = Value::from(if cfg!(windows) { "C:\\renders" } else { "/renders" });
+        let document = parse_project(&project.to_string()).unwrap().document;
+        let written = serde_json::to_value(&document).unwrap();
+        for key in ["sources", "sync", "laps", "activityTrim", "transitionDefaults", "render", "timeline", "rasterAssets"] {
+            assert_eq!(canonical(written[key].clone()), canonical(project[key].clone()), "{key}");
+        }
+        assert_eq!(written["sources"]["videos"][1]["cuts"][0]["frame"], serde_json::json!(150), "frames stay whole numbers");
+        assert_eq!(written["sources"]["videos"][0]["placementAnchor"], Value::Null, "null stays null");
+        let typed = &document.sources.videos[1].edits;
+        assert_eq!(typed.cuts.len(), 2);
+        assert_eq!(typed.timezone_mode, Some(TimezoneMode::Utc));
+    }
+
+    #[test]
+    fn locators_are_relative_inside_the_project_folder() {
+        let relative = |value: &str| PathLocator::ProjectRelative(value.into());
+        let absolute = |value: &str| PathLocator::Absolute(value.into());
+        assert_eq!(create_path_locator("/rides/media/a.mp4", "/rides/race.oly"), Ok(relative("media/a.mp4")));
+        assert_eq!(create_path_locator("/rides/a.mp4", "/rides/race.oly"), Ok(relative("a.mp4")));
+        assert_eq!(create_path_locator("/other/a.mp4", "/rides/race.oly"), Ok(absolute("/other/a.mp4")));
+        assert_eq!(create_path_locator("/rides-2/a.mp4", "/rides/race.oly"), Ok(absolute("/rides-2/a.mp4")));
+        assert_eq!(create_path_locator("C:\\Rides\\Media\\a.mp4", "c:\\rides\\race.oly"), Ok(relative("Media/a.mp4")));
+        assert_eq!(create_path_locator("/Rides/a.mp4", "/rides/race.oly"), Ok(absolute("/Rides/a.mp4")), "case matters off Windows");
+        assert!(create_path_locator("", "/rides/race.oly").is_err());
+    }
+
     #[test]
     fn embedded_rasters_survive_source_loss_and_follow_reachable_widgets() {
         let directory =
@@ -2281,8 +2136,10 @@ mod tests {
 
             let loaded = read_project_file_sync(&resources, path_string(path.clone())).unwrap();
             assert_eq!(loaded.project.version, PROJECT_VERSION);
-            assert_eq!(loaded.project.render.quality_type, quality_type);
-            assert_eq!(loaded.project.render.quality_value, quality_value);
+            assert_eq!(
+                loaded.project.render.settings.quality,
+                validate_quality(quality_type, quality_value).unwrap()
+            );
             assert_eq!(
                 loaded.project.editor.config["rasters"],
                 project["editor"]["config"]["rasters"]
@@ -2360,7 +2217,7 @@ mod tests {
             read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
         assert_eq!(result.project.version, PROJECT_VERSION);
         assert!(matches!(
-            result.project.render.output_mode,
+            result.project.render.settings.output_mode,
             OutputMode::Separate
         ));
         assert_eq!(result.legacy_batch_video_folder, None);
@@ -2452,14 +2309,8 @@ mod tests {
 
         assert_eq!(projects.len(), 1);
         assert_eq!(
-            projects[0].thumbnail_data_url.as_deref(),
-            Some(
-                format!(
-                    "data:image/png;base64,{}",
-                    BASE64_STANDARD.encode(thumbnail)
-                )
-                .as_str()
-            )
+            projects[0].thumbnail.as_deref(),
+            Some(&thumbnail[..])
         );
         fs::remove_dir_all(directory).unwrap();
     }
@@ -2485,7 +2336,7 @@ mod tests {
         assert!(
             read_project_file_sync(&RasterResources::default(), path_string(path.clone())).is_ok()
         );
-        assert!(read_thumbnail_data_url(&path).is_none());
+        assert!(read_thumbnail(&path).is_none());
         fs::remove_dir_all(directory).unwrap();
     }
 
@@ -2558,7 +2409,7 @@ mod tests {
             let parsed = parse_project(&input).unwrap();
             assert_eq!(parsed.legacy_batch_video_folder, None);
             let parsed = parsed.document;
-            assert!(matches!(parsed.render.output_mode, OutputMode::Combined));
+            assert!(matches!(parsed.render.settings.output_mode, OutputMode::Combined));
             assert!(parsed.render.batch_output_folder.is_none());
             let serialized = serde_json::to_value(parsed).unwrap();
             assert_eq!(serialized["render"]["outputMode"], "combined");
@@ -2627,7 +2478,7 @@ mod tests {
         ] {
             let parsed = parse_project(&legacy).unwrap().document;
             assert_eq!(parsed.version, PROJECT_VERSION);
-            assert!(parsed.editor.global_defaults.fixed_width_digits);
+            assert!(parsed.editor.global_defaults["fixed_width_digits"] == Value::Bool(true));
         }
         v3["editor"]["globalDefaults"]["fixed_width_digits"] = Value::Bool(false);
         assert!(parse_project(&v3.to_string()).is_err());
@@ -2653,7 +2504,7 @@ mod tests {
         let parsed = parse_project(&project.to_string()).unwrap();
         assert_eq!(parsed.legacy_batch_video_folder, Some(videos.clone()));
         assert!(matches!(
-            parsed.document.render.output_mode,
+            parsed.document.render.settings.output_mode,
             OutputMode::Separate
         ));
         assert_eq!(parsed.document.render.batch_output_folder, Some(renders));
@@ -2666,7 +2517,7 @@ mod tests {
         let parsed = parse_project(&project.to_string()).unwrap();
         assert_eq!(parsed.legacy_batch_video_folder, None);
         assert!(matches!(
-            parsed.document.render.output_mode,
+            parsed.document.render.settings.output_mode,
             OutputMode::Combined
         ));
         assert_eq!(parsed.document.sources.videos.len(), 1);
@@ -2688,8 +2539,7 @@ mod tests {
         assert!(parsed.sync.manual.landmarks.is_empty());
         assert_eq!(parsed.sync.manual.speed_threshold_kmh, 5.0);
         assert_eq!(parsed.sync.manual.turn_threshold_degrees, 80.0);
-        assert_eq!(parsed.render.quality_type, QualityType::Quality);
-        assert_eq!(parsed.render.quality_value, 18.0);
+        assert_eq!(parsed.render.settings.quality, EncodingQuality::Quality(18.0 as u8));
         assert!(parsed.editor.config["rasters"]
             .as_array()
             .unwrap()
@@ -2704,8 +2554,7 @@ mod tests {
         assert!(migrated.raster_assets.is_empty());
         assert_eq!(migrated.sync.manual.speed_threshold_kmh, 5.0);
         assert_eq!(migrated.sync.manual.turn_threshold_degrees, 90.0);
-        assert_eq!(migrated.render.quality_type, QualityType::Quality);
-        assert_eq!(migrated.render.quality_value, 18.0);
+        assert_eq!(migrated.render.settings.quality, EncodingQuality::Quality(18.0 as u8));
         let mut malformed: Value = serde_json::from_str(&valid_v2_project_json()).unwrap();
         malformed["editor"]["config"]["rasters"] = serde_json::json!([]);
         assert!(parse_project(&malformed.to_string()).is_err());
@@ -2797,8 +2646,7 @@ mod tests {
                 project["render"]["bitrateMbps"] = Value::from(60.0);
                 let parsed = parse_project(&project.to_string()).unwrap().document;
                 assert_eq!(parsed.version, PROJECT_VERSION);
-                assert_eq!(parsed.render.quality_type, QualityType::Quality);
-                assert_eq!(parsed.render.quality_value, expected);
+                assert_eq!(parsed.render.settings.quality, EncodingQuality::Quality(expected as u8));
                 project["render"]["bitrateMbps"] = Value::from(-1.0);
                 assert!(parse_project(&project.to_string()).is_err());
             }
@@ -2925,12 +2773,12 @@ mod tests {
         assert!(
             matches!(&video.path, PathLocator::ProjectRelative(path) if path == "media/ride.mp4")
         );
-        assert_eq!(video.offset_seconds, 12.5);
-        assert!(video.cuts.is_empty());
-        let start = &video.segments[FIRST_SEGMENT_KEY];
+        assert_eq!(video.edits.offset_seconds, 12.5);
+        assert!(video.edits.cuts.is_empty());
+        let start = &video.edits.segments[FIRST_SEGMENT_KEY];
         assert!(!start.excluded && start.transition_in.is_none());
-        assert!(video.placement_anchor.is_none());
-        assert!(matches!(video.timezone_mode, Some(VideoTimezoneMode::Utc)));
+        assert!(video.edits.placement_anchor.is_none());
+        assert!(matches!(video.edits.timezone_mode, Some(TimezoneMode::Utc)));
         assert!(video.metadata.is_none());
         assert_eq!(
             parsed.sync.manual.video_id.as_deref(),

@@ -33,5 +33,7 @@ pub mod plan;
 pub mod progress;
 /// Composite quality/bitrate validation and FFmpeg arguments.
 pub mod quality;
+/// The editor's render settings, which projects save.
+pub mod render_settings;
 /// Video-local activity coverage shared by both export modes.
 pub mod video_timing;

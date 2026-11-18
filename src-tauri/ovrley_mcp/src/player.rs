@@ -319,8 +319,8 @@ fn file_name(path: &str) -> &str {
     ovrley_app::lib::file_dialog::filename_from_selected_path(path).unwrap_or(path)
 }
 
-fn transition_json(transition: ovrley_app::lib::video_program::Transition) -> Value {
-    json!({ "type": transition.kind().name(), "durationSeconds": transition.duration_seconds() })
+fn transition_json(transition: ovrley_core::media::video_edits::Transition) -> Value {
+    serde_json::to_value(transition).expect("a transition serializes")
 }
 
 /// The videos part of `ovrley_summary`, in timeline order.
@@ -627,7 +627,8 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn with_videos(offsets: &[(&'static str, f64, f64)]) -> Store {
-        use ovrley_app::lib::video_program::{create_imported_video, VideoEdits};
+        use ovrley_app::lib::video_program::create_imported_video;
+        use ovrley_core::media::video_edits::VideoEdits;
         use std::rc::Rc;
         let mut store = with_activity(600.0);
         let videos: Vec<_> = offsets

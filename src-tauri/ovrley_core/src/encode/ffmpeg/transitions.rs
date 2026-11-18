@@ -5,21 +5,39 @@
 
 use std::sync::OnceLock;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::composite_filters::format_seconds_arg;
 
 /// The join type of a hard cut.
 pub const NO_TRANSITION: &str = "none";
 
-/// Transition defaults of new and migrated projects.
-#[derive(Clone, Debug, Deserialize, PartialEq)]
+/// The project's default join transition and continuity threshold. The catalogue's are those of
+/// new and migrated projects; the store holds the project's, and projects save them.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TransitionDefaults {
     #[serde(rename = "type")]
     pub transition_type: String,
     pub duration_seconds: f64,
     pub split_gap_threshold_seconds: f64,
+}
+
+impl TransitionDefaults {
+    /// `requireTransitionDefaults`: a catalogue type, a positive duration (kept for "no
+    /// transition" so that choosing a type later keeps it) and a non-negative threshold.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.transition_type != NO_TRANSITION && !is_xfade_transition(&self.transition_type) {
+            return Err(format!("transitionDefaults unknown transition type: {}", self.transition_type));
+        }
+        if !self.duration_seconds.is_finite() || self.duration_seconds <= 0.0 {
+            return Err("transitionDefaults.durationSeconds must be a positive finite number".into());
+        }
+        if !self.split_gap_threshold_seconds.is_finite() || self.split_gap_threshold_seconds < 0.0 {
+            return Err("transitionDefaults.splitGapThresholdSeconds must be a finite non-negative number".into());
+        }
+        Ok(())
+    }
 }
 
 /// The grid of `assets/transition-previews.webp`: a cell per `xfade` transition, in catalogue

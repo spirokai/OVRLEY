@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn i_and_o_trim_the_activity_at_the_playhead_and_mod_x_resets() {
-        use crate::lib::activity::ActivityTrim;
+        use ovrley_core::activity::trim::ActivityTrim;
         let mut store = with_activity(60.0);
         store.editor.set_selected_second(10.0);
         assert!(handle_player_key(&mut store, &key("i"), Instant::now()));
