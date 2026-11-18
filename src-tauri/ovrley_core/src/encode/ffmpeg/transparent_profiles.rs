@@ -33,7 +33,7 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
             "-profile:v",
             "4444",
             "-qscale:v",
-            "5",
+            "10",
             "-f",
             "mov",
             "-pix_fmt",
@@ -48,6 +48,8 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
         output_args: &[
             "-profile:v",
             "4",
+            "-q:v",
+            "10",
             "-mbs_per_slice",
             "8",
             "-vendor",
