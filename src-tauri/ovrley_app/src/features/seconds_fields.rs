@@ -52,9 +52,13 @@ impl SecondsField {
         match key {
             "import-shared" => Some(Self::ImportSharedOffset),
             "import-transition" => Some(Self::ImportTransitionDuration),
+            "panel-transition" => Some(Self::PanelTransitionDuration),
+            "panel-threshold" => Some(Self::PanelContinuityThreshold),
             _ => key
                 .strip_prefix("import-row:")
-                .map(|video_id| Self::ImportRowOffset(video_id.to_string())),
+                .map(|video_id| Self::ImportRowOffset(video_id.to_string()))
+                .or_else(|| key.strip_prefix("drawer-start:").map(|video_id| Self::DrawerVideoStart(video_id.to_string())))
+                .or_else(|| key.strip_prefix("join:").map(|join_key| Self::JoinDuration(join_key.to_string()))),
         }
     }
 
@@ -304,9 +308,32 @@ mod tests {
             SecondsField::ImportRowOffset("a:b".into()),
             SecondsField::ImportSharedOffset,
             SecondsField::ImportTransitionDuration,
+            SecondsField::DrawerVideoStart("v".into()),
+            SecondsField::JoinDuration("v:start".into()),
+            SecondsField::PanelTransitionDuration,
+            SecondsField::PanelContinuityThreshold,
         ] {
             assert_eq!(SecondsField::from_key(&field.key()), Some(field));
         }
         assert_eq!(SecondsField::from_key("nothing"), None);
+    }
+}
+
+#[cfg(test)]
+mod drawer_tests {
+    use super::*;
+    use crate::lib::video_program::fixtures::*;
+    use crate::store::slices::video_import::tests::store_with;
+
+    #[test]
+    fn the_drawer_start_keeps_a_typed_draft_and_commits_it() {
+        let mut store = store_with(vec![simple("ride", 10.0, 0)], &[]);
+        crate::features::player::reconcile_player(&mut store);
+        let key = SecondsField::DrawerVideoStart("ride".into()).key();
+        assert!(edited(&mut store, &key, "12"));
+        assert_eq!(field_view(&store, &SecondsField::DrawerVideoStart("ride".into())).text, "12");
+        assert!(key_down(&mut store, &key, &KeyInput::new("enter")));
+        crate::features::player::reconcile_player(&mut store);
+        assert_eq!(store.video_import.video_edits["ride"].offset_seconds, 12.0);
     }
 }
