@@ -1723,3 +1723,59 @@ Time,Lap,Latitude,Longitude\n\
         }
     }
 }
+
+#[test]
+fn coolant_temperature_headers_map_to_celsius() {
+    let embedded = "time_s,coolant_temperature_c\n0,50.5\n1,51\n";
+    let fahrenheit = "Time,Engine Coolant Temperature(°F)\n0,212\n1,32\n";
+    let bare_unit = "Time,Engine Coolant Temperature (C)\n0,90\n1,91\n";
+    let logger = "Time,WaterTemp\n0,88\n1,89\n";
+
+    let parse = |csv: &str| {
+        parse_csv_activity_reader(Cursor::new(csv.to_owned()), "coolant.csv")
+            .unwrap()
+            .parsed_activity
+            .coolant_temperature
+    };
+
+    assert_eq!(parse(embedded), vec![Some(50.5), Some(51.0)]);
+    assert_eq!(parse(fahrenheit), vec![Some(100.0), Some(0.0)]);
+    assert_eq!(parse(bare_unit), vec![Some(90.0), Some(91.0)]);
+    assert_eq!(parse(logger), vec![Some(88.0), Some(89.0)]);
+}
+
+#[test]
+fn boost_pressure_headers_convert_to_gauge_kilopascals() {
+    let parse = |csv: &str| {
+        parse_csv_activity_reader(Cursor::new(csv.to_owned()), "boost.csv")
+            .unwrap()
+            .parsed_activity
+            .boost_pressure
+    };
+
+    // Unannotated boost is kilopascals; vacuum stays negative.
+    assert_eq!(
+        parse("time_s,boost_pressure\n0,0.05\n1,-20\n"),
+        vec![Some(0.05), Some(-20.0)]
+    );
+    assert_eq!(
+        parse("Time,Boost Pressure (bar)\n0,1.2\n1,0\n"),
+        vec![Some(120.0), Some(0.0)]
+    );
+    let psi = parse("Time,Turbo Boost & Vacuum Gauge(psi)\n0,14.5\n1,0\n");
+    assert_close(psi[0], 14.5 * 6.894_757_293_168_361);
+}
+
+#[test]
+fn shearwater_water_temperature_stays_water_temperature() {
+    let csv = "Time (sec),Depth,Average PPO2,Fraction O2,Fraction He,Water Temp\n\
+0,1.0,0.21,0.21,0.0,18\n\
+10,2.0,0.25,0.21,0.0,17\n";
+
+    let activity = parse_csv_activity_reader(Cursor::new(csv), "dive.csv")
+        .unwrap()
+        .parsed_activity;
+
+    assert_eq!(activity.water_temperature, vec![Some(18.0), Some(17.0)]);
+    assert!(activity.coolant_temperature.iter().all(Option::is_none));
+}

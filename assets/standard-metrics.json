@@ -124,6 +124,8 @@
         "ev",
         "focal_length",
         "engine_load",
+        "coolant_temperature",
+        "boost_pressure",
         "brake_position",
         "g_force",
         "g_force_x",
@@ -693,6 +695,8 @@
     ["hpa", "inhg"],
     ["mbar", "inhg"],
     ["mmhg", "inhg"],
+    ["kpa", "psi"],
+    ["bar", "psi"],
     ["mps", "ftmin"],
     ["mps", "ftps"],
     ["mps", "ftph"],
@@ -1319,6 +1323,87 @@
       "defaults": {
         "show_units": true,
         "display_unit": "percent"
+      }
+    },
+    {
+      "type": "coolant_temperature",
+      "plottable": true,
+      "activity": {
+        "column": {
+          "unit": "celsius"
+        },
+        "sources": ["coolant_temperature"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.coolant_temperature.name",
+      "shortNameKey": "widgets.types.coolant_temperature.shortName",
+      "supportedDisplayUnits": [
+        {
+          "value": "celsius",
+          "label": "°C"
+        },
+        {
+          "value": "fahrenheit",
+          "label": "°F"
+        }
+      ],
+      "formatter": "temperature",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-coolant-temperature.svg"
+      },
+      "category": "motosports",
+      "defaults": {
+        "show_units": true,
+        "display_unit": "celsius"
+      }
+    },
+    {
+      "type": "boost_pressure",
+      "plottable": true,
+      "activity": {
+        "column": {
+          "unit": "kpa"
+        },
+        "sources": ["boost_pressure"],
+        "requires": []
+      },
+      "current": true,
+      "nameKey": "widgets.types.boost_pressure.name",
+      "shortNameKey": "widgets.types.boost_pressure.shortName",
+      "supportedDisplayUnits": [
+        {
+          "value": "kpa",
+          "label": "kPa",
+          "renderLabel": "KPA"
+        },
+        {
+          "value": "bar",
+          "label": "bar",
+          "renderLabel": "BAR"
+        },
+        {
+          "value": "psi",
+          "label": "psi",
+          "renderLabel": "PSI"
+        }
+      ],
+      "formatter": "decimal",
+      "interpolation": "linear",
+      "unitsMode": "selectable",
+      "maxDecimals": 2,
+      "icon": {
+        "source": "custom",
+        "assetFile": "widget-boost-pressure.svg"
+      },
+      "category": "motosports",
+      "defaults": {
+        "show_units": true,
+        "display_unit": "kpa",
+        "decimals": 1
       }
     },
     {
@@ -2168,7 +2253,6 @@
       "plottable": true,
       "activity": {
         "column": {
-          "rawSample": false,
           "unit": "rpm"
         },
         "sources": ["rpm"],

@@ -91,6 +91,10 @@ enum Metric {
     FractionHe,
     /// Water temperature in degrees Celsius.
     WaterTemperature,
+    /// Engine coolant temperature in degrees Celsius.
+    CoolantTemperature,
+    /// Boost pressure in kilopascals, gauge or absolute as recorded; finalization converts to gauge.
+    BoostPressure,
     /// Raw date string companion for time-of-day timestamp reconstruction.
     ///
     /// This is not emitted as an activity metric; it supplies the calendar date

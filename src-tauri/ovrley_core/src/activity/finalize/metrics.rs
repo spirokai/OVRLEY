@@ -306,6 +306,40 @@ pub fn derive_gradient_series(
     gradient_series
 }
 
+/// A running engine never pulls manifold pressure this low in absolute terms,
+/// so a boost log that reaches it is already gauge pressure.
+const GAUGE_BOOST_MAX_MINIMUM_KPA: f64 = 10.0;
+/// Atmospheric pressure assumed when the activity records no air pressure.
+const STANDARD_ATMOSPHERE_KPA: f64 = 101.325;
+
+/// Converts an absolute boost log to gauge pressure.
+///
+/// Exporters rarely say which one they record. Absolute manifold pressure stays
+/// above roughly 20 kPa even at full vacuum, while any gauge log that includes
+/// idle, cruise or engine-off samples reaches zero or below. A log whose minimum
+/// stays above the threshold is therefore absolute; the recorded air pressure,
+/// or the standard atmosphere without one, is subtracted per sample.
+pub fn derive_gauge_boost_pressure_series(
+    boost_kpa: &NumericSeries,
+    air_pressure_bar: &NumericSeries,
+) -> NumericSeries {
+    let is_gauge = boost_kpa
+        .iter()
+        .flatten()
+        .any(|pressure| *pressure <= GAUGE_BOOST_MAX_MINIMUM_KPA);
+    if is_gauge {
+        return boost_kpa.clone();
+    }
+    boost_kpa
+        .iter()
+        .zip(air_pressure_bar)
+        .map(|(boost, air)| {
+            let atmosphere_kpa = air.map_or(STANDARD_ATMOSPHERE_KPA, |bar| bar * 100.0);
+            boost.and_then(|absolute| round_f64(absolute - atmosphere_kpa, 3))
+        })
+        .collect()
+}
+
 /// Derives heading from course points using a straight-line baseline.
 ///
 /// A stopped receiver's position wanders inside a few metres, so path length
@@ -733,6 +767,14 @@ pub fn derive_activity_metric_series(
             combine_series(values, &null_series, false),
         );
     }
+    map.insert(
+        "boost_pressure".to_string(),
+        combine_series(
+            &derive_gauge_boost_pressure_series(&direct["boost_pressure"], &direct["air_pressure"]),
+            &null_series,
+            false,
+        ),
+    );
     let derived_calories = derive_calories_from_power(&direct["power"], elapsed_series);
     map.insert(
         "calories".to_string(),
@@ -856,9 +898,43 @@ ovrley_widgets::activity_input_columns!(direct_activity_columns);
 #[cfg(test)]
 mod tests {
     use super::{
-        derive_distance_to_home_series, derive_gradient_series, derive_heading_series,
-        derive_total_ascent_series,
+        derive_distance_to_home_series, derive_gauge_boost_pressure_series, derive_gradient_series,
+        derive_heading_series, derive_total_ascent_series,
     };
+
+    #[test]
+    fn gauge_boost_logs_pass_through() {
+        // Idle vacuum clamped to zero, then boost.
+        let boost = vec![Some(0.05), None, Some(26.14)];
+        assert_eq!(
+            derive_gauge_boost_pressure_series(&boost, &vec![None; 3]),
+            boost
+        );
+        // Unclamped idle vacuum is negative.
+        let boost = vec![Some(-65.0), Some(80.0)];
+        assert_eq!(
+            derive_gauge_boost_pressure_series(&boost, &vec![None; 2]),
+            boost
+        );
+    }
+
+    #[test]
+    fn absolute_boost_logs_subtract_atmosphere() {
+        // Engine off, idle vacuum, then boost, in absolute kilopascals.
+        let boost = vec![Some(101.325), Some(30.0), Some(201.325)];
+        assert_eq!(
+            derive_gauge_boost_pressure_series(&boost, &vec![None; 3]),
+            vec![Some(0.0), Some(-71.325), Some(100.0)]
+        );
+        // Recorded air pressure in bar replaces the standard atmosphere.
+        assert_eq!(
+            derive_gauge_boost_pressure_series(
+                &vec![Some(90.0), Some(190.0)],
+                &vec![Some(0.9), None]
+            ),
+            vec![Some(0.0), Some(88.675)]
+        );
+    }
 
     #[test]
     fn heading_windows_preserve_thresholds_plateaus_holes_and_endpoints() {
