@@ -44,7 +44,9 @@ global LanePointer {
 
 // Striped shade (an excluded part or the trimmed-off activity, `background` at 90% with white at
 // 8%; an overlap band, `destructive` at 45% with black at 25%). The lines overshoot the box, which
-// clips them to straight top and bottom edges.
+// clips them to straight top and bottom edges. The commands are in the box's own pixels, so the
+// path is not fitted: Slint's default `contain` fit scales it into the box minus the stroke width,
+// keeping the aspect ratio, which pulled the stripes in from both ends of a wide box.
 component Stripes inherits Rectangle {
     in property <string> commands;
     in property <color> stripe-color;
@@ -53,8 +55,7 @@ component Stripes inherits Rectangle {
     Path {
         width: parent.width;
         height: parent.height;
-        viewbox-width: parent.width / 1px;
-        viewbox-height: parent.height / 1px;
+        fit: preserve;
         commands: root.commands;
         stroke: root.stripe-color;
         stroke-width: root.stripe-width;
