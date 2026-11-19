@@ -14,7 +14,23 @@ pub const MIN_MANUAL_SPEED_THRESHOLD_KMH: f64 = 1.0;
 pub const MAX_MANUAL_SPEED_THRESHOLD_KMH: f64 = 10.0;
 pub const DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 80.0;
 pub const MIN_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 70.0;
-pub const MAX_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 160.0;
+pub const MAX_MANUAL_TURN_THRESHOLD_DEGREES: f64 = 180.0;
+
+/// What a landmark marks: the four types the user can mark (`VIDEO_SYNC_LANDMARK_TYPES`), in the
+/// type select's order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum LandmarkKind {
+    Stop,
+    LeftTurn,
+    RightTurn,
+    Location,
+}
+
+impl LandmarkKind {
+    pub const ALL: [Self; 4] = [Self::Stop, Self::LeftTurn, Self::RightTurn, Self::Location];
+}
 
 /// A landmark the user placed in the video.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -49,6 +65,41 @@ pub enum Landmark {
 }
 
 impl Landmark {
+    /// A new landmark of `kind`. A location landmark's activity second is always `None`: nothing
+    /// sets it, but projects carry the field (a React oddity kept).
+    pub fn new(id: String, kind: LandmarkKind, video_second: f64) -> Self {
+        match kind {
+            LandmarkKind::Stop => Self::Stop { id, video_second },
+            LandmarkKind::LeftTurn => Self::LeftTurn { id, video_second },
+            LandmarkKind::RightTurn => Self::RightTurn { id, video_second },
+            LandmarkKind::Location => Self::Location { id, video_second, activity_second: None },
+        }
+    }
+
+    pub fn kind(&self) -> LandmarkKind {
+        match self {
+            Self::Stop { .. } => LandmarkKind::Stop,
+            Self::LeftTurn { .. } => LandmarkKind::LeftTurn,
+            Self::RightTurn { .. } => LandmarkKind::RightTurn,
+            Self::Location { .. } => LandmarkKind::Location,
+        }
+    }
+
+    /// The same landmark retyped (`setVideoSyncLandmarkType`): a new location's activity second is
+    /// `None`, and another type drops it.
+    pub fn retyped(&self, kind: LandmarkKind) -> Self {
+        Self::new(self.id().to_string(), kind, self.video_second())
+    }
+
+    pub fn set_video_second(&mut self, second: f64) {
+        match self {
+            Self::Stop { video_second, .. }
+            | Self::LeftTurn { video_second, .. }
+            | Self::RightTurn { video_second, .. }
+            | Self::Location { video_second, .. } => *video_second = second,
+        }
+    }
+
     pub fn id(&self) -> &str {
         match self {
             Self::Stop { id, .. }
@@ -212,5 +263,25 @@ mod tests {
         bad["speedThresholdKmh"] = json!(11);
         assert!(serde_json::from_value::<ManualVideoSync>(bad).is_err());
         assert_eq!(ManualVideoSync::default().validate(), Ok(()));
+    }
+
+    #[test]
+    fn the_turn_threshold_reaches_180_degrees() {
+        // React's slider goes to 180 degrees; projects it saved above 160 failed to open (Q3: A).
+        let value = |degrees: f64| json!({
+            "videoId": null, "landmarks": [], "speedThresholdKmh": 5.0, "turnThresholdDegrees": degrees
+        });
+        assert_eq!(serde_json::from_value::<ManualVideoSync>(value(170.0)).unwrap().turn_threshold_degrees, 170.0);
+        assert!(serde_json::from_value::<ManualVideoSync>(value(180.0)).is_ok());
+        assert!(serde_json::from_value::<ManualVideoSync>(value(185.0)).is_err());
+        assert!(serde_json::from_value::<ManualVideoSync>(value(65.0)).is_err());
+    }
+
+    #[test]
+    fn retyping_a_landmark_keeps_its_id_and_second() {
+        let stop = Landmark::new("a".into(), LandmarkKind::Stop, 3.0);
+        let location = stop.retyped(LandmarkKind::Location);
+        assert_eq!(location, Landmark::Location { id: "a".into(), video_second: 3.0, activity_second: None });
+        assert_eq!(location.retyped(LandmarkKind::RightTurn).kind(), LandmarkKind::RightTurn);
     }
 }
