@@ -13,8 +13,9 @@ use ovrley_core::media::manual_video_sync::LandmarkKind;
 
 const GRAPH_ROBUST_PERCENTILE: f64 = 0.99;
 const GRAPH_MIN_SCALE_VALUE: f64 = 1.0;
-/// `VIDEO_SYNC_GRAPH_HEIGHT_PX`: the graph's viewbox height.
-pub const GRAPH_HEIGHT_PX: f64 = 64.0;
+/// The graph row's height in rem (`h-16`). Its paths are built at its height in logical pixels,
+/// so they scale 1:1 with the bands.
+pub const GRAPH_HEIGHT_REM: f64 = 4.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GraphScale {
@@ -147,6 +148,7 @@ pub fn build_svg_path(
     scale: GraphScale,
     view: TimelineViewport,
     width_px: f64,
+    height_px: f64,
 ) -> String {
     if width_px <= 0.0 || view.view_end <= view.view_start || series.is_empty() {
         return String::new();
@@ -167,7 +169,7 @@ pub fn build_svg_path(
             continue;
         };
         let x = seconds_to_view_px(sample.time, view, width_px);
-        let y = value_to_y(value, scale, GRAPH_HEIGHT_PX);
+        let y = value_to_y(value, scale, height_px);
         commands.push(format!(
             "{} {x} {y}",
             if starts_subpath { 'M' } else { 'L' }
@@ -271,6 +273,7 @@ pub fn build_event_bands(
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct GraphView {
     pub width_px: f64,
+    pub height_px: f64,
     pub speed_path: String,
     pub turning_path: String,
     pub bands: Vec<EventBand>,
@@ -280,6 +283,7 @@ pub fn graph_view(
     detection: Option<&Detection>,
     view: TimelineViewport,
     width_px: f64,
+    height_px: f64,
     language: crate::i18n::Locale,
 ) -> GraphView {
     let empty = GraphSeries::default();
@@ -287,8 +291,9 @@ pub fn graph_view(
     let scales = build_graph_scales(series);
     GraphView {
         width_px,
-        speed_path: build_svg_path(&series.speed, scales.speed, view, width_px),
-        turning_path: build_svg_path(&series.turning, scales.turning, view, width_px),
+        height_px,
+        speed_path: build_svg_path(&series.speed, scales.speed, view, width_px, height_px),
+        turning_path: build_svg_path(&series.turning, scales.turning, view, width_px, height_px),
         bands: build_event_bands(detection, view, width_px, language),
     }
 }
@@ -523,7 +528,7 @@ mod tests {
             },
             ..Detection::default()
         };
-        let graph = graph_view(Some(&detection), view(0.0, 20.0), 400.0, Locale::En);
+        let graph = graph_view(Some(&detection), view(0.0, 20.0), 400.0, 64.0, Locale::En);
         assert!(graph.speed_path.contains("M 0 64"));
         assert!(graph.speed_path.contains("L 100"));
         assert!(graph.speed_path.contains("M 300"));

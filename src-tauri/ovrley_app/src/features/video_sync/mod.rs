@@ -4,6 +4,7 @@
 pub mod detection;
 pub mod maps;
 pub mod matching;
+pub mod speed_readout;
 pub mod timeline;
 
 use crate::i18n::catalog;
@@ -103,6 +104,8 @@ pub struct VideoSyncWorkspace {
     pub landmark_drag: Option<timeline::LandmarkDrag>,
     /// Both maps, while the mode is on (D5, D6).
     pub maps: Option<maps::SyncMaps>,
+    /// The speed readout, while the mode is on and the activity has speed (D12).
+    pub speed: Option<speed_readout::SpeedReadout>,
 }
 
 // --- The workspace (`useVideoSyncWorkspace`, `videoSyncPresentation.js`) -----------------------
@@ -481,6 +484,7 @@ pub fn reconcile_video_sync(store: &mut Store, services: &mut Services) {
     }
     follow_committed_thresholds(store);
     maps::reconcile_sync_maps(store, services, std::time::Instant::now());
+    speed_readout::reconcile_speed_readout(store, services);
 }
 
 fn reconcile_calculation(store: &mut Store, services: &mut Services) {

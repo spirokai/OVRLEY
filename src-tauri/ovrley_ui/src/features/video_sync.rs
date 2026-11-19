@@ -144,6 +144,7 @@ pub fn project(window: &AppWindow, store: &Store) {
         project_timeline(&global, store);
     }
     project_maps(&global, store);
+    project_speed(&global, store);
     if mode && store.layout.left_drawer_visible {
         project_drawer(&global, store);
     }
@@ -155,6 +156,8 @@ thread_local! {
     /// The maps' Slint images, built once per frame they show: `(revision, image)`.
     static SELECTION_IMAGE: RefCell<Option<(u64, Image)>> = const { RefCell::new(None) };
     static NAVIGATION_IMAGE: RefCell<Option<(u64, Image)>> = const { RefCell::new(None) };
+    /// The speed readout's image, by its pixels' revision.
+    static SPEED_IMAGE: RefCell<Option<(u32, Image)>> = const { RefCell::new(None) };
 }
 
 /// The raw wheel event's device, from the window's winit events.
@@ -182,6 +185,37 @@ fn cached_image(cache: &'static std::thread::LocalKey<RefCell<Option<(u64, Image
         *cache = Some((revision, image.clone()));
         (image, true)
     })
+}
+
+/// The speed readout: its image is built again only when its pixels' revision changes.
+fn project_speed(global: &VideoSync<'_>, store: &Store) {
+    let readout = store.video_sync.speed.as_ref();
+    let frame = readout.and_then(|readout| readout.frame());
+    set_if_changed(global.get_speed_shown(), frame.is_some(), |value| global.set_speed_shown(value));
+    set_if_changed(global.get_speed_error(), SharedString::from(readout.and_then(|readout| readout.error.clone()).unwrap_or_default()), |value| global.set_speed_error(value));
+    let Some(frame) = frame else {
+        SPEED_IMAGE.with(|cache| *cache.borrow_mut() = None);
+        return;
+    };
+    let geometry = &frame.geometry.widget;
+    let fresh = SPEED_IMAGE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.as_ref().is_some_and(|(revision, _)| *revision == frame.revision) {
+            return None;
+        }
+        let image = Image::from_rgba8(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(frame.pixels, geometry.width, geometry.height));
+        *cache = Some((frame.revision, image.clone()));
+        Some(image)
+    });
+    if let Some(image) = fresh {
+        global.set_speed_image(image);
+    }
+    // The scene scale already lays the widget out at its screen size.
+    let scale = f64::from(geometry.preview_raster_scale);
+    set_if_changed(global.get_speed_x(), geometry.left, |value| global.set_speed_x(value));
+    set_if_changed(global.get_speed_y(), geometry.top, |value| global.set_speed_y(value));
+    set_if_changed(global.get_speed_width(), (f64::from(geometry.width) / scale) as f32, |value| global.set_speed_width(value));
+    set_if_changed(global.get_speed_height(), (f64::from(geometry.height) / scale) as f32, |value| global.set_speed_height(value));
 }
 
 fn project_maps(global: &VideoSync<'_>, store: &Store) {
@@ -244,7 +278,7 @@ fn project_maps(global: &VideoSync<'_>, store: &Store) {
 }
 
 /// The graph's inputs: the detection's pointer, the view, the width and the language.
-type GraphKey = (usize, (u64, u64), u64, ovrley_app::i18n::Locale);
+type GraphKey = (usize, (u64, u64), u64, u64, ovrley_app::i18n::Locale);
 
 thread_local! {
     /// The graph row, rebuilt only when its inputs change, never per playhead frame.
@@ -255,20 +289,22 @@ fn project_timeline(global: &VideoSync<'_>, store: &Store) {
     let detection = store.manual_video_sync_detection.as_deref();
     let view = store.editor.timeline_viewport;
     let width = store.player.viewport.metrics.width_px;
+    let height = store.player.viewport.metrics.rem * timeline::GRAPH_HEIGHT_REM;
     let language = store.i18n.language;
-    let key = (detection.map_or(0, |detection| detection as *const _ as usize), (view.view_start.to_bits(), view.view_end.to_bits()), width.to_bits(), language);
+    let key = (detection.map_or(0, |detection| detection as *const _ as usize), (view.view_start.to_bits(), view.view_end.to_bits()), width.to_bits(), height.to_bits(), language);
     let fresh = GRAPH.with(|cache| {
         let mut cache = cache.borrow_mut();
         if cache.as_ref().is_some_and(|(cached, _)| *cached == key) {
             return None;
         }
-        let graph = timeline::graph_view(detection, view, width, language);
+        let graph = timeline::graph_view(detection, view, width, height, language);
         *cache = Some((key, graph.clone()));
         Some(graph)
     });
     if let Some(graph) = fresh {
         let t = |key: &str| ovrley_app::i18n::catalog().t(language, key).to_string();
         global.set_graph_width(graph.width_px as f32);
+        global.set_graph_height(graph.height_px as f32);
         global.set_speed_path(graph.speed_path.into());
         global.set_turning_path(graph.turning_path.into());
         let bands: Vec<EventBandView> = graph

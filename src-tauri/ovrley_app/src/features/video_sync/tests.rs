@@ -37,6 +37,7 @@ fn dispatcher(
     offsets: &[(&str, f64)],
 ) -> (Dispatcher, Fakes) {
     let mut store: Store = store_with(videos, offsets);
+    store.theme = Some(crate::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() });
     store.media.activity_summary = Some(ActivitySummary {
         duration_seconds: 100.0,
         ..ActivitySummary::of(&activity)
@@ -305,6 +306,7 @@ fn builds_both_graph_paths() {
             view_end: 20.0,
         },
         400.0,
+        64.0,
         crate::i18n::Locale::En,
     );
     assert!(!graph.speed_path.is_empty() && !graph.turning_path.is_empty());

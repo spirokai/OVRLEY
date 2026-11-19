@@ -48,7 +48,7 @@ pub struct FontKey {
 }
 
 impl FontKey {
-    fn plain(font: &Value) -> Self {
+    pub fn plain(font: &Value) -> Self {
         Self {
             font: font.as_str().unwrap_or_default().to_string(),
             font_weight: None,
@@ -56,7 +56,7 @@ impl FontKey {
         }
     }
 
-    fn request(&self) -> Value {
+    pub fn request(&self) -> Value {
         let mut request = Map::new();
         request.insert("font".into(), Value::String(self.font.clone()));
         if let Some(weight) = &self.font_weight {

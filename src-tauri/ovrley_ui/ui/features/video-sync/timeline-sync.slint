@@ -5,11 +5,11 @@ import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Landmarks } from "video-sync-drawer.slint";
 import { VideoSync } from "index.slint";
 
-// `VideoSyncTimelineGraph`: the graph row between the ruler and the lanes (`h-16`, `mt-3 mb-1`, a
+// `VideoSyncTimelineGraph`: the graph row between the ruler and the lanes (`h-16`, `mb-1`, a
 // 30% border left and right, `bg-background/20`): speed and turning at 40% (1.5px), the event
 // bands at 60% with their tooltips, the legend at the bottom left.
 export component TimelineGraph inherits VerticalLayout {
-    padding-top: 0.75rem;
+    // React's `mt-3` is dropped: the ruler's own bottom margin is gap enough (user, 2026-11-19).
     padding-bottom: 0.25rem;
     Rectangle {
         height: 4rem;
@@ -25,7 +25,7 @@ export component TimelineGraph inherits VerticalLayout {
             width: parent.width;
             height: parent.height;
             viewbox-width: max(1, VideoSync.graph-width / 1px);
-            viewbox-height: 64;
+            viewbox-height: max(1, VideoSync.graph-height / 1px);
             commands: VideoSync.speed-path;
             stroke: Theme.video-sync-stop.transparentize(0.6);
             stroke-width: 1.5px;
@@ -35,7 +35,7 @@ export component TimelineGraph inherits VerticalLayout {
             width: parent.width;
             height: parent.height;
             viewbox-width: max(1, VideoSync.graph-width / 1px);
-            viewbox-height: 64;
+            viewbox-height: max(1, VideoSync.graph-height / 1px);
             commands: VideoSync.turning-path;
             stroke: Theme.video-sync-turn.transparentize(0.6);
             stroke-width: 1.5px;

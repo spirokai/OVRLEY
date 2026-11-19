@@ -103,6 +103,7 @@ export global VideoSync {
 
     // The timeline's graph row and landmark layer (D9).
     in property <length> graph-width;
+    in property <length> graph-height;
     in property <string> speed-path;
     in property <string> turning-path;
     in property <[EventBandView]> bands;
@@ -135,6 +136,15 @@ export global VideoSync {
     in property <[Choice]> map-styles;
     in property <string> map-style;
     in property <string> attribution;
+
+    // The speed readout (D12): its image at its widget geometry, or its error.
+    in property <bool> speed-shown;
+    in property <image> speed-image;
+    in property <length> speed-x;
+    in property <length> speed-y;
+    in property <length> speed-width;
+    in property <length> speed-height;
+    in property <string> speed-error;
 
     // The chase inset (D6).
     in property <bool> has-nav-image;

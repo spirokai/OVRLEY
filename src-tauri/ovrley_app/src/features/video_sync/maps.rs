@@ -626,6 +626,8 @@ pub struct FramedView {
 pub struct SelectionImage {
     pub pixels: MapFramePixels,
     pub view: FramedView,
+    /// The style it was drawn in.
+    pub style: Option<ovrley_map::MapStyleId>,
     pub revision: u64,
 }
 
@@ -658,6 +660,10 @@ pub struct SelectionMap {
     pub popup_open: bool,
     /// Frame requests sent, for the performance tests and the review's debug counter.
     pub requests_sent: u64,
+    /// The style the map draws; an image in another style is drawn again.
+    pub style: Option<ovrley_map::MapStyleId>,
+    /// The style of the frame in flight.
+    in_flight_style: Option<ovrley_map::MapStyleId>,
 }
 
 impl Default for SelectionMap {
@@ -681,6 +687,8 @@ impl Default for SelectionMap {
             action: None,
             popup_open: false,
             requests_sent: 0,
+            style: None,
+            in_flight_style: None,
         }
     }
 }
@@ -956,9 +964,15 @@ impl SelectionMap {
         self.image = Some(SelectionImage {
             pixels,
             view,
+            style: self.in_flight_style.take(),
             revision: self.revision,
         });
         Ok(true)
+    }
+
+    /// Whether the image on show is `view` in the map's style.
+    fn is_current(&self, view: FramedView) -> bool {
+        self.image.as_ref().is_some_and(|image| image.view == view && image.style == self.style)
     }
 
     /// The view to draw: the camera on show at the settled size.
@@ -978,7 +992,7 @@ impl SelectionMap {
         let Some(stream) = &self.stream else {
             return Ok(());
         };
-        if stream.is_drawing() || self.image.as_ref().is_some_and(|image| image.view == view) {
+        if stream.is_drawing() || self.is_current(view) {
             return Ok(());
         }
         if self
@@ -997,6 +1011,7 @@ impl SelectionMap {
             .map_err(|error| error.to_string())?;
         if stream.is_drawing() {
             self.in_flight = Some(view);
+            self.in_flight_style = Some(spec.style.clone());
             self.last_request = Some(now);
             self.requests_sent += 1;
         }
@@ -1011,7 +1026,7 @@ impl SelectionMap {
         let scroll = self.scroll.deadline(now);
         let waiting = self
             .wanted()
-            .filter(|view| self.image.as_ref().is_none_or(|image| image.view != *view))
+            .filter(|view| !self.is_current(*view))
             .filter(|_| {
                 self.stream
                     .as_ref()
@@ -1328,6 +1343,7 @@ pub fn reconcile_sync_maps(store: &mut crate::store::Store, services: &mut crate
                 }
             }
             maps.style = Some(style.clone());
+            maps.selection.style = Some(style.id.clone());
         }
     }
     let Some(spec) = maps.style.as_ref().map(sync_style_spec) else { return };
@@ -1557,7 +1573,7 @@ mod tests {
     /// A selection map at 400×300 with a fake stream, the course fitted.
     fn map(now: Instant) -> (SelectionMap, Arc<FakeProvider>) {
         let provider = Arc::new(FakeProvider::default());
-        let mut map = SelectionMap { stream: Some(MapFrameStream::streamed(provider.clone())), ..SelectionMap::default() };
+        let mut map = SelectionMap { stream: Some(MapFrameStream::streamed(provider.clone())), style: Some(spec().style), ..SelectionMap::default() };
         map.set_size((400.0, 300.0), 2.0, now);
         map.advance(&course(), now);
         (map, provider)
@@ -1671,6 +1687,25 @@ mod tests {
             turn(&mut map, at(ms));
         }
         assert_eq!(provider.count(), 3, "quiet once still");
+    }
+
+    #[test]
+    fn another_style_draws_the_same_view_again() {
+        let now = Instant::now();
+        let (mut map, provider) = map(now);
+        turn(&mut map, now);
+        provider.answer();
+        turn(&mut map, now + FRAME_INTERVAL);
+        assert_eq!(provider.count(), 1);
+        let dark = MapStyleSpec { style: ovrley_map::MapStyleId::new("dark").unwrap(), ..spec() };
+        map.style = Some(dark.style.clone());
+        map.advance(&course(), now + FRAME_INTERVAL * 2);
+        map.send_request(&dark, now + FRAME_INTERVAL * 2).unwrap();
+        assert_eq!(provider.count(), 2, "the view in the new style");
+        provider.answer();
+        map.collect(&course()).unwrap();
+        map.send_request(&dark, now + FRAME_INTERVAL * 3).unwrap();
+        assert_eq!(provider.count(), 2, "then quiet again");
     }
 
     #[test]
