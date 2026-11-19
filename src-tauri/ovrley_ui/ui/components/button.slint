@@ -10,7 +10,8 @@ export enum ButtonSize { default, sm, lg, icon, icon-sm, icon-lg, toolbar-icon }
 
 // button.jsx. Content is `text`, an optional `icon`, and a slot for other content (spinners,
 // custom layouts). Text is `text-sm`, weight 600, in `rounded-sm`, 0.5rem apart; it keeps its
-// case except in the toolbar variant. The colour, type, shadow and spacing properties default to
+// case except in the toolbar variant. The default height is 2rem, the File button's (the user's
+// choice; React's is `h-9`). The colour, type, shadow and spacing properties default to
 // the variant's values and are the call sites' overrides (D5); width and height are Slint geometry.
 export component Button {
     in property <ButtonVariant> variant: ButtonVariant.default;
@@ -59,7 +60,7 @@ export component Button {
 
     property <length> box-size: root.size == ButtonSize.sm || root.size == ButtonSize.icon-sm ? 2rem
         : root.size == ButtonSize.lg || root.size == ButtonSize.icon-lg ? 2.5rem
-        : root.size == ButtonSize.toolbar-icon ? 1.75rem : 2.25rem;
+        : root.size == ButtonSize.toolbar-icon ? 1.75rem : 2rem;
     property <bool> square: root.size == ButtonSize.icon || root.size == ButtonSize.icon-sm || root.size == ButtonSize.icon-lg || root.size == ButtonSize.toolbar-icon;
     // Disabled default and outline buttons keep their normal colours on hover; other variants
     // still change, as `:hover` applies to disabled buttons in the browser.

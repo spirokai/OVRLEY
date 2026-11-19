@@ -55,6 +55,8 @@ export component BlurInput {
     // `aria-label`: the field's accessible name.
     in property <string> label;
     in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <bool> show-focus-ring: true;
+    out property <bool> has-focus: field.has-focus;
     callback changed(value: string);
     callback blurred();
 
@@ -106,6 +108,7 @@ export component BlurInput {
         inset-right: root.inset-right;
         label: root.label;
         group-position: root.group-position;
+        show-focus-ring: root.show-focus-ring;
 
         focus-changed(focused) => {
             if !focused {

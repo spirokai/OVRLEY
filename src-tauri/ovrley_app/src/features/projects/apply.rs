@@ -8,14 +8,14 @@ use crate::features::app_shell::{self, activate_parsed_activity};
 use crate::features::player::playback::{pause, timeline_minimum};
 use crate::features::player::viewport::clamp_to_view;
 use crate::lib::activity::{trim_activity_edge, TrimEdge, MIN_ACTIVITY_TRIM_SECONDS};
-use crate::lib::video_program::collection::timeline_bounds;
+use crate::lib::video_program::collection::{sort_clips_by_timeline, timeline_bounds};
 use crate::lib::video_program::segments::fit_cuts_to_frame_count;
 use crate::lib::video_program::{ImportedVideo, VideoEditsMap};
 use crate::store::slices::editor::{PreviewPlaybackState, TimelineViewport};
 use crate::store::slices::media::{ActivitySource, ImportedActivity};
 use crate::store::slices::template::{create_new_template, hydrate_template_state};
 use crate::store::slices::manual_video_sync::{hydrate_video_sync_state, reset_video_sync_state};
-use crate::store::slices::video_import::{clear_imported_videos, commit_video_collection};
+use crate::store::slices::video_import::{clear_imported_videos, commit_video_collection, select_clip, ClipLane, SelectedClip};
 use crate::store::Store;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::transition_defaults;
@@ -133,7 +133,8 @@ pub struct PreparedProject {
 }
 
 /// The activity is activated before the videos join, so detecting
-/// video times on activation never moves the saved placements; then the project-owned state.
+/// video times on activation never moves the saved placements; then the project-owned state. The
+/// first video on the timeline starts selected.
 pub fn apply_project(store: &mut Store, prepared: PreparedProject) {
     pause(store);
     store.media.activity_source = None;
@@ -152,6 +153,10 @@ pub fn apply_project(store: &mut Store, prepared: PreparedProject) {
         prepared.manual_video_sync,
         prepared.disabled_laps,
     );
+    let first = sort_clips_by_timeline(&store.video_import.clips())
+        .first()
+        .map(|clip| SelectedClip { lane: ClipLane::Video(clip.id().to_string()), segment_key: None });
+    select_clip(store, first).expect("the first clip is imported");
 }
 
 /// The editor, the settings and the timeline, after the media.

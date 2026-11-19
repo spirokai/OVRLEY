@@ -152,6 +152,8 @@ export component AppHeader inherits Rectangle {
                         Image {
                             source: @image-url("../../../../../app/public/logo.svg");
                             height: 1.25rem;
+                            // An Image's preferred width is its natural width, not the scaled one.
+                            width: self.height * self.source.width / self.source.height;
                             accessible-role: AccessibleRole.image;
                             accessible-label: "OVRLEY";
                         }
@@ -257,7 +259,6 @@ export component AppHeader inherits Rectangle {
                     VerticalLayout {
                         alignment: center;
                         Button {
-                            height: 2.25rem;
                             size: ButtonSize.sm;
                             variant: ButtonVariant.outline;
                             padding-x: 1rem;
@@ -274,7 +275,6 @@ export component AppHeader inherits Rectangle {
                     if RenderVideo.png-shown: VerticalLayout {
                         alignment: center;
                         Button {
-                            height: 2.25rem;
                             size: ButtonSize.sm;
                             variant: ButtonVariant.outline;
                             padding-x: 1rem;
@@ -295,7 +295,6 @@ export component AppHeader inherits Rectangle {
                             content: RenderVideo.header-start-tooltip;
                             side: bottom;
                             Button {
-                                height: 2.25rem;
                                 size: ButtonSize.sm;
                                 icon: Icons.play;
                                 text: RenderVideo.rendering ? @tr("render-video.renderingFrames" => "Rendering frames...") : @tr("render-video.startRender" => "Start Render");

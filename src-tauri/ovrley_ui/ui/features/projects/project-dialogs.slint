@@ -4,14 +4,14 @@ import { Icon, Icons } from "../../components/icons.slint";
 import { Button, ButtonVariant } from "../../components/button.slint";
 import { Dialog, DialogTitle, DialogDescription } from "../../components/dialog.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
+import { DashedBorder } from "../../components/dashed-border.slint";
 import { DialogPanel, UnsavedChangesDialog } from "../app-shell/dialogs.slint";
 import { UnsavedAnswer } from "../template-manager/index.slint";
 import { Projects, ProjectCardView, MissingSourceRole, ProjectNoticeKind, ProjectIntent } from "index.slint";
 
 // `ProjectCard`: an `aspect-video` box, `rounded-xs`, a 1px border `foreground` at 80% on
-// `surface`; on hover `primary` with `surface-elevated`. New Project shows a 4.5rem circle
-// (`foreground` at 10%) with a 3rem plus (its border is dashed in React; Slint has no dashed
-// borders); a project shows its thumbnail, covering, or a 2.5rem FileBox. The name sits 0.5rem
+// `surface`; on hover `primary` with `surface-elevated`. New Project's border is dashed and it
+// shows a 4.5rem circle (`foreground` at 10%) with a 3rem plus; a project shows its thumbnail, covering, or a 2.5rem FileBox. The name sits 0.5rem
 // below, `text-sm` medium, elided.
 component ProjectCard inherits VerticalLayout {
     in property <bool> new-project;
@@ -25,10 +25,15 @@ component ProjectCard inherits VerticalLayout {
     box := Rectangle {
         height: self.width * 9 / 16;
         border-radius: Theme.radius-xs * 1rem;
-        border-width: 1px;
-        border-color: root.hover ? Theme.primary : Theme.foreground.transparentize(0.2);
+        property <color> outline: root.hover ? Theme.primary : Theme.foreground.transparentize(0.2);
+        border-width: root.new-project ? 0px : 1px;
+        border-color: self.outline;
         background: root.hover ? Theme.surface-elevated : Theme.surface;
         clip: true;
+        if root.new-project: DashedBorder {
+            radius: Theme.radius-xs * 1rem;
+            border-color: box.outline;
+        }
         if root.new-project: Rectangle {
             width: 4.5rem;
             height: 4.5rem;
@@ -40,9 +45,12 @@ component ProjectCard inherits VerticalLayout {
                 color: root.hover ? Theme.foreground : Theme.foreground.transparentize(0.3);
             }
         }
+        // Inside the border, as the browser lays an image out in the content box.
         if !root.new-project && root.card.has-thumbnail: Image {
-            width: parent.width;
-            height: parent.height;
+            x: 1px;
+            y: 1px;
+            width: parent.width - 2px;
+            height: parent.height - 2px;
             source: root.card.thumbnail;
             image-fit: cover;
         }
@@ -62,6 +70,8 @@ component ProjectCard inherits VerticalLayout {
     }
     AppText {
         content: root.new-project ? @tr("projects.newProject" => "New Project") : root.card.name;
+        // A project's name keeps its case.
+        uppercase: root.new-project;
         horizontal-alignment: center;
         font-size: Theme.text-sm * 1rem;
         font-weight: Theme.font-weight-medium;
@@ -101,33 +111,32 @@ export component StartupProjectsDialog {
                     color: Theme.primary;
                 }
                 grid := ScrollArea {
+                    // As tall as its cards, between 30rem and 50rem (`min-h-120 max-h-200`).
                     min-height: 30rem;
+                    preferred-height: cards.preferred-height;
                     max-height: 50rem;
                     property <int> columns: max(1, Math.floor((self.width + root.gap-x) / (root.min-card + root.gap-x)));
                     property <int> count: Projects.startup-projects.length + 1;
-                    VerticalLayout {
+                    cards := VerticalLayout {
                         spacing: 1.5rem;
                         alignment: start;
                         for row in Math.ceil(grid.count / grid.columns): HorizontalLayout {
                             spacing: root.gap-x;
-                            for column in grid.columns: Rectangle {
+                            // The cards are the row's layout items, so each row is as high as
+                            // its cards; the cells past the last project keep the columns even.
+                            for column in grid.columns: ProjectCard {
                                 property <int> index: row * grid.columns + column;
                                 horizontal-stretch: 1;
                                 preferred-width: 0px;
                                 min-width: 0px;
-                                if index == 0: ProjectCard {
-                                    width: parent.width;
-                                    new-project: true;
-                                    disabled: Projects.startup-opening;
-                                    clicked => {
+                                visible: index < grid.count;
+                                new-project: index == 0;
+                                card: Projects.startup-projects[index - 1];
+                                disabled: Projects.startup-opening || index >= grid.count;
+                                clicked => {
+                                    if self.new-project {
                                         Projects.startup-new();
-                                    }
-                                }
-                                if index > 0 && index < grid.count: ProjectCard {
-                                    width: parent.width;
-                                    card: Projects.startup-projects[index - 1];
-                                    disabled: Projects.startup-opening;
-                                    clicked => {
+                                    } else {
                                         Projects.startup-open-project(self.card.path);
                                     }
                                 }

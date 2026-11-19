@@ -36,6 +36,9 @@ export component HexColorPicker {
     in property <[string]> preset-colors: ["#ffffff", "#afeeee", "#40e0d0", "#005b5b", "#c65102", "#000000"];
     // The hex field's fill, the call site's override (D5): the widget editor's fields sit on `surface`.
     in property <color> field-background: transparent;
+    // The hex field's type, the call site's override (D5): the widget editor matches its fields.
+    in property <length> field-font-size: 0.815rem;
+    in property <bool> field-mono: true;
     out property <bool> is-open: popup.is-open;
     callback changed(hex: string);
 
@@ -54,6 +57,7 @@ export component HexColorPicker {
     // The hex field's text: the shown value (uppercase, as React's trigger shows it) until the user
     // edits it, and again after each commit or revert.
     property <string> hex-text: root.shown-value.to-uppercase();
+    property <bool> hex-field-focused;
 
     // `setValueFromProps`: the store follows the draft, keeping its alpha.
     function sync-store() {
@@ -143,9 +147,11 @@ export component HexColorPicker {
     // The default trigger (user's design, 2026-11-14): a group like the input + button one. The
     // hex field on the left takes typed or pasted values and commits a valid one on Enter or blur
     // (normalized; anything else reverts). The swatch button on the right is filled with the colour
-    // edge to edge and opens the picker; without the field it takes the picker's whole width.
-    if !root.custom-trigger: HorizontalLayout {
-        opacity: root.disabled ? 0.5 : 1;
+    // edge to edge and opens the picker; beside the field it is square, without it it takes the
+    // picker's whole width. One focus ring goes around the field and the swatch.
+    if !root.custom-trigger: Rectangle {
+      opacity: root.disabled ? 0.5 : 1;
+      HorizontalLayout {
 
         if root.show-value: hex-field := Input {
             horizontal-stretch: 1;
@@ -154,12 +160,14 @@ export component HexColorPicker {
             placeholder: "#000000";
             group-position: GroupPosition.first;
             disabled: root.disabled;
-            mono: true;
-            font-size: 0.815rem;
+            mono: root.field-mono;
+            font-size: root.field-font-size;
             background: root.field-background;
+            show-focus-ring: false;
             focus-changed(focused) => {
+                root.hex-field-focused = focused;
                 if focused {
-                    root.hex-text = root.shown-value;
+                    root.hex-text = root.shown-value.to-uppercase();
                 } else {
                     root.commit-hex-text();
                 }
@@ -170,8 +178,8 @@ export component HexColorPicker {
         }
 
         swatch-button := Rectangle {
-            min-width: root.show-value ? 3.5rem : 2.25rem;
-            max-width: root.show-value ? 3.5rem : 100000px;
+            min-width: 2.25rem;
+            max-width: root.show-value ? 2.25rem : 100000px;
             horizontal-stretch: root.show-value ? 0 : 1;
             accessible-role: AccessibleRole.button;
             accessible-label: @tr("components.currentColorVal" => "Current color: {0}", root.shown-value);
@@ -187,9 +195,6 @@ export component HexColorPicker {
                 group-position: root.show-value ? GroupPosition.last : GroupPosition.isolated;
                 radius: root.radius;
                 background: ColorPickerLogic.hex-to-color(root.shown-value);
-                border-width: 1px;
-                border-color: swatch-touch.has-hover ? Theme.accent-border : Theme.border.transparentize(0.3);
-                animate border-color { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
             }
             swatch-touch := TouchArea {
                 enabled: !root.disabled;
@@ -221,12 +226,13 @@ export component HexColorPicker {
                     reject
                 }
             }
-            FocusRing {
-                shown: swatch-focus.focus-visible;
-                radius: root.radius;
-                group-position: root.show-value ? GroupPosition.last : GroupPosition.isolated;
-            }
         }
+      }
+      FocusRing {
+          shown: root.hex-field-focused || swatch-focus.focus-visible;
+          ring-width: 1px;
+          radius: root.radius;
+      }
     }
 
     popup := PopupWindow {

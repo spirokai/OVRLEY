@@ -3,7 +3,7 @@ import { AppText } from "app-text.slint";
 import { AlertLayerView } from "alert-layer.slint";
 
 // dialog.jsx: modal over the whole window. The scrim is `surface-overlay` at the caller's opacity
-// (today 70% or 82%); the 12px backdrop blur is not available in Slint 1.18 (Q3). The slot is
+// (today 70% or 82%) over a 6px backdrop blur (half of React's 12px, the user's choice). The slot is
 // centred with 1rem side padding; feature dialogs draw their own panel in it, as today. Escape
 // and a scrim click report `open-changed(false)`; focus moves into the content on open. A dialog
 // opened later stacks above one opened earlier, which matches today's z-index use (130 over 120).
@@ -36,6 +36,7 @@ export component Dialog {
 
         Rectangle {
             background: root.scrim;
+            backdrop-blur: 6px;
             TouchArea {
                 clicked => {
                     root.open-changed(false);

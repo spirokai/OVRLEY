@@ -137,6 +137,8 @@ export component ColorField inherits VerticalLayout {
         value: root.value;
         disabled: root.disabled;
         field-background: Theme.surface;
+        field-font-size: Theme.text-xs * 1rem;
+        field-mono: false;
         changed(hex) => {
             root.changed(hex);
         }

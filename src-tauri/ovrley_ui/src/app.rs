@@ -149,6 +149,8 @@ pub fn run(
 
     // On every resize: a restored window fits its screen, and on macOS the traffic lights return
     // to their inset (AppKit puts them back in the corner).
+    #[cfg(target_os = "macos")]
+    let header = window.as_weak();
     window.window().on_winit_window_event(move |slint_window, event| {
         // Line deltas come from a notched wheel, pixel deltas from a trackpad; Slint's scroll event
         // that follows does not say which (Phase 8 D5).
@@ -161,7 +163,10 @@ pub fn run(
         if let winit::event::WindowEvent::Resized(_) = event {
             slint_window.with_winit_window(platform::fit_restored_window);
             #[cfg(target_os = "macos")]
-            slint_window.with_winit_window(platform::macos::apply_traffic_light_inset);
+            if let Some(header) = header.upgrade() {
+                let header_height = f64::from(header.get_header_height());
+                slint_window.with_winit_window(|winit_window| platform::macos::apply_traffic_light_inset(winit_window, header_height));
+            }
         }
         EventResult::Propagate
     });
@@ -258,8 +263,10 @@ fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::Dis
         #[cfg(target_os = "macos")]
         {
             use platform::macos::FullscreenTransition;
-            platform::macos::apply_traffic_light_inset(&winit_window);
-            platform::macos::observe_fullscreen(&winit_window, move |transition| {
+            platform::macos::apply_traffic_light_inset(&winit_window, f64::from(app.get_header_height()));
+            let header = app.as_weak();
+            let header_height = move || header.upgrade().map_or(0.0, |app| f64::from(app.get_header_height()));
+            platform::macos::observe_fullscreen(&winit_window, header_height, move |transition| {
                 let fullscreen = matches!(transition, FullscreenTransition::WillEnter | FullscreenTransition::DidEnter);
                 dispatch.dispatch(move |store, _| store.traffic_light_inset.set_fullscreen(fullscreen));
             });

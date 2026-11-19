@@ -27,10 +27,11 @@ component ReviewAlerts inherits VerticalLayout {
 }
 
 // The resolution mismatch screen: the triangle (`h-10`, `red-500`), the message in bold red, the
-// instructions in muted text (left-aligned: Slint has no justified text), and Cancel.
+// instructions in muted text (left-aligned: Slint has no justified text), and Cancel 1.5rem below,
+// as the other dialogs' footers (React's `space-y-12` read as a gap).
 component MismatchScreen inherits VerticalLayout {
     padding: 0.75rem;
-    spacing: 3rem;
+    spacing: 1.5rem;
     VerticalLayout {
         spacing: 2rem;
         HorizontalLayout {

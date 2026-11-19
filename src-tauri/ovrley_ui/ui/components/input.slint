@@ -38,6 +38,8 @@ export component Input {
     in property <length> inset-left: root.inline ? 0.25rem : 0.75rem;
     in property <length> inset-right: root.inset-left;
     in property <ShadowSize> shadow: root.inline ? ShadowSize.none : ShadowSize.xs;
+    // False when the caller rings the whole input + button group instead of the field alone.
+    in property <bool> show-focus-ring: true;
 
     out property <bool> has-focus: field.has-focus;
     callback edited(text: string);
@@ -171,7 +173,7 @@ export component Input {
     FocusRing {
         // `:focus-visible` matches text fields on every focus. An invalid field also keeps its
         // ring: in React, `reportValidity()` refocuses it (Q2 drops the bubble itself).
-        shown: field.has-focus || root.invalid;
+        shown: root.show-focus-ring && (field.has-focus || root.invalid);
         ring-width: 1px;
         radius: root.radius;
         group-position: root.group-position;

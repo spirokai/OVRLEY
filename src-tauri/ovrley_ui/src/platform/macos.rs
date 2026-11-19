@@ -1,5 +1,5 @@
-//! macOS window chrome: the traffic lights at the Tauri config's `trafficLightPosition` (x 20, y
-//! 28), as the Tauri app's `traffic_lights.rs` places them, and the full-screen transitions.
+//! macOS window chrome: the traffic lights 20 points from the left, centred on the header's
+//! midline, and the full-screen transitions.
 //!
 //! AppKit puts the buttons back in the window corner on resizes, and lays the title bar out again
 //! when a full-screen transition ends, after the last resize. winit only learns that the window
@@ -20,9 +20,8 @@ use std::ptr::NonNull;
 use slint::winit_030::winit;
 use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 
-/// `trafficLightPosition` in `tauri.macos.conf.json`.
+/// The traffic lights' distance from the window's left edge.
 const TRAFFIC_LIGHT_X: f64 = 20.0;
-const TRAFFIC_LIGHT_Y: f64 = 28.0;
 
 fn ns_window(window: &winit::window::Window) -> Option<Retained<NSWindow>> {
     let handle = match window.window_handle() {
@@ -40,10 +39,11 @@ fn ns_window(window: &winit::window::Window) -> Option<Retained<NSWindow>> {
     ns_view.window()
 }
 
-/// Moves the traffic lights to their configured position. Must run on the main thread.
-pub fn apply_traffic_light_inset(window: &winit::window::Window) {
+/// Moves the traffic lights onto the midline of a header `header_height` points high. Must run on
+/// the main thread.
+pub fn apply_traffic_light_inset(window: &winit::window::Window, header_height: f64) {
     if let Some(ns_window) = ns_window(window) {
-        inset(&ns_window, TRAFFIC_LIGHT_X, TRAFFIC_LIGHT_Y);
+        inset(&ns_window, header_height);
     }
 }
 
@@ -62,10 +62,16 @@ thread_local! {
 }
 
 /// Calls `on_transition` for each full-screen transition of `window`, on the main thread, and
-/// re-applies the traffic-light inset as each one starts and ends.
-pub fn observe_fullscreen(window: &winit::window::Window, on_transition: impl Fn(FullscreenTransition) + 'static) {
+/// re-applies the traffic-light inset, on the header `header_height` reports, as an exit starts
+/// and ends.
+pub fn observe_fullscreen(
+    window: &winit::window::Window,
+    header_height: impl Fn() -> f64 + 'static,
+    on_transition: impl Fn(FullscreenTransition) + 'static,
+) {
     let Some(ns_window) = ns_window(window) else { return };
     let on_transition = std::rc::Rc::new(on_transition);
+    let header_height = std::rc::Rc::new(header_height);
     let center = NSNotificationCenter::defaultCenter();
     // SAFETY: AppKit's notification names are immutable statics.
     let names = unsafe {
@@ -78,10 +84,11 @@ pub fn observe_fullscreen(window: &winit::window::Window, on_transition: impl Fn
     };
     for (name, transition) in names {
         let on_transition = on_transition.clone();
+        let header_height = header_height.clone();
         let target = ns_window.clone();
         let block = RcBlock::new(move |_: NonNull<NSNotification>| {
             if matches!(transition, FullscreenTransition::WillExit | FullscreenTransition::DidExit) {
-                inset(&target, TRAFFIC_LIGHT_X, TRAFFIC_LIGHT_Y);
+                inset(&target, header_height());
             }
             on_transition(transition);
         });
@@ -93,8 +100,9 @@ pub fn observe_fullscreen(window: &winit::window::Window, on_transition: impl Fn
     }
 }
 
-/// Mirrors wry's `inset_traffic_lights`, as the Tauri app does.
-fn inset(ns_window: &NSWindow, x: f64, y: f64) {
+/// After wry's `inset_traffic_lights`: the title bar container spans the header, and the buttons
+/// sit `TRAFFIC_LIGHT_X` from the left, centred vertically in it.
+fn inset(ns_window: &NSWindow, header_height: f64) {
     let (Some(close), Some(miniaturize)) = (
         ns_window.standardWindowButton(NSWindowButton::CloseButton),
         ns_window.standardWindowButton(NSWindowButton::MiniaturizeButton),
@@ -110,11 +118,17 @@ fn inset(ns_window: &NSWindow, x: f64, y: f64) {
     };
 
     let close_rect = NSView::frame(&close);
-    let title_bar_frame_height = close_rect.size.height + y;
     let mut title_bar_rect = NSView::frame(&title_bar_container_view);
-    title_bar_rect.size.height = title_bar_frame_height;
-    title_bar_rect.origin.y = ns_window.frame().size.height - title_bar_frame_height;
+    title_bar_rect.size.height = header_height;
+    title_bar_rect.origin.y = ns_window.frame().size.height - header_height;
     title_bar_container_view.setFrame(title_bar_rect);
+    // The buttons' own view fills the container; centring in it puts them on the header's
+    // midline whether or not it is flipped.
+    // SAFETY: as above.
+    let Some(button_view) = (unsafe { close.superview() }) else {
+        return;
+    };
+    let button_view_height = button_view.bounds().size.height;
 
     let space_between = NSView::frame(&miniaturize).origin.x - close_rect.origin.x;
     for (index, button) in [Some(close), Some(miniaturize), zoom]
@@ -123,7 +137,8 @@ fn inset(ns_window: &NSWindow, x: f64, y: f64) {
         .enumerate()
     {
         let mut rect = NSView::frame(&button);
-        rect.origin.x = x + (index as f64 * space_between);
+        rect.origin.x = TRAFFIC_LIGHT_X + (index as f64 * space_between);
+        rect.origin.y = (button_view_height - rect.size.height) / 2.0;
         button.setFrameOrigin(rect.origin);
     }
 }

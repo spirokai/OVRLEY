@@ -7,6 +7,7 @@ import { Select } from "../../components/select.slint";
 import { HexColorPicker } from "../../components/hex-color-picker.slint";
 import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { GroupPosition } from "../../components/group-surface.slint";
+import { FocusRing } from "../../components/focus-ring.slint";
 import { Icons } from "../../components/icons.slint";
 import { Choice } from "../../components/logic.slint";
 import { ShapeToggleView } from "index.slint";
@@ -192,13 +193,13 @@ export component RasterPicker inherits VerticalLayout {
     callback pick();
 
     spacing: 0.5rem;
-    ButtonGroup {
+    // The focus ring goes around the field and its button.
+    Rectangle {
+      ButtonGroup {
         alignment: stretch;
         // The path's tooltip wraps the field, as React's `title` sits on the input.
         SimpleTooltip {
             horizontal-stretch: 1;
-            // The field's ring draws above the button, this element's sibling.
-            z: path-field.has-focus ? 1 : 0;
             content: root.path;
             wrap-text: true;
             path-field := Input {
@@ -208,6 +209,7 @@ export component RasterPicker inherits VerticalLayout {
                 label: root.label;
                 font-size: Theme.text-xs * 1rem;
                 group-position: GroupPosition.first;
+                show-focus-ring: false;
             }
         }
         Button {
@@ -228,6 +230,12 @@ export component RasterPicker inherits VerticalLayout {
                 root.pick();
             }
         }
+      }
+      FocusRing {
+          shown: path-field.has-focus;
+          ring-width: 1px;
+          radius: Theme.radius-sm * 1rem;
+      }
     }
     if root.error != "": AppText {
         content: root.error;

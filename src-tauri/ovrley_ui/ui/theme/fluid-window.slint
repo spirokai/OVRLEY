@@ -15,7 +15,7 @@ export component FluidWindow inherits Window {
     default-font-family: Theme.font-sans;
     default-font-weight: Theme.font-weight-normal;
     // A frameless window whose system draws no corners or edge (Linux): the content is clipped to
-    // rounded corners over a transparent window, with a light grey 1px border.
+    // rounded corners over a transparent window, with a 1px `border`, as the app's other borders.
     in property <bool> rounded-frame;
     property <length> frame-radius: root.rounded-frame ? 8px : 0px;
     background: root.rounded-frame ? transparent : Theme.background;
@@ -49,6 +49,6 @@ export component FluidWindow inherits Window {
     if root.rounded-frame: Rectangle {
         border-radius: root.frame-radius;
         border-width: 1px;
-        border-color: #d4d4d4;
+        border-color: Theme.border;
     }
 }

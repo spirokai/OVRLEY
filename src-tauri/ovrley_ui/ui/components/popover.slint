@@ -20,6 +20,10 @@ export component Popover {
     in property <length> content-width: 18rem;
     in property <length> content-padding: 1rem;
     in property <length> radius: Theme.radius-xs * 1rem;
+    // `shadow-sm` by default; menus pass a larger, coloured one that shows on the dark theme.
+    in property <ShadowSize> shadow: ShadowSize.sm;
+    in property <bool> has-shadow-color;
+    in property <color> shadow-color;
     callback open-changed(open: bool);
 
     property <bool> popup-open: popup.is-open;
@@ -52,8 +56,10 @@ export component Popover {
         OverlayMotion {
             side: popup.placed.side;
             Shadow {
-                size: ShadowSize.sm;
+                size: root.shadow;
                 radius: root.radius;
+                has-color: root.has-shadow-color;
+                color: root.shadow-color;
             }
             Rectangle {
                 border-radius: root.radius;

@@ -2,6 +2,7 @@ import { Theme } from "../../theme/theme.slint";
 import { Icons } from "../../components/icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
 import { Popover } from "../../components/popover.slint";
+import { ShadowSize } from "../../components/shadow.slint";
 import { PlacementAlign } from "../../components/logic.slint";
 import { Separator } from "../../components/separator.slint";
 import { Projects } from "../projects/index.slint";
@@ -61,6 +62,9 @@ export component FileMenu {
         align: PlacementAlign.start;
         side-offset: 6px;
         content-width: 13.75rem;
+        shadow: ShadowSize.md;
+        has-shadow-color: true;
+        shadow-color: #000000b3;
         content-padding: 0.25rem;
         open-changed(open) => {
             root.open = open;

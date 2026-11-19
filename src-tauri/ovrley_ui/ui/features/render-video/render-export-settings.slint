@@ -8,6 +8,7 @@ import { Slider } from "../../components/slider.slint";
 import { Switch } from "../../components/switch.slint";
 import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
 import { GroupPosition } from "../../components/group-surface.slint";
+import { FocusRing } from "../../components/focus-ring.slint";
 import { ChoiceKind } from "../../components/logic.slint";
 import { DialogTitle } from "../../components/dialog.slint";
 import { RenderVideo } from "index.slint";
@@ -301,7 +302,6 @@ export component RenderExportSettings inherits VerticalLayout {
                 content: @tr("render-video.outputFolder" => "Output folder");
             }
             Button {
-                height: 2.25rem;
                 variant: ButtonVariant.outline;
                 icon: Icons.folder-open;
                 icon-size: 0.875rem;
@@ -326,8 +326,10 @@ export component RenderExportSettings inherits VerticalLayout {
             FieldLabel {
                 content: @tr("render-video.outputFile" => "Output file");
             }
-            HorizontalLayout {
-                BlurInput {
+            // The focus ring goes around the field and its button.
+            Rectangle {
+              HorizontalLayout {
+                output-path := BlurInput {
                     horizontal-stretch: 1;
                     min-width: 0px;
                     preferred-width: 100%;
@@ -336,6 +338,7 @@ export component RenderExportSettings inherits VerticalLayout {
                     font-size: Theme.text-xs * 1rem;
                     label: @tr("render-video.outputPath" => "Output path");
                     group-position: GroupPosition.first;
+                    show-focus-ring: false;
                     changed(value) => {
                         RenderVideo.commit-output-path(value);
                     }
@@ -351,6 +354,12 @@ export component RenderExportSettings inherits VerticalLayout {
                         RenderVideo.browse();
                     }
                 }
+              }
+              FocusRing {
+                  shown: output-path.has-focus;
+                  ring-width: 1px;
+                  radius: Theme.radius-sm * 1rem;
+              }
             }
             if RenderVideo.path-error != "": AppText {
                 content: RenderVideo.path-error;

@@ -38,6 +38,8 @@ export component AppWindow inherits FluidWindow {
     rounded-frame: Platform.os == OperatingSystemType.linux && !AppShell.window-maximized;
 
     property <length> control-panel-width: 26.5rem;
+    // macOS centres the traffic lights on the header's midline.
+    out property <length> header-height: header.height;
 
     // The root focus scope (D7). Slint delivers a key to the focused element and bubbles what it
     // rejects to its parents, so `key-pressed` sees only keys no control used. A click on empty space
@@ -57,7 +59,7 @@ export component AppWindow inherits FluidWindow {
         }
 
     VerticalLayout {
-        AppHeader {
+        header := AppHeader {
             // Skia on wgpu repaints the whole window on every frame, and playback repaints at the
             // preview's frame rate. Regions that stay still draw from a cached layer, which is
             // rasterized again only when something inside it changes.

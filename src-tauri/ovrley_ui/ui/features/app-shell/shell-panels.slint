@@ -10,6 +10,9 @@ import { SidebarSettingsTab } from "../scene-settings/sidebar-settings-tab.slint
 // gutter. The tab is local state, uncontrolled as today. The Settings tab holds the scene settings.
 export component ControlPanel inherits Rectangle {
     property <string> tab: "settings";
+    // Each tab keeps its own scroll position: the area is shared, its offset is not.
+    property <length> settings-scroll-y;
+    property <length> widgets-scroll-y;
     background: Theme.card;
 
     // The 1px left divider, under the content, so an open widget's accent border covers it instead
@@ -31,7 +34,13 @@ export component ControlPanel inherits Rectangle {
             ];
             value: root.tab;
             value-changed(value) => {
+                if root.tab == "settings" {
+                    root.settings-scroll-y = scroll.content-y;
+                } else {
+                    root.widgets-scroll-y = scroll.content-y;
+                }
                 root.tab = value;
+                scroll.content-y = value == "settings" ? root.settings-scroll-y : root.widgets-scroll-y;
             }
         }
         // Radix unmounts the inactive tab's content; here only the active one is instantiated, so

@@ -458,7 +458,6 @@ component ManualSyncTab inherits VerticalLayout {
         VerticalLayout {
             spacing: 0.5rem;
             Button {
-                height: 2.25rem;
                 text: @tr("videoSync.syncLandmarks" => "Sync All Landmarks");
                 disabled: !VideoSync.can-calculate-all || VideoSync.calculating;
                 clicked => {
@@ -466,7 +465,6 @@ component ManualSyncTab inherits VerticalLayout {
                 }
             }
             Button {
-                height: 2.25rem;
                 text: @tr("videoSync.syncLocation" => "Match Location Only");
                 disabled: !VideoSync.can-calculate-location || VideoSync.calculating;
                 clicked => {

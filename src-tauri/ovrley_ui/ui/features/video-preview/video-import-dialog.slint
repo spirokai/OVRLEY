@@ -401,8 +401,10 @@ export component VideoImportDialog {
                         }
                     }
                     Rectangle {
-                        // The widest label any count or the far question can show.
+                        // The widest label any count or the far question can show. The hidden
+                        // labels are stacked, so the height is the button's alone.
                         min-width: alternatives.preferred-width + 3rem;
+                        height: import-button.min-height;
                         alternatives := VerticalLayout {
                             visible: false;
                             for label in VideoImport.import-label-alternatives: AppText {
@@ -412,7 +414,7 @@ export component VideoImportDialog {
                                 font-weight: Theme.font-weight-semibold;
                             }
                         }
-                        Button {
+                        import-button := Button {
                             width: parent.width;
                             icon: root.importing ? Icons.loader-circle : Icons.download;
                             text: root.confirming ? @tr("video-preview.importAnyway" => "Import anyway") : VideoImport.import-label;

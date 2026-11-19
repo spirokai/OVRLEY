@@ -2,6 +2,7 @@ import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Icon } from "../../components/icons.slint";
 import { Popover } from "../../components/popover.slint";
+import { ShadowSize } from "../../components/shadow.slint";
 import { ScrollArea } from "../../components/scroll-area.slint";
 import { PlacementAlign, PlacementSide } from "../../components/logic.slint";
 import { DrawerItemView, DrawerOptionView, WidgetDrawer } from "index.slint";
@@ -148,6 +149,9 @@ component WidgetButton inherits Rectangle {
             side-offset: 6.8px - 0.5rem;
             content-width: 13rem;
             content-padding: 0.2rem;
+            shadow: ShadowSize.md;
+            has-shadow-color: true;
+            shadow-color: #000000b3;
             radius: 0px;
             open-changed(open) => {
                 root.open = open;

@@ -2,6 +2,7 @@ import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
 import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { DashedBorder } from "../../components/dashed-border.slint";
 import { DrawerRowView } from "index.slint";
 
 // The pieces the activity and video drawers share.
@@ -29,9 +30,8 @@ export component Cell inherits HorizontalLayout {
     }
 }
 
-// `FileDropZone`: at least 6rem high, 1rem below the button, `rounded-xs`, a 1px `border` at 80%
-// on `surface`, a 1.25rem FileUp, the bold label and the format list. Slint has no dashed borders,
-// so the border is solid (as the window's drop overlay). Native drops land on the whole window
+// `FileDropZone`: at least 6rem high, 1rem below the button, `rounded-xs`, a 1px dashed `border`
+// at 80% on `surface`, a 1.25rem FileUp, the bold label and the format list. Native drops land on the whole window
 // (Phase 2 D10), whose overlay covers the drawer while a file hovers, so the zone shows no hover
 // state of its own.
 export component FileDropZone inherits Rectangle {
@@ -42,9 +42,11 @@ export component FileDropZone inherits Rectangle {
     min-height: 6rem;
     vertical-stretch: 0;
     border-radius: Theme.radius-xs * 1rem;
-    border-width: 1px;
-    border-color: Theme.border.transparentize(0.2);
     background: Theme.surface;
+    DashedBorder {
+        radius: Theme.radius-xs * 1rem;
+        border-color: Theme.border.transparentize(0.2);
+    }
     VerticalLayout {
         alignment: center;
         padding-left: 1rem;

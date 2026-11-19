@@ -154,7 +154,6 @@ component SelectionLayer inherits Rectangle {
                 hint-text := AppText {
                     // A chase camera follows the rider, so it only zooms.
                     content: badge.fixed ? @tr("overlay-editor.mapViewHint" => "Double-click to pan & zoom") : @tr("overlay-editor.mapViewZoomHint" => "Double-click to zoom");
-                    uppercase: false;
                     font-size: 0.741rem;
                     font-weight: Theme.font-weight-medium;
                     color: Theme.muted-foreground;
@@ -168,6 +167,7 @@ component SelectionLayer inherits Rectangle {
                 preferred-height: 1.5rem;
                 max-height: 1.5rem;
                 text: @tr("overlay-editor.mapReset" => "Reset");
+                uppercase: true;
                 icon: Icons.rotate-ccw;
                 icon-size: 0.75rem;
                 font-size: 0.741rem;

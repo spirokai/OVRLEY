@@ -56,6 +56,8 @@ component VideoCard inherits Rectangle {
         }
     }
     focus := FocusScope {
+        // The press goes to `touch`, which focuses the card; the scope would take the first press.
+        focus-on-click: false;
         key-pressed(event) => {
             if event.text == Key.Delete || event.text == Key.Backspace {
                 Toolbar.remove-video(root.card.id);
