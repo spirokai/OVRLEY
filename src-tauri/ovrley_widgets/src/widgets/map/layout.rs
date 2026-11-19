@@ -36,13 +36,45 @@ use std::{
 };
 
 /// The map's sources by name: the tile host, the tile schema and the data.
-const ATTRIBUTION: &str = "OpenFreeMap \u{a9} OpenMapTiles \u{a9} OpenStreetMap";
+pub const ATTRIBUTION: &str = "OpenFreeMap \u{a9} OpenMapTiles \u{a9} OpenStreetMap";
 const ATTRIBUTION_FONT_SIZE: f32 = 8.0;
 const ATTRIBUTION_PADDING: f32 = 2.0;
 const ATTRIBUTION_TEXT_OPACITY: f32 = 0.8;
 const ATTRIBUTION_BACKING_OPACITY: f32 = 0.65;
 /// The most of a curved edge the credit fills, so it never wraps up the sides.
 const ATTRIBUTION_MAX_EDGE_SHARE: f32 = 0.9;
+
+/// `frame` with `lines` stroked over it, in its output pixels: round caps and joins, `width_px`
+/// wide, in `color`. Each line is stroked on its own, so a gap between lines stays open. Sync
+/// Doctor's top-down map strokes its course into each frame once, so playback never redraws it.
+pub fn stroke_lines_over_frame(frame: &super::preview::MapFramePixels, lines: &[Vec<(f32, f32)>], color: [u8; 3], width_px: f32) -> WidgetResult<super::preview::MapFramePixels> {
+    let image = frame.image();
+    let (width, height) = (image.width(), image.height());
+    let info = skia_safe::ImageInfo::new((width, height), skia_safe::ColorType::RGBA8888, AlphaType::Premul, None);
+    let mut surface = skia_safe::surfaces::raster(&info, None, None).ok_or_else(|| WidgetError::Render("unable to create a course surface".into()))?;
+    let canvas = surface.canvas();
+    canvas.draw_image(image, (0, 0), None);
+    let mut paint = Paint::default();
+    paint.set_anti_alias(true);
+    paint.set_style(PaintStyle::Stroke);
+    paint.set_stroke_width(width_px);
+    paint.set_stroke_cap(skia_safe::PaintCap::Round);
+    paint.set_stroke_join(PaintJoin::Round);
+    paint.set_color(Color::from_rgb(color[0], color[1], color[2]));
+    for line in lines.iter().filter(|line| line.len() > 1) {
+        let mut path = PathBuilder::new();
+        path.move_to(line[0]);
+        for point in &line[1..] {
+            path.line_to(*point);
+        }
+        canvas.draw_path(&path.detach(), &paint);
+    }
+    let mut pixels = vec![0_u8; width as usize * height as usize * 4];
+    if !surface.read_pixels(&info, &mut pixels, width as usize * 4, (0, 0)) {
+        return Err(WidgetError::Render("unable to read the course surface".into()));
+    }
+    super::preview::MapFramePixels::new(width as u32, height as u32, pixels)
+}
 
 fn color_floats(color: &str, opacity: f32) -> [f32; 4] {
     let color = parse_color(color, opacity);

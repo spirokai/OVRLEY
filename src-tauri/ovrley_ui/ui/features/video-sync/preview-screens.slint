@@ -6,6 +6,7 @@ import { SimpleTooltip } from "../../components/simple-tooltip.slint";
 import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { Landmarks } from "video-sync-drawer.slint";
 import { VideoSync, LandmarkKind } from "index.slint";
+import { NavigationMapView, SelectionMapView } from "map-screens.slint";
 
 // One mark button: `rounded-sm bg-surface shadow-md` around a ghost button (`min-h-7`, `px-2
 // py-1`, 0.75rem semibold uppercase) with a 70% border and text in its type's colour, hover at
@@ -149,6 +150,16 @@ export component VideoSyncScreens inherits Rectangle {
         width: VideoSync.screen-width;
         height: VideoSync.screen-height;
         fill: #000000;
+        NavigationMapView {
+            property <length> side: (parent.width < parent.height ? parent.height : parent.width) * 0.25;
+            x: parent.width * 0.98 - self.side;
+            y: parent.height * 0.03;
+            width: self.side;
+            height: self.side;
+            drop-shadow-blur: 15px;
+            drop-shadow-offset-y: 10px;
+            drop-shadow-color: #00000040;
+        }
         MarkControls {
             portrait: parent.width < parent.height;
             width: min(self.preferred-width, parent.width - 2rem);
@@ -163,5 +174,9 @@ export component VideoSyncScreens inherits Rectangle {
         width: VideoSync.screen-width;
         height: VideoSync.screen-height;
         fill: Theme.surface-elevated;
+        SelectionMapView {
+            width: parent.width;
+            height: parent.height;
+        }
     }
 }

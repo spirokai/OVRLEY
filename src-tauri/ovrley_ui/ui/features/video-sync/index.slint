@@ -1,4 +1,5 @@
 import { SecondsFieldView } from "../seconds-fields/index.slint";
+import { Choice } from "../../components/logic.slint";
 
 // `deriveVideoSyncControls` for one collection: the store's, or the import dialog's draft.
 export struct VideoSyncView {
@@ -107,7 +108,57 @@ export global VideoSync {
     in property <[EventBandView]> bands;
     in property <[TimelineLandmarkView]> timeline-landmarks;
 
+    // The selection map (D5): its image placed against the camera on show, and the markers.
+    in property <bool> has-map-image;
+    in property <image> map-image;
+    in property <length> map-image-x;
+    in property <length> map-image-y;
+    in property <length> map-image-width;
+    in property <length> map-image-height;
+    in property <color> map-background;
+    in property <bool> playback-shown;
+    in property <length> playback-x;
+    in property <length> playback-y;
+    in property <bool> hover-shown;
+    in property <length> hover-x;
+    in property <length> hover-y;
+    in property <bool> action-shown;
+    in property <length> action-x;
+    in property <length> action-y;
+    in property <bool> pin-shown;
+    in property <length> pin-x;
+    in property <length> pin-y;
+    in property <bool> popup-open;
+    in property <bool> map-dragging;
+    in property <bool> map-can-zoom-in;
+    in property <bool> map-can-zoom-out;
+    in property <[Choice]> map-styles;
+    in property <string> map-style;
+    in property <string> attribution;
+
+    // The chase inset (D6).
+    in property <bool> has-nav-image;
+    in property <image> nav-image;
+    in property <bool> nav-marker-shown;
+    in property <float> nav-pitch;
+    in property <float> nav-max-pitch;
+    in property <bool> nav-can-zoom-in;
+    in property <bool> nav-can-zoom-out;
+
     callback set-tab(tab: string);
+    // The selection map's pointer: "down", "move", "up" or "leave", in screen coordinates.
+    callback map-pointer(phase: string, x: length, y: length);
+    callback map-wheel(delta-y: length, x: length, y: length, shift: bool);
+    callback map-double-click(x: length, y: length, shift: bool);
+    callback map-zoom(zoom-in: bool);
+    callback set-location();
+    callback pin-dropped(x: length, y: length);
+    callback pin-clicked();
+    callback delete-location();
+    callback set-map-style(id: string);
+    callback nav-wheel(delta-y: length, shift: bool);
+    callback nav-zoom(zoom-in: bool);
+    callback nav-pitch-changed(pitch: float);
     // A landmark handle's pointer: "down", "move" (timeline x), "up" or "cancel".
     callback landmark-pointer(id: string, phase: string, x: length);
     callback compute();

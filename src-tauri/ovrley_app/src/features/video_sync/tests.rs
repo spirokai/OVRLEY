@@ -172,8 +172,8 @@ use crate::store::slices::manual_video_sync::{self as slice, CandidateStatus};
 use crate::store::slices::media::{ActivitySummary, ImportedActivity};
 use crate::store::slices::video_import::tests::store_with;
 use crate::store::{Dispatcher, Store};
-use ovrley_core::media::manual_video_sync::{LandmarkKind, ManualVideoSync};
 use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::media::manual_video_sync::{LandmarkKind, ManualVideoSync};
 use std::sync::Arc;
 
 fn activity(speed: &[Option<f64>]) -> ParsedActivity {
@@ -191,13 +191,26 @@ fn moving() -> ParsedActivity {
 }
 
 /// A store with the activity, the clips at their offsets and two stop landmarks on `video-1`.
-fn dispatcher(activity: ParsedActivity, videos: Vec<crate::lib::video_program::ImportedVideo>, offsets: &[(&str, f64)]) -> (Dispatcher, Fakes) {
+fn dispatcher(
+    activity: ParsedActivity,
+    videos: Vec<crate::lib::video_program::ImportedVideo>,
+    offsets: &[(&str, f64)],
+) -> (Dispatcher, Fakes) {
     let mut store: Store = store_with(videos, offsets);
-    store.media.activity_summary = Some(ActivitySummary { duration_seconds: 100.0, ..ActivitySummary::of(&activity) });
-    store.media.parsed_activity = Some(ImportedActivity { activity: Arc::new(activity), preview_bytes: Arc::new(Vec::new()) });
+    store.media.activity_summary = Some(ActivitySummary {
+        duration_seconds: 100.0,
+        ..ActivitySummary::of(&activity)
+    });
+    store.media.parsed_activity = Some(ImportedActivity {
+        activity: Arc::new(activity),
+        preview_bytes: Arc::new(Vec::new()),
+    });
     store.manual_video_sync = ManualVideoSync {
         video_id: Some("video-1".into()),
-        landmarks: vec![Landmark::new("video-stop-1".into(), LandmarkKind::Stop, 4.0), Landmark::new("video-stop-2".into(), LandmarkKind::Stop, 12.0)],
+        landmarks: vec![
+            Landmark::new("video-stop-1".into(), LandmarkKind::Stop, 4.0),
+            Landmark::new("video-stop-2".into(), LandmarkKind::Stop, 12.0),
+        ],
         turn_threshold_degrees: 90.0,
         ..ManualVideoSync::default()
     };
@@ -224,7 +237,9 @@ fn settle(dispatcher: &Dispatcher, fakes: &Fakes) {
 }
 
 fn calculate(dispatcher: &Dispatcher, scope: MatchScope) -> Result<(), String> {
-    dispatcher.dispatch_with_result(move |store, services| super::calculate(store, services, scope, None)).unwrap()
+    dispatcher
+        .dispatch_with_result(move |store, services| super::calculate(store, services, scope, None))
+        .unwrap()
 }
 
 #[test]
@@ -244,7 +259,15 @@ fn gates_the_first_search_on_usable_landmark_telemetry() {
     assert!(dispatcher.with_store(|store| store.manual_video_sync_detection.is_some()));
     assert!(!dispatcher.with_store(|store| super::calculation_eligibility(store).can_calculate_all));
     assert!(calculate(&dispatcher, MatchScope::All).is_err());
-    dispatcher.with_store(|store| assert_eq!((store.manual_video_sync_results.all.has_searched, store.manual_video_sync_results.all.status), (false, CandidateStatus::Idle)));
+    dispatcher.with_store(|store| {
+        assert_eq!(
+            (
+                store.manual_video_sync_results.all.has_searched,
+                store.manual_video_sync_results.all.status
+            ),
+            (false, CandidateStatus::Idle)
+        )
+    });
 }
 
 #[test]
@@ -257,11 +280,17 @@ fn reruns_the_search_after_a_committed_sensitivity_change() {
         store.manual_video_sync_results.all.revision
     });
     dispatcher.dispatch(|store, _| slice::set_speed_threshold(store, 6.0).unwrap());
-    assert!(dispatcher.with_store(|store| store.manual_video_sync_results.is_calculating()), "the commit started the rerun");
+    assert!(
+        dispatcher.with_store(|store| store.manual_video_sync_results.is_calculating()),
+        "the commit started the rerun"
+    );
     settle(&dispatcher, &fakes);
     dispatcher.with_store(|store| {
         let all = &store.manual_video_sync_results.all;
-        assert_eq!((all.revision, all.status, all.has_searched), (revision + 1, CandidateStatus::Fresh, true));
+        assert_eq!(
+            (all.revision, all.status, all.has_searched),
+            (revision + 1, CandidateStatus::Fresh, true)
+        );
     });
 }
 
@@ -270,7 +299,8 @@ fn drops_a_result_when_a_landmark_changes_while_it_runs() {
     let (dispatcher, fakes) = dispatcher(moving(), one_video(), &[]);
     calculate(&dispatcher, MatchScope::All).unwrap();
     settle(&dispatcher, &fakes);
-    let previous = dispatcher.with_store(|store| store.manual_video_sync_detection.clone().unwrap());
+    let previous =
+        dispatcher.with_store(|store| store.manual_video_sync_detection.clone().unwrap());
     calculate(&dispatcher, MatchScope::All).unwrap();
     dispatcher.dispatch(|store, _| slice::move_landmark(store, "video-stop-2", 13.0).unwrap());
     for _ in 0..400 {
@@ -281,8 +311,17 @@ fn drops_a_result_when_a_landmark_changes_while_it_runs() {
     }
     fakes.ui_post.drain(&dispatcher);
     dispatcher.with_store(|store| {
-        assert_eq!(store.manual_video_sync_results.all.status, CandidateStatus::Stale);
-        assert!(Arc::ptr_eq(store.manual_video_sync_detection.as_ref().unwrap(), &previous), "the dropped result left the detection alone");
+        assert_eq!(
+            store.manual_video_sync_results.all.status,
+            CandidateStatus::Stale
+        );
+        assert!(
+            Arc::ptr_eq(
+                store.manual_video_sync_detection.as_ref().unwrap(),
+                &previous
+            ),
+            "the dropped result left the detection alone"
+        );
     });
 }
 
@@ -291,18 +330,43 @@ fn stores_and_applies_a_location_only_result() {
     let videos = vec![simple("video-1", 30.0, 0), simple("video-2", 30.0, 1)];
     let (dispatcher, fakes) = dispatcher(moving(), videos, &[("video-1", 0.0), ("video-2", 35.0)]);
     dispatcher.dispatch(|store, _| {
-        store.manual_video_sync.landmarks = vec![Landmark::new("video-location".into(), LandmarkKind::Location, 4.0)];
+        store.manual_video_sync.landmarks = vec![Landmark::new(
+            "video-location".into(),
+            LandmarkKind::Location,
+            4.0,
+        )];
         slice::set_detected_location(store, 12.0).unwrap();
     });
     calculate(&dispatcher, MatchScope::Location).unwrap();
     settle(&dispatcher, &fakes);
-    let candidate = dispatcher.with_store(|store| store.manual_video_sync_results.location.candidates[0].clone());
-    assert_eq!((candidate.variant, candidate.offset, candidate.matched_count, candidate.eligible_count), (CandidateVariant::LocationOnly, 8.0, 1, 1));
-    dispatcher.dispatch(move |store, _| slice::apply_candidate(store, MatchScope::Location, candidate.offset).unwrap());
+    let candidate = dispatcher
+        .with_store(|store| store.manual_video_sync_results.location.candidates[0].clone());
+    assert_eq!(
+        (
+            candidate.variant,
+            candidate.offset,
+            candidate.matched_count,
+            candidate.eligible_count
+        ),
+        (CandidateVariant::LocationOnly, 8.0, 1, 1)
+    );
+    dispatcher.dispatch(move |store, _| {
+        slice::apply_candidate(store, MatchScope::Location, candidate.offset).unwrap()
+    });
     dispatcher.with_store(|store| {
-        assert_eq!(store.video_import.video_edits["video-1"].offset_seconds, 8.0);
-        assert_eq!(store.video_import.video_edits["video-2"].offset_seconds, 43.0);
-        assert_eq!(store.history.past.len(), 1, "applying a candidate is one undo step");
+        assert_eq!(
+            store.video_import.video_edits["video-1"].offset_seconds,
+            8.0
+        );
+        assert_eq!(
+            store.video_import.video_edits["video-2"].offset_seconds,
+            43.0
+        );
+        assert_eq!(
+            store.history.past.len(),
+            1,
+            "applying a candidate is one undo step"
+        );
     });
 }
 
@@ -311,8 +375,17 @@ fn reports_no_video_until_a_target_clip_is_selected() {
     let (dispatcher, _) = dispatcher(moving(), one_video(), &[]);
     dispatcher.dispatch(|store, _| store.manual_video_sync.video_id = None);
     let eligibility = dispatcher.with_store(super::calculation_eligibility);
-    assert_eq!((eligibility.can_calculate_all, eligibility.can_calculate_location), (false, false));
-    assert_eq!(eligibility.all_explanation.as_deref(), Some("A video is required for Landmark Sync"));
+    assert_eq!(
+        (
+            eligibility.can_calculate_all,
+            eligibility.can_calculate_location
+        ),
+        (false, false)
+    );
+    assert_eq!(
+        eligibility.all_explanation.as_deref(),
+        Some("A video is required for Landmark Sync")
+    );
 }
 
 // --- The timeline (`useVideoSyncTimeline.test.jsx`) -------------------------------------------
@@ -324,14 +397,33 @@ use crate::store::slices::layout::LeftDrawerTool;
 /// A 20 s activity, a 20 s video at offset 2 with a stop at its third second, Sync Doctor open, the
 /// timeline 400 px wide showing 0 to `view_end`.
 fn timeline_store(landmark: Landmark, view_end: f64) -> Dispatcher {
-    let (dispatcher, _) = dispatcher(moving(), vec![simple("video-1", 20.0, 0)], &[("video-1", 2.0)]);
+    let (dispatcher, _) = dispatcher(
+        moving(),
+        vec![simple("video-1", 20.0, 0)],
+        &[("video-1", 2.0)],
+    );
     dispatcher.dispatch(move |store, _| {
-        store.media.activity_summary.as_mut().unwrap().duration_seconds = 20.0;
+        store
+            .media
+            .activity_summary
+            .as_mut()
+            .unwrap()
+            .duration_seconds = 20.0;
         store.manual_video_sync.landmarks = vec![landmark];
-        store.layout.select_left_drawer_tool(LeftDrawerTool::VideoSync);
-        store.player.viewport.metrics = TimelineMetrics { width_px: 400.0, ..TimelineMetrics::default() };
+        store
+            .layout
+            .select_left_drawer_tool(LeftDrawerTool::VideoSync);
+        store.player.viewport.metrics = TimelineMetrics {
+            width_px: 400.0,
+            ..TimelineMetrics::default()
+        };
     });
-    dispatcher.dispatch(move |store, _| store.editor.timeline_viewport = TimelineViewport { view_start: 0.0, view_end });
+    dispatcher.dispatch(move |store, _| {
+        store.editor.timeline_viewport = TimelineViewport {
+            view_start: 0.0,
+            view_end,
+        }
+    });
     dispatcher
 }
 
@@ -343,12 +435,38 @@ fn stop_at(second: f64) -> Landmark {
 fn builds_both_graph_paths() {
     let detection = super::detection::Detection {
         graph_series: super::detection::GraphSeries {
-            speed: vec![super::detection::GraphPoint { time: 0.0, value: Some(1.0) }, super::detection::GraphPoint { time: 10.0, value: Some(2.0) }],
-            turning: vec![super::detection::GraphPoint { time: 0.0, value: Some(0.0) }, super::detection::GraphPoint { time: 10.0, value: Some(30.0) }],
+            speed: vec![
+                super::detection::GraphPoint {
+                    time: 0.0,
+                    value: Some(1.0),
+                },
+                super::detection::GraphPoint {
+                    time: 10.0,
+                    value: Some(2.0),
+                },
+            ],
+            turning: vec![
+                super::detection::GraphPoint {
+                    time: 0.0,
+                    value: Some(0.0),
+                },
+                super::detection::GraphPoint {
+                    time: 10.0,
+                    value: Some(30.0),
+                },
+            ],
         },
         ..super::detection::Detection::default()
     };
-    let graph = super::timeline::graph_view(Some(&detection), TimelineViewport { view_start: 0.0, view_end: 20.0 }, 400.0, crate::i18n::Locale::En);
+    let graph = super::timeline::graph_view(
+        Some(&detection),
+        TimelineViewport {
+            view_start: 0.0,
+            view_end: 20.0,
+        },
+        400.0,
+        crate::i18n::Locale::En,
+    );
     assert!(!graph.speed_path.is_empty() && !graph.turning_path.is_empty());
 }
 
@@ -359,11 +477,20 @@ fn a_handle_drag_commits_one_video_local_move_and_keeps_the_offset() {
     assert_eq!(left, 100.0, "timeline second 5");
     dispatcher.dispatch(|store, _| super::timeline::landmark_down(store, "mark-1"));
     dispatcher.dispatch(|store, _| super::timeline::landmark_move(store, 200.0));
-    dispatcher.with_store(|store| assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 3.0, "the move is a preview"));
+    dispatcher.with_store(|store| {
+        assert_eq!(
+            store.manual_video_sync.landmarks[0].video_second(),
+            3.0,
+            "the move is a preview"
+        )
+    });
     dispatcher.dispatch(|store, _| super::timeline::landmark_up(store, true).unwrap());
     dispatcher.with_store(|store| {
         assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 8.0);
-        assert_eq!(store.video_import.video_edits["video-1"].offset_seconds, 2.0);
+        assert_eq!(
+            store.video_import.video_edits["video-1"].offset_seconds,
+            2.0
+        );
     });
 }
 
@@ -379,17 +506,31 @@ fn a_press_without_a_move_scrubs_to_the_landmark() {
 fn the_displayed_offset_moves_the_handles_without_committing() {
     let dispatcher = timeline_store(stop_at(3.0), 20.0);
     dispatcher.dispatch(|store, _| {
-        store.video_import.video_drag_preview = Some(crate::lib::video_program::collection::VideoDragPreview { video_id: None, delta_seconds: 3.0 });
+        store.video_import.video_drag_preview =
+            Some(crate::lib::video_program::collection::VideoDragPreview {
+                video_id: None,
+                delta_seconds: 3.0,
+            });
     });
     dispatcher.with_store(|store| {
-        assert_eq!(super::timeline::landmark_models(store)[0].left, 160.0, "timeline second 8");
+        assert_eq!(
+            super::timeline::landmark_models(store)[0].left,
+            160.0,
+            "timeline second 8"
+        );
         assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 3.0);
     });
 }
 
 #[test]
 fn off_view_landmarks_clamp_to_an_inert_edge_marker() {
-    let dispatcher = timeline_store(Landmark::new("late".into(), LandmarkKind::RightTurn, 15.0), 10.0);
+    let dispatcher = timeline_store(
+        Landmark::new("late".into(), LandmarkKind::RightTurn, 15.0),
+        10.0,
+    );
     let model = dispatcher.with_store(|store| super::timeline::landmark_models(store)[0].clone());
-    assert_eq!((model.clamped, model.interactive, model.left), (true, false, 400.0));
+    assert_eq!(
+        (model.clamped, model.interactive, model.left),
+        (true, false, 400.0)
+    );
 }

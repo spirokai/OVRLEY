@@ -5818,6 +5818,7 @@ dependencies = [
  "image",
  "log",
  "ovrley_core",
+ "ovrley_map",
  "ovrley_services",
  "ovrley_widgets",
  "regex",

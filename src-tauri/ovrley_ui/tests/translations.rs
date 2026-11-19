@@ -12,7 +12,15 @@ use std::path::{Path, PathBuf};
 
 /// Keys React translates with a code default (`t(key, default)`) that no locale file has. They
 /// show the `@tr` text in every language, as i18next shows the default.
-const CODE_DEFAULT_KEYS: &[&str] = &["components.gradient"];
+const CODE_DEFAULT_KEYS: &[&str] = &[
+    "components.gradient",
+    // Sync Doctor's maps: a code default in React (`mapStyle`) or English text React hardcodes.
+    "videoSync.mapStyle",
+    "videoSync.zoomIn",
+    "videoSync.zoomOut",
+    "videoSync.deleteLocationMarker",
+    "videoSync.navigationPitch",
+];
 
 fn manifest_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))

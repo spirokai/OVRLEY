@@ -140,6 +140,12 @@ pub struct ActivitySampler {
     split_tables: Vec<SplitTable>,
 }
 impl ActivitySampler {
+    /// The activity's whole track as the map widget builds its own, smoothed by
+    /// `smoothing_meters`; `None` without two GPS samples. Sync Doctor's chase inset follows it.
+    pub fn map_track(&self, smoothing_meters: f64) -> Option<crate::widgets::map::track::MapTrack> {
+        crate::widgets::map::track::MapTrack::new(self.route.track_samples(None), smoothing_meters)
+    }
+
     pub fn from_json(bytes: &[u8]) -> WidgetResult<Self> {
         let activity: PreviewActivity = serde_json::from_slice(bytes)
             .map_err(|e| WidgetError::Config(format!("preview activity: {e}")))?;

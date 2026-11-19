@@ -4,7 +4,10 @@ use crate::features::video_preview::sync_view;
 use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
 use crate::{AppWindow, EventBandView, CandidateCardView, CandidateListView, LandmarkKind, LandmarkRowView, TimelineLandmarkView, VideoSync};
 use ovrley_app::features::video_sync::timeline::{self, BandTone, GraphView};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use ovrley_app::features::video_sync::maps::{self, WheelDevice};
+use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
+use std::time::Instant;
 use ovrley_app::features::seconds_fields::SecondsField;
 use ovrley_app::features::video_sync::matching::MatchScope;
 use ovrley_app::features::video_sync::{self as sync, CandidateListView as AppCandidateList};
@@ -140,9 +143,104 @@ pub fn project(window: &AppWindow, store: &Store) {
     if mode {
         project_timeline(&global, store);
     }
+    project_maps(&global, store);
     if mode && store.layout.left_drawer_visible {
         project_drawer(&global, store);
     }
+}
+
+thread_local! {
+    /// The device of the last raw wheel event, which the scroll event right after it reads.
+    static WHEEL_DEVICE: Cell<Option<WheelDevice>> = const { Cell::new(None) };
+    /// The maps' Slint images, built once per frame they show: `(revision, image)`.
+    static SELECTION_IMAGE: RefCell<Option<(u64, Image)>> = const { RefCell::new(None) };
+    static NAVIGATION_IMAGE: RefCell<Option<(u64, Image)>> = const { RefCell::new(None) };
+}
+
+/// The raw wheel event's device, from the window's winit events.
+pub fn record_wheel_device(device: WheelDevice) {
+    WHEEL_DEVICE.with(|cell| cell.set(Some(device)));
+}
+
+fn wheel_device() -> Option<WheelDevice> {
+    WHEEL_DEVICE.with(Cell::get)
+}
+
+/// The frame's pixels as a Slint image, built only when `revision` changes, so Slint uploads it
+/// once and draws the same texture until the next frame.
+fn cached_image(cache: &'static std::thread::LocalKey<RefCell<Option<(u64, Image)>>>, revision: u64, frame: &ovrley_widgets::widgets::map::preview::MapFramePixels) -> (Image, bool) {
+    cache.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some((cached, image)) = cache.as_ref() {
+            if *cached == revision {
+                return (image.clone(), false);
+            }
+        }
+        let source = frame.image();
+        let buffer = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(frame.pixels(), source.width() as u32, source.height() as u32);
+        let image = Image::from_rgba8_premultiplied(buffer);
+        *cache = Some((revision, image.clone()));
+        (image, true)
+    })
+}
+
+fn project_maps(global: &VideoSync<'_>, store: &Store) {
+    let Some(view) = maps::map_view(store) else {
+        set_if_changed(global.get_has_map_image(), false, |value| global.set_has_map_image(value));
+        set_if_changed(global.get_has_nav_image(), false, |value| global.set_has_nav_image(value));
+        SELECTION_IMAGE.with(|cache| *cache.borrow_mut() = None);
+        NAVIGATION_IMAGE.with(|cache| *cache.borrow_mut() = None);
+        return;
+    };
+    set_if_changed(global.get_has_map_image(), view.image.is_some(), |value| global.set_has_map_image(value));
+    if let Some((image, origin, size)) = view.image {
+        let (slint_image, fresh) = cached_image(&SELECTION_IMAGE, image.revision, &image.pixels);
+        if fresh {
+            global.set_map_image(slint_image);
+        }
+        set_if_changed(global.get_map_image_x(), origin.0 as f32, |value| global.set_map_image_x(value));
+        set_if_changed(global.get_map_image_y(), origin.1 as f32, |value| global.set_map_image_y(value));
+        set_if_changed(global.get_map_image_width(), size.0 as f32, |value| global.set_map_image_width(value));
+        set_if_changed(global.get_map_image_height(), size.1 as f32, |value| global.set_map_image_height(value));
+    }
+    let [r, g, b] = view.background;
+    set_if_changed(global.get_map_background(), slint::Color::from_rgb_u8(r, g, b), |value| global.set_map_background(value));
+    macro_rules! marker {
+        ($point:expr, $shown:ident, $set_shown:ident, $x:ident, $set_x:ident, $y:ident, $set_y:ident) => {
+            let point: Option<(f64, f64)> = $point;
+            set_if_changed(global.$shown(), point.is_some(), |value| global.$set_shown(value));
+            if let Some((px, py)) = point {
+                set_if_changed(global.$x(), px as f32, |value| global.$set_x(value));
+                set_if_changed(global.$y(), py as f32, |value| global.$set_y(value));
+            }
+        };
+    }
+    marker!(view.playback, get_playback_shown, set_playback_shown, get_playback_x, set_playback_x, get_playback_y, set_playback_y);
+    marker!(view.hover, get_hover_shown, set_hover_shown, get_hover_x, set_hover_x, get_hover_y, set_hover_y);
+    marker!(view.action, get_action_shown, set_action_shown, get_action_x, set_action_x, get_action_y, set_action_y);
+    marker!(view.pin, get_pin_shown, set_pin_shown, get_pin_x, set_pin_x, get_pin_y, set_pin_y);
+    set_if_changed(global.get_popup_open(), view.popup_open, |value| global.set_popup_open(value));
+    set_if_changed(global.get_map_dragging(), view.dragging, |value| global.set_map_dragging(value));
+    set_if_changed(global.get_map_can_zoom_in(), view.can_zoom_in, |value| global.set_map_can_zoom_in(value));
+    set_if_changed(global.get_map_can_zoom_out(), view.can_zoom_out, |value| global.set_map_can_zoom_out(value));
+    set_if_changed(global.get_has_nav_image(), view.navigation_frame.is_some(), |value| global.set_has_nav_image(value));
+    if let Some((frame, serial)) = view.navigation_frame {
+        let (image, fresh) = cached_image(&NAVIGATION_IMAGE, serial, frame);
+        if fresh {
+            global.set_nav_image(image);
+        }
+    }
+    set_if_changed(global.get_nav_marker_shown(), view.navigation_marker, |value| global.set_nav_marker_shown(value));
+    set_if_changed(global.get_nav_pitch(), view.navigation_pitch as f32, |value| global.set_nav_pitch(value));
+    set_if_changed(global.get_nav_max_pitch(), maps::NAVIGATION_MAX_PITCH as f32, |value| global.set_nav_max_pitch(value));
+    set_if_changed(global.get_nav_can_zoom_in(), view.navigation_zoom < maps::NAVIGATION_MAX_ZOOM, |value| global.set_nav_can_zoom_in(value));
+    set_if_changed(global.get_nav_can_zoom_out(), view.navigation_zoom > 0.0, |value| global.set_nav_can_zoom_out(value));
+    let chosen = store.video_sync.maps.as_ref().and_then(|maps| maps.chosen_style.clone());
+    let (options, value) = ovrley_app::features::maps::map_style_select(store, chosen.as_deref());
+    let choices = options.into_iter().map(|option| crate::Choice { kind: crate::ChoiceKind::Item, value: option.value.into(), label: option.label.into(), ..Default::default() }).collect();
+    replace_if_changed(global.get_map_styles(), choices, |model| global.set_map_styles(model));
+    set_if_changed(global.get_map_style(), SharedString::from(value), |value| global.set_map_style(value));
+    set_if_changed(global.get_attribution(), SharedString::from(ovrley_widgets::widgets::map::layout::ATTRIBUTION), |value| global.set_attribution(value));
 }
 
 /// The graph's inputs: the detection's pointer, the view, the width and the language.
@@ -447,6 +545,50 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             _ => command(&d, |store, _| timeline::landmark_up(store, false)),
         }
     });
+    let d = dispatcher.clone();
+    global.on_map_pointer(move |phase, x, y| {
+        let point = (f64::from(x), f64::from(y));
+        d.dispatch(move |store, _| maps::map_pointer(store, &phase, point, Instant::now()));
+    });
+    // Slint reports a wheel turned towards the user as negative; the browser's `deltaY` is
+    // positive then.
+    let d = dispatcher.clone();
+    global.on_map_wheel(move |delta_y, x, y, shift| {
+        let (value, point, device) = (-f64::from(delta_y), (f64::from(x), f64::from(y)), wheel_device());
+        d.dispatch(move |store, _| maps::map_wheel(store, value, device, shift, point, Instant::now()));
+    });
+    let d = dispatcher.clone();
+    global.on_map_double_click(move |x, y, shift| {
+        let point = (f64::from(x), f64::from(y));
+        d.dispatch(move |store, _| maps::map_double_click(store, point, shift, Instant::now()));
+    });
+    let d = dispatcher.clone();
+    global.on_map_zoom(move |zoom_in| d.dispatch(move |store, _| maps::map_zoom(store, zoom_in, Instant::now())));
+    let d = dispatcher.clone();
+    global.on_set_location(move || command(&d, |store, _| maps::set_location_from_action(store)));
+    let d = dispatcher.clone();
+    global.on_pin_dropped(move |x, y| {
+        let point = (f64::from(x), f64::from(y));
+        command(&d, move |store, _| maps::pin_dropped(store, point));
+    });
+    let d = dispatcher.clone();
+    global.on_pin_clicked(move || d.dispatch(|store, _| maps::toggle_popup(store)));
+    let d = dispatcher.clone();
+    global.on_delete_location(move || d.dispatch(|store, _| maps::delete_location(store)));
+    let d = dispatcher.clone();
+    global.on_set_map_style(move |id| {
+        let id = id.to_string();
+        d.dispatch(move |store, services| maps::set_map_style(store, services, id));
+    });
+    let d = dispatcher.clone();
+    global.on_nav_wheel(move |delta_y, shift| {
+        let (value, device) = (-f64::from(delta_y), wheel_device());
+        d.dispatch(move |store, _| maps::nav_wheel(store, value, device, shift, Instant::now()));
+    });
+    let d = dispatcher.clone();
+    global.on_nav_zoom(move |zoom_in| d.dispatch(move |store, _| maps::nav_zoom(store, zoom_in, Instant::now())));
+    let d = dispatcher.clone();
+    global.on_nav_pitch_changed(move |pitch| d.dispatch(move |store, _| maps::nav_pitch(store, f64::from(pitch))));
     let d = dispatcher.clone();
     global.on_mark(move |kind| {
         command(&d, move |store, _| {

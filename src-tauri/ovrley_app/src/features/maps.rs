@@ -328,7 +328,9 @@ pub fn reset_map_view(store: &mut Store, widget_id: &str) -> Result<(), String> 
 pub fn next_deadline(store: &Store) -> Option<Instant> {
     let wheel = store.maps.view.pending.as_ref().and_then(|pending| pending.wheel_commit);
     let download = store.maps.download.waiting.as_ref().map(|(at, _)| *at);
-    wheel.into_iter().chain(download).min()
+    // Sync Doctor's maps: their animations, the settle and the frame throttle (Phase 8 D5).
+    let sync = crate::features::video_sync::maps::next_deadline(store, Instant::now());
+    wheel.into_iter().chain(download).chain(sync).min()
 }
 
 /// The deadline's turn: commits a wheel's zoom once the wheel has been still, and starts the

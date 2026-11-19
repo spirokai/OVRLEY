@@ -275,7 +275,7 @@ fn take(window: slint::Weak<AppWindow>, dispatcher: Dispatcher, dir: PathBuf, st
             dispatcher.dispatch(action);
             // An editor capture waits for the accordion item to grow to its new content: its
             // height animation advances slowly while the window only renders snapshots.
-            if name.starts_with("editor-") {
+            if name.starts_with("editor-") || name.starts_with("sync-") {
                 3000
             } else {
                 800

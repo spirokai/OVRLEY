@@ -2,6 +2,7 @@
 //! panel share (`deriveVideoSyncControls`), and the manual sync workspace (Phase 8).
 
 pub mod detection;
+pub mod maps;
 pub mod matching;
 pub mod timeline;
 
@@ -100,6 +101,8 @@ pub struct VideoSyncWorkspace {
     drafts_follow: Option<(f64, f64)>,
     /// A landmark handle being dragged on the timeline (D9).
     pub landmark_drag: Option<timeline::LandmarkDrag>,
+    /// Both maps, while the mode is on (D5, D6).
+    pub maps: Option<maps::SyncMaps>,
 }
 
 // --- The workspace (`useVideoSyncWorkspace`, `videoSyncPresentation.js`) -----------------------
@@ -413,6 +416,7 @@ pub fn reconcile_video_sync(store: &mut Store, services: &mut Services) {
         store.video_sync.landmark_drag = None;
     }
     follow_committed_thresholds(store);
+    maps::reconcile_sync_maps(store, services, std::time::Instant::now());
 }
 
 fn reconcile_calculation(store: &mut Store, services: &mut Services) {

@@ -150,6 +150,14 @@ pub fn run(
     // On every resize: a restored window fits its screen, and on macOS the traffic lights return
     // to their inset (AppKit puts them back in the corner).
     window.window().on_winit_window_event(move |slint_window, event| {
+        // Line deltas come from a notched wheel, pixel deltas from a trackpad; Slint's scroll event
+        // that follows does not say which (Phase 8 D5).
+        if let winit::event::WindowEvent::MouseWheel { delta, .. } = event {
+            features::video_sync::record_wheel_device(match delta {
+                winit::event::MouseScrollDelta::LineDelta(..) => ovrley_app::features::video_sync::maps::WheelDevice::Wheel,
+                winit::event::MouseScrollDelta::PixelDelta(..) => ovrley_app::features::video_sync::maps::WheelDevice::Trackpad,
+            });
+        }
         if let winit::event::WindowEvent::Resized(_) = event {
             slint_window.with_winit_window(platform::fit_restored_window);
             #[cfg(target_os = "macos")]
