@@ -182,9 +182,7 @@ pub fn open_join_panel(store: &mut Store, key: &str) {
 /// Runs the duration field with the open join, committing through `commit_join_duration`.
 pub fn with_duration_field<R>(store: &mut Store, run: impl FnOnce(&mut SecondsInputState, SecondsInputOptions, f64, Locale, &mut dyn FnMut(f64) -> Option<String>) -> R) -> Option<R> {
     let mut panel = store.player.join_panel.take()?;
-    let Some(model) = join_model(store, &panel.key) else {
-        return None;
-    };
+    let model = join_model(store, &panel.key)?;
     let Some(value) = model.duration_seconds else {
         store.player.join_panel = Some(panel);
         return None;

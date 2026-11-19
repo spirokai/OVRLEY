@@ -227,7 +227,7 @@ fn project_maps(global: &VideoSync<'_>, store: &Store) {
         return;
     };
     set_if_changed(global.get_has_map_image(), view.image.is_some(), |value| global.set_has_map_image(value));
-    if let Some((image, origin, size)) = view.image {
+    if let Some((image, (origin, size))) = view.image {
         let (slint_image, fresh) = cached_image(&SELECTION_IMAGE, image.revision, &image.pixels);
         if fresh {
             global.set_map_image(slint_image);

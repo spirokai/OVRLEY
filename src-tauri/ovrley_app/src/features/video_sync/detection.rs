@@ -131,7 +131,7 @@ fn median(values: &[f64]) -> f64 {
     let mut ordered = values.to_vec();
     ordered.sort_by(f64::total_cmp);
     let middle = ordered.len() / 2;
-    if ordered.len() % 2 == 0 {
+    if ordered.len().is_multiple_of(2) {
         (ordered[middle - 1] + ordered[middle]) / 2.0
     } else {
         ordered[middle]
@@ -543,13 +543,13 @@ pub fn derive_turning_series(input: &SyncInput) -> Vec<GraphPoint> {
         .map(|&time| GraphPoint { time, value: None })
         .collect();
     for segment in &input.segments {
-        for index in segment.start + 1..segment.end {
+        for (index, point) in series.iter_mut().enumerate().take(segment.end).skip(segment.start + 1) {
             let (Some(previous), Some(current)) = (input.heading[index - 1], input.heading[index])
             else {
                 continue;
             };
             let elapsed = input.elapsed_seconds[index] - input.elapsed_seconds[index - 1];
-            series[index].value = Some(signed_heading_delta(current, previous) / elapsed);
+            point.value = Some(signed_heading_delta(current, previous) / elapsed);
         }
     }
     series
@@ -793,11 +793,11 @@ pub fn detect_turns_from_series(
         events: Vec::new(),
     };
     for segment in &input.segments {
-        for index in segment.start + 1..segment.end {
+        for (index, point) in turning.iter().enumerate().take(segment.end).skip(segment.start + 1) {
             reader.read(
                 input.elapsed_seconds[index - 1],
                 input.elapsed_seconds[index],
-                turning[index].value,
+                point.value,
                 |interval| collector.add(interval),
             );
         }
@@ -1005,7 +1005,7 @@ mod tests {
             speed: vec![Some(3.0); 6],
             heading: vec![None; 6],
             availability: Availability::default(),
-            segments: vec![0..6],
+            segments: vec![Range { start: 0, end: 6 }],
         };
         let turning: Vec<GraphPoint> = [
             None,

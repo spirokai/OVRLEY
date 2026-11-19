@@ -269,11 +269,9 @@ impl OverlayConfig {
             .iter()
             .map(|collection| self.collection(*collection).len())
             .collect();
-        let mut next_id = self.next_generated_id();
-        for (collection, data) in widgets {
+        for (next_id, (collection, data)) in (self.next_generated_id()..).zip(widgets) {
             let mut data = data.clone();
             data.insert("id".into(), Value::String(format!("widget-{next_id}")));
-            next_id += 1;
             for (field, delta) in [("x", offset.0), ("y", offset.1)] {
                 let position = data.get(field).and_then(Value::as_f64).unwrap_or_default();
                 data.insert(field.into(), number(position + delta));
@@ -1111,17 +1109,14 @@ pub fn create_widget_defaults(
                 let sizing = definition
                     .course_sizing
                     .expect("courseSizing needs the widget's sizing");
-                match course_widget_dimensions(
+                // `Object.assign(data, null)` keeps the manifest frame.
+                if let Some((width, height)) = course_widget_dimensions(
                     &options.course_points,
                     sizing.max_dimension,
                     sizing.min_dimension,
                 ) {
-                    Some((width, height)) => {
-                        data.insert("width".into(), number(width));
-                        data.insert("height".into(), number(height));
-                    }
-                    // `Object.assign(data, null)` keeps the manifest frame.
-                    None => {}
+                    data.insert("width".into(), number(width));
+                    data.insert("height".into(), number(height));
                 }
             }
             "pointLabelFontSize" => {

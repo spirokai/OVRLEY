@@ -21,13 +21,15 @@ use std::time::{Duration, Instant};
 
 fn dispatcher() -> (Dispatcher, Fakes) {
     let (parts, fakes) = fake_services(json!({"last-render-output-dir": "/renders"}));
-    let mut store = Store::default();
-    store.theme = Some(ThemeColors {
-        ice: "#010101".into(),
-        aqua: "#020202".into(),
-        teal: "#030303".into(),
-        accent: "#040404".into(),
-    });
+    let mut store = Store {
+        theme: Some(ThemeColors {
+            ice: "#010101".into(),
+            aqua: "#020202".into(),
+            teal: "#030303".into(),
+            accent: "#040404".into(),
+        }),
+        ..Store::default()
+    };
     store.editor.config = Rc::new(
         OverlayConfig::from_value(&json!({"scene": {"width": 1920, "height": 1080, "fps": 30}}))
             .unwrap(),

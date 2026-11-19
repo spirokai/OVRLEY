@@ -288,12 +288,14 @@ mod tests {
 
     #[test]
     fn an_anchor_to_a_video_left_out_goes() {
-        let mut anchored = VideoEdits::default();
-        anchored.placement_anchor = Some(PlacementAnchor {
-            video_id: "gone".into(),
-            side: AnchorSide::After,
-        });
-        anchored.offset_seconds = 12.0;
+        let anchored = VideoEdits {
+            placement_anchor: Some(PlacementAnchor {
+                video_id: "gone".into(),
+                side: AnchorSide::After,
+            }),
+            offset_seconds: 12.0,
+            ..VideoEdits::default()
+        };
         let edits =
             create_project_video_edits(&[simple("a", 20.0, 0)], &[project_video("a", anchored)])
                 .unwrap();

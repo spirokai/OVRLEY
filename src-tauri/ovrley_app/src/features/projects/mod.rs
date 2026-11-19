@@ -135,17 +135,21 @@ struct StatusKey {
     global_defaults: Rc<Map<String, Value>>,
     videos: Rc<Vec<ImportedVideo>>,
     edits: Rc<crate::lib::video_program::VideoEditsMap>,
-    rest: (
-        Option<ActivitySource>,
-        Option<ovrley_core::activity::trim::ActivityTrim>,
-        Vec<usize>,
-        ovrley_core::encode::ffmpeg::transitions::TransitionDefaults,
-        ovrley_core::encode::render_settings::RenderSettings,
-        ovrley_core::media::manual_video_sync::ManualVideoSync,
-        Option<String>,
-        Option<String>,
-        u64,
-    ),
+    values: StatusValues,
+}
+
+/// The small project-owned values of a `StatusKey`, compared by value.
+#[derive(Clone, Debug, PartialEq)]
+struct StatusValues {
+    activity_source: Option<ActivitySource>,
+    activity_trim: Option<ovrley_core::activity::trim::ActivityTrim>,
+    disabled_laps: Vec<usize>,
+    transition_defaults: ovrley_core::encode::ffmpeg::transitions::TransitionDefaults,
+    render_settings: ovrley_core::encode::render_settings::RenderSettings,
+    manual_video_sync: ovrley_core::media::manual_video_sync::ManualVideoSync,
+    batch_output_folder: Option<String>,
+    loaded_project_path: Option<String>,
+    baseline_serial: u64,
 }
 
 impl StatusKey {
@@ -155,17 +159,17 @@ impl StatusKey {
             global_defaults: Rc::clone(&store.template.global_defaults),
             videos: Rc::clone(&store.video_import.imported_videos),
             edits: Rc::clone(&store.video_import.video_edits),
-            rest: (
-                store.media.activity_source.clone(),
-                store.media.activity_trim,
-                store.media.disabled_laps.clone(),
-                store.video_import.transition_defaults.clone(),
-                store.render_settings.clone(),
-                store.manual_video_sync.clone(),
-                store.batch_render.batch_output_folder.clone(),
-                store.projects.loaded_project_path.clone(),
-                store.projects.baseline_serial,
-            ),
+            values: StatusValues {
+                activity_source: store.media.activity_source.clone(),
+                activity_trim: store.media.activity_trim,
+                disabled_laps: store.media.disabled_laps.clone(),
+                transition_defaults: store.video_import.transition_defaults.clone(),
+                render_settings: store.render_settings.clone(),
+                manual_video_sync: store.manual_video_sync.clone(),
+                batch_output_folder: store.batch_render.batch_output_folder.clone(),
+                loaded_project_path: store.projects.loaded_project_path.clone(),
+                baseline_serial: store.projects.baseline_serial,
+            },
         }
     }
 
@@ -174,7 +178,7 @@ impl StatusKey {
             && Rc::ptr_eq(&self.global_defaults, &other.global_defaults)
             && Rc::ptr_eq(&self.videos, &other.videos)
             && Rc::ptr_eq(&self.edits, &other.edits)
-            && self.rest == other.rest
+            && self.values == other.values
     }
 }
 
@@ -766,7 +770,7 @@ pub fn locate_missing_source(store: &mut Store, services: &mut Services) {
             let Some(path) = selected else { return };
             let Some(missing) = store.projects.missing_source.take() else { return };
             let extension = path.rsplit('.').next().unwrap_or_default().to_ascii_lowercase();
-            if !accepted.iter().any(|accepted| *accepted == extension) {
+            if !accepted.contains(&extension) {
                 let role = match missing.role {
                     SourceRole::Activity => "activity",
                     SourceRole::Video => "video",
@@ -1023,10 +1027,7 @@ pub fn projects_drawer_view(store: &Store) -> ProjectsDrawerView {
         busy: is_busy(store),
         save_disabled: project_status(store) == ProjectStatus::Saved,
         project: store.projects.loaded_project_path.as_deref().map(source_row),
-        activity: match &store.media.activity_source {
-            Some(ActivitySource::File { path }) => Some(source_row(path)),
-            None => None,
-        },
+        activity: store.media.activity_source.as_ref().map(|ActivitySource::File { path }| source_row(path)),
         videos: sort_clips_by_timeline(&clips).into_iter().map(|clip| source_row(&clip.video.path)).collect(),
     }
 }

@@ -140,24 +140,30 @@ fn models_equal<T: Clone + PartialEq + 'static>(left: &ModelRc<T>, right: &Model
     left.row_count() == right.row_count() && left.iter().zip(right.iter()).all(|(left, right)| left == right)
 }
 
+/// A video's decoded thumbnail and the PNG bytes it was decoded from.
+struct DecodedThumbnail {
+    bytes: Arc<[u8]>,
+    image: Image,
+}
+
 thread_local! {
-    /// Each video's decoded thumbnail, by the bytes it was decoded from.
-    static THUMBNAILS: RefCell<HashMap<String, (Arc<[u8]>, Image)>> = RefCell::new(HashMap::new());
+    /// Each video's decoded thumbnail, by video id.
+    static THUMBNAILS: RefCell<HashMap<String, DecodedThumbnail>> = RefCell::new(HashMap::new());
 }
 
 /// The card's image: the PNG decoded once per video.
 fn thumbnail_image(id: &str, bytes: &Arc<[u8]>) -> Option<Image> {
     THUMBNAILS.with(|cache| {
         let mut cache = cache.borrow_mut();
-        if let Some((cached, image)) = cache.get(id) {
-            if Arc::ptr_eq(cached, bytes) {
-                return Some(image.clone());
+        if let Some(cached) = cache.get(id) {
+            if Arc::ptr_eq(&cached.bytes, bytes) {
+                return Some(cached.image.clone());
             }
         }
         let decoded = image::load_from_memory_with_format(bytes, image::ImageFormat::Png).ok()?.into_rgba8();
         let pixels = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(decoded.as_raw(), decoded.width(), decoded.height());
         let image = Image::from_rgba8(pixels);
-        cache.insert(id.to_string(), (Arc::clone(bytes), image.clone()));
+        cache.insert(id.to_string(), DecodedThumbnail { bytes: Arc::clone(bytes), image: image.clone() });
         Some(image)
     })
 }
@@ -186,7 +192,7 @@ fn project_video_panel(toolbar: &Toolbar<'_>, store: &Store) {
     if !shown {
         return;
     }
-    let timezone = store.media.parsed_activity.as_ref().and_then(|_| store.media.activity_summary.as_ref()).and_then(|summary| summary.timezone.as_deref());
+    let timezone = store.media.parsed_activity.as_ref().and(store.media.activity_summary.as_ref()).and_then(|summary| summary.timezone.as_deref());
     let controls = ovrley_app::features::video_sync::derive_video_sync_controls(&store.video_import.imported_videos, &store.video_import.video_edits, timezone);
     set_if_changed(toolbar.get_panel_sync(), sync_view(store, &controls, &SecondsField::PanelTransitionDuration), |value| toolbar.set_panel_sync(value));
     let defaults = &store.video_import.transition_defaults;

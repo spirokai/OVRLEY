@@ -306,7 +306,7 @@ impl CollectionDraft<'_> {
         for video_id in &undetermined {
             unplaced.remove(video_id);
             let clips = join_video_edits(self.videos, self.edits);
-            let last = sort_clips_by_timeline(&clips).into_iter().filter(|clip| clip.id() != video_id && !unplaced.contains(clip.id())).last().map(|clip| clip.id().to_string());
+            let last = sort_clips_by_timeline(&clips).into_iter().rfind(|clip| clip.id() != video_id && !unplaced.contains(clip.id())).map(|clip| clip.id().to_string());
             if let Some(last) = last {
                 self.anchor_video(video_id, &last, AnchorSide::After)?;
             }

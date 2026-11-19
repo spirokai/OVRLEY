@@ -291,11 +291,11 @@ impl<'de> Deserialize<'de> for WidgetRequest {
 }
 
 pub enum PreviewWidget {
-    DivingProfile(PreviewDivingProfile),
+    DivingProfile(Box<PreviewDivingProfile>),
     RollingChart(PreviewRollingChart),
-    Elevation(PreviewElevation),
+    Elevation(Box<PreviewElevation>),
     Route(PreviewRoute),
-    Map(PreviewMap),
+    Map(Box<PreviewMap>),
     Raster(PreviewRaster),
     Backdrop(PreviewBackdrop),
     Label(PreviewLabel),
@@ -308,7 +308,7 @@ pub enum PreviewWidget {
     HeadingCompass(PreviewHeadingCompass),
     HeartZones(PreviewHeartZones),
     AltitudeTape(PreviewAltitudeTape),
-    Gauge(PreviewGauge),
+    Gauge(Box<PreviewGauge>),
     Value(ValuePreview),
 }
 
@@ -321,25 +321,25 @@ impl PreviewWidget {
         maps: &PreviewMaps,
     ) -> WidgetResult<Self> {
         match request {
-            WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
+            WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(Box::new(
                 PreviewDivingProfile::new(widget, scene, raster_scale)?,
-            )),
+            ))),
             WidgetRequest::RollingChart { widget, scene, .. } => Ok(Self::RollingChart(
                 PreviewRollingChart::new(widget, scene, raster_scale, fonts)?,
             )),
-            WidgetRequest::Elevation { widget, scene, .. } => Ok(Self::Elevation(
+            WidgetRequest::Elevation { widget, scene, .. } => Ok(Self::Elevation(Box::new(
                 PreviewElevation::new(widget, scene, raster_scale)?,
-            )),
+            ))),
             WidgetRequest::Route { widget, scene, .. } => {
                 Ok(Self::Route(PreviewRoute::new(widget, scene, raster_scale)?))
             }
-            WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(PreviewMap::new(
+            WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(Box::new(PreviewMap::new(
                 widget,
                 scene,
                 raster_scale,
                 maps,
                 fonts,
-            )?)),
+            )?))),
             WidgetRequest::Raster { widget, scene, .. } => Ok(Self::Raster(PreviewRaster::new(
                 widget,
                 scene,
@@ -398,11 +398,11 @@ impl PreviewWidget {
             WidgetRequest::AltitudeTape(request) => Ok(Self::AltitudeTape(
                 PreviewAltitudeTape::new(request.widget, request.scene, raster_scale, fonts)?,
             )),
-            WidgetRequest::Gauge(request) => Ok(Self::Gauge(PreviewGauge::new(
+            WidgetRequest::Gauge(request) => Ok(Self::Gauge(Box::new(PreviewGauge::new(
                 request.widget,
                 request.scene,
                 raster_scale,
-            )?)),
+            )?))),
             WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(
                 request,
                 raster_scale,
@@ -418,15 +418,15 @@ impl PreviewWidget {
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         Ok(match widget {
-            ValidatedWidget::DivingProfile(widget) => Self::DivingProfile(
+            ValidatedWidget::DivingProfile(widget) => Self::DivingProfile(Box::new(
                 PreviewDivingProfile::from_validated(widget.clone(), scene.clone(), host)?,
-            ),
+            )),
             ValidatedWidget::RollingChart(widget) => Self::RollingChart(
                 PreviewRollingChart::from_validated(widget, scene, host, fonts)?,
             ),
-            ValidatedWidget::Elevation(widget) => Self::Elevation(
+            ValidatedWidget::Elevation(widget) => Self::Elevation(Box::new(
                 PreviewElevation::from_validated(widget.clone(), scene.clone(), host)?,
-            ),
+            )),
             ValidatedWidget::Route(widget) => Self::Route(PreviewRoute::from_validated(
                 widget.clone(),
                 scene.clone(),
@@ -437,7 +437,7 @@ impl PreviewWidget {
                 style,
                 frames,
                 content,
-            } => Self::Map(PreviewMap::from_validated(
+            } => Self::Map(Box::new(PreviewMap::from_validated(
                 widget.clone(),
                 style,
                 scene.clone(),
@@ -445,7 +445,7 @@ impl PreviewWidget {
                 frames,
                 content,
                 fonts,
-            )?),
+            )?)),
             ValidatedWidget::Raster {
                 geometry,
                 source_id,
@@ -492,16 +492,16 @@ impl PreviewWidget {
                 ValidatedValue::LeanAngle(widget) => {
                     Self::LeanAngle(PreviewLeanAngle::from_validated(widget, scene, host)?)
                 }
-                ValidatedValue::LinearGauge(widget) => Self::Gauge(PreviewGauge::from_validated(
+                ValidatedValue::LinearGauge(widget) => Self::Gauge(Box::new(PreviewGauge::from_validated(
                     ValidatedGauge::Linear(widget.clone()),
                     scene.clone(),
                     host,
-                )),
-                ValidatedValue::ArcGauge(widget) => Self::Gauge(PreviewGauge::from_validated(
+                ))),
+                ValidatedValue::ArcGauge(widget) => Self::Gauge(Box::new(PreviewGauge::from_validated(
                     ValidatedGauge::Arc(widget.clone()),
                     scene.clone(),
                     host,
-                )),
+                ))),
                 ValidatedValue::GForce(widget) => {
                     Self::GForce(PreviewGForce::from_validated(widget.clone(), scene, host)?)
                 }

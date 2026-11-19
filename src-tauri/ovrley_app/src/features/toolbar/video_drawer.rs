@@ -227,7 +227,7 @@ pub fn selected_video_row(store: &Store) -> Option<SelectedVideoRow> {
         .media
         .parsed_activity
         .as_ref()
-        .and_then(|_| store.media.activity_summary.as_ref())
+        .and(store.media.activity_summary.as_ref())
         .and_then(|summary| summary.timezone.as_deref());
     let models: BTreeMap<String, JoinModel> = join_models(committed, locale)
         .into_iter()

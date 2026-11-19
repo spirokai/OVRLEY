@@ -62,7 +62,7 @@ pub const PREVIEW_SCREEN_GAP: f64 = 16.0;
 
 /// `useVideoSyncControls`: the store's collection, with the external activity's timezone.
 pub fn store_video_sync_controls(store: &Store) -> VideoSyncControls {
-    let timezone = store.media.parsed_activity.as_ref().and_then(|_| store.media.activity_summary.as_ref()).and_then(|summary| summary.timezone.as_deref());
+    let timezone = store.media.parsed_activity.as_ref().and(store.media.activity_summary.as_ref()).and_then(|summary| summary.timezone.as_deref());
     derive_video_sync_controls(&store.video_import.imported_videos, &store.video_import.video_edits, timezone)
 }
 

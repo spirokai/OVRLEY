@@ -366,7 +366,7 @@ mod tests {
         assert_eq!(video.frame_count, 301);
         assert!((video.duration_seconds - 301.0 * 1001.0 / 30000.0).abs() < 1e-12);
         assert_eq!(video.resolution, VideoResolution { width: 1080, height: 1920 });
-        assert_eq!((video.import_order, video.preview_warnings.clone(), video.sync_warning.clone()), (3, vec!["slow seeking".to_string()], None));
+        assert_eq!((video.import_order, video.preview_warnings.clone(), video.sync_warning), (3, vec!["slow seeking".to_string()], None));
         assert_eq!(video.telemetry.status(), TelemetryStatus::Pending);
     }
 

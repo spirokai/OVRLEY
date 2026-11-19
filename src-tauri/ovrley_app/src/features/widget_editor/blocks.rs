@@ -303,7 +303,7 @@ pub enum PanelPart {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum BlockContent {
-    Heading(Heading),
+    Heading(Box<Heading>),
     Row(Row),
 }
 
@@ -324,7 +324,7 @@ pub struct Block {
 pub enum Node {
     /// A conditional element that renders nothing.
     Empty,
-    Heading(Heading),
+    Heading(Box<Heading>),
     /// `grid grid-cols-n gap-*`: cells fill rows of `columns`; a row gap separates the rows.
     Grid {
         columns: u8,
@@ -441,22 +441,22 @@ pub fn full(cell: Cell) -> Node {
 }
 
 pub fn heading(icon: Glyph, title: impl Into<String>, trailing: Option<Cell>) -> Node {
-    Node::Heading(Heading {
+    Node::Heading(Box::new(Heading {
         icon,
         title: title.into(),
         trailing,
         scene: false,
-    })
+    }))
 }
 
 /// Scene settings' section heading (`OverlaySettingsSection`, `GlobalSettingsSection`).
 pub fn scene_heading(icon: Glyph, title: impl Into<String>, trailing: Option<Cell>) -> Node {
-    Node::Heading(Heading {
+    Node::Heading(Box::new(Heading {
         icon,
         title: title.into(),
         trailing,
         scene: true,
-    })
+    }))
 }
 
 /// `cond ? node : null`.

@@ -554,13 +554,15 @@ pub(crate) mod tests {
 
     /// A store with a template, the theme and a 20 s activity, as `renderVideo.test.js` sets up.
     pub(crate) fn store() -> Store {
-        let mut store = Store::default();
-        store.theme = Some(ThemeColors {
-            ice: "#010101".into(),
-            aqua: "#020202".into(),
-            teal: "#030303".into(),
-            accent: "#040404".into(),
-        });
+        let mut store = Store {
+            theme: Some(ThemeColors {
+                ice: "#010101".into(),
+                aqua: "#020202".into(),
+                teal: "#030303".into(),
+                accent: "#040404".into(),
+            }),
+            ..Store::default()
+        };
         store.editor.config = Rc::new(
             OverlayConfig::from_value(
                 &json!({"scene": {"width": 1920, "height": 1080, "fps": 30}}),

@@ -25,6 +25,12 @@ pub const INITIAL_ZOOM: f64 = 13.0;
 /// The fit leaves this much room around the course, and stops at this zoom.
 const FIT_PADDING_PX: f64 = 64.0;
 const FIT_MAX_ZOOM: f64 = 17.0;
+
+/// A course segment through a camera: `(x, y, second)` per point.
+pub type ProjectedSegment = Vec<(f64, f64, f64)>;
+
+/// A rectangle on screen: its origin and its size.
+pub type ScreenRect = ((f64, f64), (f64, f64));
 /// The renderer's deepest zoom.
 pub const MAX_ZOOM: f64 = MAX_TILE_ZOOM as f64;
 /// A pointer within this distance of the course snaps to it.
@@ -285,7 +291,7 @@ impl Course {
     /// The closest course point to `point` within the snap distance (`getSnappedCoursePosition`),
     /// on the course projected through `camera`.
     pub fn snap(
-        projected: &[Vec<(f64, f64, f64)>],
+        projected: &[ProjectedSegment],
         camera: &TopDownCamera,
         size: (f64, f64),
         point: (f64, f64),
@@ -319,8 +325,8 @@ impl Course {
         })
     }
 
-    /// The course through `camera`: `(x, y, second)` per point.
-    pub fn project(&self, camera: &TopDownCamera, size: (f64, f64)) -> Vec<Vec<(f64, f64, f64)>> {
+    /// The course through `camera`.
+    pub fn project(&self, camera: &TopDownCamera, size: (f64, f64)) -> Vec<ProjectedSegment> {
         self.segments
             .iter()
             .map(|segment| {
@@ -356,8 +362,7 @@ pub fn fit_camera(bounds: ((f64, f64), (f64, f64)), size: (f64, f64)) -> TopDown
     };
     let zoom = fit(available.0, span.0)
         .min(fit(available.1, span.1))
-        .min(FIT_MAX_ZOOM)
-        .max(0.0);
+        .clamp(0.0, FIT_MAX_ZOOM);
     TopDownCamera {
         world: ((min_x + max_x) / 2.0, (min_y + max_y) / 2.0),
         zoom,
@@ -413,9 +418,9 @@ pub enum WheelDevice {
 fn guess_device(value: f64, since_last: Option<Duration>) -> WheelDevice {
     if value != 0.0 && value % WHEEL_NOTCH == 0.0 {
         WheelDevice::Wheel
-    } else if value != 0.0 && value.abs() < 4.0 {
-        WheelDevice::Trackpad
-    } else if since_last.is_some_and(|gap| (gap.as_secs_f64() * 1000.0 * value).abs() < 200.0) {
+    } else if (value != 0.0 && value.abs() < 4.0)
+        || since_last.is_some_and(|gap| (gap.as_secs_f64() * 1000.0 * value).abs() < 200.0)
+    {
         WheelDevice::Trackpad
     } else {
         WheelDevice::Wheel
@@ -651,7 +656,7 @@ pub struct SelectionMap {
     pub animation: Option<Animation>,
     pub scroll: ScrollZoom,
     /// The course projected through the camera on show, cached per camera and size.
-    projected: Option<(FramedView, Vec<Vec<(f64, f64, f64)>>)>,
+    projected: Option<(FramedView, Vec<ProjectedSegment>)>,
     /// Within snap distance of the pointer: the dot that follows the course.
     pub hover: Option<CoursePick>,
     /// The clicked course point that "Set location" sets.
@@ -734,7 +739,7 @@ impl SelectionMap {
     }
 
     /// The course through the camera on show.
-    fn projected(&mut self, course: &Course) -> Option<&[Vec<(f64, f64, f64)>]> {
+    fn projected(&mut self, course: &Course) -> Option<&[ProjectedSegment]> {
         let view = FramedView {
             camera: self.camera,
             size: self.size?,
@@ -1043,7 +1048,7 @@ impl SelectionMap {
 
     /// The image's placement on screen: where the framed view's top left lands under the camera on
     /// show, and its displayed size.
-    pub fn image_placement(&self) -> Option<((f64, f64), (f64, f64))> {
+    pub fn image_placement(&self) -> Option<ScreenRect> {
         let image = self.image.as_ref()?;
         let size = self.size?;
         let scale = (self.camera.zoom - image.view.camera.zoom).exp2();
@@ -1497,8 +1502,8 @@ pub fn nav_pitch(store: &mut crate::store::Store, pitch: f64) {
 
 /// What the screens show of the maps.
 pub struct MapView<'a> {
-    /// The selection image with its placement: origin and size on screen.
-    pub image: Option<(&'a SelectionImage, (f64, f64), (f64, f64))>,
+    /// The selection image with its placement.
+    pub image: Option<(&'a SelectionImage, ScreenRect)>,
     pub background: [u8; 3],
     pub playback: Option<(f64, f64)>,
     pub hover: Option<(f64, f64)>,
@@ -1524,7 +1529,7 @@ pub fn map_view(store: &crate::store::Store) -> Option<MapView<'_>> {
     let location = store.manual_video_sync_detection.as_ref().and_then(|detection| detection.location);
     let at = |world: Option<(f64, f64)>| world.and_then(|world| selection.screen_point(world));
     Some(MapView {
-        image: selection.image.as_ref().zip(selection.image_placement()).map(|(image, (origin, size))| (image, origin, size)),
+        image: selection.image.as_ref().zip(selection.image_placement()),
         background: maps.style.as_ref().map_or([0, 0, 0], |style| style.background),
         playback: at(course.position_at(second)),
         hover: at(selection.hover.map(|pick| pick.world)),
@@ -1550,9 +1555,12 @@ mod tests {
     use std::sync::Mutex;
 
     /// Counts requests and holds each reply's sender, so a test answers them when it likes.
+    /// A frame request with the channel its reply goes to.
+    type PendingFrame = (MapFrameRequest, Sender<Result<MapFramePixels, String>>);
+
     #[derive(Default)]
     struct FakeProvider {
-        requests: Mutex<Vec<(MapFrameRequest, Sender<Result<MapFramePixels, String>>)>>,
+        requests: Mutex<Vec<PendingFrame>>,
     }
 
     impl MapFrameProvider for FakeProvider {

@@ -407,8 +407,7 @@ pub fn build_shown_collection(
     }
     let Some(last) = sorted_ids(&shown)
         .into_iter()
-        .filter(|id| included_ids.contains(id))
-        .last()
+        .rfind(|id| included_ids.contains(id))
     else {
         return shown;
     };
@@ -443,8 +442,7 @@ pub fn switch_on_waiting_video(
         .ok_or_else(|| format!("Unknown imported video: {video_id}"))?;
     let above = order[..index]
         .iter()
-        .filter(|clip| included_ids.contains(clip.id()))
-        .last()
+        .rfind(|clip| included_ids.contains(clip.id()))
         .map(|clip| clip.id().to_string());
     let shown_offset = order[index].offset_seconds();
     let next = collection.edited(|draft| match &above {

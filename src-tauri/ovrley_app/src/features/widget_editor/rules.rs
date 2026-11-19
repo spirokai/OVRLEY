@@ -499,7 +499,7 @@ fn named_patch(named: &Named, cell: &Cell, input: Input, context: &RuleContext) 
         }
         Named::SplitDistance => {
             let value = js_number(&text_input(cell, &input)?);
-            if !(value > 0.0) {
+            if value.is_nan() || value <= 0.0 {
                 return Ok(Patch::Nothing);
             }
             at_cell(data, cell, number(value))
@@ -742,7 +742,7 @@ pub fn split_corner_radius_max(data: &Map<String, Value>) -> f64 {
 
 /// `maxSplitBarBorderThickness`.
 pub fn split_border_max(data: &Map<String, Value>) -> f64 {
-    ((field(data, "track_thickness") - 1.0) / 2.0).floor().max(0.0).min(SPLIT_BAR_BORDER_MAX)
+    ((field(data, "track_thickness") - 1.0) / 2.0).floor().clamp(0.0, SPLIT_BAR_BORDER_MAX)
 }
 
 /// `Number(text)` for an editor input.
