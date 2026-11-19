@@ -389,6 +389,70 @@ pub fn calculate(store: &mut Store, services: &mut Services, scope: MatchScope, 
     Ok(())
 }
 
+/// One search's result as agents read it: its status, error and candidates.
+pub fn describe_result(store: &Store, scope: MatchScope) -> serde_json::Value {
+    use serde_json::json;
+    let result = store.manual_video_sync_results.get(scope);
+    let applied = slice::find_video_sync_target(store).map(|clip| clip.offset_seconds());
+    let candidates: Vec<serde_json::Value> = result
+        .candidates
+        .iter()
+        .map(|candidate| {
+            json!({
+                "offsetSeconds": candidate.offset,
+                "score": candidate.match_score,
+                "matchedCount": candidate.matched_count,
+                "eligibleCount": candidate.eligible_count,
+                "variant": match candidate.variant {
+                    matching::CandidateVariant::Ordinary => "ordinary",
+                    matching::CandidateVariant::LocationConflict => "locationConflict",
+                    matching::CandidateVariant::LocationOnly => "locationOnly",
+                },
+                "applied": applied == Some(candidate.offset),
+            })
+        })
+        .collect();
+    json!({ "scope": scope, "status": result.status.name(), "error": result.error, "candidates": candidates })
+}
+
+/// The manual sync as agents read it (`video_sync_get`).
+pub fn describe_video_sync(store: &Store) -> serde_json::Value {
+    use serde_json::json;
+    let target = slice::find_video_sync_target(store);
+    let offset = target.as_ref().map_or(0.0, |clip| clip.offset_seconds());
+    let landmarks: Vec<serde_json::Value> = store
+        .manual_video_sync
+        .landmarks
+        .iter()
+        .map(|landmark| json!({ "id": landmark.id(), "type": landmark.kind(), "videoSecond": landmark.video_second(), "timelineSecond": offset + landmark.video_second() }))
+        .collect();
+    let detection = store.manual_video_sync_detection.as_deref();
+    let eligibility = calculation_eligibility(store);
+    let (speed, turn) = (slice::SPEED_THRESHOLD_RANGE, slice::TURN_THRESHOLD_RANGE);
+    json!({
+        "targetVideo": target.as_ref().map(|clip| json!({ "id": clip.id(), "offsetSeconds": clip.offset_seconds(), "durationSeconds": clip.duration_seconds() })),
+        "landmarks": landmarks,
+        "detectedLocationSecond": store.manual_video_sync.detected_location_second,
+        "sensitivity": {
+            "speedThresholdKmh": store.manual_video_sync.speed_threshold_kmh,
+            "speedRange": [speed.0, speed.1],
+            "turnThresholdDegrees": store.manual_video_sync.turn_threshold_degrees,
+            "turnRange": [turn.0, turn.1],
+        },
+        "detection": detection.map(|detection| json!({
+            "speedAvailable": detection.availability.speed,
+            "headingAvailable": detection.availability.heading,
+            "stops": detection.stops.len(),
+            "leftTurns": detection.turn_count(detection::TurnDirection::Left),
+            "rightTurns": detection.turn_count(detection::TurnDirection::Right),
+        })),
+        "searches": {
+            "all": { "eligible": eligibility.can_calculate_all, "reason": eligibility.all_explanation, "result": describe_result(store, MatchScope::All) },
+            "location": { "eligible": eligibility.can_calculate_location, "result": describe_result(store, MatchScope::Location) },
+        },
+    })
+}
+
 /// A search's result arrives: applied when its revision is current, else dropped. A waiting agent
 /// learns which.
 fn finish_search(store: &mut Store, scope: MatchScope, revision: u64, detection: detection::Detection, outcome: Result<Vec<matching::Candidate>, String>) {
@@ -401,7 +465,7 @@ fn finish_search(store: &mut Store, scope: MatchScope, revision: u64, detection:
         reply.send(match (applied, result.status) {
             (false, _) => Err("The landmarks or the sensitivity changed while the search ran, so its result was dropped. Run it again.".into()),
             (true, CandidateStatus::Error) => Err(result.error.clone().unwrap_or_default()),
-            (true, _) => Ok(serde_json::Value::Null),
+            (true, _) => Ok(describe_result(store, scope)),
         });
     }
 }

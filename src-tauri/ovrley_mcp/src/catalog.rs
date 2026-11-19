@@ -384,6 +384,7 @@ pub fn tools() -> Vec<ToolDefinition> {
     tools.extend(crate::videos::tools());
     tools.extend(crate::projects::tools());
     tools.extend(crate::render::tools());
+    tools.extend(crate::video_sync::tools());
     tools
 }
 
@@ -424,6 +425,7 @@ fn summary(store: &Store) -> Value {
         "widgets": describe_widgets(store),
         "history": { "canUndo": store.history.can_undo(), "canRedo": store.history.can_redo() },
         "render": ovrley_app::features::render_video::agent::describe_render(store),
+        "videoSync": crate::video_sync::summary(store),
     })
 }
 
@@ -605,6 +607,7 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, services: &mu
             other if crate::videos::handles(other) => crate::videos::call(other, arguments_value, store, services, reply),
             other if crate::projects::handles(other) => crate::projects::call(other, arguments_value, store, services, reply),
             other if crate::render::handles(other) => crate::render::call(other, arguments_value, store, services, reply),
+            other if crate::video_sync::handles(other) => crate::video_sync::call(other, arguments_value, store, services, reply),
             other => crate::player::call(other, arguments_value, store, services, reply).unwrap_or_else(|| Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}")))),
         }
     };

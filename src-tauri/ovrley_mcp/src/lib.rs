@@ -9,5 +9,6 @@ pub mod projects;
 pub mod protocol;
 pub mod render;
 pub mod scene_settings;
+pub mod video_sync;
 pub mod videos;
 pub mod widgets;
