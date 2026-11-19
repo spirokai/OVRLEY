@@ -2,6 +2,8 @@ import { Theme } from "../../theme/theme.slint";
 import { AppText } from "../../components/app-text.slint";
 import { Player, PointerPhase, TimelineSurfaceKind } from "index.slint";
 import { ClipTooltip, TimelineLane } from "timeline-lane.slint";
+import { VideoSync } from "../video-sync/index.slint";
+import { TimelineGraph, TimelineLandmarks } from "../video-sync/timeline-sync.slint";
 
 // `TimelineSurface`: the axis (`h-7`, `mt-4 mb-1`, crosshair) with its tick strip, the lane
 // background (`border` at 40%, `foreground` at 3%, `py-1`, `space-y-0.5`, `e-resize`) holding the
@@ -100,6 +102,8 @@ export component TimelineSurface {
                 }
             }
         }
+        // Sync Doctor's telemetry graph (Phase 8 D9).
+        if VideoSync.mode: TimelineGraph { }
         // The lane background.
         lanes := Rectangle {
             border-width: 1px;
@@ -141,6 +145,12 @@ export component TimelineSurface {
                 background: Theme.success;
             }
         }
+    }
+
+    // Sync Doctor's landmarks over the whole surface, under the playhead.
+    if VideoSync.mode: TimelineLandmarks {
+        width: root.width;
+        height: root.height;
     }
 
     // The playhead: the head and the 1px line share one parent at a screen-pixel origin, so the

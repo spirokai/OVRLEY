@@ -42,6 +42,24 @@ export struct CandidateListView {
     cards: [CandidateCardView],
 }
 
+// A detected event's band over the graph; its tone is stop, turn or location.
+export struct EventBandView {
+    left: length,
+    width: length,
+    tone: LandmarkKind,
+    tooltip: string,
+    accessible-label: string,
+}
+
+// A landmark on the timeline: its handle and line, in timeline pixels.
+export struct TimelineLandmarkView {
+    id: string,
+    kind: LandmarkKind,
+    left: length,
+    interactive: bool,
+    seconds: string,
+}
+
 // Sync Doctor's global (Phase 8), written by `src/features/video_sync.rs`.
 export global VideoSync {
     // The workspace mode: Sync Doctor is the active tool.
@@ -82,7 +100,16 @@ export global VideoSync {
     in property <string> mark-reason;
     in property <string> location-reason;
 
+    // The timeline's graph row and landmark layer (D9).
+    in property <length> graph-width;
+    in property <string> speed-path;
+    in property <string> turning-path;
+    in property <[EventBandView]> bands;
+    in property <[TimelineLandmarkView]> timeline-landmarks;
+
     callback set-tab(tab: string);
+    // A landmark handle's pointer: "down", "move" (timeline x), "up" or "cancel".
+    callback landmark-pointer(id: string, phase: string, x: length);
     callback compute();
     callback reset-creation-times();
     callback filename-creation-times();

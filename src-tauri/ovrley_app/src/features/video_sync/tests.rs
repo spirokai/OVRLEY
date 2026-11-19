@@ -314,3 +314,82 @@ fn reports_no_video_until_a_target_clip_is_selected() {
     assert_eq!((eligibility.can_calculate_all, eligibility.can_calculate_location), (false, false));
     assert_eq!(eligibility.all_explanation.as_deref(), Some("A video is required for Landmark Sync"));
 }
+
+// --- The timeline (`useVideoSyncTimeline.test.jsx`) -------------------------------------------
+
+use crate::features::player::viewport::TimelineMetrics;
+use crate::store::slices::editor::TimelineViewport;
+use crate::store::slices::layout::LeftDrawerTool;
+
+/// A 20 s activity, a 20 s video at offset 2 with a stop at its third second, Sync Doctor open, the
+/// timeline 400 px wide showing 0 to `view_end`.
+fn timeline_store(landmark: Landmark, view_end: f64) -> Dispatcher {
+    let (dispatcher, _) = dispatcher(moving(), vec![simple("video-1", 20.0, 0)], &[("video-1", 2.0)]);
+    dispatcher.dispatch(move |store, _| {
+        store.media.activity_summary.as_mut().unwrap().duration_seconds = 20.0;
+        store.manual_video_sync.landmarks = vec![landmark];
+        store.layout.select_left_drawer_tool(LeftDrawerTool::VideoSync);
+        store.player.viewport.metrics = TimelineMetrics { width_px: 400.0, ..TimelineMetrics::default() };
+    });
+    dispatcher.dispatch(move |store, _| store.editor.timeline_viewport = TimelineViewport { view_start: 0.0, view_end });
+    dispatcher
+}
+
+fn stop_at(second: f64) -> Landmark {
+    Landmark::new("mark-1".into(), LandmarkKind::Stop, second)
+}
+
+#[test]
+fn builds_both_graph_paths() {
+    let detection = super::detection::Detection {
+        graph_series: super::detection::GraphSeries {
+            speed: vec![super::detection::GraphPoint { time: 0.0, value: Some(1.0) }, super::detection::GraphPoint { time: 10.0, value: Some(2.0) }],
+            turning: vec![super::detection::GraphPoint { time: 0.0, value: Some(0.0) }, super::detection::GraphPoint { time: 10.0, value: Some(30.0) }],
+        },
+        ..super::detection::Detection::default()
+    };
+    let graph = super::timeline::graph_view(Some(&detection), TimelineViewport { view_start: 0.0, view_end: 20.0 }, 400.0, crate::i18n::Locale::En);
+    assert!(!graph.speed_path.is_empty() && !graph.turning_path.is_empty());
+}
+
+#[test]
+fn a_handle_drag_commits_one_video_local_move_and_keeps_the_offset() {
+    let dispatcher = timeline_store(stop_at(3.0), 20.0);
+    let left = dispatcher.with_store(|store| super::timeline::landmark_models(store)[0].left);
+    assert_eq!(left, 100.0, "timeline second 5");
+    dispatcher.dispatch(|store, _| super::timeline::landmark_down(store, "mark-1"));
+    dispatcher.dispatch(|store, _| super::timeline::landmark_move(store, 200.0));
+    dispatcher.with_store(|store| assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 3.0, "the move is a preview"));
+    dispatcher.dispatch(|store, _| super::timeline::landmark_up(store, true).unwrap());
+    dispatcher.with_store(|store| {
+        assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 8.0);
+        assert_eq!(store.video_import.video_edits["video-1"].offset_seconds, 2.0);
+    });
+}
+
+#[test]
+fn a_press_without_a_move_scrubs_to_the_landmark() {
+    let dispatcher = timeline_store(stop_at(3.0), 20.0);
+    dispatcher.dispatch(|store, _| super::timeline::landmark_down(store, "mark-1"));
+    dispatcher.dispatch(|store, _| super::timeline::landmark_up(store, true).unwrap());
+    dispatcher.with_store(|store| assert_eq!(store.editor.selected_second, 5.0));
+}
+
+#[test]
+fn the_displayed_offset_moves_the_handles_without_committing() {
+    let dispatcher = timeline_store(stop_at(3.0), 20.0);
+    dispatcher.dispatch(|store, _| {
+        store.video_import.video_drag_preview = Some(crate::lib::video_program::collection::VideoDragPreview { video_id: None, delta_seconds: 3.0 });
+    });
+    dispatcher.with_store(|store| {
+        assert_eq!(super::timeline::landmark_models(store)[0].left, 160.0, "timeline second 8");
+        assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 3.0);
+    });
+}
+
+#[test]
+fn off_view_landmarks_clamp_to_an_inert_edge_marker() {
+    let dispatcher = timeline_store(Landmark::new("late".into(), LandmarkKind::RightTurn, 15.0), 10.0);
+    let model = dispatcher.with_store(|store| super::timeline::landmark_models(store)[0].clone());
+    assert_eq!((model.clamped, model.interactive, model.left), (true, false, 400.0));
+}

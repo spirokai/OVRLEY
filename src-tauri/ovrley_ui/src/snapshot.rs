@@ -136,6 +136,7 @@ fn tour() -> Vec<Step> {
             }
             manual::set_detected_location(store, 100.0).expect("a course location");
             store.editor.set_selected_second(40.0);
+            store.editor.timeline_viewport = ovrley_app::store::slices::editor::TimelineViewport { view_start: 0.0, view_end: 120.0 };
             calculate(store, services, MatchScope::All, None).expect("an eligible search");
         }),
         ("sync-closed", |store, _| {

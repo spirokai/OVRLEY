@@ -3,6 +3,7 @@
 
 pub mod detection;
 pub mod matching;
+pub mod timeline;
 
 use crate::i18n::catalog;
 use crate::store::agent::AgentReply;
@@ -97,6 +98,8 @@ pub struct VideoSyncWorkspace {
     pub turn_draft_degrees: Option<f64>,
     /// The committed thresholds the drafts follow.
     drafts_follow: Option<(f64, f64)>,
+    /// A landmark handle being dragged on the timeline (D9).
+    pub landmark_drag: Option<timeline::LandmarkDrag>,
 }
 
 // --- The workspace (`useVideoSyncWorkspace`, `videoSyncPresentation.js`) -----------------------
@@ -405,6 +408,10 @@ fn finish_search(store: &mut Store, scope: MatchScope, revision: u64, detection:
 /// that ran runs again. Nothing runs while a search does; its inputs are read again after it.
 pub fn reconcile_video_sync(store: &mut Store, services: &mut Services) {
     reconcile_calculation(store, services);
+    // Leaving the mode ends a landmark drag (the drag hook's effect).
+    if !crate::features::player::video_sync_mode(store) {
+        store.video_sync.landmark_drag = None;
+    }
     follow_committed_thresholds(store);
 }
 

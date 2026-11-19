@@ -2,9 +2,9 @@
 
 use crate::features::video_preview::sync_view;
 use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
-use crate::{
-    AppWindow, CandidateCardView, CandidateListView, LandmarkKind, LandmarkRowView, VideoSync,
-};
+use crate::{AppWindow, EventBandView, CandidateCardView, CandidateListView, LandmarkKind, LandmarkRowView, TimelineLandmarkView, VideoSync};
+use ovrley_app::features::video_sync::timeline::{self, BandTone, GraphView};
+use std::cell::RefCell;
 use ovrley_app::features::seconds_fields::SecondsField;
 use ovrley_app::features::video_sync::matching::MatchScope;
 use ovrley_app::features::video_sync::{self as sync, CandidateListView as AppCandidateList};
@@ -137,9 +137,75 @@ pub fn project(window: &AppWindow, store: &Store) {
             |value| global.set_location_reason(value),
         );
     }
+    if mode {
+        project_timeline(&global, store);
+    }
     if mode && store.layout.left_drawer_visible {
         project_drawer(&global, store);
     }
+}
+
+/// The graph's inputs: the detection's pointer, the view, the width and the language.
+type GraphKey = (usize, (u64, u64), u64, ovrley_app::i18n::Locale);
+
+thread_local! {
+    /// The graph row, rebuilt only when its inputs change, never per playhead frame.
+    static GRAPH: RefCell<Option<(GraphKey, GraphView)>> = const { RefCell::new(None) };
+}
+
+fn project_timeline(global: &VideoSync<'_>, store: &Store) {
+    let detection = store.manual_video_sync_detection.as_deref();
+    let view = store.editor.timeline_viewport;
+    let width = store.player.viewport.metrics.width_px;
+    let language = store.i18n.language;
+    let key = (detection.map_or(0, |detection| detection as *const _ as usize), (view.view_start.to_bits(), view.view_end.to_bits()), width.to_bits(), language);
+    let fresh = GRAPH.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if cache.as_ref().is_some_and(|(cached, _)| *cached == key) {
+            return None;
+        }
+        let graph = timeline::graph_view(detection, view, width, language);
+        *cache = Some((key, graph.clone()));
+        Some(graph)
+    });
+    if let Some(graph) = fresh {
+        let t = |key: &str| ovrley_app::i18n::catalog().t(language, key).to_string();
+        global.set_graph_width(graph.width_px as f32);
+        global.set_speed_path(graph.speed_path.into());
+        global.set_turning_path(graph.turning_path.into());
+        let bands: Vec<EventBandView> = graph
+            .bands
+            .iter()
+            .map(|band| {
+                let label = t(band.label_key);
+                let (start, end) = (format!("{:.1}", band.start_second), format!("{:.1}", band.end_second));
+                let values = [("label", label.as_str()), ("start", start.as_str()), ("end", end.as_str())];
+                EventBandView {
+                    left: band.left as f32,
+                    width: band.width as f32,
+                    tone: match band.tone {
+                        BandTone::Stop => LandmarkKind::Stop,
+                        BandTone::Turn => LandmarkKind::LeftTurn,
+                        BandTone::Location => LandmarkKind::Location,
+                    },
+                    tooltip: ovrley_app::i18n::catalog().t_with(language, "videoSync.detectedEvent", &values).into(),
+                    accessible_label: ovrley_app::i18n::catalog().t_with(language, "videoSync.detectedEventRange", &values).into(),
+                }
+            })
+            .collect();
+        global.set_bands(ModelRc::new(VecModel::from(bands)));
+    }
+    let landmarks = timeline::landmark_models(store)
+        .into_iter()
+        .map(|model| TimelineLandmarkView {
+            id: model.id.into(),
+            kind: to_slint(model.kind),
+            left: model.left as f32,
+            interactive: model.interactive,
+            seconds: format!("{:.1}", model.video_second).into(),
+        })
+        .collect();
+    replace_if_changed(global.get_timeline_landmarks(), landmarks, |model| global.set_timeline_landmarks(model));
 }
 
 fn project_drawer(global: &VideoSync<'_>, store: &Store) {
@@ -370,6 +436,16 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         command(&d, move |store, _| {
             sync::apply_candidate_at(store, scope, index)
         })
+    });
+    let d = dispatcher.clone();
+    global.on_landmark_pointer(move |id, phase, x| {
+        let x = f64::from(x);
+        match phase.as_str() {
+            "down" => d.dispatch(move |store, _| timeline::landmark_down(store, &id)),
+            "move" => d.dispatch(move |store, _| timeline::landmark_move(store, x)),
+            "up" => command(&d, |store, _| timeline::landmark_up(store, true)),
+            _ => command(&d, |store, _| timeline::landmark_up(store, false)),
+        }
     });
     let d = dispatcher.clone();
     global.on_mark(move |kind| {

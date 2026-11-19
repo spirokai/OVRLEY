@@ -38,6 +38,19 @@ export global Landmarks {
         Icons.map-pin
     }
 
+    public pure function label(kind: LandmarkKind) -> string {
+        if kind == LandmarkKind.stop {
+            return @tr("videoSync.stop" => "Stop");
+        }
+        if kind == LandmarkKind.left-turn {
+            return @tr("videoSync.leftTurn" => "Left Turn");
+        }
+        if kind == LandmarkKind.right-turn {
+            return @tr("videoSync.rightTurn" => "Right Turn");
+        }
+        @tr("videoSync.location" => "Location")
+    }
+
     public pure function value(kind: LandmarkKind) -> string {
         if kind == LandmarkKind.stop {
             return "stop";

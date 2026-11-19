@@ -1,0 +1,159 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon } from "../../components/icons.slint";
+import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { Landmarks } from "video-sync-drawer.slint";
+import { VideoSync } from "index.slint";
+
+// `VideoSyncTimelineGraph`: the graph row between the ruler and the lanes (`h-16`, `mt-3 mb-1`, a
+// 30% border left and right, `bg-background/20`): speed and turning at 40% (1.5px), the event
+// bands at 60% with their tooltips, the legend at the bottom left.
+export component TimelineGraph inherits VerticalLayout {
+    padding-top: 0.75rem;
+    padding-bottom: 0.25rem;
+    Rectangle {
+        height: 4rem;
+        background: Theme.background.transparentize(0.8);
+        accessible-role: image;
+        accessible-label: @tr("videoSync.timelineGraph" => "Activity telemetry graph");
+        for border in [0, 1]: Rectangle {
+            x: border == 0 ? 0px : parent.width - 1px;
+            width: 1px;
+            background: Theme.border.transparentize(0.7);
+        }
+        Path {
+            width: parent.width;
+            height: parent.height;
+            viewbox-width: max(1, VideoSync.graph-width / 1px);
+            viewbox-height: 64;
+            commands: VideoSync.speed-path;
+            stroke: Theme.video-sync-stop.transparentize(0.6);
+            stroke-width: 1.5px;
+            fill: transparent;
+        }
+        Path {
+            width: parent.width;
+            height: parent.height;
+            viewbox-width: max(1, VideoSync.graph-width / 1px);
+            viewbox-height: 64;
+            commands: VideoSync.turning-path;
+            stroke: Theme.video-sync-turn.transparentize(0.6);
+            stroke-width: 1.5px;
+            fill: transparent;
+        }
+        for band in VideoSync.bands: Rectangle {
+            x: band.left;
+            width: band.width;
+            SimpleTooltip {
+                content: band.tooltip;
+                Rectangle {
+                    background: Landmarks.color(band.tone).transparentize(0.4);
+                    accessible-role: text;
+                    accessible-label: band.accessible-label;
+                }
+            }
+        }
+        legend := Rectangle {
+            x: 0.25rem;
+            y: parent.height - self.height;
+            width: legend-layout.preferred-width;
+            height: legend-layout.preferred-height;
+            background: Theme.background.transparentize(0.5);
+            legend-layout := HorizontalLayout {
+                padding-left: 0.25rem;
+                padding-right: 0.25rem;
+                padding-top: 0.125rem;
+                padding-bottom: 0.125rem;
+                spacing: 0.5rem;
+                AppText {
+                    content: @tr("videoSync.speed" => "Speed");
+                    font-size: 0.6rem;
+                    font-weight: Theme.font-weight-semibold;
+                    line-height: Theme.leading-none;
+                    color: Theme.video-sync-stop;
+                }
+                AppText {
+                    content: @tr("videoSync.turning" => "Turning");
+                    font-size: 0.6rem;
+                    font-weight: Theme.font-weight-semibold;
+                    line-height: Theme.leading-none;
+                    color: Theme.video-sync-turn;
+                }
+            }
+        }
+    }
+}
+
+// `VideoSyncTimelineLandmarks`: per landmark a 1px line across the timeline in its type's colour
+// and a `1.5rem` handle `1rem` from the top with its icon; an off-view landmark is a small inert
+// marker (`h-5 w-4`) at the edge it is past. Dragging a handle previews its second; a press
+// without a move scrubs to it.
+export component TimelineLandmarks inherits Rectangle {
+    for landmark in VideoSync.timeline-landmarks: Rectangle {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        Rectangle {
+            x: landmark.left - 0.5px;
+            width: 1px;
+            background: Landmarks.color(landmark.kind);
+        }
+        if landmark.interactive: SimpleTooltip {
+            x: landmark.left - 0.75rem;
+            y: 1rem;
+            width: 1.5rem;
+            height: 1.5rem;
+            content: Landmarks.label(landmark.kind) + " - " + landmark.seconds + "s";
+            Rectangle {
+                border-radius: Theme.radius-sm * 1rem;
+                border-width: 1px;
+                border-color: Theme.background;
+                background: Landmarks.color(landmark.kind);
+                drop-shadow-blur: 2px;
+                drop-shadow-color: #0000004d;
+                accessible-role: button;
+                accessible-label: @tr("videoSync.landmarkAriaLabel" => "{0} landmark at {1} seconds", Landmarks.label(landmark.kind), landmark.seconds);
+                Icon {
+                    glyph: Landmarks.icon(landmark.kind);
+                    size: 0.875rem;
+                    stroke: 2.5;
+                    color: Theme.background;
+                }
+                TouchArea {
+                    mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+                    pointer-event(event) => {
+                        if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                            VideoSync.landmark-pointer(landmark.id, "down", landmark.left);
+                        } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                            VideoSync.landmark-pointer(landmark.id, "up", landmark.left);
+                        } else if event.kind == PointerEventKind.cancel {
+                            VideoSync.landmark-pointer(landmark.id, "cancel", landmark.left);
+                        }
+                    }
+                    moved => {
+                        if self.pressed {
+                            VideoSync.landmark-pointer(landmark.id, "move", landmark.left - 0.75rem + self.mouse-x);
+                        }
+                    }
+                }
+            }
+        }
+        if !landmark.interactive: Rectangle {
+            x: landmark.left - 0.5rem;
+            y: 1rem;
+            width: 1rem;
+            height: 1.25rem;
+            border-radius: Theme.radius-sm * 1rem;
+            border-width: 1px;
+            border-color: Theme.background;
+            background: Landmarks.color(landmark.kind);
+            Icon {
+                glyph: Landmarks.icon(landmark.kind);
+                size: 0.75rem;
+                stroke: 2.5;
+                color: Theme.background;
+            }
+        }
+    }
+}
