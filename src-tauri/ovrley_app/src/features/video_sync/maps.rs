@@ -1090,6 +1090,11 @@ pub struct NavigationMap {
     pub scroll: ScrollZoom,
     /// An eased button zoom: `(from, to, start)`.
     zoom_ease: Option<(f64, f64, Instant)>,
+    /// When the last request went out; requests are at least a frame interval apart, so a frame
+    /// arriving does not ask for the next one at once and starve the UI thread.
+    last_request: Option<Instant>,
+    /// A newer request is waiting for the interval.
+    waiting: bool,
     pub requests_sent: u64,
 }
 
@@ -1104,6 +1109,8 @@ impl Default for NavigationMap {
             line: None,
             scroll: ScrollZoom::default(),
             zoom_ease: None,
+            last_request: None,
+            waiting: false,
             requests_sent: 0,
         }
     }
@@ -1140,7 +1147,8 @@ impl NavigationMap {
 
     pub fn deadline(&self, now: Instant) -> Option<Instant> {
         let ease = self.zoom_ease.map(|_| now + FRAME_INTERVAL);
-        [ease, self.scroll.deadline(now)]
+        let throttle = self.last_request.filter(|_| self.waiting).map(|last| last + FRAME_INTERVAL);
+        [ease, self.scroll.deadline(now), throttle]
             .into_iter()
             .flatten()
             .min()
@@ -1203,15 +1211,23 @@ impl NavigationMap {
         }))
     }
 
-    /// Asks for `request`, the newest wins: one frame is drawn at a time, the last stays on show.
-    pub fn send(&mut self, request: &MapFrameRequest) -> Result<(), String> {
+    /// Asks for `request`, the newest wins: one frame is drawn at a time, the last stays on show,
+    /// and requests are at least a frame interval apart.
+    pub fn send(&mut self, request: &MapFrameRequest, now: Instant) -> Result<(), String> {
         let Some(stream) = &mut self.stream else {
             return Ok(());
         };
-        if stream.is_drawing() || stream.answers(request) {
+        if stream.answers(request) {
+            self.waiting = false;
+            return Ok(());
+        }
+        if stream.is_drawing() || self.last_request.is_some_and(|last| now.duration_since(last) < FRAME_INTERVAL) {
+            self.waiting = true;
             return Ok(());
         }
         stream.request(request).map_err(|error| error.to_string())?;
+        self.waiting = false;
+        self.last_request = Some(now);
         self.requests_sent += 1;
         Ok(())
     }
@@ -1366,7 +1382,7 @@ pub fn reconcile_sync_maps(store: &mut crate::store::Store, services: &mut crate
     if let Some(track) = maps.course.as_ref().filter(|course| course.course.position_at(second).is_some()).and_then(|course| course.track.clone()) {
         match maps.navigation.request(&spec, &track, second) {
             Ok(Some(request)) => {
-                if let Err(error) = maps.navigation.send(&request) {
+                if let Err(error) = maps.navigation.send(&request, now) {
                     log::error!("Sync Doctor navigation map: {error}");
                 }
             }
@@ -1709,6 +1725,28 @@ mod tests {
     }
 
     #[test]
+    fn the_inset_asks_at_most_every_sixteen_milliseconds_and_comes_back_for_a_waiting_view() {
+        let start = Instant::now();
+        let provider = Arc::new(FakeProvider::default());
+        let mut inset = NavigationMap { stream: Some(MapFrameStream::streamed(provider.clone())), ..NavigationMap::default() };
+        let request = |zoom: f64| {
+            let camera = MapCamera::new(8.0, 47.0, zoom, 40.0, 0.0, 0.45).unwrap();
+            MapFrameRequest { spec: spec(), camera, viewport: MapViewport::new(100, 100, 1.0).unwrap(), route: None, labels: None, corner_radius_px: 0.0 }
+        };
+        inset.send(&request(15.5), start).unwrap();
+        provider.answer();
+        inset.stream.as_mut().unwrap().collect();
+        // The frame arrived at once: the next zoom still waits for the interval.
+        let soon = start + Duration::from_millis(4);
+        inset.send(&request(15.6), soon).unwrap();
+        assert_eq!(provider.count(), 1);
+        assert_eq!(inset.deadline(soon), Some(start + FRAME_INTERVAL));
+        inset.send(&request(15.6), start + FRAME_INTERVAL).unwrap();
+        assert_eq!(provider.count(), 2);
+        assert_eq!(inset.deadline(start + FRAME_INTERVAL), None);
+    }
+
+    #[test]
     fn requests_are_at_least_sixteen_milliseconds_apart() {
         let start = Instant::now();
         let (mut map, provider) = map(start);
@@ -1820,3 +1858,4 @@ mod tests {
         assert!((ease.at(1.0) - 1.0).abs() < 1e-9);
     }
 }
+
