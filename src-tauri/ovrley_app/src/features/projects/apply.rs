@@ -14,10 +14,8 @@ use crate::lib::video_program::{ImportedVideo, VideoEditsMap};
 use crate::store::slices::editor::{PreviewPlaybackState, TimelineViewport};
 use crate::store::slices::media::{ActivitySource, ImportedActivity};
 use crate::store::slices::template::{create_new_template, hydrate_template_state};
-use crate::store::slices::video_import::{
-    clear_imported_videos, commit_video_collection, hydrate_video_sync_state,
-    reset_video_sync_state,
-};
+use crate::store::slices::manual_video_sync::{hydrate_video_sync_state, reset_video_sync_state};
+use crate::store::slices::video_import::{clear_imported_videos, commit_video_collection};
 use crate::store::Store;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::transition_defaults;

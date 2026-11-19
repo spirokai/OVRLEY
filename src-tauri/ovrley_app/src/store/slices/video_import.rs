@@ -11,7 +11,7 @@ use crate::lib::video_program::collection::{join_video_edits, sort_clips_by_time
 use crate::lib::video_program::edits::{find_video, segment_before_cut, CollectionDraft, CreationTimeSource};
 use crate::lib::video_program::segments::{fit_cuts_to_frame_count, TrimSide};
 use crate::lib::video_program::{Clip, ImportedVideo, TelemetryStatus, VideoEditsMap, VideoTelemetry};
-use ovrley_core::media::manual_video_sync::ManualVideoSync;
+use crate::store::slices::manual_video_sync::{clear_video_sync_for_activity, select_video_sync_video};
 use ovrley_core::media::video_edits::{TimezoneMode, Transition, FIRST_SEGMENT_KEY};
 use crate::lib::video_sync::SyncActivity;
 use crate::store::Store;
@@ -320,35 +320,6 @@ pub fn set_video_telemetry(store: &mut Store, video_id: &str, telemetry: VideoTe
     }
     Rc::make_mut(&mut store.video_import.imported_videos)[index].telemetry = telemetry;
     Ok(true)
-}
-
-/// `selectVideoSyncVideo`: the video whose landmarks the manual sync matches; landmarks belong to
-/// one video and are cleared on a change.
-pub fn select_video_sync_video(store: &mut Store, video_id: Option<String>) -> Result<(), String> {
-    if store.manual_video_sync.video_id == video_id {
-        return Ok(());
-    }
-    if let Some(video_id) = &video_id {
-        find_video(&store.video_import.imported_videos, video_id).map_err(|_| format!("Unknown manual video sync video: {video_id}"))?;
-    }
-    store.manual_video_sync.video_id = video_id;
-    store.manual_video_sync.landmarks.clear();
-    Ok(())
-}
-
-/// `clearVideoSyncForActivity`: the detected location belongs to the replaced activity.
-pub fn clear_video_sync_for_activity(store: &mut Store) {
-    store.manual_video_sync.detected_location_second = None;
-}
-
-/// `hydrateVideoSyncState`: a project's manual sync, validated when it was read.
-pub fn hydrate_video_sync_state(store: &mut Store, manual: ManualVideoSync) {
-    store.manual_video_sync = manual;
-}
-
-/// `resetVideoSyncState`.
-pub fn reset_video_sync_state(store: &mut Store) {
-    store.manual_video_sync = ManualVideoSync::default();
 }
 
 /// `activateActivityFile` and `clearActivityFile`'s placement: the detected location goes, and the
@@ -739,22 +710,6 @@ pub(crate) mod tests {
         assert_eq!(store.video_import.selected_clip.as_ref().unwrap().segment_key, None);
         assert!(!store.video_import.imported_videos[0].missing);
         assert!(relink_video(&mut store, simple("ride", 5.0, 0)).is_err(), "only a missing video relinks");
-    }
-
-    #[test]
-    fn the_manual_sync_selects_known_videos_and_keeps_landmarks_across_activities() {
-        use ovrley_core::media::manual_video_sync::{Landmark, ManualVideoSync};
-        let mut store = store_with(vec![simple("ride", 10.0, 0)], &[]);
-        assert!(select_video_sync_video(&mut store, Some("gone".into())).unwrap_err().contains("Unknown manual video sync video"));
-        hydrate_video_sync_state(&mut store, ManualVideoSync { video_id: Some("ride".into()), landmarks: vec![Landmark::Stop { id: "s".into(), video_second: 1.0 }], detected_location_second: Some(5.0), ..ManualVideoSync::default() });
-        clear_video_sync_for_activity(&mut store);
-        assert_eq!((store.manual_video_sync.detected_location_second, store.manual_video_sync.landmarks.len()), (None, 1));
-        select_video_sync_video(&mut store, Some("ride".into())).unwrap();
-        assert_eq!(store.manual_video_sync.landmarks.len(), 1, "selecting the same video keeps its landmarks");
-        select_video_sync_video(&mut store, None).unwrap();
-        assert!(store.manual_video_sync.landmarks.is_empty());
-        reset_video_sync_state(&mut store);
-        assert_eq!(store.manual_video_sync, ManualVideoSync::default());
     }
 
     #[test]

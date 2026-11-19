@@ -43,8 +43,12 @@ pub struct Store {
     pub video_import: VideoImportSlice,
     /// `createRenderSettingsSlice`'s state (phase 4 D15).
     pub render_settings: RenderSettings,
-    /// `createManualVideoSyncSlice`'s durable state; Phase 8 adds the rest.
+    /// `createManualVideoSyncSlice`'s durable state, which projects save (`manualVideoSync`).
     pub manual_video_sync: ovrley_core::media::manual_video_sync::ManualVideoSync,
+    /// `manualVideoSyncDetection`: the activity's events, `None` before the first detection.
+    pub manual_video_sync_detection: Option<std::sync::Arc<crate::features::video_sync::detection::Detection>>,
+    /// `manualVideoSyncResults` (Phase 8 D2).
+    pub manual_video_sync_results: slices::manual_video_sync::CandidateResults,
     /// `createBatchRenderSlice`'s output folder, which projects save.
     pub batch_render: slices::batch_render::BatchRenderSlice,
     /// The timeline filmstrips (phase 4 D12).
@@ -59,6 +63,8 @@ pub struct Store {
     pub telemetry_queue: crate::features::video_preview::import::VideoTelemetryQueue,
     /// `useVideoFilmstripQueue`'s state.
     pub filmstrip_queue: crate::features::video_preview::filmstrips::FilmstripQueue,
+    /// Sync Doctor's hook state (Phase 8).
+    pub video_sync: crate::features::video_sync::VideoSyncWorkspace,
     /// The player's hook state and cached timeline (phase 4 D3, D5).
     pub player: crate::features::player::PlayerState,
     /// The editor history (D6).

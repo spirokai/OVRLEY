@@ -31,6 +31,8 @@ pub(super) fn run(store: &mut Store, services: &mut Services) {
     crate::features::player::reconcile_player(store);
     //    The filmstrips of the clips and the zoom windows the view wants (phase 4 D12).
     crate::features::video_preview::filmstrips::reconcile_filmstrips(store, services);
+    //    Sync Doctor: detection and the reruns of a search (Phase 8 D3).
+    crate::features::video_sync::reconcile_video_sync(store, services);
     // 6. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame (D9).
     crate::features::widget_preview::reconcile_widget_preview(store);
     // 7. The render dialog: its codec and update-rate rules, the inspection and the export review
