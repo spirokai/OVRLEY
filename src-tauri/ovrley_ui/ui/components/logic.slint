@@ -181,6 +181,8 @@ export struct Choice {
     label: string,
     // An `Icons` path; empty for none.
     icon: string,
+    // A select item's icon colour (`OptionIcon className`); transparent for the item's text colour.
+    icon-color: color,
     // The accessible name of an icon-only item; empty to use `label`.
     accessible-label: string,
     disabled: bool,

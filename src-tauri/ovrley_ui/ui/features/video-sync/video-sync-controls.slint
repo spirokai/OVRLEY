@@ -21,6 +21,9 @@ export component VideoSyncControls inherits VerticalLayout {
     callback reset-creation-times();
     callback filename-creation-times();
     callback set-utc(utc: bool);
+    // The warning's "Open Manual Sync", where manual sync is available (after import).
+    in property <bool> can-open-manual-sync;
+    callback open-manual-sync();
 
     spacing: 1rem;
     HorizontalLayout {
@@ -154,13 +157,34 @@ export component VideoSyncControls inherits VerticalLayout {
                 size: 0.75rem;
                 color: #fbbf24;
             }
-            AppText {
-                content: root.sync.warning;
-                font-size: 0.65rem;
-                font-weight: Theme.font-weight-semibold;
-                color: #fbbf24;
-                wrap: word-wrap;
+            VerticalLayout {
                 horizontal-stretch: 1;
+                padding-left: 0.5rem;
+                spacing: 0.75rem;
+                alignment: center;
+                AppText {
+                    content: root.sync.warning;
+                    font-size: 0.65rem;
+                    font-weight: Theme.font-weight-semibold;
+                    color: #fbbf24;
+                    wrap: word-wrap;
+                }
+                // Outline `sm`, `h-8 w-full`, amber-400 at 30% border and 10% fill.
+                if root.can-open-manual-sync: Button {
+                    variant: ButtonVariant.outline;
+                    size: ButtonSize.sm;
+                    height: 2rem;
+                    font-size: 0.75rem;
+                    text: @tr("videoSync.openManualSync" => "Open Manual Sync");
+                    background: #fbbf241a;
+                    hover-background: #f59e0b33;
+                    border-color: #fbbf244d;
+                    text-color: #fbbf24;
+                    hover-text-color: #fde68a;
+                    clicked => {
+                        root.open-manual-sync();
+                    }
+                }
             }
         }
     }

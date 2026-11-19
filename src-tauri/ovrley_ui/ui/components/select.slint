@@ -53,6 +53,11 @@ export component Select {
     in property <string> leading-icon;
     in property <length> leading-icon-size: 0.75rem;
     in property <color> leading-icon-color: Theme.primary;
+    // The trigger's text and chevron colour (`[&>svg:last-child]:text-current` when coloured).
+    in property <color> text-color: Theme.foreground;
+    in property <color> chevron-color: Theme.muted-foreground;
+    // `SelectValue` shows the chosen item's icon, as Radix renders the item's children.
+    in property <bool> item-icon-in-trigger;
     callback value-changed(value: string);
 
     property <int> selected-index: ChoiceListLogic.index-of(root.items, root.value);
@@ -146,10 +151,15 @@ export component Select {
             size: root.leading-icon-size;
             color: root.leading-icon-color;
         }
+        if root.item-icon-in-trigger && root.selected-index >= 0 && root.items[root.selected-index].icon != "": Icon {
+            glyph: root.items[root.selected-index].icon;
+            size: 0.875rem;
+            color: root.items[root.selected-index].icon-color.alpha > 0 ? root.items[root.selected-index].icon-color : root.text-color;
+        }
         AppText {
             horizontal-stretch: 1;
             content: root.selected-index >= 0 ? root.items[root.selected-index].label : root.placeholder;
-            color: root.selected-index >= 0 ? Theme.foreground : Theme.muted-foreground;
+            color: root.selected-index >= 0 ? root.text-color : Theme.muted-foreground;
             mono: root.mono;
             uppercase: root.uppercase;
             font-size: root.font-size * Theme.field-text-scale;
@@ -160,7 +170,7 @@ export component Select {
         Icon {
             glyph: Icons.chevron-down;
             size: 1rem;
-            color: Theme.muted-foreground;
+            color: root.chevron-color;
             opacity: 0.5;
         }
     }
@@ -366,6 +376,15 @@ export component Select {
                                         HorizontalLayout {
                                             horizontal-stretch: 1;
                                             spacing: 0.25rem;
+                                            // `[&_svg]:size-3.5`, `gap-2` before the label.
+                                            if item.icon != "": HorizontalLayout {
+                                                padding-right: 0.25rem;
+                                                Icon {
+                                                    glyph: item.icon;
+                                                    size: 0.875rem;
+                                                    color: item.icon-color.alpha > 0 ? item.icon-color : (row.highlighted ? Theme.accent-foreground : Theme.popover-foreground);
+                                                }
+                                            }
                                             AppText {
                                                 horizontal-stretch: item.help == "" ? 1 : 0;
                                                 vertical-alignment: center;
