@@ -635,6 +635,45 @@ fn derive_torque_series(
         .collect()
 }
 
+/// Derives theoretical lean angle from ground speed and heading rate.
+///
+/// Uses the steady-state coordinated-turn formula `atan(v · ω / g)` where `v`
+/// is speed in m/s and `ω` is the heading change rate in rad/s. The rate is
+/// measured against the newest heading at least one second older than each
+/// sample to reduce GPS noise. Samples before the first computed lean take that
+/// value; later samples without such a window stay `None`.
+fn derive_lean_angle_series(
+    speed_mps: &NumericSeries,
+    heading_deg: &NumericSeries,
+    elapsed_seconds: &[f64],
+) -> NumericSeries {
+    const G: f64 = 9.806_65;
+    const RATE_WINDOW_SECONDS: f64 = 1.0;
+    let mut lean: NumericSeries = (0..elapsed_seconds.len())
+        .map(|index| {
+            let speed = speed_mps[index]?;
+            let heading = heading_deg[index]?;
+            let current_time = elapsed_seconds[index];
+            let (dt, previous) = (0..index).rev().find_map(|previous| {
+                let dt = current_time - elapsed_seconds[previous];
+                (dt >= RATE_WINDOW_SECONDS)
+                    .then_some(heading_deg[previous])
+                    .flatten()
+                    .map(|previous| (dt, previous))
+            })?;
+            let delta = (heading - previous + 540.0).rem_euclid(360.0) - 180.0;
+            let omega_rad_s = delta.to_radians() / dt;
+            finite_f64((speed * omega_rad_s / G).atan().to_degrees())
+        })
+        .collect();
+    // The rate window leaves the start empty; hold the first lean back over it. Later gaps stay missing.
+    if let Some(first) = lean.iter().position(Option::is_some) {
+        let value = lean[first];
+        lean[..first].fill(value);
+    }
+    lean
+}
+
 /// Combines preferred and fallback series while preserving provenance.
 ///
 /// Some metrics prefer direct sensor values, while gradient intentionally
@@ -828,26 +867,32 @@ pub fn derive_activity_metric_series(
         "gradient".to_string(),
         combine_series(&derived_gradient, &direct["gradient"], true),
     );
-    map.insert(
-        "heading".to_string(),
-        if columns.preserve_direct_metric_gaps.heading {
-            select_series(&direct["heading"], &derived_heading)
-        } else {
-            combine_series(&direct["heading"], &derived_heading, false)
-        },
-    );
+    let heading = if columns.preserve_direct_metric_gaps.heading {
+        select_series(&direct["heading"], &derived_heading)
+    } else {
+        combine_series(&direct["heading"], &derived_heading, false)
+    };
+    let speed = if columns.preserve_direct_metric_gaps.speed {
+        select_series(&direct["speed"], &derived_speed)
+    } else {
+        combine_series(&direct["speed"], &derived_speed, false)
+    };
+    // Lean derives from the final speed and heading, so every source with GPS gets one.
+    if let (MetricSeries::Numeric(speed), MetricSeries::Numeric(heading)) =
+        (&speed.series, &heading.series)
+    {
+        let derived_lean = derive_lean_angle_series(speed, heading, elapsed_series);
+        map.insert(
+            "lean_angle".to_string(),
+            select_series(&direct["lean_angle"], &derived_lean),
+        );
+    }
+    map.insert("heading".to_string(), heading);
     map.insert(
         "pace".to_string(),
         combine_series(&direct["pace"], &derived_pace, false),
     );
-    map.insert(
-        "speed".to_string(),
-        if columns.preserve_direct_metric_gaps.speed {
-            select_series(&direct["speed"], &derived_speed)
-        } else {
-            combine_series(&direct["speed"], &derived_speed, false)
-        },
-    );
+    map.insert("speed".to_string(), speed);
     map.insert(
         "torque".to_string(),
         combine_series(&direct["torque"], &derived_torque, false),

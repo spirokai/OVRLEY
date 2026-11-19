@@ -7,7 +7,7 @@
 //! the finite-value check between the two extraction paths.
 //!
 //! Owns: [`finite_f64`], [`g_force_from_components`],
-//! [`lean_angle_from_lateral_g`].
+//! [`backfill_lateral_g_from_lean_angle`].
 //! Does not own: camera metadata extraction, protobuf decoding, or smoothing.
 
 /// Returns `Some(value)` when the float is finite, `None` otherwise.
@@ -73,90 +73,6 @@ pub fn round_f64(value: f64, digits: i32) -> Option<f64> {
 pub fn g_force_from_components(x: f64, y: f64, z: f64) -> Option<f64> {
     let g = (x.powi(2) + y.powi(2) + z.powi(2)).sqrt() - 1.0;
     finite_f64(g)
-}
-
-/// Calculates signed theoretical lean angle from lateral acceleration in g.
-///
-/// This assumes earth-frame lateral acceleration (physically correct for
-/// the g-force from a coordinated turn). Raw device-frame IMU `LatAcc`
-/// values such as those exported by RaceBox are not earth-frame lateral
-/// acceleration and will produce incorrect results when passed here.
-#[inline]
-pub fn lean_angle_from_lateral_g(lateral_g: f64) -> Option<f64> {
-    finite_f64(-lateral_g.atan().to_degrees())
-}
-
-/// Calculates theoretical lean angle from ground speed and heading rate.
-///
-/// Ground speed in metres per second and heading/course rate in radians per
-/// second are used to compute steady-state lateral acceleration, which is
-/// then converted to a signed lean angle in degrees.
-#[inline]
-pub fn lean_angle_from_speed_and_heading_rate(
-    speed_mps: f64,
-    heading_rate_rad_s: f64,
-) -> Option<f64> {
-    const G: f64 = 9.806_65;
-    finite_f64((speed_mps * heading_rate_rad_s / G).atan().to_degrees())
-}
-
-/// Derives lean angle from ground speed and heading rate at each sample interval.
-///
-/// Uses the steady-state formula `atan(v · ω / g)` where `v` is speed in m/s and
-/// `ω` is the heading change rate in rad/s. The heading rate is computed over a
-/// configurable smoothing window to reduce GPS noise instead of using raw
-/// sample-to-sample differences. Returns a series of the same length as the
-/// inputs; samples without a valid window are `None`.
-pub fn derive_lean_from_speed_heading(
-    speed_mps: &[Option<f64>],
-    heading_deg: &[Option<f64>],
-    elapsed_seconds: &[f64],
-) -> Vec<Option<f64>> {
-    derive_lean_from_speed_heading_with_window(speed_mps, heading_deg, elapsed_seconds, 1.0)
-}
-
-/// Same as [`derive_lean_from_speed_heading`] with an explicit rate-smoothing
-/// window in seconds.
-fn derive_lean_from_speed_heading_with_window(
-    speed_mps: &[Option<f64>],
-    heading_deg: &[Option<f64>],
-    elapsed_seconds: &[f64],
-    window_seconds: f64,
-) -> Vec<Option<f64>> {
-    let sample_count = elapsed_seconds.len();
-    let mut lean = vec![None; sample_count];
-    for i in 0..sample_count {
-        let current_time = elapsed_seconds[i];
-        let hdg_curr = match heading_deg[i] {
-            Some(h) => h,
-            None => continue,
-        };
-        let speed = match speed_mps[i] {
-            Some(s) => s,
-            None => continue,
-        };
-
-        let mut j = i;
-        while j > 0 {
-            j -= 1;
-            let dt = current_time - elapsed_seconds[j];
-            if dt >= window_seconds {
-                if let Some(hdg_prev) = heading_deg[j] {
-                    let mut dh = hdg_curr - hdg_prev;
-                    if dh > 180.0 {
-                        dh -= 360.0;
-                    }
-                    if dh < -180.0 {
-                        dh += 360.0;
-                    }
-                    let omega_rad_s = dh.to_radians() / dt;
-                    lean[i] = lean_angle_from_speed_and_heading_rate(speed, omega_rad_s);
-                    break;
-                }
-            }
-        }
-    }
-    lean
 }
 
 /// Back-fills the missing lateral g-force axis from a lean-angle series.

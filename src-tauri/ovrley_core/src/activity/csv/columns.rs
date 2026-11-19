@@ -21,7 +21,7 @@ use crate::activity::schema::{
 };
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{
-    backfill_lateral_g_from_lean_angle, derive_lean_from_speed_heading, lean_angle_from_lateral_g,
+    backfill_lateral_g_from_lean_angle,
 };
 use csv::StringRecord;
 use serde_json::json;
@@ -296,25 +296,7 @@ pub(super) fn build_activity_columns(
     } else {
         vec![None; sample_count]
     };
-    let (mut lean_angle, _) = series(Metric::LeanAngle);
-    if lean_angle.iter().all(Option::is_none) {
-        lean_angle = derive_lean_from_speed_heading(&speed, &heading, &elapsed_seconds);
-    }
-    if lean_angle.iter().all(Option::is_none) {
-        if let Some(lateral) = selected_acceleration_series(
-            Metric::GForceX,
-            AccelerationKind::Semantic,
-            &header.columns,
-            units_row,
-            data,
-        ) {
-            let derived = lateral
-                .into_iter()
-                .map(|value| value.and_then(lean_angle_from_lateral_g))
-                .collect::<Vec<_>>();
-            lean_angle = coalesce_series(derived, &groups);
-        }
-    }
+    let (lean_angle, _) = series(Metric::LeanAngle);
     if lean_angle.iter().any(Option::is_some) {
         let (new_x, new_y) =
             backfill_lateral_g_from_lean_angle(&g_force_x, &g_force_y, &lean_angle);

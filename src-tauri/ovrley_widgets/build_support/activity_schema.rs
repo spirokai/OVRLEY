@@ -57,7 +57,9 @@ fn idle_assignment(value: &Value) -> Option<&'static str> {
         .expect("numeric idleValue is required")
     {
         "preserve" => None,
-        "zero" => Some("Some(0.0)"),
+        // Idle samples clone the preceding real sample; only zero fields the source records,
+        // so a pause never invents a column the file lacks (it would block derivation).
+        "zero" => Some("self.{key}.map(|_| 0.0)"),
         "missing" => Some("None"),
         policy => panic!("unknown activity idleValue: {policy}"),
     }
@@ -160,6 +162,7 @@ fn generate_struct_macros(
             for (key, definition) in numeric {
                 if samples.contains_key(key) {
                     if let Some(value) = idle_assignment(definition) {
+                        let value = value.replace("{key}", key);
                         write!(generated, "self.{key} = {value};").unwrap();
                     }
                 }
