@@ -14,6 +14,9 @@ dev-windows = []
 # Dev only (`pnpm dev:native:live`, with SLINT_LIVE_PREVIEW=1): saving a .slint file reloads the
 # UI inside the running app. Never in release builds.
 live-preview = ["slint/live-preview"]
+# Phase 6B spike (branch spike/mdk-macos, never merged): video playback in the canvas. Runs only
+# with OVRLEY_PLAYBACK set; needs MDK_SDK at build time.
+video-playback = ["dep:ovrley_playback"]
 
 [[bin]]
 # Packaging renames it in Phase 9.
@@ -49,6 +52,7 @@ slint = { version = "=1.19.0", default-features = false, features = [
 skia-safe = { version = "=0.157.0", features = ["binary-cache", "no-compile"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+ovrley_playback = { path = "../ovrley_playback", optional = true }
 objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = [

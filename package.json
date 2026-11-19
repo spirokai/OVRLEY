@@ -23,6 +23,7 @@
     "test": "pnpm --dir app test",
     "release": "semantic-release",
     "dev:native": "cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley",
+    "dev:native:playback": "MDK_SDK=$HOME/SDKs/mdk-v0.40.1/mdk-sdk OVRLEY_PLAYBACK=1 cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley --features video-playback",
     "dev:native:live": "SLINT_LIVE_PREVIEW=1 cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley --features live-preview",
     "showcase:native": "cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --features dev-windows --example showcase",
     "test:native-ui": "cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_app -p ovrley_ui -p ovrley_services -p ovrley_mcp --features ovrley_ui/dev-windows",

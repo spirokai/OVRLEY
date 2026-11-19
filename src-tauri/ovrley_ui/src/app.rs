@@ -52,6 +52,8 @@ impl Projections {
         self.widget_drawer.project(&window, store);
         self.maps.project(store);
         self.scene_settings.project(&window, store);
+        #[cfg(all(feature = "video-playback", target_os = "macos"))]
+        features::video_playback::project(store);
     }
 }
 
@@ -197,8 +199,12 @@ pub fn run(
     #[cfg(debug_assertions)]
     crate::snapshot::start_if_requested(&window, &dispatcher);
 
+    #[cfg(all(feature = "video-playback", target_os = "macos"))]
+    features::video_playback::start_if_requested(&window, gpu.as_ref(), &dispatcher.handle());
     let _gpu = gpu;
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
+    #[cfg(all(feature = "video-playback", target_os = "macos"))]
+    features::video_playback::shutdown();
     dispatcher.flush_preferences();
     result
 }
