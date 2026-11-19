@@ -92,3 +92,7 @@ debug-assertions = false
 [profile.dev.package."*"]
 debug = false
 opt-level = 2
+
+# Published crates with a local change; see patches/README.md.
+[patch.crates-io]
+i-slint-renderer-skia = { path = "patches/i-slint-renderer-skia" }
