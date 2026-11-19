@@ -12,5 +12,6 @@ pub mod toolbar;
 pub mod transitions;
 pub mod undo_redo;
 pub mod video_preview;
+pub mod video_sync;
 pub mod widget_drawer;
 pub mod widget_editor;

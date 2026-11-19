@@ -44,6 +44,7 @@ impl Projections {
         features::projects::project(&window, store);
         features::render_video::project(&window, store);
         features::video_preview::project(&window, store);
+        features::video_sync::project(&window, store);
         features::undo_redo::project(&window, store);
         self.overlay.project(&window, store);
         self.player.project(&window, store);
@@ -91,6 +92,7 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     features::widget_drawer::bind(window, &dispatcher);
     features::scene_settings::bind(window, &dispatcher);
     features::video_preview::bind(window, &dispatcher);
+    features::video_sync::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher

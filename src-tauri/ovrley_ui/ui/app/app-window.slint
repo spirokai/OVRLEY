@@ -15,6 +15,7 @@ import { VideoImport } from "../features/video-preview/index.slint";
 import { Toolbar } from "../features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "../features/toolbar/toolbar-drawer-layout.slint";
 import { VideoPanel } from "../features/toolbar/video-panel.slint";
+import { VideoSync } from "../features/video-sync/index.slint";
 import { Projects, ProjectNoticeKind } from "../features/projects/index.slint";
 import { StartupProjectsDialog, MissingSourceDialog, ProjectNoticeDialog, ProjectUnsavedDialog } from "../features/projects/project-dialogs.slint";
 import { RenderVideo } from "../features/render-video/index.slint";
@@ -102,7 +103,8 @@ export component AppWindow inherits FluidWindow {
             active-tool: Toolbar.active-tool;
             drawer-visible: Toolbar.visible;
             pinned: Toolbar.pinned;
-            trailing-width: root.control-panel-width;
+            // Sync Doctor hides the control panel (Phase 8 D4).
+            trailing-width: VideoSync.mode ? 0px : root.control-panel-width;
             trailing-above-backdrop: Toolbar.video-panel-shown;
             select-tool(tool) => {
                 Toolbar.select-tool(tool);
@@ -143,7 +145,7 @@ export component AppWindow inherits FluidWindow {
                     label: Projects.loading ? @tr("app.loadingProject" => "Loading project...") : AppShell.importing-video ? @tr("app.importingYourVideo" => "Importing your video...") : @tr("app.processingYourActivity" => "Processing your activity...");
                 }
             }
-            Rectangle {
+            if !VideoSync.mode: Rectangle {
                 width: root.control-panel-width;
                 // A still region: drawn from a cached layer (see `AppHeader`).
                 cache-rendering-hint: true;

@@ -32,6 +32,8 @@ pub enum SecondsField {
     PanelTransitionDuration,
     /// The panel's continuity threshold.
     PanelContinuityThreshold,
+    /// Sync Doctor's shared offset: where the earliest clip starts (`commitSharedOffset`).
+    SyncSharedOffset,
 }
 
 impl SecondsField {
@@ -45,6 +47,7 @@ impl SecondsField {
             Self::JoinDuration(join_key) => format!("join:{join_key}"),
             Self::PanelTransitionDuration => "panel-transition".into(),
             Self::PanelContinuityThreshold => "panel-threshold".into(),
+            Self::SyncSharedOffset => "sync-shared".into(),
         }
     }
 
@@ -54,6 +57,7 @@ impl SecondsField {
             "import-transition" => Some(Self::ImportTransitionDuration),
             "panel-transition" => Some(Self::PanelTransitionDuration),
             "panel-threshold" => Some(Self::PanelContinuityThreshold),
+            "sync-shared" => Some(Self::SyncSharedOffset),
             _ => key
                 .strip_prefix("import-row:")
                 .map(|video_id| Self::ImportRowOffset(video_id.to_string()))
@@ -165,6 +169,10 @@ pub fn field_target(store: &Store, field: &SecondsField) -> Option<FieldTarget> 
             value: store.video_import.transition_defaults.split_gap_threshold_seconds,
             step: None,
         }),
+        SecondsField::SyncSharedOffset => {
+            let controls = crate::features::video_sync::store_video_sync_controls(store);
+            Some(FieldTarget { options: start_options(controls.shared_offset_fps), value: controls.shared_offset_seconds, step: Some(0.1) })
+        }
     }
 }
 
@@ -180,6 +188,10 @@ fn commit(store: &mut Store, field: &SecondsField, seconds: f64) -> Result<(), S
         SecondsField::JoinDuration(join_key) => crate::features::transitions::commit_join_duration(store, join_key, seconds),
         SecondsField::PanelTransitionDuration => set_panel_defaults(store, |defaults| defaults.duration_seconds = seconds),
         SecondsField::PanelContinuityThreshold => set_panel_defaults(store, |defaults| defaults.split_gap_threshold_seconds = seconds),
+        SecondsField::SyncSharedOffset => {
+            let shared = crate::features::video_sync::store_video_sync_controls(store).shared_offset_seconds;
+            crate::store::slices::video_import::shift_video_offsets(store, seconds - shared, false)
+        }
     }
 }
 

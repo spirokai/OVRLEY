@@ -12,6 +12,7 @@ use crate::store::Store;
 use detection::{create_sync_input, detect_activity_events, DetectionSettings, LocationEvent, SyncInput};
 use matching::{match_candidates, MatchScope};
 use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::media::manual_video_sync::{LandmarkKind, MAX_MANUAL_LANDMARKS};
 use std::sync::Arc;
 
 use crate::lib::video_program::collection::{join_video_edits, sort_clips_by_timeline};
@@ -53,6 +54,15 @@ pub fn derive_video_sync_controls(videos: &[ImportedVideo], edits: &VideoEditsMa
     }
 }
 
+/// `VIDEO_SYNC_PREVIEW_SCREEN_GAP`: the gap between the two screens, in scene units.
+pub const PREVIEW_SCREEN_GAP: f64 = 16.0;
+
+/// `useVideoSyncControls`: the store's collection, with the external activity's timezone.
+pub fn store_video_sync_controls(store: &Store) -> VideoSyncControls {
+    let timezone = store.media.parsed_activity.as_ref().and_then(|_| store.media.activity_summary.as_ref()).and_then(|summary| summary.timezone.as_deref());
+    derive_video_sync_controls(&store.video_import.imported_videos, &store.video_import.video_edits, timezone)
+}
+
 /// What a detection reads (`useVideoSyncCalculation`'s effect inputs).
 #[derive(Clone, Debug)]
 struct DetectionInputs {
@@ -81,6 +91,223 @@ pub struct VideoSyncWorkspace {
     detected: Option<DetectionInputs>,
     /// An agent waiting for the running search (D13).
     search_reply: Option<AgentReply>,
+    /// The sensitivity sliders' drafts while they move (`speedThresholdDraftKmh`,
+    /// `turnThresholdDraftDegrees`); `None` shows the committed value.
+    pub speed_draft_kmh: Option<f64>,
+    pub turn_draft_degrees: Option<f64>,
+    /// The committed thresholds the drafts follow.
+    drafts_follow: Option<(f64, f64)>,
+}
+
+// --- The workspace (`useVideoSyncWorkspace`, `videoSyncPresentation.js`) -----------------------
+
+/// A slider moved: its draft shows. Release commits it.
+pub fn set_speed_draft(store: &mut Store, kmh: f64) {
+    store.video_sync.speed_draft_kmh = Some(kmh);
+}
+
+pub fn set_turn_draft(store: &mut Store, degrees: f64) {
+    store.video_sync.turn_draft_degrees = Some(degrees);
+}
+
+/// The drafts follow the committed thresholds (the hook's effects), the reconcile step's last part.
+fn follow_committed_thresholds(store: &mut Store) {
+    let committed = (store.manual_video_sync.speed_threshold_kmh, store.manual_video_sync.turn_threshold_degrees);
+    let previous = store.video_sync.drafts_follow.replace(committed);
+    if let Some((speed, turn)) = previous {
+        if speed != committed.0 {
+            store.video_sync.speed_draft_kmh = None;
+        }
+        if turn != committed.1 {
+            store.video_sync.turn_draft_degrees = None;
+        }
+    }
+}
+
+/// The four mark buttons' state at the playhead (`resolveVideoSyncMarkControls`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct MarkControls {
+    pub can_mark: bool,
+    pub can_mark_location: bool,
+    /// The tooltip of the stop and turn buttons when they are disabled.
+    pub mark_disabled_reason: Option<String>,
+    pub location_disabled_reason: Option<String>,
+}
+
+pub fn mark_controls(store: &Store) -> MarkControls {
+    let language = store.i18n.language;
+    let t = |key: &str| catalog().t(language, key).to_string();
+    let target = slice::find_video_sync_target(store);
+    let landmarks = &store.manual_video_sync.landmarks;
+    let has_location = landmarks.iter().any(|landmark| landmark.kind() == LandmarkKind::Location);
+    let has_capacity = landmarks.len() < MAX_MANUAL_LANDMARKS;
+    let inside = target.as_ref().is_some_and(|clip| {
+        let second = store.editor.selected_second - clip.offset_seconds();
+        second >= 0.0 && second < clip.duration_seconds()
+    });
+    let mark_disabled_reason = if target.is_none() {
+        Some(t("videoSync.videoRequired"))
+    } else if !inside {
+        Some(t("videoSync.playheadInsideVideo"))
+    } else if !has_capacity {
+        Some(t("videoSync.landmarkLimit"))
+    } else {
+        None
+    };
+    let can_mark = inside && has_capacity;
+    MarkControls {
+        can_mark,
+        can_mark_location: can_mark && !has_location,
+        location_disabled_reason: if has_location { Some(t("videoSync.locationLimit")) } else { mark_disabled_reason.clone() },
+        mark_disabled_reason,
+    }
+}
+
+/// A mark button: a landmark at the playhead's video second (`addLandmarkAtPlayhead`).
+pub fn add_landmark_at_playhead(store: &mut Store, kind: LandmarkKind) -> Result<String, String> {
+    let offset = slice::find_video_sync_target(store).map(|clip| clip.offset_seconds()).ok_or("A video must be loaded before adding a manual video sync landmark")?;
+    slice::add_landmark(store, kind, store.editor.selected_second - offset)
+}
+
+/// A landmark type's label key (`VIDEO_SYNC_LANDMARK_PRESENTATION`).
+pub fn landmark_label_key(kind: LandmarkKind) -> &'static str {
+    match kind {
+        LandmarkKind::Stop => "videoSync.stop",
+        LandmarkKind::LeftTurn => "videoSync.leftTurn",
+        LandmarkKind::RightTurn => "videoSync.rightTurn",
+        LandmarkKind::Location => "videoSync.location",
+    }
+}
+
+/// One landmark row of the drawer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LandmarkCard {
+    pub id: String,
+    pub kind: LandmarkKind,
+    pub label: String,
+    pub video_time_label: String,
+}
+
+/// One candidate card (`buildVideoSyncCandidateCards`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct CandidateCard {
+    pub offset_label: String,
+    /// "{matched} / {eligible} landmarks matched", or "Location only".
+    pub subline: String,
+    pub score: Option<f64>,
+    /// `hsl(score × 1.2, 72%, 48%)`'s hue.
+    pub score_hue: f64,
+    pub applied: bool,
+}
+
+/// One scope's list (`VideoSyncCandidateList`).
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct CandidateListView {
+    /// Hidden until a search ran.
+    pub shown: bool,
+    pub error: Option<String>,
+    pub stale: bool,
+    /// Fresh and empty: "No candidate aligns at least two landmarks".
+    pub empty: bool,
+    /// Cards apply only from a fresh result.
+    pub disabled: bool,
+    pub cards: Vec<CandidateCard>,
+}
+
+/// The detected events' counts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DetectionCounts {
+    pub left_turns: usize,
+    pub stops: usize,
+    pub right_turns: usize,
+    pub locations: usize,
+}
+
+/// The Manual Sync tab (`buildVideoSyncDrawerPresentation` and the drawer's props).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DrawerView {
+    pub landmarks: Vec<LandmarkCard>,
+    pub has_location_landmark: bool,
+    pub speed_draft_kmh: f64,
+    pub turn_draft_degrees: f64,
+    pub speed_label: String,
+    pub turn_label: String,
+    pub counts: DetectionCounts,
+    pub eligibility: CalculationEligibility,
+    pub calculating: bool,
+    pub location: CandidateListView,
+    pub all: CandidateListView,
+}
+
+fn candidate_list(store: &Store, scope: MatchScope, applied_offset: f64) -> CandidateListView {
+    let language = store.i18n.language;
+    let result = store.manual_video_sync_results.get(scope);
+    let cards = result
+        .candidates
+        .iter()
+        .map(|candidate| CandidateCard {
+            offset_label: crate::lib::format::format_clock_duration(candidate.offset),
+            subline: if candidate.variant == matching::CandidateVariant::LocationOnly {
+                catalog().t(language, "videoSync.locationOnly").to_string()
+            } else {
+                catalog().t_with(language, "videoSync.landmarksMatched", &[("matched", &candidate.matched_count.to_string()), ("eligible", &candidate.eligible_count.to_string())])
+            },
+            score: candidate.match_score,
+            score_hue: candidate.match_score.unwrap_or(0.0) * 1.2,
+            applied: candidate.offset == applied_offset,
+        })
+        .collect::<Vec<_>>();
+    CandidateListView {
+        shown: result.is_shown(),
+        error: (result.status == CandidateStatus::Error).then(|| result.error.clone().unwrap_or_default()),
+        stale: result.status == CandidateStatus::Stale,
+        empty: result.has_searched && result.status == CandidateStatus::Fresh && cards.is_empty(),
+        disabled: result.status != CandidateStatus::Fresh,
+        cards,
+    }
+}
+
+pub fn drawer_view(store: &Store) -> DrawerView {
+    let language = store.i18n.language;
+    let mut landmarks: Vec<&ovrley_core::media::manual_video_sync::Landmark> = store.manual_video_sync.landmarks.iter().collect();
+    landmarks.sort_by(|left, right| left.video_second().total_cmp(&right.video_second()).then_with(|| crate::lib::format::compare_text(left.id(), right.id(), language)));
+    let detection = store.manual_video_sync_detection.as_deref();
+    let counts = detection.map_or_else(DetectionCounts::default, |detection| DetectionCounts {
+        left_turns: detection.turn_count(detection::TurnDirection::Left),
+        stops: detection.stops.len(),
+        right_turns: detection.turn_count(detection::TurnDirection::Right),
+        locations: usize::from(detection.location.is_some()),
+    });
+    let speed = store.video_sync.speed_draft_kmh.unwrap_or(store.manual_video_sync.speed_threshold_kmh);
+    let turn = store.video_sync.turn_draft_degrees.unwrap_or(store.manual_video_sync.turn_threshold_degrees);
+    let applied = slice::find_video_sync_target(store).map_or(0.0, |clip| clip.offset_seconds());
+    DrawerView {
+        landmarks: landmarks
+            .iter()
+            .map(|landmark| LandmarkCard {
+                id: landmark.id().to_string(),
+                kind: landmark.kind(),
+                label: catalog().t(language, landmark_label_key(landmark.kind())).to_string(),
+                video_time_label: crate::lib::format::format_clock_duration(landmark.video_second()),
+            })
+            .collect(),
+        has_location_landmark: store.manual_video_sync.landmarks.iter().any(|landmark| landmark.kind() == LandmarkKind::Location),
+        speed_draft_kmh: speed,
+        turn_draft_degrees: turn,
+        speed_label: format!("{speed:.1}km/h"),
+        turn_label: format!("{turn:.1}°"),
+        counts,
+        eligibility: calculation_eligibility(store),
+        calculating: store.manual_video_sync_results.is_calculating(),
+        location: candidate_list(store, MatchScope::Location, applied),
+        all: candidate_list(store, MatchScope::All, applied),
+    }
+}
+
+/// A candidate card: applies that scope's candidate at `index` of its fresh result.
+pub fn apply_candidate_at(store: &mut Store, scope: MatchScope, index: usize) -> Result<(), String> {
+    let offset = store.manual_video_sync_results.get(scope).candidates.get(index).map(|candidate| candidate.offset).ok_or("Manual video sync candidate is not part of the current result")?;
+    slice::apply_candidate(store, scope, offset)
 }
 
 /// The external activity's detector input, built once per activity.
@@ -177,6 +404,11 @@ fn finish_search(store: &mut Store, scope: MatchScope, revision: u64, detection:
 /// activity, a threshold or the detected location changed, and after a threshold commit a search
 /// that ran runs again. Nothing runs while a search does; its inputs are read again after it.
 pub fn reconcile_video_sync(store: &mut Store, services: &mut Services) {
+    reconcile_calculation(store, services);
+    follow_committed_thresholds(store);
+}
+
+fn reconcile_calculation(store: &mut Store, services: &mut Services) {
     let inputs = DetectionInputs {
         activity: store.media.parsed_activity.as_ref().map(|activity| activity.activity.clone()),
         settings: settings(store),

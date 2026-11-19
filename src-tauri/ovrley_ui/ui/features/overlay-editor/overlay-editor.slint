@@ -186,6 +186,8 @@ component SelectionLayer inherits Rectangle {
     }
 }
 import { EditorToolbar } from "editor-toolbar.slint";
+import { VideoSync } from "../video-sync/index.slint";
+import { VideoSyncScreens } from "../video-sync/preview-screens.slint";
 
 // `OverlayCanvas`: the scene rectangle in the background colour, `rounded-sm`, a `border` at
 // 50%, shadow `0 5px 20px 3px` black at 20%; the checker pattern while the background is checker
@@ -297,6 +299,10 @@ export component OverlayEditorView inherits Rectangle {
                 : OverlayEditor.cursor == EditorCursor.rotate ? MouseCursor.alias
                 : MouseCursor.default;
             pointer-event(event) => {
+                // Sync Doctor has no selection, marquee or gestures (Phase 8 D4).
+                if VideoSync.mode {
+                    return;
+                }
                 if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
                     OverlayEditor.pointer-down(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
                 } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
@@ -311,7 +317,9 @@ export component OverlayEditorView inherits Rectangle {
                 }
             }
             double-clicked => {
-                OverlayEditor.double-click(self.mouse-x, self.mouse-y);
+                if !VideoSync.mode {
+                    OverlayEditor.double-click(self.mouse-x, self.mouse-y);
+                }
             }
             scroll-event(event) => {
                 OverlayEditor.wheel(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y,
@@ -324,7 +332,13 @@ export component OverlayEditorView inherits Rectangle {
             y: -OverlayEditor.scroll-y;
             width: OverlayEditor.stage-width;
             height: OverlayEditor.stage-height;
-            OverlayCanvas {
+            if VideoSync.mode: VideoSyncScreens {
+                x: OverlayEditor.scene-left;
+                y: OverlayEditor.scene-top;
+                width: OverlayEditor.scene-width;
+                height: OverlayEditor.scene-height;
+            }
+            if !VideoSync.mode: OverlayCanvas {
                 x: OverlayEditor.scene-left;
                 y: OverlayEditor.scene-top;
                 width: OverlayEditor.scene-width;
@@ -339,7 +353,7 @@ export component OverlayEditorView inherits Rectangle {
                 widgets: OverlayEditor.widgets;
                 error: OverlayEditor.error;
             }
-            SelectionLayer {
+            if !VideoSync.mode: SelectionLayer {
                 width: parent.width;
                 height: parent.height;
             }

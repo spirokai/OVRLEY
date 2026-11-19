@@ -104,14 +104,25 @@ pub fn scene_size(store: &Store) -> (f64, f64) {
     (dimension("width"), dimension("height"))
 }
 
-/// The display scale: the fit times the zoom.
-pub fn display_scale(store: &Store) -> f64 {
-    store.overlay_editor.viewport.display_scale(scene_size(store), store.editor_shell.editor_zoom_level)
+/// `getViewportContentSize`: what the viewport fits and scrolls, the scene, or in Sync Doctor the
+/// two screens side by side with their gap (Phase 8 D4).
+pub fn viewport_content_size(store: &Store) -> (f64, f64) {
+    let (width, height) = scene_size(store);
+    if crate::features::player::video_sync_mode(store) {
+        (width * 2.0 + crate::features::video_sync::PREVIEW_SCREEN_GAP, height)
+    } else {
+        (width, height)
+    }
 }
 
-/// The stage the scroll area shows.
+/// The display scale: the fit times the zoom.
+pub fn display_scale(store: &Store) -> f64 {
+    store.overlay_editor.viewport.display_scale(viewport_content_size(store), store.editor_shell.editor_zoom_level)
+}
+
+/// The stage the scroll area shows: the scene's, or in Sync Doctor the pair's.
 pub fn stage(store: &Store) -> StageLayout {
-    let (width, height) = scene_size(store);
+    let (width, height) = viewport_content_size(store);
     viewport::stage_layout(&store.overlay_editor.viewport.metrics, width, height, display_scale(store))
 }
 
@@ -127,7 +138,7 @@ pub fn raster_scale(store: &Store) -> f64 {
 
 /// The UI measured the editor.
 pub fn set_viewport_metrics(store: &mut Store, metrics: ViewportMetrics) {
-    let scene = scene_size(store);
+    let scene = viewport_content_size(store);
     let zoom = store.editor_shell.editor_zoom_level;
     store.overlay_editor.viewport.set_metrics(metrics, scene, zoom);
 }
@@ -138,7 +149,7 @@ pub fn set_zoom(store: &mut Store, zoom: f64, cursor: Option<(f64, f64)>) {
     let from = store.editor_shell.editor_zoom_level;
     store.editor_shell.set_editor_zoom_level(zoom);
     let to = store.editor_shell.editor_zoom_level;
-    let scene = scene_size(store);
+    let scene = viewport_content_size(store);
     store.overlay_editor.viewport.rezoom(scene, from, to, cursor);
 }
 
@@ -154,7 +165,7 @@ pub struct WheelInput {
 /// The wheel through the keyboard matcher's `wheel` key: `mod`+wheel zooms at the cursor,
 /// Shift+wheel scrolls horizontally, and a plain wheel scrolls as the browser does.
 pub fn handle_wheel(store: &mut Store, input: &KeyInput, wheel: WheelInput) {
-    let scene = scene_size(store);
+    let scene = viewport_content_size(store);
     let zoom = store.editor_shell.editor_zoom_level;
     match match_keyboard_shortcut(input, Scope::Editor).map(|found| found.command.id.as_str()) {
         Some("editor.wheelZoom") => {

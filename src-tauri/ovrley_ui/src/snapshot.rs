@@ -118,6 +118,32 @@ fn tour() -> Vec<Step> {
             ovrley_app::features::render_video::close_render_dialog(store);
             snapshot_videos(store, &[]);
         }),
+        // Sync Doctor (Phase 8): the Autodetect tab over the pair, then the Manual Sync tab with
+        // landmarks, a course location and a search.
+        ("sync-autodetect", |store, _| {
+            use ovrley_app::store::slices::manual_video_sync as manual;
+            snapshot_videos(store, &[(1920, 1080, 30.0)]);
+            manual::select_video_sync_video(store, Some("clip-0".into())).expect("a snapshot clip");
+            store.layout.select_left_drawer_tool(LeftDrawerTool::VideoSync);
+        }),
+        ("sync-manual", |store, services| {
+            use ovrley_app::features::video_sync::{calculate, matching::MatchScope};
+            use ovrley_app::store::slices::manual_video_sync as manual;
+            use ovrley_core::media::manual_video_sync::LandmarkKind;
+            store.layout.open_manual_video_sync();
+            for (kind, second) in [(LandmarkKind::Stop, 5.0), (LandmarkKind::LeftTurn, 12.0), (LandmarkKind::Location, 20.0)] {
+                manual::add_landmark(store, kind, second).expect("a landmark inside the clip");
+            }
+            manual::set_detected_location(store, 100.0).expect("a course location");
+            store.editor.set_selected_second(40.0);
+            calculate(store, services, MatchScope::All, None).expect("an eligible search");
+        }),
+        ("sync-closed", |store, _| {
+            ovrley_app::store::slices::manual_video_sync::reset_video_sync_state(store);
+            store.layout.select_left_drawer_tool(LeftDrawerTool::Widgets);
+            store.layout.dismiss_left_drawer_overlay();
+            snapshot_videos(store, &[]);
+        }),
     ];
     let mut tour: Vec<Step> = steps.into_iter().map(|(name, action)| (name, StepKind::Action(action))).collect();
     tour.push(("widgets-tab", StepKind::WidgetsTab));

@@ -1,0 +1,167 @@
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SimpleTooltip } from "../../components/simple-tooltip.slint";
+import { Shadow, ShadowSize } from "../../components/shadow.slint";
+import { Landmarks } from "video-sync-drawer.slint";
+import { VideoSync, LandmarkKind } from "index.slint";
+
+// One mark button: `rounded-sm bg-surface shadow-md` around a ghost button (`min-h-7`, `px-2
+// py-1`, 0.75rem semibold uppercase) with a 70% border and text in its type's colour, hover at
+// 20%; the tooltip gives the reason when disabled (at most 16rem wide).
+component MarkButton inherits Rectangle {
+    in property <LandmarkKind> kind;
+    in property <string> label;
+    in property <bool> enabled;
+    in property <string> reason;
+
+    property <color> tone: Landmarks.color(root.kind);
+    min-height: 1.75rem;
+    Shadow {
+        size: ShadowSize.md;
+        radius: Theme.radius-sm * 1rem;
+    }
+    HorizontalLayout {
+        SimpleTooltip {
+            content: root.enabled ? root.label : root.reason;
+            content-width: 16rem;
+            wrap-text: true;
+            Button {
+                variant: ButtonVariant.ghost;
+                size: ButtonSize.sm;
+                radius: Theme.radius-sm * 1rem;
+                padding-x: 0.5rem;
+                font-size: 0.75rem;
+                uppercase: true;
+                icon: Landmarks.icon(root.kind);
+                icon-size: 0.875rem;
+                text: root.label;
+                background: Theme.surface;
+                hover-background: root.tone.transparentize(0.8);
+                border-width: 1px;
+                border-color: root.tone.transparentize(0.3);
+                text-color: root.tone;
+                hover-text-color: root.tone;
+                disabled: !root.enabled;
+                accessible-label: root.label;
+                clicked => {
+                    VideoSync.mark(root.kind);
+                }
+            }
+        }
+    }
+}
+
+// `VideoSyncMarkControls`: Mark Left Turn, Mark Stop, Mark Location, Mark Right Turn at the
+// bottom centre (`bottom-4`, `gap-1`, at most `100% - 2rem` wide), in one row, or two rows on a
+// portrait screen (left turn, right turn over stop, location).
+component MarkControls inherits VerticalLayout {
+    in property <bool> portrait;
+
+    property <string> left-label: @tr("videoSync.markLeftTurn" => "Mark Left Turn");
+    property <string> stop-label: @tr("videoSync.markStop" => "Mark Stop");
+    property <string> location-label: @tr("videoSync.markLocation" => "Mark Location");
+    property <string> right-label: @tr("videoSync.markRightTurn" => "Mark Right Turn");
+    accessible-role: groupbox;
+    accessible-label: @tr("videoSync.markControls" => "Video sync landmark controls");
+
+    if !root.portrait: HorizontalLayout {
+        spacing: 0.25rem;
+        MarkButton {
+            kind: LandmarkKind.left-turn;
+            label: root.left-label;
+            enabled: VideoSync.can-mark;
+            reason: VideoSync.mark-reason;
+        }
+        MarkButton {
+            kind: LandmarkKind.stop;
+            label: root.stop-label;
+            enabled: VideoSync.can-mark;
+            reason: VideoSync.mark-reason;
+        }
+        MarkButton {
+            kind: LandmarkKind.location;
+            label: root.location-label;
+            enabled: VideoSync.can-mark-location;
+            reason: VideoSync.location-reason;
+        }
+        MarkButton {
+            kind: LandmarkKind.right-turn;
+            label: root.right-label;
+            enabled: VideoSync.can-mark;
+            reason: VideoSync.mark-reason;
+        }
+    }
+    if root.portrait: GridLayout {
+        spacing: 0.25rem;
+        Row {
+            MarkButton {
+                kind: LandmarkKind.left-turn;
+                label: root.left-label;
+                enabled: VideoSync.can-mark;
+                reason: VideoSync.mark-reason;
+            }
+            MarkButton {
+                kind: LandmarkKind.right-turn;
+                label: root.right-label;
+                enabled: VideoSync.can-mark;
+                reason: VideoSync.mark-reason;
+            }
+        }
+        Row {
+            MarkButton {
+                kind: LandmarkKind.stop;
+                label: root.stop-label;
+                enabled: VideoSync.can-mark;
+                reason: VideoSync.mark-reason;
+            }
+            MarkButton {
+                kind: LandmarkKind.location;
+                label: root.location-label;
+                enabled: VideoSync.can-mark-location;
+                reason: VideoSync.location-reason;
+            }
+        }
+    }
+}
+
+// A screen: `rounded-sm`, a 50% border, the shadow `0 5px 20px 3px` black at 20%.
+component Screen inherits Rectangle {
+    in property <color> fill;
+    border-radius: Theme.radius-sm * 1rem;
+    border-width: 1px;
+    border-color: Theme.border.transparentize(0.5);
+    background: root.fill;
+    drop-shadow-offset-y: 5px;
+    drop-shadow-blur: 20px;
+    drop-shadow-color: #00000033;
+    clip: true;
+    @children
+}
+
+// `VideoSyncPreviewScreens`: the video screen (black until Phase 6B, with the mark controls) and
+// the map screen, side by side with the gap between them.
+export component VideoSyncScreens inherits Rectangle {
+    video-screen := Screen {
+        x: 0px;
+        y: 0px;
+        width: VideoSync.screen-width;
+        height: VideoSync.screen-height;
+        fill: #000000;
+        MarkControls {
+            portrait: parent.width < parent.height;
+            width: min(self.preferred-width, parent.width - 2rem);
+            height: self.preferred-height;
+            x: (parent.width - self.width) / 2;
+            y: parent.height - 1rem - self.height;
+        }
+    }
+    map-screen := Screen {
+        x: VideoSync.screen-width + VideoSync.screen-gap;
+        y: 0px;
+        width: VideoSync.screen-width;
+        height: VideoSync.screen-height;
+        fill: Theme.surface-elevated;
+    }
+}

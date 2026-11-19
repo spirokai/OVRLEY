@@ -480,6 +480,10 @@ impl PreviewHost {
 
 /// Reconcile step: marks the host dirty when an input of the frame changed (D9).
 pub fn reconcile_widget_preview(store: &mut Store) {
+    // Sync Doctor hides the canvas, so its preview pauses (Phase 8 D4). React unmounts it.
+    if crate::features::player::video_sync_mode(store) {
+        return;
+    }
     let activity = preview_activity(store);
     let inputs = FrameInputs {
         config: Some(Rc::as_ptr(&store.editor.config)),
@@ -624,6 +628,9 @@ fn load_split_tables(store: &mut Store, services: &mut Services, widgets: &[Prev
 /// become the canvas error.
 pub fn preview_frame(store: &mut Store, services: &mut Services) {
     store.preview.dirty = false;
+    if crate::features::player::video_sync_mode(store) {
+        return;
+    }
     let theme = store
         .theme
         .clone()
