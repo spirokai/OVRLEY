@@ -884,7 +884,7 @@ pub fn derive_activity_metric_series(
         let derived_lean = derive_lean_angle_series(speed, heading, elapsed_series);
         map.insert(
             "lean_angle".to_string(),
-            select_series(&direct["lean_angle"], &derived_lean),
+            combine_series(&direct["lean_angle"], &derived_lean, false),
         );
     }
     map.insert("heading".to_string(), heading);
