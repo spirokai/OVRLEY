@@ -306,6 +306,7 @@ mod tests {
         let (parts, fakes) = fake_services(json!({}));
         let mut store = Store::default();
         store.agent_session.allow_agent_edits = true;
+        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() });
         let activity = ovrley_core::activity::schema::ParsedActivity {
             sample_elapsed_seconds: (0..=100).map(f64::from).collect(),
             speed: vec![Some(3.0); 101],
