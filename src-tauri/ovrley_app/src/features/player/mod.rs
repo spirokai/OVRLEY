@@ -107,6 +107,8 @@ pub struct PlayerState {
     pub timeline: timeline::TimelineCache,
     /// `usePlaybackEngine`'s refs (D6).
     pub playback: playback::PlaybackEngine,
+    /// Phase 6B spike: a decoder is attached that can be the video clock.
+    pub video_clock_available: bool,
     /// `useTimelineViewport`'s measurements and rule inputs (D7).
     pub viewport: viewport::ViewportState,
     /// A scrub, playhead drag or pan (`useTimelineGestures`, D9).

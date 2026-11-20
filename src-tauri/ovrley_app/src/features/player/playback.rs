@@ -120,8 +120,8 @@ pub fn player_timing(store: &Store) -> PlayerTiming {
         timeline_minimum,
         has_activity: has_activity_data && total_duration > 0.0,
         clamped_playhead: clamp(store.editor.selected_second, timeline_minimum, total_duration),
-        // The video background mode arrives with Phase 6.
-        should_use_video_playback: false,
+        // Phase 6B spike: the video clock plays inside clips once a decoder is attached.
+        should_use_video_playback: store.player.video_clock_available && store.video_import.has_videos(),
         effective_fps: container_fps(store.render_settings.fps, f64::from(store.render_settings.widget_update_rate)),
     }
 }
@@ -234,6 +234,30 @@ pub fn playback_tick(store: &mut Store, now: Instant) -> bool {
         store.editor.set_selected_second(clamp(frame_second, timing.timeline_minimum, timing.total_duration));
     }
     true
+}
+
+/// Phase 6B spike: the video clock presented `piece_id`'s frame at `source_second`. Inside the
+/// piece the playhead follows it; once the piece's last frame is presented, playback continues
+/// where `play` would start at the piece's end: the next piece's video, or the timeline clock.
+/// `ended` is the decoder's end of file, which can come without the last frame (React's `ended`).
+pub fn video_clock_frame(store: &mut Store, piece_id: &str, source_second: f64, ended: bool, now: Instant) {
+    if store.editor.preview_playback_state != PreviewPlaybackState::Playing || store.editor.preview_playback_source != PlaybackSource::Video {
+        return;
+    }
+    let timeline = std::rc::Rc::clone(&store.player.timeline.timeline().committed);
+    let Some(piece) = timeline.program.pieces.iter().find(|piece| piece.id == piece_id) else { return };
+    let last_frame_second = piece.fps.frames_to_seconds(piece.source_end_frame - 1);
+    if !ended && source_second + 1e-6 < last_frame_second {
+        let second = piece.timeline_start_second + (source_second - piece.source_start_second).max(0.0);
+        store.editor.set_selected_second(second.min(piece.timeline_end_second));
+        return;
+    }
+    let timing = player_timing(store);
+    if piece.timeline_end_second >= timing.total_duration {
+        pause_at_second(store, timing.total_duration);
+        return;
+    }
+    start_playback(store, timing, piece.timeline_end_second, now);
 }
 
 /// When the timeline clock reaches its next preview frame, while it plays; the timer skips the

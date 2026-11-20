@@ -196,6 +196,7 @@ component OverlayCanvas inherits Rectangle {
     in property <BackgroundMode> background-mode;
     in property <color> background-color;
     in property <image> background-image;
+    in property <image> video-frame;
     in property <bool> grid-visible;
     in property <string> grid-commands;
     in property <string> checkerboard-commands;
@@ -222,6 +223,13 @@ component OverlayCanvas inherits Rectangle {
             height: parent.height;
             source: root.background-image;
             image-fit: cover;
+        }
+        // Video playback: the decoder letterboxes inside the texture, so it fills the scene.
+        if root.background-mode == BackgroundMode.video: Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.video-frame;
+            image-fit: fill;
         }
     }
     if root.grid-visible: Path {
@@ -346,6 +354,7 @@ export component OverlayEditorView inherits Rectangle {
                 background-mode: OverlayEditor.background-mode;
                 background-color: OverlayEditor.background-color;
                 background-image: OverlayEditor.background-image;
+                video-frame: OverlayEditor.video-frame;
                 grid-visible: OverlayEditor.grid-visible;
                 grid-commands: OverlayEditor.grid-commands;
                 checkerboard-commands: OverlayEditor.checkerboard-commands;

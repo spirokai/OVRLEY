@@ -1,0 +1,7 @@
+//! Video playback (Phase 6B spike, branch spike/mdk-macos, never merged): decoders that render
+//! into a texture of the shared wgpu device. macOS only for now, with MDK as the one engine.
+
+// The `cpp!` block in `player` expands deeply.
+#![recursion_limit = "1024"]
+
+pub mod player;

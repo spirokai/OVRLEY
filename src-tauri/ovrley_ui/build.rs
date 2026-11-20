@@ -8,6 +8,13 @@
 mod translations;
 
 fn main() {
+    // Video playback: mdk.framework is found through an rpath to the SDK, which only the final
+    // binary can carry.
+    if std::env::var_os("CARGO_FEATURE_VIDEO_PLAYBACK").is_some() {
+        println!("cargo:rerun-if-env-changed=MDK_SDK");
+        let sdk = std::env::var("MDK_SDK").expect("the video-playback feature needs MDK_SDK");
+        println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{sdk}/lib");
+    }
     let dev = std::env::var_os("CARGO_FEATURE_DEV_WINDOWS").is_some();
     let root = if dev { "ui/dev-index.slint" } else { "ui/index.slint" };
 
