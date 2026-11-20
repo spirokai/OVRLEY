@@ -61,7 +61,7 @@ export function parseVideoFilenameCreationTime(path) {
 
 /**
  * Formats a video creation timestamp according to its authoritative source.
- * GPS timestamps and explicitly UTC metadata timestamps are converted into the
+ * GPS/timecode timestamps and explicitly UTC metadata timestamps are converted into the
  * recording timezone. Local metadata timestamps retain their clock values.
  *
  * @param {string|null} timestamp - Canonical RFC 3339 timestamp.
@@ -74,7 +74,7 @@ export function parseVideoFilenameCreationTime(path) {
 export function formatVideoCreationTime(timestamp, source, timezone, timezoneMode = null, locale) {
   if (!timestamp) return 'Unknown'
 
-  if ((source === 'gps' || ((source === 'ffprobe' || source === 'filename') && timezoneMode === 'utc')) && timezone) {
+  if ((source === 'gps' || source === 'timecode' || ((source === 'ffprobe' || source === 'filename') && timezoneMode === 'utc')) && timezone) {
     return formatZonedDateTime(timestamp, timezone, locale)
   }
 

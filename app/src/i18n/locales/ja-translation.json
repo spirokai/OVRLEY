@@ -430,6 +430,7 @@
     "timeSourceGps": "GPSタイムスタンプ",
     "timeSourceMetadata": "メタデータ",
     "timeSourceFilename": "ファイル名",
+    "timeSourceTimecode": "タイムコード",
     "unknown": "不明",
     "unknownTimeSource": "不明な時刻ソース ({{value}})",
     "unpinDrawer": "ドロワーの固定を解除",

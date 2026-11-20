@@ -430,6 +430,7 @@
     "timeSourceGps": "GPS timestamp",
     "timeSourceMetadata": "Metadata",
     "timeSourceFilename": "Filename",
+    "timeSourceTimecode": "Timecode",
     "unknown": "Unknown",
     "unknownTimeSource": "Unknown ({{value}})",
     "unpinDrawer": "Unpin drawer",

@@ -430,6 +430,7 @@
     "timeSourceGps": "GPS-Zeitstempel",
     "timeSourceMetadata": "Metadaten",
     "timeSourceFilename": "Dateiname",
+    "timeSourceTimecode": "Timecode",
     "unknown": "Unbekannt",
     "unknownTimeSource": "Unbekannte Zeitquelle ({{value}})",
     "unpinDrawer": "Panel loslösen",

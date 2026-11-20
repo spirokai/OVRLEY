@@ -93,7 +93,7 @@ export const createVideoImportSlice = (set, get) => ({
   importedVideoFpsDen: null, // exact ffprobe FPS denominator
   importedVideoResolution: null, // display-oriented { width, height }
   importedVideoCreationTime: null, // ISO-8601 string or null
-  importedVideoTimeSource: null, // "gps" | "ffprobe" | "file_mtime" | "filename" | null
+  importedVideoTimeSource: null, // "gps" | "timecode" | "ffprobe" | "file_mtime" | "filename" | null
   detectedVideoCreationTime: null, // original creation time from imported metadata
   detectedVideoTimeSource: null, // original creation-time source from imported metadata
   importedVideoImportId: null, // opaque local preview server import ID

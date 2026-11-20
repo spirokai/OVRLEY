@@ -430,6 +430,7 @@
     "timeSourceGps": "GPS 时间戳",
     "timeSourceMetadata": "元数据",
     "timeSourceFilename": "文件名",
+    "timeSourceTimecode": "时间码",
     "unknown": "未知",
     "unknownTimeSource": "未知时间来源 ({{value}})",
     "unpinDrawer": "取消固定面板",

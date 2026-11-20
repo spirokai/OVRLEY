@@ -22,7 +22,7 @@
 
 use serde_json::json;
 
-use ovrley_core::media::video_probe::read_video_stream_duration;
+use ovrley_core::media::video_probe::{metadata_from_ffprobe_json, read_video_stream_duration, timecode_sync_time};
 use ovrley_core::media::{Resolution, SourceVideoMetadata};
 
 mod common;
@@ -147,4 +147,31 @@ fn ffprobe_fixture_parses_video_stream_r_frame_rate() {
     assert_eq!(parts.len(), 2);
     let fps = parts[0] / parts[1];
     assert!(fps > 0.0 && fps <= 120.0);
+}
+
+#[test]
+fn gopro_timecode_refines_creation_time_to_absolute_first_frame() {
+    let probe = json!({ "streams": [{
+        "codec_type": "video",
+        "avg_frame_rate": "60000/1001",
+        "tags": { "creation_time": "2026-11-14T13:40:54.000000Z", "timecode": "14:40:02:03" }
+    }]});
+
+    let metadata = metadata_from_ffprobe_json("GL014259.mp4", &probe);
+
+    assert_eq!(metadata.sync_time.as_deref(), Some("2026-11-14T13:40:02.050Z"));
+    assert_eq!(metadata.time_source.as_deref(), Some("timecode"));
+}
+
+#[test]
+fn timecode_rule_accepts_real_offsets_and_rejects_counters() {
+    let sync = |tc, ct| timecode_sync_time(tc, Some((30, 1)), ct).map(|s| (s.sync_time, s.utc_offset_minutes));
+    assert_eq!(sync("08:40:02:00", "2026-11-14T13:40:30Z"), Some(("2026-11-14T13:40:02.000Z".into(), -300)));
+    assert_eq!(sync("00:20:00:00", "2026-11-14T23:20:40Z"), Some(("2026-11-14T23:20:00.000Z".into(), 60)));
+    assert_eq!(sync("14:52:00:00", "2026-11-14T13:40:00Z"), None);
+    assert_eq!(sync("01:00:00:02", "2026-11-14T00:00:30Z"), None);
+
+    let record_run: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(common::test_config::ffprobe_1080p_path()).unwrap()).unwrap();
+    assert_eq!(metadata_from_ffprobe_json("test-1080p.mp4", &record_run).time_source.as_deref(), Some("ffprobe"));
 }
