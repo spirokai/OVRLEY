@@ -20,6 +20,25 @@ pub(crate) fn register(app: &App) {
 fn install(app: &App, appimage: &Path, appdir: &Path) -> Result<(), String> {
     let data_dir = app.path().data_dir().map_err(|error| error.to_string())?;
     let entry_name = format!("{}.desktop", app.config().identifier);
+    let bundled_entry = appdir.join("usr/share/applications").join(&entry_name);
+    let entry = launch_from(
+        &std::fs::read_to_string(&bundled_entry)
+            .map_err(|error| format!("{}: {error}", bundled_entry.display()))?,
+        appimage,
+    );
+    let target = data_dir.join("applications").join(&entry_name);
+
+    // An AppImage manager such as Shelly names its entry after the bundled one. When that entry
+    // already launches this file, the manager owns it and its icons, so neither is touched.
+    let path = appimage.to_string_lossy();
+    if std::fs::read_to_string(&target).is_ok_and(|current| {
+        current != entry
+            && current
+                .lines()
+                .any(|line| line.starts_with("Exec=") && line.contains(&*path))
+    }) {
+        return Ok(());
+    }
 
     // Icons go first so the entry never appears without one.
     let icon_sizes = appdir.join("usr/share/icons/hicolor");
@@ -38,13 +57,7 @@ fn install(app: &App, appimage: &Path, appdir: &Path) -> Result<(), String> {
         }
     }
 
-    let bundled_entry = appdir.join("usr/share/applications").join(&entry_name);
-    let entry = std::fs::read_to_string(&bundled_entry)
-        .map_err(|error| format!("{}: {error}", bundled_entry.display()))?;
-    write_if_changed(
-        &data_dir.join("applications").join(&entry_name),
-        launch_from(&entry, appimage).as_bytes(),
-    )
+    write_if_changed(&target, entry.as_bytes())
 }
 
 /// Points the bundled entry, whose `Exec` names the binary inside the image, at the AppImage file.

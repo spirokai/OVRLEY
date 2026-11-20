@@ -4,8 +4,12 @@ use crate::{
     error::WidgetResult,
     model::{scene::ValidatedScenePresentation, standard_widgets::widget_font_weight},
     render::text::{
-        draw_text, measure_text, parse_color, rgba_color, text_selection_bounds, FontResolver,
-        ResolvedTextStyle,
+        draw_text_with_vertical_metrics_text, measure_text, parse_color, rgba_color,
+        text_selection_bounds, FontResolver, ResolvedTextStyle,
+    },
+    widgets::value::layout::{
+        metric_vertical_metrics_text, METRIC_WIDGET_LINE_HEIGHT, METRIC_WIDGET_UNIT_RATIO,
+        MIN_UNITS_FONT_SIZE,
     },
 };
 use skia_safe::{paint::Style, Canvas, Paint, PaintCap, Path, PathBuilder, Point, Rect};
@@ -53,9 +57,22 @@ pub struct GradientFrame {
 
 impl GradientFrame {
     pub fn draw(&self, canvas: &Canvas, fonts: &dyn FontResolver) -> WidgetResult<()> {
-        draw_text(canvas, &self.value.0, &self.value.1, fonts)?;
+        let (text, style) = &self.value;
+        draw_text_with_vertical_metrics_text(
+            canvas,
+            text,
+            metric_vertical_metrics_text(text),
+            style,
+            fonts,
+        )?;
         if let Some(style) = &self.unit {
-            draw_text(canvas, "%", style, fonts)?;
+            draw_text_with_vertical_metrics_text(
+                canvas,
+                "%",
+                metric_vertical_metrics_text("%"),
+                style,
+                fonts,
+            )?;
         }
         if let Some((path, paint)) = &self.triangle {
             canvas.draw_path(path, paint);
@@ -73,28 +90,47 @@ pub fn prepare_gradient_frame(
     fonts: &dyn FontResolver,
 ) -> WidgetResult<GradientFrame> {
     let formatted = format_validated_gradient(widget, raw);
-    let value_measure = measure_text(&formatted, base_style, fonts)?;
-    let line_height = base_style.font_size * 0.92;
+    let (value_text, has_unit) = match formatted.strip_suffix('%') {
+        Some(prefix) => (prefix.to_owned(), true),
+        None => (formatted, false),
+    };
+    let line_height = base_style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+    let mut value_style = base_style.clone();
+    value_style.line_height = line_height;
+    let value_width = measure_text(&value_text, &value_style, fonts)?.width;
+    // The unit is sized like metric widget units, but sits flush against the digits.
+    let mut unit = has_unit.then(|| {
+        let mut style = base_style.clone();
+        style.font_size =
+            (base_style.font_size * METRIC_WIDGET_UNIT_RATIO).max(MIN_UNITS_FONT_SIZE * scale);
+        style.line_height = style.font_size * METRIC_WIDGET_LINE_HEIGHT;
+        style.color = rgba_color(widget.unit_color, scene_opacity);
+        style
+    });
+    let unit_width = match &unit {
+        Some(style) => measure_text("%", style, fonts)?.width,
+        None => 0.0,
+    };
+    let text_width = value_width + unit_width;
     let triangle_width = widget.triangle_width * scale;
     let show_triangle = widget.show_triangle && triangle_width > 0.0;
-    let content_width = value_measure
-        .width
-        .max(if show_triangle { triangle_width } else { 0.0 });
+    let content_width = text_width.max(if show_triangle { triangle_width } else { 0.0 });
     // Indicator width changes its shape around this fixed baseline.
     let zero_baseline = base_style.y + line_height + TRIANGLE_GAP * scale;
-    let mut value_style = base_style.clone();
-    value_style.x = base_style.x + (content_width - value_measure.width) * 0.5;
+    value_style.x = base_style.x + (content_width - text_width) * 0.5;
     // value_offset retains its existing scene-pixel meaning in native export.
     value_style.y = base_style.y - widget.value_offset;
-    value_style.line_height = line_height;
-    let (value_text, unit) = if let Some(prefix) = formatted.strip_suffix('%') {
-        let mut unit_style = value_style.clone();
-        unit_style.x += measure_text(prefix, &value_style, fonts)?.width;
-        unit_style.color = rgba_color(widget.unit_color, scene_opacity);
-        (prefix.to_owned(), Some(unit_style))
-    } else {
-        (formatted, None)
-    };
+    if let Some(style) = &mut unit {
+        // Align the unit's reference ink bottom with the value's, as metric widgets do.
+        let value_reference =
+            measure_text(metric_vertical_metrics_text(&value_text), &value_style, fonts)?;
+        let bottom = value_style.y
+            + (line_height + value_reference.bounds_bottom - value_reference.bounds_top) * 0.5;
+        let unit_reference = measure_text(metric_vertical_metrics_text("%"), style, fonts)?;
+        style.x = value_style.x + value_width;
+        style.y = bottom
+            - (style.line_height + unit_reference.bounds_bottom - unit_reference.bounds_top) * 0.5;
+    }
     let (mut bounds, mut content_bounds) = text_bounds(&value_text, &value_style, fonts)?;
     if let Some(style) = &unit {
         let (unit_bounds, unit_content) = text_bounds("%", style, fonts)?;
@@ -187,9 +223,11 @@ fn text_bounds(
     style: &ResolvedTextStyle,
     fonts: &dyn FontResolver,
 ) -> WidgetResult<(Rect, Rect)> {
+    // Baseline comes from the same stable reference the draw uses, so digits don't jump.
     let ink = measure_text(text, style, fonts)?;
-    let baseline =
-        style.y + (style.line_height - (ink.bounds_bottom - ink.bounds_top)) * 0.5 - ink.bounds_top;
+    let reference = measure_text(metric_vertical_metrics_text(text), style, fonts)?;
+    let baseline = style.y + (style.line_height - (reference.bounds_bottom - reference.bounds_top)) * 0.5
+        - reference.bounds_top;
     Ok((
         Rect::new(
             style.x + ink.bounds_left,

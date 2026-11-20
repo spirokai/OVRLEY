@@ -84,8 +84,6 @@ pub(super) struct ChannelLayout {
     pub(super) g_force: Option<usize>,
     /// Source index of lateral or X-axis g-force.
     pub(super) g_force_x: Option<usize>,
-    /// Source index of explicitly lateral acceleration for lean-angle derivation.
-    pub(super) lateral_acceleration: Option<usize>,
     /// Source index of longitudinal or Y-axis g-force.
     pub(super) g_force_y: Option<usize>,
     /// Source index of vertical or Z-axis g-force.
@@ -147,8 +145,6 @@ enum Metric {
     GForce,
     /// Lateral or X-axis acceleration.
     GForceX,
-    /// Explicitly lateral acceleration, excluding literal source X axes.
-    LateralAcceleration,
     /// Longitudinal or Y-axis acceleration.
     GForceY,
     /// Vertical or Z-axis acceleration.
@@ -190,13 +186,6 @@ impl Metric {
                 "lat_accel",
                 "x_acc",
             ],
-            Self::LateralAcceleration => &[
-                "lateral_acc",
-                "lat_acc",
-                "latacc",
-                "lateral_accel",
-                "lat_accel",
-            ],
             Self::GForceY => &[
                 "longitudinal_acc",
                 "long_acc",
@@ -226,7 +215,6 @@ impl Metric {
         match self {
             Self::GForce
             | Self::GForceX
-            | Self::LateralAcceleration
             | Self::GForceY
             | Self::GForceZ => {
                 if has("canbus") {
@@ -276,8 +264,7 @@ impl Metric {
             self,
             Self::GForce
                 | Self::GForceX
-                | Self::LateralAcceleration
-                | Self::GForceY
+                    | Self::GForceY
                 | Self::GForceZ
                 | Self::Rpm
                 | Self::ThrottlePosition
@@ -338,7 +325,6 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
     let distance = resolve_metric(&channels, Metric::Distance);
     let g_force = resolve_metric(&channels, Metric::GForce);
     let g_force_x = resolve_metric(&channels, Metric::GForceX);
-    let lateral_acceleration = resolve_metric(&channels, Metric::LateralAcceleration);
     let g_force_y = resolve_metric(&channels, Metric::GForceY);
     let g_force_z = resolve_metric(&channels, Metric::GForceZ);
     let rpm = resolve_metric(&channels, Metric::Rpm);
@@ -389,7 +375,6 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
         distance,
         g_force,
         g_force_x,
-        lateral_acceleration,
         g_force_y,
         g_force_z,
         rpm,
@@ -421,7 +406,6 @@ pub(super) fn resolve(header: &[String], identifiers: &[String]) -> CoreResult<C
         distance,
         g_force,
         g_force_x,
-        lateral_acceleration,
         g_force_y,
         g_force_z,
         rpm,
