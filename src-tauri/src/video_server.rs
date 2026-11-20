@@ -34,7 +34,8 @@ use std::time::Duration;
 use tiny_http::{Header, Method, Request, Response, Server, StatusCode};
 use uuid::Uuid;
 
-use crate::map_tile_service::{parse_style_path, parse_tile_path, MapTileService, TilePayload};
+use crate::map_styles::MapData;
+use crate::map_tile_service::{parse_tile_path, TileCacheStatus};
 
 const CHUNK_SIZE: usize = 512 * 1024;
 const WORKER_COUNT: usize = 4;
@@ -131,14 +132,11 @@ impl VideoServerHandle {
         self.start_server(None)
     }
 
-    pub(crate) fn start_with_map_tile_service(
-        &self,
-        map_tile_service: MapTileService,
-    ) -> Result<(), String> {
-        self.start_server(Some(Arc::new(map_tile_service)))
+    pub(crate) fn start_with_map_data(&self, map_data: MapData) -> Result<(), String> {
+        self.start_server(Some(Arc::new(map_data)))
     }
 
-    fn start_server(&self, map_tile_service: Option<Arc<MapTileService>>) -> Result<(), String> {
+    fn start_server(&self, map_data: Option<Arc<MapData>>) -> Result<(), String> {
         {
             let guard = self.inner.lock().map_err(|error| error.to_string())?;
             if guard.started {
@@ -163,11 +161,11 @@ impl VideoServerHandle {
         for _ in 0..WORKER_COUNT {
             let server = Arc::clone(&server);
             let inner = Arc::clone(&self.inner);
-            let map_tile_service = map_tile_service.clone();
+            let map_data = map_data.clone();
             thread::spawn(move || loop {
                 match server.recv_timeout(Duration::from_millis(200)) {
                     Ok(Some(request)) => {
-                        handle_request(&inner, map_tile_service.as_deref(), request)
+                        handle_request(&inner, map_data.as_deref(), request)
                     }
                     Ok(None) => {}
                     Err(error) => {
@@ -252,7 +250,7 @@ impl VideoServerHandle {
         })
     }
 
-    /// Builds the MapLibre URL template for cached OpenFreeMap styles.
+    /// Builds the MapLibre URL template for the installed map styles.
     pub fn map_style_url_template(&self) -> Result<String, String> {
         let port = self
             .inner
@@ -294,22 +292,23 @@ impl VideoServerHandle {
 /// failed client request should not terminate the preview server thread.
 fn handle_request(
     inner: &Arc<Mutex<VideoServerInner>>,
-    map_tile_service: Option<&MapTileService>,
+    map_data: Option<&MapData>,
     request: Request,
 ) {
-    if let Err(error) = respond_to_request(inner, map_tile_service, request) {
+    if let Err(error) = respond_to_request(inner, map_data, request) {
         log::warn!("Video preview request failed: {error}");
     }
 }
 
 /// Routes and validates an incoming HTTP request.
 ///
-/// Supports `/health`, `/styles/<style>`, `/tiles/<z>/<x>/<y>.pbf`, and `/video/<import_id>`.
+/// Supports `/health`, `/styles/<style>`, `/tiles/<z>/<x>/<y>.pbf`, `/fonts/<file>`, and
+/// `/video/<import_id>`.
 /// Video requests must match the current import ID and source file; stale IDs,
 /// missing files, and absent registrations all return `404`.
 fn respond_to_request(
     inner: &Arc<Mutex<VideoServerInner>>,
-    map_tile_service: Option<&MapTileService>,
+    map_data: Option<&MapData>,
     request: Request,
 ) -> Result<(), String> {
     let method = request.method().clone();
@@ -319,14 +318,11 @@ fn respond_to_request(
         return respond_text(request, StatusCode(200), "ok");
     }
 
-    if url.starts_with("/styles/") {
+    if let Some(style) = url.strip_prefix("/styles/") {
         if method != Method::Get {
             return respond_empty(request, StatusCode(405), common_headers(None, None));
         }
-        let Some(style) = parse_style_path(&url) else {
-            return respond_empty(request, StatusCode(400), common_headers(None, None));
-        };
-        let Some(map_tile_service) = map_tile_service else {
+        let Some(map_data) = map_data else {
             return respond_empty(request, StatusCode(404), common_headers(None, None));
         };
         let tile_url_template = {
@@ -337,12 +333,19 @@ fn respond_to_request(
                 .ok_or_else(|| "Video preview server is not running".to_string())?;
             format!("http://127.0.0.1:{port}/tiles/{{z}}/{{x}}/{{y}}.pbf")
         };
-        return match map_tile_service.resolve_style(style, &tile_url_template) {
-            Ok(payload) => respond_map_resource(request, payload, "application/json"),
-            Err(error) => {
-                log::warn!("Map style request failed: {error}");
-                respond_empty(request, StatusCode(502), common_headers(None, None))
-            }
+        return match map_data.registry().served(style, &tile_url_template) {
+            Some(bytes) => respond_map_resource(request, bytes, "application/json", None),
+            None => respond_empty(request, StatusCode(404), common_headers(None, None)),
+        };
+    }
+
+    if let Some(name) = url.strip_prefix("/fonts/") {
+        if method != Method::Get {
+            return respond_empty(request, StatusCode(405), common_headers(None, None));
+        }
+        return match map_data.and_then(|map_data| map_data.font_file(name)) {
+            Some(bytes) => respond_map_resource(request, bytes, "application/octet-stream", None),
+            None => respond_empty(request, StatusCode(404), common_headers(None, None)),
         };
     }
 
@@ -353,13 +356,16 @@ fn respond_to_request(
         let Some(coordinates) = parse_tile_path(&url) else {
             return respond_empty(request, StatusCode(400), common_headers(None, None));
         };
-        let Some(map_tile_service) = map_tile_service else {
+        let Some(map_data) = map_data else {
             return respond_empty(request, StatusCode(404), common_headers(None, None));
         };
-        return match map_tile_service.resolve(coordinates) {
-            Ok(payload) => {
-                respond_map_resource(request, payload, "application/vnd.mapbox-vector-tile")
-            }
+        return match map_data.tiles().resolve(coordinates) {
+            Ok(payload) => respond_map_resource(
+                request,
+                payload.bytes,
+                "application/vnd.mapbox-vector-tile",
+                Some(payload.cache_status),
+            ),
             Err(error) => {
                 log::warn!("Tile request failed: {error}");
                 respond_empty(request, StatusCode(502), common_headers(None, None))
@@ -405,25 +411,27 @@ fn respond_to_request(
     }
 }
 
+/// A style, tile or font for the preview. Tiles say how the cache served them; styles and fonts are
+/// installed, so they have no cache.
 fn respond_map_resource(
     request: Request,
-    payload: TilePayload,
+    bytes: Vec<u8>,
     content_type: &str,
+    cache_status: Option<TileCacheStatus>,
 ) -> Result<(), String> {
-    let content_length = payload.bytes.len();
+    let content_length = bytes.len();
     let mut headers = common_headers(Some(content_type.to_string()), None);
     headers.push(header("Access-Control-Allow-Origin", "*")?);
     headers.push(header("Content-Length", content_length.to_string())?);
-    headers.push(header(
-        "X-OVRLEY-Cache",
-        payload.cache_status.as_header_value(),
-    )?);
+    if let Some(cache_status) = cache_status {
+        headers.push(header("X-OVRLEY-Cache", cache_status.as_header_value())?);
+    }
     request
         .respond(
             Response::new(
                 StatusCode(200),
                 headers,
-                std::io::Cursor::new(payload.bytes),
+                std::io::Cursor::new(bytes),
                 Some(content_length),
                 None,
             )

@@ -5,7 +5,10 @@
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { getFontSelectOptions } from '@/lib/fonts'
+import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+
+const NO_FONTS = []
 
 /**
  * Renders the font select field component.
@@ -25,13 +28,42 @@ export default function FontSelectField({
   value,
   onValueChange,
   disabled = false,
-  recommendedFonts = [],
-  systemFonts = [],
+  recommendedFonts = NO_FONTS,
+  systemFonts = NO_FONTS,
   triggerClassName = 'h-8 text-xs',
   labelClassName = 'text-[0.741rem] text-muted-foreground uppercase font-bold',
 }) {
   const { t } = useTranslation()
-  const { recommendedOptions, filteredSystemFonts } = getFontSelectOptions(value, recommendedFonts, systemFonts)
+  // Radix builds every item even while closed, and a system can list hundreds of families.
+  // Reusing the same element lets React skip the list when an unrelated parent update re-renders this field.
+  const content = useMemo(() => {
+    const { recommendedOptions, filteredSystemFonts } = getFontSelectOptions(value, recommendedFonts, systemFonts)
+    return (
+      <SelectContent>
+        <SelectGroup>
+          <SelectLabel>{t('components.recommended', 'Recommended')}</SelectLabel>
+          {recommendedOptions.map((font) => (
+            <SelectItem key={font.id} value={font.id}>
+              {font.name}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+        {filteredSystemFonts.length ? (
+          <>
+            <SelectSeparator />
+            <SelectGroup>
+              <SelectLabel>{t('components.system', 'System')}</SelectLabel>
+              {filteredSystemFonts.map((font) => (
+                <SelectItem key={font.id} value={font.id}>
+                  {font.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          </>
+        ) : null}
+      </SelectContent>
+    )
+  }, [value, recommendedFonts, systemFonts, t])
 
   return (
     <div className="space-y-1">
@@ -42,29 +74,7 @@ export default function FontSelectField({
         <SelectTrigger className={triggerClassName} disabled={disabled}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectLabel>{t('components.recommended', 'Recommended')}</SelectLabel>
-            {recommendedOptions.map((font) => (
-              <SelectItem key={font.id} value={font.id}>
-                {font.name}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-          {filteredSystemFonts.length ? (
-            <>
-              <SelectSeparator />
-              <SelectGroup>
-                <SelectLabel>{t('components.system', 'System')}</SelectLabel>
-                {filteredSystemFonts.map((font) => (
-                  <SelectItem key={font.id} value={font.id}>
-                    {font.name}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </>
-          ) : null}
-        </SelectContent>
+        {content}
       </Select>
     </div>
   )

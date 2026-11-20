@@ -90,7 +90,6 @@ export default function AppHeader({
         />
 
         <ActionButtons
-          onOpenKeyboardShortcuts={editorShell.openKeyboardShortcuts}
           onOpenRenderDialog={renderWorkflow.openRenderDialog}
           onRenderPreviewFrame={editorShell.debugModeEnabled ? renderWorkflow.handleRenderPreviewFrame : undefined}
           renderDisabled={renderWorkflow.renderDisabled}

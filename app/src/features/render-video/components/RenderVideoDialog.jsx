@@ -8,7 +8,7 @@ import { AlertTriangle, Loader2, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import BatchRenderQueue from './BatchRenderQueue'
-import RenderExportSettings, { RenderTargetTabs } from './RenderExportSettings'
+import RenderExportSettings from './RenderExportSettings'
 import RenderProgressPanel from './RenderProgressPanel'
 import useRenderVideoDialogState from '../hooks/useRenderVideoDialogState'
 import { useTranslation } from 'react-i18next'
@@ -36,8 +36,6 @@ export default function RenderVideoDialog(props) {
     throw new Error('Render settings are required while the render dialog is open')
   }
 
-  const hasBlockingResolutionMismatch = ctx.hasImportedVideo && ctx.resolutionMismatch
-
   return (
     <Dialog
       open
@@ -49,7 +47,7 @@ export default function RenderVideoDialog(props) {
     >
       <DialogContent
         overlayClassName="absolute inset-0 z-120 flex items-center justify-center bg-surface-overlay/82 px-4 backdrop-blur-md"
-        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${ctx.isBatchTarget ? 'max-w-6xl' : 'max-w-xl'}`}
+        className={`w-full rounded-sm border border-accent-border/80 bg-card p-6 shadow-2xl shadow-background/50 ${ctx.isBatchTarget && !ctx.resolutionMismatch ? 'max-w-6xl' : 'max-w-xl'}`}
         aria-describedby={undefined}
         onEscapeKeyDown={(event) => {
           if (ctx.isProgress || ctx.submissionPending || ctx.batchRunning) {
@@ -72,10 +70,9 @@ export default function RenderVideoDialog(props) {
               isCancelling={ctx.isCancelling}
             />
           </>
-        ) : hasBlockingResolutionMismatch ? (
+        ) : ctx.resolutionMismatch ? (
           <div className="space-y-12 p-3">
             <DialogTitle className="sr-only">{t('render-video.videoResolutionMismatch', 'Video resolution mismatch')}</DialogTitle>
-            <RenderTargetTabs renderTarget={ctx.settings.renderTarget} onRenderTargetChange={ctx.handleRenderTargetChange} />
             <div className="space-y-8">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 h-10 w-10 shrink-0 text-red-500" />

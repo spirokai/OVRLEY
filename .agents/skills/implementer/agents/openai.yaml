@@ -1,0 +1,5 @@
+interface:
+  display_name: 'Implementer'
+  short_description: 'Build a task file, uncommitted, for review'
+policy:
+  allow_implicit_invocation: false

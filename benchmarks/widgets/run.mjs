@@ -54,11 +54,11 @@ const child = (binary, args, cwd = root) =>
 async function main() {
   if (values.build) {
     await child('cargo', ['build', '-p', 'ovrley_core', '--release', '--bin', 'benchmark_widgets', '--locked'], join(root, 'src-tauri'))
-    await child(process.execPath, [join(root, 'scripts/build-wasm.mjs')])
+    await child(process.execPath, [join(root, 'scripts/wasm/build.mjs')])
     return
   }
   const { createServer } = await import('vite-plus')
-  const { artifactDir } = await import('../../scripts/build-wasm.mjs')
+  const { artifactDir } = await import('../../scripts/wasm/build.mjs')
   const files = new Map(['js', 'wasm'].map((ext) => [`/wasm-bindings/wasm_bindings.${ext}`, join(artifactDir, `wasm_bindings.${ext}`)]))
   const serve = async (req, res, next) => {
     const path = new URL(req.url, 'http://localhost').pathname

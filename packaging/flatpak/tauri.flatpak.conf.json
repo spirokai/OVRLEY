@@ -4,8 +4,8 @@
     "createUpdaterArtifacts": false,
     "resources": {
       "../vendor/ffmpeg": null,
-      "../INSTALL-linux.txt": null,
-      "../THIRD_PARTY_NOTICES.txt": null
+      "../packaging/install/INSTALL-linux.txt": null,
+      "target/packaging/THIRD_PARTY_NOTICES.txt": null
     }
   }
 }

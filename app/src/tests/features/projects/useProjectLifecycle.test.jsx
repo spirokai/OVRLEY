@@ -366,7 +366,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(state.selectedSecond).toBe(0)
     expect(state.timelineViewport).toEqual({ viewStart: 0, viewEnd: 73 })
     expect(result.current.loadedProjectPath).toBeNull()
-    expect(result.current.status).toBe('Unsaved')
+    expect(result.current.status).toBe('New')
   })
 
   test('New Project saves the current project first when the user chooses Save', async () => {
@@ -413,7 +413,7 @@ describe('useProjectLifecycle canonical load orchestration', () => {
     expect(boundaries.writeProjectFile).toHaveBeenCalledOnce()
     expect(useStore.getState().config.labels.map((widget) => widget.id)).toEqual(['template-widget'])
     expect(result.current.loadedProjectPath).toBeNull()
-    expect(result.current.status).toBe('Unsaved')
+    expect(result.current.status).toBe('New')
   })
 
   test('New Project keeps the session when the user cancels the confirmation', async () => {

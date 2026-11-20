@@ -6,7 +6,7 @@ use crate::{
     widgets::route::sampling::RouteWindow,
 };
 
-/// The editor preview reads these from scene extras once; export supplies them typed.
+/// The editor preview reads these from scene extras and its session's raster scale; export supplies them typed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WidgetHost {
     pub(crate) raster_scale: PreviewRasterScale,
@@ -34,7 +34,10 @@ impl WidgetHost {
     }
 
     /// Preview extras are optional per family; a present extra must be well formed.
-    pub(crate) fn from_scene(scene: &ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn from_scene(
+        scene: &ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
         let finite = |field: &str| {
             scene
                 .extra
@@ -79,7 +82,7 @@ impl WidgetHost {
             ));
         }
         Ok(Self {
-            raster_scale: PreviewRasterScale::from_scene(scene)?,
+            raster_scale,
             export_window,
             placeholder_duration,
             export_start_seconds: finite("export_start_seconds")?,

@@ -46,7 +46,7 @@ function MenuItem({ icon: Icon, label, onClick, disabled, shortcut }) {
  * @param {function} props.onNewProject - Starts a blank project from the current template.
  * @param {function} props.onLoadProject - Opens the project file picker.
  * @param {function} props.onSaveProject - Saves the project to its current path.
- * @param {string} props.status - Project document status: 'Unsaved' | 'Saved' | 'Modified'.
+ * @param {string} props.status - Project document status: 'New' | 'Unsaved' | 'Saved' | 'Modified'.
  * @param {function} props.onSaveProjectAs - Saves the project to a new path.
  * @returns {JSX.Element} Rendered component.
  */

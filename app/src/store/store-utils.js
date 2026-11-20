@@ -8,18 +8,10 @@
  * store actions do not depend on hidden module state or timer windows.
  */
 
+import { DEFAULT_SCENE } from '@/lib/template/template-constants'
+
 export const DEFAULT_CONFIG = {
-  scene: {
-    width: 1920,
-    height: 1080,
-    fps: 30,
-    updateRate: 1,
-    start: 0,
-    end: 60,
-    font: 'Arial.ttf',
-    color: '#ffffff',
-    font_size: 30,
-  },
+  scene: { ...DEFAULT_SCENE },
   backdrops: [],
   rasters: [],
   labels: [],

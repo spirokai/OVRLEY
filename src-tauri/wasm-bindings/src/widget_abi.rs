@@ -3,7 +3,9 @@
 use ovrley_widgets::{
     error::{WidgetError, WidgetResult},
     preview::PreviewSession,
-    preview_widget::WidgetRequest,
+    preview_widget::{PreviewWidget, WidgetRequest},
+    render::preview::PreviewRasterScale,
+    widgets::map::preview::PreviewMap,
 };
 use std::sync::{Once, OnceLock};
 
@@ -92,6 +94,18 @@ pub unsafe extern "C" fn ovrley_preview_activity(
     session.status(result)
 }
 
+/// JSON array of the installed map styles. The host sets it before it creates a map.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_styles(
+    session: *mut Session,
+    ptr: *const u8,
+    len: usize,
+) -> u32 {
+    let session = &mut *session;
+    let result = bytes(ptr, len).and_then(|b| session.preview.replace_map_styles(b));
+    session.status(result)
+}
+
 /// JSON array of the editor's disabled lap IDs.
 #[no_mangle]
 pub unsafe extern "C" fn ovrley_preview_disabled_laps(
@@ -103,6 +117,15 @@ pub unsafe extern "C" fn ovrley_preview_disabled_laps(
     let result = bytes(ptr, len)
         .and_then(|b| serde_json::from_slice(b).map_err(|e| WidgetError::Config(e.to_string())))
         .and_then(|disabled| session.preview.select_laps(disabled));
+    session.status(result)
+}
+
+/// The editor's display density; widgets re-rasterize when it changes.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_raster_scale(session: *mut Session, scale: f32) -> u32 {
+    let session = &mut *session;
+    let result =
+        PreviewRasterScale::new(scale).and_then(|scale| session.preview.set_raster_scale(scale));
     session.status(result)
 }
 
@@ -148,6 +171,41 @@ pub unsafe extern "C" fn ovrley_preview_image(
         session.preview.images.register(id.to_owned(), bytes(ptr, len)?)
     })();
     session.status(result)
+}
+
+/// A map handle's family state. Only the JS map layer calls these, and only with map handles.
+unsafe fn map_widget<'a>(session: *mut Session, id: u32) -> &'a mut PreviewMap {
+    match &mut (*session).preview.widgets.get_mut(&id).expect("live widget handle").widget {
+        PreviewWidget::Map(map) => map,
+        _ => panic!("widget {id} is not a map"),
+    }
+}
+
+/// Whether the map canvas is showing under this widget. Until it is, the widget draws its placeholder.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_layer_ready(session: *mut Session, id: u32, ready: u32) {
+    map_widget(session, id).set_layer_ready(ready != 0);
+}
+
+/// JSON of what the map canvas should draw at the last render. Empty when it should draw nothing.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_view_ptr(session: *mut Session, id: u32) -> *const u8 {
+    map_widget(session, id).view.as_ptr()
+}
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_view_len(session: *mut Session, id: u32) -> usize {
+    map_widget(session, id).view.len()
+}
+
+/// The view's route line as `f64` triples of `world_x, world_y, along_metres`.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_route_ptr(session: *mut Session, id: u32) -> *const f64 {
+    map_widget(session, id).route_points.as_ptr()
+}
+/// In `f64` values, not bytes.
+#[no_mangle]
+pub unsafe extern "C" fn ovrley_preview_map_route_len(session: *mut Session, id: u32) -> usize {
+    map_widget(session, id).route_points.len()
 }
 
 #[no_mangle]

@@ -1,0 +1,4268 @@
+{
+  "$version": 8,
+  "$root": {
+    "version": {
+      "required": true,
+      "type": "enum",
+      "values": [8]
+    },
+    "name": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "*"
+    },
+    "center": {
+      "type": "array",
+      "value": "number",
+      "length": 2
+    },
+    "centerAltitude": {
+      "type": "number"
+    },
+    "zoom": {
+      "type": "number"
+    },
+    "bearing": {
+      "type": "number",
+      "default": 0,
+      "period": 360
+    },
+    "pitch": {
+      "type": "number",
+      "default": 0
+    },
+    "roll": {
+      "type": "number",
+      "default": 0
+    },
+    "state": {
+      "type": "state",
+      "default": {}
+    },
+    "light": {
+      "type": "light"
+    },
+    "sky": {
+      "type": "sky"
+    },
+    "projection": {
+      "type": "projection"
+    },
+    "terrain": {
+      "type": "terrain"
+    },
+    "sources": {
+      "required": true,
+      "type": "sources"
+    },
+    "sprite": {
+      "type": "sprite"
+    },
+    "glyphs": {
+      "type": "string"
+    },
+    "font-faces": {
+      "type": "fontFaces"
+    },
+    "transition": {
+      "type": "transition"
+    },
+    "layers": {
+      "required": true,
+      "type": "array",
+      "value": "layer"
+    }
+  },
+  "sources": {
+    "*": {
+      "type": "source"
+    }
+  },
+  "source": ["source_vector", "source_raster", "source_raster_dem", "source_geojson", "source_video", "source_image"],
+  "source_vector": {
+    "type": {
+      "required": true,
+      "type": "enum",
+      "values": {
+        "vector": {}
+      }
+    },
+    "url": {
+      "type": "string"
+    },
+    "tiles": {
+      "type": "array",
+      "value": "string"
+    },
+    "bounds": {
+      "type": "array",
+      "value": "number",
+      "length": 4,
+      "default": [-180, -85.051129, 180, 85.051129]
+    },
+    "scheme": {
+      "type": "enum",
+      "values": {
+        "xyz": {},
+        "tms": {}
+      },
+      "default": "xyz"
+    },
+    "minzoom": {
+      "type": "number",
+      "default": 0
+    },
+    "maxzoom": {
+      "type": "number",
+      "default": 22
+    },
+    "attribution": {
+      "type": "string"
+    },
+    "promoteId": {
+      "type": "promoteId"
+    },
+    "volatile": {
+      "type": "boolean",
+      "default": false
+    },
+    "encoding": {
+      "type": "enum",
+      "values": {
+        "mvt": {},
+        "mlt": {}
+      },
+      "default": "mvt"
+    },
+    "*": {
+      "type": "*"
+    }
+  },
+  "source_raster": {
+    "type": {
+      "required": true,
+      "type": "enum",
+      "values": {
+        "raster": {}
+      }
+    },
+    "url": {
+      "type": "string"
+    },
+    "tiles": {
+      "type": "array",
+      "value": "string"
+    },
+    "bounds": {
+      "type": "array",
+      "value": "number",
+      "length": 4,
+      "default": [-180, -85.051129, 180, 85.051129]
+    },
+    "minzoom": {
+      "type": "number",
+      "default": 0
+    },
+    "maxzoom": {
+      "type": "number",
+      "default": 22
+    },
+    "tileSize": {
+      "type": "number",
+      "default": 512
+    },
+    "scheme": {
+      "type": "enum",
+      "values": {
+        "xyz": {},
+        "tms": {}
+      },
+      "default": "xyz"
+    },
+    "attribution": {
+      "type": "string"
+    },
+    "volatile": {
+      "type": "boolean",
+      "default": false
+    },
+    "*": {
+      "type": "*"
+    }
+  },
+  "source_raster_dem": {
+    "type": {
+      "required": true,
+      "type": "enum",
+      "values": {
+        "raster-dem": {}
+      }
+    },
+    "url": {
+      "type": "string"
+    },
+    "tiles": {
+      "type": "array",
+      "value": "string"
+    },
+    "bounds": {
+      "type": "array",
+      "value": "number",
+      "length": 4,
+      "default": [-180, -85.051129, 180, 85.051129]
+    },
+    "minzoom": {
+      "type": "number",
+      "default": 0
+    },
+    "maxzoom": {
+      "type": "number",
+      "default": 22
+    },
+    "tileSize": {
+      "type": "number",
+      "default": 512
+    },
+    "attribution": {
+      "type": "string"
+    },
+    "encoding": {
+      "type": "enum",
+      "values": {
+        "terrarium": {},
+        "mapbox": {},
+        "custom": {}
+      },
+      "default": "mapbox"
+    },
+    "redFactor": {
+      "type": "number",
+      "default": 1
+    },
+    "blueFactor": {
+      "type": "number",
+      "default": 1
+    },
+    "greenFactor": {
+      "type": "number",
+      "default": 1
+    },
+    "baseShift": {
+      "type": "number",
+      "default": 0
+    },
+    "volatile": {
+      "type": "boolean",
+      "default": false
+    },
+    "*": {
+      "type": "*"
+    }
+  },
+  "source_geojson": {
+    "type": {
+      "required": true,
+      "type": "enum",
+      "values": {
+        "geojson": {}
+      }
+    },
+    "data": {
+      "required": true,
+      "type": "*"
+    },
+    "maxzoom": {
+      "type": "number",
+      "default": 18
+    },
+    "attribution": {
+      "type": "string"
+    },
+    "buffer": {
+      "type": "number",
+      "default": 128,
+      "maximum": 512,
+      "minimum": 0
+    },
+    "filter": {
+      "type": "filter"
+    },
+    "tolerance": {
+      "type": "number",
+      "default": 0.375
+    },
+    "cluster": {
+      "type": "boolean",
+      "default": false
+    },
+    "clusterRadius": {
+      "type": "number",
+      "default": 50,
+      "minimum": 0
+    },
+    "clusterMaxZoom": {
+      "type": "number"
+    },
+    "clusterMinPoints": {
+      "type": "number"
+    },
+    "clusterProperties": {
+      "type": "*"
+    },
+    "lineMetrics": {
+      "type": "boolean",
+      "default": false
+    },
+    "generateId": {
+      "type": "boolean",
+      "default": false
+    },
+    "promoteId": {
+      "type": "promoteId"
+    }
+  },
+  "source_video": {
+    "type": {
+      "required": true,
+      "type": "enum",
+      "values": {
+        "video": {}
+      }
+    },
+    "urls": {
+      "required": true,
+      "type": "array",
+      "value": "string"
+    },
+    "coordinates": {
+      "required": true,
+      "type": "array",
+      "length": 4,
+      "value": {
+        "type": "array",
+        "length": 2,
+        "value": "number"
+      }
+    }
+  },
+  "source_image": {
+    "type": {
+      "required": true,
+      "type": "enum",
+      "values": {
+        "image": {}
+      }
+    },
+    "url": {
+      "type": "string"
+    },
+    "coordinates": {
+      "required": true,
+      "type": "array",
+      "length": 4,
+      "value": {
+        "type": "array",
+        "length": 2,
+        "value": "number"
+      }
+    }
+  },
+  "layer": {
+    "id": {
+      "type": "string",
+      "required": true
+    },
+    "type": {
+      "type": "enum",
+      "values": {
+        "fill": {},
+        "line": {},
+        "symbol": {},
+        "circle": {},
+        "heatmap": {},
+        "fill-extrusion": {},
+        "raster": {},
+        "hillshade": {},
+        "color-relief": {},
+        "background": {}
+      },
+      "required": true
+    },
+    "metadata": {
+      "type": "*"
+    },
+    "source": {
+      "type": "string"
+    },
+    "source-layer": {
+      "type": "string"
+    },
+    "minzoom": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 24
+    },
+    "maxzoom": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 24
+    },
+    "filter": {
+      "type": "filter"
+    },
+    "layout": {
+      "type": "layout"
+    },
+    "paint": {
+      "type": "paint"
+    }
+  },
+  "layout": [
+    "layout_fill",
+    "layout_line",
+    "layout_circle",
+    "layout_heatmap",
+    "layout_fill-extrusion",
+    "layout_symbol",
+    "layout_raster",
+    "layout_hillshade",
+    "layout_color-relief",
+    "layout_background"
+  ],
+  "layout_background": {
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_fill": {
+    "fill-sort-key": {
+      "type": "number",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_circle": {
+    "circle-sort-key": {
+      "type": "number",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_heatmap": {
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_fill-extrusion": {
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-extrusion-rounded-corner-distance": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "property-type": "constant"
+    }
+  },
+  "layout_line": {
+    "line-cap": {
+      "type": "enum",
+      "values": {
+        "butt": {},
+        "round": {},
+        "square": {}
+      },
+      "default": "butt",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-join": {
+      "type": "enum",
+      "values": {
+        "bevel": {},
+        "round": {},
+        "miter": {}
+      },
+      "default": "miter",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-miter-limit": {
+      "type": "number",
+      "default": 2,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-round-limit": {
+      "type": "number",
+      "default": 1.05,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-sort-key": {
+      "type": "number",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_symbol": {
+    "symbol-placement": {
+      "type": "enum",
+      "values": {
+        "point": {},
+        "line": {},
+        "line-center": {}
+      },
+      "default": "point",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "symbol-spacing": {
+      "type": "number",
+      "default": 250,
+      "minimum": 1,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "symbol-avoid-edges": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "symbol-sort-key": {
+      "type": "number",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "symbol-z-order": {
+      "type": "enum",
+      "values": {
+        "auto": {},
+        "viewport-y": {},
+        "source": {}
+      },
+      "default": "auto",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-allow-overlap": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-overlap": {
+      "type": "enum",
+      "values": {
+        "never": {},
+        "always": {},
+        "cooperative": {}
+      },
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-ignore-placement": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-optional": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-rotation-alignment": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {},
+        "auto": {}
+      },
+      "default": "auto",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-size": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-text-fit": {
+      "type": "enum",
+      "values": {
+        "none": {},
+        "width": {},
+        "height": {},
+        "both": {}
+      },
+      "default": "none",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-text-fit-padding": {
+      "type": "array",
+      "value": "number",
+      "length": 4,
+      "default": [0, 0, 0, 0],
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-image": {
+      "type": "resolvedImage",
+      "tokens": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-rotate": {
+      "type": "number",
+      "default": 0,
+      "period": 360,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-padding": {
+      "type": "padding",
+      "default": [2],
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-keep-upright": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-offset": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-anchor": {
+      "type": "enum",
+      "values": {
+        "center": {},
+        "left": {},
+        "right": {},
+        "top": {},
+        "bottom": {},
+        "top-left": {},
+        "top-right": {},
+        "bottom-left": {},
+        "bottom-right": {}
+      },
+      "default": "center",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-pitch-alignment": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {},
+        "auto": {}
+      },
+      "default": "auto",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-pitch-alignment": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {},
+        "auto": {}
+      },
+      "default": "auto",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-rotation-alignment": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {},
+        "viewport-glyph": {},
+        "auto": {}
+      },
+      "default": "auto",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-field": {
+      "type": "formatted",
+      "default": "",
+      "tokens": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-font": {
+      "type": "array",
+      "value": "string",
+      "default": ["Open Sans Regular", "Arial Unicode MS Regular"],
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-size": {
+      "type": "number",
+      "default": 16,
+      "minimum": 0,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-max-width": {
+      "type": "number",
+      "default": 10,
+      "minimum": 0,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-line-height": {
+      "type": "number",
+      "default": 1.2,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-letter-spacing": {
+      "type": "number",
+      "default": 0,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-justify": {
+      "type": "enum",
+      "values": {
+        "auto": {},
+        "left": {},
+        "center": {},
+        "right": {}
+      },
+      "default": "center",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-radial-offset": {
+      "type": "number",
+      "default": 0,
+      "property-type": "data-driven",
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      }
+    },
+    "text-variable-anchor": {
+      "type": "array",
+      "value": "enum",
+      "values": {
+        "center": {},
+        "left": {},
+        "right": {},
+        "top": {},
+        "bottom": {},
+        "top-left": {},
+        "top-right": {},
+        "bottom-left": {},
+        "bottom-right": {}
+      },
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-variable-anchor-offset": {
+      "type": "variableAnchorOffsetCollection",
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-anchor": {
+      "type": "enum",
+      "values": {
+        "center": {},
+        "left": {},
+        "right": {},
+        "top": {},
+        "bottom": {},
+        "top-left": {},
+        "top-right": {},
+        "bottom-left": {},
+        "bottom-right": {}
+      },
+      "default": "center",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-max-angle": {
+      "type": "number",
+      "default": 45,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-writing-mode": {
+      "type": "array",
+      "value": "enum",
+      "values": {
+        "horizontal": {},
+        "vertical": {}
+      },
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-rotate": {
+      "type": "number",
+      "default": 0,
+      "period": 360,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-padding": {
+      "type": "number",
+      "default": 2,
+      "minimum": 0,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-keep-upright": {
+      "type": "boolean",
+      "default": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-transform": {
+      "type": "enum",
+      "values": {
+        "none": {},
+        "uppercase": {},
+        "lowercase": {}
+      },
+      "default": "none",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-offset": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-allow-overlap": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-overlap": {
+      "type": "enum",
+      "values": {
+        "never": {},
+        "always": {},
+        "cooperative": {}
+      },
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-ignore-placement": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-optional": {
+      "type": "boolean",
+      "default": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "symbol-height-offset": {
+      "type": "number",
+      "default": 0,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "data-driven"
+    },
+    "symbol-height-anchor": {
+      "type": "enum",
+      "values": {
+        "ground": {},
+        "absolute": {}
+      },
+      "default": "ground",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_raster": {
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_hillshade": {
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "layout_color-relief": {
+    "visibility": {
+      "type": "enum",
+      "values": {
+        "visible": {},
+        "none": {}
+      },
+      "default": "visible",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["global-state"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "filter": {
+    "type": "boolean",
+    "expression": {
+      "interpolated": false,
+      "parameters": ["zoom", "feature"]
+    },
+    "property-type": "data-driven"
+  },
+  "filter_operator": {
+    "type": "enum",
+    "values": {
+      "==": {},
+      "!=": {},
+      ">": {},
+      ">=": {},
+      "<": {},
+      "<=": {},
+      "in": {},
+      "!in": {},
+      "all": {},
+      "any": {},
+      "none": {},
+      "has": {},
+      "!has": {}
+    }
+  },
+  "geometry_type": {
+    "type": "enum",
+    "values": {
+      "Point": {},
+      "LineString": {},
+      "Polygon": {}
+    }
+  },
+  "function": {
+    "expression": {
+      "type": "expression"
+    },
+    "stops": {
+      "type": "array",
+      "value": "function_stop"
+    },
+    "base": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0
+    },
+    "property": {
+      "type": "string",
+      "default": "$zoom"
+    },
+    "type": {
+      "type": "enum",
+      "values": {
+        "identity": {},
+        "exponential": {},
+        "interval": {},
+        "categorical": {}
+      },
+      "default": "exponential"
+    },
+    "colorSpace": {
+      "type": "enum",
+      "values": {
+        "rgb": {},
+        "lab": {},
+        "hcl": {}
+      },
+      "default": "rgb"
+    },
+    "default": {
+      "type": "*",
+      "required": false
+    }
+  },
+  "function_stop": {
+    "type": "array",
+    "minimum": 0,
+    "maximum": 24,
+    "value": ["number", "color"],
+    "length": 2
+  },
+  "expression": {
+    "type": "array",
+    "value": "expression_name",
+    "minimum": 1
+  },
+  "expression_name": {
+    "type": "enum",
+    "values": {
+      "let": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["var_name_1", "var_value_1", "...", "var_name_n", "var_value_n", "expression"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "var_name_i",
+              "type": "string literal"
+            },
+            {
+              "name": "var_value_i",
+              "type": "any"
+            },
+            {
+              "name": "expression",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Variable binding"
+      },
+      "var": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["var_name"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "var_name",
+              "type": "string literal"
+            }
+          ]
+        },
+        "group": "Variable binding"
+      },
+      "literal": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["json_object"],
+              "output-type": "object"
+            },
+            {
+              "parameters": ["json_array"],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "json_object",
+              "type": "JSON object"
+            },
+            {
+              "name": "json_array",
+              "type": "JSON array"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "semiliteral": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["json_array"],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "json_array",
+              "type": "JSON array"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "array": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value"],
+              "output-type": "array"
+            },
+            {
+              "parameters": ["type", "value"],
+              "output-type": "array<type>"
+            },
+            {
+              "parameters": ["type", "length", "value"],
+              "output-type": "array<type, length>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any"
+            },
+            {
+              "name": "type",
+              "type": ["string", "number", "boolean"]
+            },
+            {
+              "name": "length",
+              "type": "number literal"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "at": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["index", "array"],
+              "output-type": "T"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "index",
+              "type": "number"
+            },
+            {
+              "name": "array",
+              "type": "array<T>"
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "in": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["item", "array"],
+              "output-type": "boolean"
+            },
+            {
+              "parameters": ["substring", "string"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "item",
+              "type": "T"
+            },
+            {
+              "name": "array",
+              "type": "array<T>"
+            },
+            {
+              "name": "substring",
+              "type": "string"
+            },
+            {
+              "name": "string",
+              "type": "string"
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "index-of": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["item", "array", "from_index?"],
+              "output-type": "number"
+            },
+            {
+              "parameters": ["substring", "string", "from_index?"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "item",
+              "type": "T"
+            },
+            {
+              "name": "array",
+              "type": "array<T>"
+            },
+            {
+              "name": "substring",
+              "type": "string"
+            },
+            {
+              "name": "string",
+              "type": "string"
+            },
+            {
+              "name": "from_index",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "slice": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["array", "start_index", "end_index?"],
+              "output-type": "array<T>"
+            },
+            {
+              "parameters": ["string", "start_index", "end_index?"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "array",
+              "type": "array<T>"
+            },
+            {
+              "name": "string",
+              "type": "string"
+            },
+            {
+              "name": "start_index",
+              "type": "number"
+            },
+            {
+              "name": "end_index",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "case": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["condition_1", "output_1", "...", "condition_n", "output_n", "fallback"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "condition_i",
+              "type": "boolean"
+            },
+            {
+              "name": "output_i",
+              "type": "any"
+            },
+            {
+              "name": "fallback",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "match": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input", "label_1", "output_1", "...", "label_n", "output_n", "fallback"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": ["string", "number"]
+            },
+            {
+              "name": "label_i",
+              "type": ["string literal", "number literal", "array<string literal>", "array<number literal>"]
+            },
+            {
+              "name": "output_i",
+              "type": "any"
+            },
+            {
+              "name": "fallback",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "coalesce": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["expression_1", "...", "expression_n"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "expression_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "step": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input", "output_0", "stop_input_1", "stop_output_1", "...", "stop_input_n", "stop_output_n"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            },
+            {
+              "name": "output_0",
+              "type": "any"
+            },
+            {
+              "name": "stop_input_i",
+              "type": "number literal"
+            },
+            {
+              "name": "stop_output_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Ramps, scales, curves"
+      },
+      "interpolate": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["interpolation_type", "input", "stop_input_1", "stop_output_1", "...", "stop_input_n", "stop_output_n"],
+              "output-type": ["number", "array<number>", "color", "array<color>", "projection"]
+            }
+          ],
+          "parameters": [
+            {
+              "name": "interpolation_type",
+              "type": "interpolation"
+            },
+            {
+              "name": "input",
+              "type": "number"
+            },
+            {
+              "name": "stop_input_i",
+              "type": "number literal"
+            },
+            {
+              "name": "stop_output_i",
+              "type": ["number", "array<number>", "color", "array<color>", "projection"]
+            }
+          ]
+        },
+        "group": "Ramps, scales, curves"
+      },
+      "interpolate-hcl": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["interpolation_type", "input", "stop_input_1", "stop_output_1", "...", "stop_input_n", "stop_output_n"],
+              "output-type": ["color", "array<color>"]
+            }
+          ],
+          "parameters": [
+            {
+              "name": "interpolation_type",
+              "type": "interpolation"
+            },
+            {
+              "name": "input",
+              "type": "number"
+            },
+            {
+              "name": "stop_input_i",
+              "type": "number literal"
+            },
+            {
+              "name": "stop_output_i",
+              "type": ["color", "array<color>"]
+            }
+          ]
+        },
+        "group": "Ramps, scales, curves"
+      },
+      "interpolate-lab": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["interpolation_type", "input", "stop_input_1", "stop_output_1", "...", "stop_input_n", "stop_output_n"],
+              "output-type": ["color", "array<color>"]
+            }
+          ],
+          "parameters": [
+            {
+              "name": "interpolation_type",
+              "type": "interpolation"
+            },
+            {
+              "name": "input",
+              "type": "number"
+            },
+            {
+              "name": "stop_input_i",
+              "type": "number literal"
+            },
+            {
+              "name": "stop_output_i",
+              "type": ["color", "array<color>"]
+            }
+          ]
+        },
+        "group": "Ramps, scales, curves"
+      },
+      "ln2": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "pi": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "e": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "typeof": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "string": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value_1", "...", "value_n"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "number": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value_1", "...", "value_n"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "boolean": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value_1", "...", "value_n"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "object": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value_1", "...", "value_n"],
+              "output-type": "object"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "collator": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["options"],
+              "output-type": "collator"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "options",
+              "type": {
+                "case-sensitive": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "diacritic-sensitive": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "locale": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "format": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "style_overrides_1?", "...", "input_n", "style_overrides_n?"],
+              "output-type": "formatted"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": ["string", "image"]
+            },
+            {
+              "name": "style_overrides_i",
+              "type": {
+                "text-font": {
+                  "type": "string"
+                },
+                "text-color": {
+                  "type": "color"
+                },
+                "font-scale": {
+                  "type": "number"
+                },
+                "vertical-align": {
+                  "type": "enum",
+                  "default": "bottom",
+                  "values": {
+                    "bottom": {},
+                    "center": {},
+                    "top": {}
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "image": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["image_name"],
+              "output-type": "image"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "image_name",
+              "type": "string"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "global-state": {
+        "group": "Lookup",
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["property_name"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "property_name",
+              "type": "string literal"
+            }
+          ]
+        }
+      },
+      "number-format": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input", "format_options"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            },
+            {
+              "name": "format_options",
+              "type": {
+                "locale": {
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "unit": {
+                  "type": "string"
+                },
+                "min-fraction-digits": {
+                  "type": "number"
+                },
+                "max-fraction-digits": {
+                  "type": "number"
+                }
+              }
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "to-string": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "to-number": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value_1", "...", "value_n"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "to-boolean": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "to-rgba": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["color"],
+              "output-type": "array"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "color",
+              "type": "color"
+            }
+          ]
+        },
+        "group": "Color"
+      },
+      "to-color": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["value_1", "...", "value_n"],
+              "output-type": "color"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "value_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "Types"
+      },
+      "rgb": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["red", "green", "blue"],
+              "output-type": "color"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "red",
+              "type": "number"
+            },
+            {
+              "name": "green",
+              "type": "number"
+            },
+            {
+              "name": "blue",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Color"
+      },
+      "rgba": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["red", "green", "blue", "alpha"],
+              "output-type": "color"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "red",
+              "type": "number"
+            },
+            {
+              "name": "green",
+              "type": "number"
+            },
+            {
+              "name": "blue",
+              "type": "number"
+            },
+            {
+              "name": "alpha",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Color"
+      },
+      "get": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["property_name", "object?"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "property_name",
+              "type": "string"
+            },
+            {
+              "name": "object",
+              "type": "object"
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "has": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["property_name", "object?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "property_name",
+              "type": "string"
+            },
+            {
+              "name": "object",
+              "type": "object"
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "length": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["array_or_string"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "array_or_string",
+              "type": ["array", "string"]
+            }
+          ]
+        },
+        "group": "Lookup"
+      },
+      "properties": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "object"
+            }
+          ]
+        },
+        "group": "Feature data"
+      },
+      "feature-state": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["property_name"],
+              "output-type": "any"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "property_name",
+              "type": "string"
+            }
+          ]
+        },
+        "group": "Feature data"
+      },
+      "geometry-type": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "string"
+            }
+          ]
+        },
+        "group": "Feature data"
+      },
+      "id": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "any"
+            }
+          ]
+        },
+        "group": "Feature data"
+      },
+      "zoom": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Zoom"
+      },
+      "heatmap-density": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Heatmap"
+      },
+      "elevation": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Color Relief"
+      },
+      "line-progress": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "number"
+            }
+          ]
+        },
+        "group": "Feature data"
+      },
+      "accumulated": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "any"
+            }
+          ]
+        },
+        "group": "Feature data"
+      },
+      "+": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "*": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "-": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "input_2"],
+              "output-type": "number"
+            },
+            {
+              "parameters": ["single_input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_1",
+              "type": "number"
+            },
+            {
+              "name": "input_2",
+              "type": "number"
+            },
+            {
+              "name": "single_input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "/": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "input_2"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_1",
+              "type": "number"
+            },
+            {
+              "name": "input_2",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "%": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "input_2"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_1",
+              "type": "number"
+            },
+            {
+              "name": "input_2",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "^": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "input_2"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_1",
+              "type": "number"
+            },
+            {
+              "name": "input_2",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "sqrt": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "log10": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "ln": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "log2": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "sin": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "cos": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "tan": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "asin": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "acos": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "atan": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "min": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "max": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "round": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "abs": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "ceil": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "floor": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "number"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "distance": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["geojson"],
+              "output-type": "number"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "geojson",
+              "type": "GeoJSON object"
+            }
+          ]
+        },
+        "group": "Math"
+      },
+      "==": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "input_2", "collator?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_1",
+              "type": "any"
+            },
+            {
+              "name": "input_2",
+              "type": "any"
+            },
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "!=": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "input_2", "collator?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_1",
+              "type": "any"
+            },
+            {
+              "name": "input_2",
+              "type": "any"
+            },
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      ">": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["string_1", "string_2", "collator?"],
+              "output-type": "boolean"
+            },
+            {
+              "parameters": ["number_1", "number_2", "collator?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "string_i",
+              "type": "string"
+            },
+            {
+              "name": "number_i",
+              "type": "number"
+            },
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "<": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["string_1", "string_2", "collator?"],
+              "output-type": "boolean"
+            },
+            {
+              "parameters": ["number_1", "number_2", "collator?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "string_i",
+              "type": "string"
+            },
+            {
+              "name": "number_i",
+              "type": "number"
+            },
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      ">=": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["string_1", "string_2", "collator?"],
+              "output-type": "boolean"
+            },
+            {
+              "parameters": ["number_1", "number_2", "collator?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "string_i",
+              "type": "string"
+            },
+            {
+              "name": "number_i",
+              "type": "number"
+            },
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "<=": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["string_1", "string_2", "collator?"],
+              "output-type": "boolean"
+            },
+            {
+              "parameters": ["number_1", "number_2", "collator?"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "string_i",
+              "type": "string"
+            },
+            {
+              "name": "number_i",
+              "type": "number"
+            },
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "all": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "boolean"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "any": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "boolean"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "!": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "boolean"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "within": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["geojson"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "geojson",
+              "type": "GeoJSON object"
+            }
+          ]
+        },
+        "group": "Decision"
+      },
+      "is-supported-script": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "boolean"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "string"
+            }
+          ]
+        },
+        "group": "String"
+      },
+      "upcase": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "string"
+            }
+          ]
+        },
+        "group": "String"
+      },
+      "downcase": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "string"
+            }
+          ]
+        },
+        "group": "String"
+      },
+      "concat": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input_1", "...", "input_n"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input_i",
+              "type": "any"
+            }
+          ]
+        },
+        "group": "String"
+      },
+      "resolved-locale": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["collator"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "collator",
+              "type": "collator"
+            }
+          ]
+        },
+        "group": "String"
+      },
+      "split": {
+        "group": "String",
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input", "separator"],
+              "output-type": "array<string>"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "string"
+            },
+            {
+              "name": "separator",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "join": {
+        "group": "String",
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["input", "separator"],
+              "output-type": "string"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "input",
+              "type": "array"
+            },
+            {
+              "name": "separator",
+              "type": "string"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "light": {
+    "anchor": {
+      "type": "enum",
+      "default": "viewport",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "property-type": "data-constant",
+      "transition": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      }
+    },
+    "position": {
+      "type": "array",
+      "default": [1.15, 210, 30],
+      "length": 3,
+      "value": "number",
+      "property-type": "data-constant",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      }
+    },
+    "color": {
+      "type": "color",
+      "property-type": "data-constant",
+      "default": "#ffffff",
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "intensity": {
+      "type": "number",
+      "property-type": "data-constant",
+      "default": 0.5,
+      "minimum": 0,
+      "maximum": 1,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    }
+  },
+  "sky": {
+    "sky-color": {
+      "type": "color",
+      "property-type": "data-constant",
+      "default": "#88C6FC",
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "horizon-color": {
+      "type": "color",
+      "property-type": "data-constant",
+      "default": "#ffffff",
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "fog-color": {
+      "type": "color",
+      "property-type": "data-constant",
+      "default": "#ffffff",
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "fog-ground-blend": {
+      "type": "number",
+      "property-type": "data-constant",
+      "default": 0.5,
+      "minimum": 0,
+      "maximum": 1,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "horizon-fog-blend": {
+      "type": "number",
+      "property-type": "data-constant",
+      "default": 0.8,
+      "minimum": 0,
+      "maximum": 1,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "sky-horizon-blend": {
+      "type": "number",
+      "property-type": "data-constant",
+      "default": 0.8,
+      "minimum": 0,
+      "maximum": 1,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    },
+    "atmosphere-blend": {
+      "type": "number",
+      "property-type": "data-constant",
+      "default": 0.8,
+      "minimum": 0,
+      "maximum": 1,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "transition": true
+    }
+  },
+  "terrain": {
+    "source": {
+      "type": "string",
+      "required": true
+    },
+    "exaggeration": {
+      "type": "number",
+      "minimum": 0,
+      "default": 1
+    }
+  },
+  "projection": {
+    "type": {
+      "type": "projectionDefinition",
+      "default": "mercator",
+      "property-type": "data-constant",
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      }
+    }
+  },
+  "paint": [
+    "paint_fill",
+    "paint_line",
+    "paint_circle",
+    "paint_heatmap",
+    "paint_fill-extrusion",
+    "paint_symbol",
+    "paint_raster",
+    "paint_hillshade",
+    "paint_color-relief",
+    "paint_background"
+  ],
+  "paint_fill": {
+    "fill-antialias": {
+      "type": "boolean",
+      "default": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "fill-layer-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "global-state"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "fill-outline-color": {
+      "type": "color",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "fill-translate": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-translate-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-pattern": {
+      "type": "resolvedImage",
+      "transition": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "cross-faded-data-driven"
+    }
+  },
+  "paint_fill-extrusion": {
+    "fill-extrusion-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-extrusion-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "fill-extrusion-translate": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-extrusion-translate-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "fill-extrusion-pattern": {
+      "type": "resolvedImage",
+      "transition": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "cross-faded-data-driven"
+    },
+    "fill-extrusion-height": {
+      "type": "number",
+      "default": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "fill-extrusion-base": {
+      "type": "number",
+      "default": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "fill-extrusion-vertical-gradient": {
+      "type": "boolean",
+      "default": true,
+      "transition": false,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "paint_line": {
+    "line-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-layer-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "global-state"]
+      },
+      "property-type": "data-constant"
+    },
+    "line-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-translate": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "line-translate-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "line-width": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-gap-width": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-offset": {
+      "type": "number",
+      "default": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-blur": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "line-dasharray": {
+      "type": "array",
+      "value": "number",
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "cross-faded-data-driven"
+    },
+    "line-pattern": {
+      "type": "resolvedImage",
+      "transition": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom", "feature"]
+      },
+      "property-type": "cross-faded-data-driven"
+    },
+    "line-gradient": {
+      "type": "color",
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["line-progress"]
+      },
+      "property-type": "color-ramp"
+    }
+  },
+  "paint_circle": {
+    "circle-radius": {
+      "type": "number",
+      "default": 5,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "circle-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "circle-blur": {
+      "type": "number",
+      "default": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "circle-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "circle-translate": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "circle-translate-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "circle-pitch-scale": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "circle-pitch-alignment": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "viewport",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "circle-stroke-width": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "circle-stroke-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "circle-stroke-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    }
+  },
+  "paint_heatmap": {
+    "heatmap-radius": {
+      "type": "number",
+      "default": 30,
+      "minimum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "heatmap-weight": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "heatmap-intensity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "heatmap-color": {
+      "type": "color",
+      "default": [
+        "interpolate",
+        ["linear"],
+        ["heatmap-density"],
+        0,
+        "rgba(0, 0, 255, 0)",
+        0.1,
+        "royalblue",
+        0.3,
+        "cyan",
+        0.5,
+        "lime",
+        0.7,
+        "yellow",
+        1,
+        "red"
+      ],
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["heatmap-density"]
+      },
+      "property-type": "color-ramp"
+    },
+    "heatmap-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "paint_symbol": {
+    "icon-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-halo-color": {
+      "type": "color",
+      "default": "rgba(0, 0, 0, 0)",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-halo-width": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-halo-blur": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "icon-translate": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "icon-translate-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "overridable": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-halo-color": {
+      "type": "color",
+      "default": "rgba(0, 0, 0, 0)",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-halo-width": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-halo-blur": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom", "feature", "feature-state"]
+      },
+      "property-type": "data-driven"
+    },
+    "text-translate": {
+      "type": "array",
+      "value": "number",
+      "length": 2,
+      "default": [0, 0],
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "text-translate-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "map",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "paint_raster": {
+    "raster-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-hue-rotate": {
+      "type": "number",
+      "default": 0,
+      "period": 360,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-brightness-min": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-brightness-max": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-saturation": {
+      "type": "number",
+      "default": 0,
+      "minimum": -1,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-contrast": {
+      "type": "number",
+      "default": 0,
+      "minimum": -1,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "resampling": {
+      "type": "enum",
+      "values": {
+        "linear": {},
+        "nearest": {}
+      },
+      "default": "linear",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-resampling": {
+      "type": "enum",
+      "values": {
+        "linear": {},
+        "nearest": {}
+      },
+      "default": "linear",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "raster-fade-duration": {
+      "type": "number",
+      "default": 300,
+      "minimum": 0,
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "paint_hillshade": {
+    "hillshade-illumination-direction": {
+      "type": "numberArray",
+      "default": 335,
+      "minimum": 0,
+      "maximum": 359,
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-illumination-altitude": {
+      "type": "numberArray",
+      "default": 45,
+      "minimum": 0,
+      "maximum": 90,
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-illumination-anchor": {
+      "type": "enum",
+      "values": {
+        "map": {},
+        "viewport": {}
+      },
+      "default": "viewport",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-exaggeration": {
+      "type": "number",
+      "default": 0.5,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-shadow-color": {
+      "type": "colorArray",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-highlight-color": {
+      "type": "colorArray",
+      "default": "#FFFFFF",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-accent-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "hillshade-method": {
+      "type": "enum",
+      "values": {
+        "standard": {},
+        "basic": {},
+        "combined": {},
+        "igor": {},
+        "multidirectional": {}
+      },
+      "default": "standard",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "resampling": {
+      "type": "enum",
+      "values": {
+        "linear": {},
+        "nearest": {}
+      },
+      "default": "linear",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "paint_color-relief": {
+    "color-relief-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "color-relief-color": {
+      "type": "color",
+      "transition": false,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["elevation"]
+      },
+      "property-type": "color-ramp"
+    },
+    "resampling": {
+      "type": "enum",
+      "values": {
+        "linear": {},
+        "nearest": {}
+      },
+      "default": "linear",
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "paint_background": {
+    "background-color": {
+      "type": "color",
+      "default": "#000000",
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    },
+    "background-pattern": {
+      "type": "resolvedImage",
+      "transition": true,
+      "expression": {
+        "interpolated": false,
+        "parameters": ["zoom"]
+      },
+      "property-type": "cross-faded"
+    },
+    "background-opacity": {
+      "type": "number",
+      "default": 1,
+      "minimum": 0,
+      "maximum": 1,
+      "transition": true,
+      "expression": {
+        "interpolated": true,
+        "parameters": ["zoom"]
+      },
+      "property-type": "data-constant"
+    }
+  },
+  "transition": {
+    "duration": {
+      "type": "number",
+      "default": 300,
+      "minimum": 0
+    },
+    "delay": {
+      "type": "number",
+      "default": 0,
+      "minimum": 0
+    }
+  },
+  "property-type": {
+    "data-driven": {
+      "type": "property-type"
+    },
+    "cross-faded": {
+      "type": "property-type"
+    },
+    "cross-faded-data-driven": {
+      "type": "property-type"
+    },
+    "color-ramp": {
+      "type": "property-type"
+    },
+    "data-constant": {
+      "type": "property-type"
+    },
+    "constant": {
+      "type": "property-type"
+    }
+  },
+  "promoteId": {
+    "*": {
+      "type": "string"
+    }
+  },
+  "interpolation": {
+    "type": "array",
+    "value": "interpolation_name",
+    "minimum": 1
+  },
+  "interpolation_name": {
+    "type": "enum",
+    "values": {
+      "linear": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": [],
+              "output-type": "interpolation"
+            }
+          ],
+          "parameters": []
+        }
+      },
+      "exponential": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["base"],
+              "output-type": "interpolation"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "base",
+              "type": "number literal"
+            }
+          ]
+        }
+      },
+      "cubic-bezier": {
+        "syntax": {
+          "overloads": [
+            {
+              "parameters": ["x1", "y1", "x2", "y2"],
+              "output-type": "interpolation"
+            }
+          ],
+          "parameters": [
+            {
+              "name": "x1",
+              "type": "number literal"
+            },
+            {
+              "name": "y1",
+              "type": "number literal"
+            },
+            {
+              "name": "x2",
+              "type": "number literal"
+            },
+            {
+              "name": "y2",
+              "type": "number literal"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

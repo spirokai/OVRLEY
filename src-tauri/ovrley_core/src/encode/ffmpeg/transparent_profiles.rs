@@ -66,7 +66,10 @@ const BUILTIN_PROFILES: &[TransparentProfile] = &[
         cpu_cores_per_frame_worker: 4,
         input_args: &[],
         filter_complex: None,
-        output_args: &["-profile:v", "4", "-f", "mov", "-pix_fmt", "yuva444p10le"],
+        // The encoder does not accept yuva444p10le; FFmpeg would substitute
+        // ayuv64le and convert every frame on the CPU. BGRA leaves only a
+        // channel swizzle and lets VideoToolbox convert to 4444 itself.
+        output_args: &["-profile:v", "4", "-f", "mov", "-pix_fmt", "bgra"],
     },
     TransparentProfile {
         codec_id: TransparentCodecId::Qtrle,

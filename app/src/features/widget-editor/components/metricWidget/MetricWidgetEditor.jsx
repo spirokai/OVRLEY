@@ -9,6 +9,7 @@
 import { NumberField, SelectField } from '../widgetFormControls'
 import { useCallback } from 'react'
 import { buildDisplayTypeChangeUpdate } from '@/lib/widget/widget-resolver'
+import { useUnitSystem } from '@/hooks/useAppStoreSelectors'
 import { getWidgetDisplayTypeOptions } from '@/lib/widget/widget-catalog'
 import TextDisplaySection from './TextDisplaySection'
 import LinearDisplaySection from './LinearDisplaySection'
@@ -62,13 +63,14 @@ export default function MetricWidgetEditor({
   const { t } = useTranslation()
   const displayType = widget.data.display_type
   const displayOptions = getWidgetDisplayTypeOptions(widget.type, t)
+  const unitSystem = useUnitSystem()
 
   const handleDisplayTypeChange = useCallback(
     (value) => {
-      const patch = buildDisplayTypeChangeUpdate(widget.data, value)
+      const patch = buildDisplayTypeChangeUpdate(widget.data, value, unitSystem)
       updateWidgetData(widget.id, patch)
     },
-    [widget.id, widget.data, updateWidgetData],
+    [widget.id, widget.data, unitSystem, updateWidgetData],
   )
 
   const showTypeDropdown = showDisplayControls && displayOptions.length > 1

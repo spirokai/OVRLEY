@@ -4,7 +4,7 @@
   },
   "bundle": {
     "resources": {
-      "../INSTALL-linux.txt": "INSTALL.txt"
+      "../packaging/install/INSTALL-linux.txt": "INSTALL.txt"
     }
   }
 }

@@ -159,6 +159,8 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
   for (const mode of ['current_lap', 'best_lap', 'delta', 'lap_log'])
     specs.push([`lap-${mode}`, 'lap_timer', 'racebox', { displayType: 'lap_timer', lapTimerMode: mode }, {}])
   specs.push(['splits-run', 'splits_run', 'splits', { displayType: 'splits_run' }, {}])
+  for (const size of [500, 1000])
+    for (const pitch of [0, 40, 60]) specs.push([`map-p${pitch}-${size}`, 'map', 'ride', {}, { size, pitch, follow_zoom: 17 }])
   const globals = { ...DEFAULT_GLOBAL_DEFAULTS, ...template.settings.globalDefaults }
   const result = []
   const selected = [['empty', null, 'ride', {}, {}], ...specs].filter(([id]) => only === undefined || id === 'empty' || id === only)
@@ -190,6 +192,7 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
       gradient: ['gradient'],
       lap_timer: ['lap_time_seconds', 'delta_to_best_lap_seconds'],
       splits_run: ['distance'],
+      map: ['sample_course_points'],
     }
     for (const field of required[type] ?? [])
       if (
@@ -211,12 +214,16 @@ export function createCases({ activities, template, image, frames, warmup, fps, 
     let fonts = []
     if (type !== null) {
       const widget = resolveActiveWidgetData(effective[requireWidgetTypeDefinition(type).collection][0])
+      // A map case is named by its output pixels along each edge.
+      if (type === 'map') Object.assign(widget, { width: overrides.size / effective.scene.scale, height: overrides.size / effective.scene.scale })
       request = { type, widget: type === 'raster' ? { ...widget, resourceId: 'benchmark-image' } : widget, scene: effective.scene }
       fonts = widgetFonts({ type, data: request.widget })
     }
     // The native resource step derives the table core would hand the editor for this split length.
     const split_table = type === 'splits_run' ? `split-table-${id}.json` : null
-    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table })
+    // The map itself is a WebGL2 canvas: both preview backends time the widget drawn over it.
+    const map_layer = type === 'map'
+    result.push({ id, activity, start_frame, dynamic, config: effective, request, fonts, split_table, map_layer })
   }
   return result
 }
@@ -276,6 +283,7 @@ export async function play({ entry, frames, warmup, fps, fonts }) {
     }
     const widget = entry.request === null ? 0 : send(entry.request, (ptr, len) => module._ovrley_preview_widget_create(session, ptr, len))
     if (entry.request !== null && widget === 0) fail()
+    if (entry.map_layer) module._ovrley_preview_map_layer_ready(session, widget, 1)
     const step = (index, measured) => {
       if (widget === 0 || (!entry.dynamic && lastRevision !== -1)) return false
       let mark = performance.now()

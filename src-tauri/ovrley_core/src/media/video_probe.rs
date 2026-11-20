@@ -30,12 +30,9 @@ use std::process::Command;
 ///
 /// Spawns `ffprobe -v quiet -print_format json -show_format -show_streams` for
 /// the given file. Parses the JSON output into a [`SourceVideoMetadata`] struct.
-/// `creation_time` and the ffprobe fallback `sync_time` are resolved with this
-/// priority:
-/// 1. Stream-level `creation_time` tag from the first video stream
-/// 2. Container-level `creation_time` from the format tags
-/// 3. QuickTime-specific `com.apple.quicktime.creationdate` tag
-/// 4. File-system modification time (converted to RFC 3339) as final fallback
+/// `creation_time` and the ffprobe fallback `sync_time` come from
+/// [`ffprobe_creation_time`], with the file-system modification time
+/// (converted to RFC 3339) as final fallback.
 ///
 /// A metadata creation time (1–3) is then refined by a time-of-day `timecode`
 /// tag when one fits, see [`timecode_sync_time`].
@@ -217,38 +214,7 @@ pub fn metadata_from_ffprobe_json(file_path: &str, json: &Value) -> SourceVideoM
     // ── PHASE 4: BUILD CREATION TIME VIA PRIORITY CHAIN ──
     log::debug!("Probing video: {}", file_path);
 
-    // Priority order:
-    // 1. format.tags.creation_time
-    let format_creation_time = format
-        .and_then(|f| f.get("tags"))
-        .and_then(|t| t.get("creation_time"))
-        .and_then(|v| v.as_str());
-    if let Some(t) = format_creation_time {
-        log::debug!("Found format.tags.creation_time: {}", t);
-    }
-
-    // 2. streams[0].tags.creation_time
-    let stream_creation_time = video_stream
-        .and_then(|s| s.get("tags"))
-        .and_then(|t| t.get("creation_time"))
-        .and_then(|v| v.as_str());
-    if let Some(t) = stream_creation_time {
-        log::debug!("Found streams[0].tags.creation_time: {}", t);
-    }
-
-    // 3. format.tags.com.apple.quicktime.creationdate
-    let apple_creation_date = format
-        .and_then(|f| f.get("tags"))
-        .and_then(|t| t.get("com.apple.quicktime.creationdate"))
-        .and_then(|v| v.as_str());
-    if let Some(t) = apple_creation_date {
-        log::debug!("Found format.tags.com.apple.quicktime.creationdate: {}", t);
-    }
-
-    metadata.creation_time = format_creation_time
-        .or(stream_creation_time)
-        .or(apple_creation_date)
-        .map(|s| s.to_string());
+    metadata.creation_time = ffprobe_creation_time(&json).map(str::to_string);
     if metadata.creation_time.is_some() {
         metadata.time_source = Some("ffprobe".to_string());
     }
@@ -377,6 +343,32 @@ fn read_timecode<'a>(json: &'a Value, video_stream: Option<&'a Value>) -> Option
         .and_then(tag)
         .or_else(|| json.get("streams")?.as_array()?.iter().find_map(tag))
         .or_else(|| json.get("format").and_then(tag))
+}
+
+/// Selects a video's creation timestamp from ffprobe JSON
+/// (`-show_format -show_streams`), in priority order:
+/// 1. Container-level `creation_time` from the format tags
+/// 2. Stream-level `creation_time` from the first video stream
+/// 3. QuickTime-specific `com.apple.quicktime.creationdate` format tag
+pub(crate) fn ffprobe_creation_time(json: &Value) -> Option<&str> {
+    fn string_tag<'a>(tags: Option<&'a Value>, key: &str) -> Option<&'a str> {
+        tags?.get(key)?.as_str()
+    }
+
+    let format_tags = json.get("format").and_then(|format| format.get("tags"));
+    let video_stream_tags = json
+        .get("streams")
+        .and_then(Value::as_array)
+        .and_then(|streams| {
+            streams
+                .iter()
+                .find(|stream| stream.get("codec_type").and_then(Value::as_str) == Some("video"))
+        })
+        .and_then(|stream| stream.get("tags"));
+
+    string_tag(format_tags, "creation_time")
+        .or_else(|| string_tag(video_stream_tags, "creation_time"))
+        .or_else(|| string_tag(format_tags, "com.apple.quicktime.creationdate"))
 }
 
 fn read_rational_rate(stream: &Value, key: &str) -> Option<(u32, u32)> {

@@ -19,7 +19,7 @@ flags are unchanged. See [Emscripten's SIMD documentation](https://emscripten.or
 
 The first build failed because skcms unconditionally imports additional x86
 headers under Clang, including unsupported AVX-512 headers. The source builder
-now applies [a two-line header-guard patch](../../scripts/patches/skcms-emscripten-intrinsics.patch)
+now applies [a two-line header-guard patch](../../scripts/wasm/skcms-emscripten-intrinsics.patch)
 that excludes these extra imports on Emscripten. Its `immintrin.h` already
 includes the enabled SSE2 headers. No drawing algorithms were patched.
 

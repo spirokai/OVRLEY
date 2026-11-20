@@ -7,6 +7,12 @@ use crate::widgets::{
     g_force::format::GForceSample,
     gauges::{metric::GaugeFrameState, validation::ValidatedGauge},
     lap_timer::format::LapTimerContent,
+    map::{
+        config::MapConfig,
+        content::MapContent,
+        preview::{MapFrameProvider, PreviewMap},
+        validation::ValidatedMapWidget,
+    },
     raster::validation::RasterGeometry,
     route::validation::ValidatedRoutePlot,
 };
@@ -20,6 +26,7 @@ use crate::{
     },
     render::{
         image::{ImageSource, RasterImage},
+        preview::PreviewRasterScale,
         text::FontResolver,
     },
     widgets::{
@@ -33,8 +40,10 @@ use crate::{
         },
     },
 };
+use ovrley_map::{MapCamera, MapStyleCatalog, MapStyleInfo};
 use serde::{Deserialize, Deserializer, Serialize};
 use skia_safe::Canvas;
+use std::sync::Arc;
 
 use crate::widgets::altitude_tape::preview::{AltitudeTapeSample, PreviewAltitudeTape};
 use crate::widgets::diving_profile::{config::DivingProfileConfig, preview::PreviewDivingProfile};
@@ -61,6 +70,15 @@ pub enum ValidatedWidget<'a> {
     RollingChart(&'a ValidatedRollingChart),
     Elevation(&'a ValidatedElevationPlot),
     Route(&'a ValidatedRoutePlot),
+    /// Maps carry the frames their host renders and the content it resolved, so that every
+    /// instance of one widget shares one route line.
+    Map {
+        widget: &'a ValidatedMapWidget,
+        /// The installed style the widget's own resolved to.
+        style: MapStyleInfo,
+        frames: Arc<dyn MapFrameProvider>,
+        content: MapContent,
+    },
     Raster {
         geometry: &'a RasterGeometry,
         source_id: String,
@@ -85,6 +103,11 @@ pub enum FrameKey {
     Parts(MetricDisplayParts),
     /// Retained geometry identity and marker progress.
     Route(usize, f32),
+    /// The camera, when GPS exists, and the marker's progress.
+    Map {
+        camera: Option<MapCamera>,
+        progress: f32,
+    },
     /// Retained geometry identity and frame state.
     Elevation(usize, ElevationFrameState),
     DivingProfile(DivingFrameState),
@@ -111,6 +134,11 @@ pub enum WidgetRequest {
     },
     Route {
         widget: CoursePlotConfig,
+        scene: ScenePresentationConfig,
+        transient: bool,
+    },
+    Map {
+        widget: MapConfig,
         scene: ScenePresentationConfig,
         transient: bool,
     },
@@ -168,6 +196,12 @@ impl<'de> Deserialize<'de> for WidgetRequest {
             })
         } else if input.r#type == "course" {
             Ok(Self::Route {
+                widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?,
+                scene: input.scene,
+                transient: input.transient,
+            })
+        } else if input.r#type == "map" {
+            Ok(Self::Map {
                 widget: serde_json::from_value(input.widget).map_err(serde::de::Error::custom)?,
                 scene: input.scene,
                 transient: input.transient,
@@ -261,6 +295,7 @@ pub enum PreviewWidget {
     RollingChart(PreviewRollingChart),
     Elevation(PreviewElevation),
     Route(PreviewRoute),
+    Map(PreviewMap),
     Raster(PreviewRaster),
     Backdrop(PreviewBackdrop),
     Label(PreviewLabel),
@@ -280,72 +315,99 @@ pub enum PreviewWidget {
 impl PreviewWidget {
     pub fn new(
         request: WidgetRequest,
+        raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
+        map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
-                PreviewDivingProfile::new(widget, scene)?,
+                PreviewDivingProfile::new(widget, scene, raster_scale)?,
             )),
             WidgetRequest::RollingChart { widget, scene, .. } => Ok(Self::RollingChart(
-                PreviewRollingChart::new(widget, scene, fonts)?,
+                PreviewRollingChart::new(widget, scene, raster_scale, fonts)?,
             )),
-            WidgetRequest::Elevation { widget, scene, .. } => {
-                Ok(Self::Elevation(PreviewElevation::new(widget, scene)?))
-            }
+            WidgetRequest::Elevation { widget, scene, .. } => Ok(Self::Elevation(
+                PreviewElevation::new(widget, scene, raster_scale)?,
+            )),
             WidgetRequest::Route { widget, scene, .. } => {
-                Ok(Self::Route(PreviewRoute::new(widget, scene)?))
+                Ok(Self::Route(PreviewRoute::new(widget, scene, raster_scale)?))
             }
-            WidgetRequest::Raster { widget, scene, .. } => {
-                Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?))
-            }
-            WidgetRequest::Backdrop { widget, scene, .. } => {
-                Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?))
-            }
-            WidgetRequest::Label { widget, scene, .. } => {
-                Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?))
-            }
+            WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(PreviewMap::new(
+                widget,
+                scene,
+                raster_scale,
+                map_styles,
+                fonts,
+            )?)),
+            WidgetRequest::Raster { widget, scene, .. } => Ok(Self::Raster(PreviewRaster::new(
+                widget,
+                scene,
+                raster_scale,
+                images,
+            )?)),
+            WidgetRequest::Backdrop { widget, scene, .. } => Ok(Self::Backdrop(
+                PreviewBackdrop::new(widget, scene, raster_scale)?,
+            )),
+            WidgetRequest::Label { widget, scene, .. } => Ok(Self::Label(PreviewLabel::new(
+                widget,
+                scene,
+                raster_scale,
+                fonts,
+            )?)),
             WidgetRequest::Gradient(request) => Ok(Self::Gradient(PreviewGradient::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::LeanAngle(request) => Ok(Self::LeanAngle(PreviewLeanAngle::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::GForce(request) => Ok(Self::GForce(PreviewGForce::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::LapTimer(request) => Ok(Self::LapTimer(PreviewLapTimer::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::SplitsRun(request) => Ok(Self::SplitsRun(PreviewSplitsRun::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::HeadingTape(request) => Ok(Self::HeadingTape(PreviewHeading::new(
                 request.widget,
                 request.scene,
+                raster_scale,
                 fonts,
             )?)),
             WidgetRequest::HeadingCompass(request) => Ok(Self::HeadingCompass(
-                PreviewHeadingCompass::new(request.widget, request.scene, fonts)?,
+                PreviewHeadingCompass::new(request.widget, request.scene, raster_scale, fonts)?,
             )),
             WidgetRequest::HeartZones(request) => Ok(Self::HeartZones(PreviewHeartZones::new(
                 request.widget,
                 request.scene,
+                raster_scale,
                 fonts,
             )?)),
             WidgetRequest::AltitudeTape(request) => Ok(Self::AltitudeTape(
-                PreviewAltitudeTape::new(request.widget, request.scene, fonts)?,
+                PreviewAltitudeTape::new(request.widget, request.scene, raster_scale, fonts)?,
             )),
             WidgetRequest::Gauge(request) => Ok(Self::Gauge(PreviewGauge::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
-            WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
+            WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(
+                request,
+                raster_scale,
+                fonts,
+            )?)),
         }
     }
     /// Builds a validated widget for a host other than the editor preview.
@@ -369,6 +431,20 @@ impl PreviewWidget {
                 widget.clone(),
                 scene.clone(),
                 host,
+            )?),
+            ValidatedWidget::Map {
+                widget,
+                style,
+                frames,
+                content,
+            } => Self::Map(PreviewMap::from_validated(
+                widget.clone(),
+                style,
+                scene.clone(),
+                host,
+                frames,
+                content,
+                fonts,
             )?),
             ValidatedWidget::Raster {
                 geometry,
@@ -459,6 +535,13 @@ impl PreviewWidget {
                 let (geometry, progress) = widget.frame_key(activity, second)?;
                 FrameKey::Route(geometry, progress)
             }
+            Self::Map(widget) => {
+                let state = widget.frame_state(activity, second)?;
+                FrameKey::Map {
+                    camera: state.camera,
+                    progress: state.progress,
+                }
+            }
             Self::Raster(_) | Self::Backdrop(_) | Self::Label(_) => FrameKey::Static,
             Self::Gradient(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
             Self::LeanAngle(widget) => FrameKey::Sample(widget.frame_key(activity, second)),
@@ -481,6 +564,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => &widget.pixels,
             Self::Elevation(widget) => &widget.pixels,
             Self::Route(widget) => &widget.pixels,
+            Self::Map(widget) => &widget.pixels,
             Self::Raster(widget) => &widget.pixels,
             Self::Backdrop(widget) => &widget.pixels,
             Self::Label(widget) => &widget.pixels,
@@ -503,6 +587,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => &widget.geometry,
             Self::Elevation(widget) => &widget.geometry,
             Self::Route(widget) => &widget.geometry,
+            Self::Map(widget) => &widget.geometry,
             Self::Raster(widget) => &widget.geometry,
             Self::Backdrop(widget) => &widget.geometry,
             Self::Label(widget) => &widget.geometry,
@@ -532,6 +617,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => Ok(widget.layout_bounds()),
             Self::Elevation(widget) => widget.layout_bounds(activity, second, fonts),
             Self::Route(widget) => widget.layout_bounds(activity, second),
+            Self::Map(widget) => Ok(widget.layout_bounds()),
             Self::Raster(widget) => Ok(widget.layout_bounds()),
             Self::Backdrop(widget) => Ok(widget.layout_bounds()),
             Self::Label(widget) => Ok(widget.layout_bounds()),
@@ -548,6 +634,23 @@ impl PreviewWidget {
             Self::Value(widget) => widget.layout_bounds(activity, second, fonts),
         }
     }
+    /// Starts any frame drawn outside this thread for `second`, so `draw` need not wait for all of it.
+    pub fn start_frame(
+        &mut self,
+        activity: Option<&ActivitySampler>,
+        second: f64,
+    ) -> WidgetResult<()> {
+        match self {
+            Self::Map(widget) => widget.start_frame(activity, second),
+            _ => Ok(()),
+        }
+    }
+
+    /// Whether `draw` may wait on a frame `start_frame` began.
+    pub fn draws_a_started_frame(&self) -> bool {
+        matches!(self, Self::Map(_))
+    }
+
     /// Draws the frame at `second` onto a host canvas in scene coordinates at raster scale 1,
     /// returning the rectangle it drew into, which equals `layout_bounds`.
     pub fn draw(
@@ -562,6 +665,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => Ok(widget.draw(canvas, activity, second)),
             Self::Elevation(widget) => widget.draw(canvas, activity, second, fonts),
             Self::Route(widget) => widget.draw(canvas, activity, second),
+            Self::Map(widget) => widget.draw(canvas, activity, second),
             Self::Raster(widget) => widget.draw(canvas),
             Self::Backdrop(widget) => Ok(widget.draw(canvas)),
             Self::Label(widget) => widget.draw(canvas),
@@ -586,6 +690,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => widget.bounds,
             Self::Elevation(widget) => widget.bounds,
             Self::Route(widget) => widget.bounds,
+            Self::Map(widget) => widget.bounds,
             Self::Raster(widget) => Some(widget.bounds),
             Self::Backdrop(widget) => Some(widget.bounds),
             Self::Label(widget) => Some(widget.bounds),
@@ -608,6 +713,7 @@ impl PreviewWidget {
             Self::RollingChart(widget) => widget.revision,
             Self::Elevation(widget) => widget.revision,
             Self::Route(widget) => widget.revision,
+            Self::Map(widget) => widget.revision,
             Self::Raster(widget) => widget.revision,
             Self::Backdrop(widget) => widget.revision,
             Self::Label(widget) => widget.revision,
@@ -639,6 +745,8 @@ pub struct ResizeRequest {
     pub size: Option<[f32; 2]>,
     /// Heading inspector edits resize the frame to preserve tick lengths.
     pub label_offset: Option<f32>,
+    /// A map's view mode pans and zooms inside its frame.
+    pub map_view: Option<crate::widgets::map::interaction::MapViewGesture>,
     pub fixed: [f32; 2],
     pub point: [f32; 2],
     pub second: f64,
@@ -651,6 +759,8 @@ pub enum ResizeUpdate {
     RollingChart(crate::widgets::rolling_chart::interaction::ResizeUpdate),
     Elevation(crate::widgets::elevation::interaction::ResizeUpdate),
     Route(crate::widgets::route::interaction::ResizeUpdate),
+    Map(crate::widgets::map::interaction::ResizeUpdate),
+    MapView(crate::widgets::map::interaction::MapViewUpdate),
     Raster(crate::widgets::raster::interaction::ResizeUpdate),
     Backdrop(crate::widgets::backdrop::interaction::ResizeUpdate),
     Label(crate::widgets::label::interaction::ResizeUpdate),

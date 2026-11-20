@@ -1,0 +1,5 @@
+interface:
+  display_name: 'Reviewer'
+  short_description: 'Review a change into findings and a verdict'
+policy:
+  allow_implicit_invocation: false

@@ -7,7 +7,7 @@ vi.mock('@tauri-apps/plugin-dialog', () => dialog)
 vi.mock('@/api/backend', () => ({ readSelectedFileBytes: vi.fn() }))
 vi.mock('@/lib/preferences-store', () => preferences)
 
-import { openSinglePath, saveSinglePath } from '@/lib/file-dialog'
+import { caseInsensitiveFilters, openSinglePath, saveSinglePath } from '@/lib/file-dialog'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -32,12 +32,12 @@ test('project open and Save As share one persistent directory preference', async
 
   expect(dialog.open).toHaveBeenCalledWith({
     multiple: false,
-    filters: [{ name: 'OVRLEY Project', extensions: ['oly'] }],
+    filters: [{ name: 'OVRLEY Project', extensions: ['oly', 'OLY'] }],
     defaultPath: 'D:\\OVRLEY Projects',
   })
   expect(dialog.save).toHaveBeenCalledWith({
     defaultPath: 'E:\\Events\\Race.oly',
-    filters: [{ name: 'OVRLEY Project', extensions: ['oly'] }],
+    filters: [{ name: 'OVRLEY Project', extensions: ['oly', 'OLY'] }],
   })
   expect(preferences.setPreference).toHaveBeenNthCalledWith(1, 'last-project-dir', 'E:\\Events')
   expect(preferences.setPreference).toHaveBeenNthCalledWith(2, 'last-project-dir', 'F:\\Archive')
@@ -52,4 +52,10 @@ test('cancelled project dialogs do not change the remembered directory', async (
   await saveSinglePath('D:\\OVRLEY Projects\\Race.oly', 'oly', 'OVRLEY Project', { lastDirectoryKey: 'last-project-dir' })
 
   expect(preferences.setPreference).not.toHaveBeenCalled()
+})
+
+test('dialog filters match uppercase extensions on case-sensitive pickers', () => {
+  expect(caseInsensitiveFilters([{ name: 'Video', extensions: ['mp4', 'mov'] }])).toEqual([
+    { name: 'Video', extensions: ['mp4', 'MP4', 'mov', 'MOV'] },
+  ])
 })

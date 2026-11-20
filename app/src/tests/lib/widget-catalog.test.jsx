@@ -11,9 +11,9 @@ import i18next from '@/i18n'
 
 describe('manifest-backed widgets', () => {
   test('offers seven scuba text metrics with diving units and conventional names', () => {
-    const group = GROUPED_QUICKMENU_ITEMS.find((group) => group.items.some((item) => item.type === 'depth'))
+    const group = GROUPED_QUICKMENU_ITEMS.find((group) => group.items.some((item) => item.key === 'depth'))
     const types = ['depth', 'first_stop_depth', 'first_stop_time', 'time_to_surface', 'average_ppo2', 'gas_mix', 'water_temperature']
-    expect(group.items.map((item) => item.type).sort()).toEqual([...types, 'diving_profile'].sort())
+    expect(group.items.map((item) => item.key).sort()).toEqual([...types, 'diving_profile'].sort())
     for (const type of types) {
       expect(WIDGET_TYPE_DEFINITIONS[type].category).toBe('scuba_diving')
       // Depth also offers the shared tape under its own name.
@@ -52,18 +52,34 @@ describe('manifest-backed widgets', () => {
       { value: 'rectangle', label: 'Rectangle' },
     ])
     const items = GROUPED_QUICKMENU_ITEMS.flatMap((group) => group.items)
-    expect(items.find((item) => item.type === 'depth').options.at(-1).labelKey).toBe('widgets.displayTypes.depthTape')
-    expect(items.find((item) => item.type === 'heading').options.map((option) => option.selection)).toEqual([
-      { displayType: 'text' },
-      { displayType: 'heading_tape' },
-      { displayType: 'heading_compass' },
+    expect(items.find((item) => item.key === 'depth').options.at(-1).labelKey).toBe('widgets.displayTypes.depthTape')
+    expect(items.find((item) => item.key === 'heading').options.map((option) => option.selection)).toEqual([
+      { type: 'heading', displayType: 'text' },
+      { type: 'heading', displayType: 'heading_tape' },
+      { type: 'heading', displayType: 'heading_compass' },
     ])
-    expect(items.find((item) => item.type === 'lap_timer').options.map((option) => option.selection)).toEqual([
-      { lapTimerMode: 'current_lap' },
-      { lapTimerMode: 'best_lap' },
-      { lapTimerMode: 'delta' },
-      { lapTimerMode: 'lap_log' },
+    expect(items.find((item) => item.key === 'lap_timer').options.map((option) => option.selection)).toEqual([
+      { type: 'lap_timer', lapTimerMode: 'current_lap' },
+      { type: 'lap_timer', lapTimerMode: 'best_lap' },
+      { type: 'lap_timer', lapTimerMode: 'delta' },
+      { type: 'lap_timer', lapTimerMode: 'lap_log' },
     ])
+  })
+
+  test('offers route, map tiles and 3D route as one map entry', () => {
+    const items = GROUPED_QUICKMENU_ITEMS.flatMap((group) => group.items)
+    const map = items.find((item) => item.key === 'map')
+    expect(items.some((item) => item.key === 'course')).toBe(false)
+    expect(map.types).toEqual(['course', 'map'])
+    expect(map.options.map((option) => i18next.t(option.labelKey))).toEqual(['Route', 'Map Tiles', '3D Route'])
+    expect(map.options.map((option) => option.selection)).toEqual([
+      { type: 'course' },
+      { type: 'map', preset: { camera_mode: 'fixed' } },
+      { type: 'map' },
+    ])
+    const [, tiles, route3d] = map.options.map((option) => createWidgetDefaults(option.selection, DEFAULT_GLOBAL_DEFAULTS))
+    expect(tiles.camera_mode).toBe('fixed')
+    expect(route3d).toMatchObject({ camera_mode: 'follow', pitch: 50 })
   })
 
   test('renders every registered icon through the production component', () => {

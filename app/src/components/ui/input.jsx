@@ -24,11 +24,12 @@ const Input = React.forwardRef(({ className, type, variant = 'default', ...props
       data-slot="input"
       data-variant={variant}
       className={cn(
-        'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground border-input h-9 w-full min-w-0 rounded-sm border bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
-        'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-1',
-        'aria-invalid:ring-destructive/20 aria-invalid:border-destructive',
+        'file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground h-9 w-full min-w-0 rounded-sm border-0 bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm',
+        'focus-visible:ring-ring/50 focus-visible:ring-1',
+        'aria-invalid:ring-destructive/20',
+        variant === 'default' && 'field-lift',
         variant === 'inline' &&
-          'rounded-xs h-4.75 border-transparent px-1 py-0 text-right text-[0.741rem] leading-3.25 font-mono text-muted-foreground shadow-none focus:border-input focus:bg-surface focus:text-foreground md:text-[0.741rem] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
+          'rounded-xs h-4.75 px-1 py-0 text-right text-[0.741rem] leading-3.25 font-mono text-muted-foreground shadow-none focus:bg-surface focus:text-foreground md:text-[0.741rem] [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         className,
       )}
       {...props}

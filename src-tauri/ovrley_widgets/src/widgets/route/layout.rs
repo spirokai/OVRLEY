@@ -1,6 +1,6 @@
-//! Cached remaining route and vector drawing; one frame supplies paint and interaction bounds.
+//! Cached route shadow and vector drawing; one frame supplies paint and interaction bounds.
 use super::{
-    geometry::{RouteFrameState, RouteGeometry},
+    geometry::{ProgressLine, RouteGeometry},
     validation::ValidatedRoutePlot,
 };
 use crate::{
@@ -18,11 +18,11 @@ use crate::{
 
 fn route_marker(config: &ValidatedRoutePlot, scene: &ValidatedScenePresentation) -> PlotMarker {
     PlotMarker::new(
-        config.marker_variant,
-        config.marker_size,
-        config.marker_variant_diameter,
-        &config.marker_color,
-        config.marker_opacity * scene.opacity,
+        config.path.marker_variant,
+        config.path.marker_size,
+        config.path.marker_variant_diameter,
+        &config.path.marker_color,
+        config.path.marker_opacity * scene.opacity,
         scene.scale,
     )
 }
@@ -34,12 +34,13 @@ pub struct RouteLayout {
     pub config: ValidatedRoutePlot,
     pub scene: ValidatedScenePresentation,
     pub geometry: Arc<RouteGeometry>,
-    /// Remaining line at the final angle, relative to the widget origin.
-    remaining: StaticRaster,
+    /// The line's shadow at the final angle, relative to the widget origin. Blurring is the costly
+    /// part, so it is drawn once. None when the scene casts no shadow.
+    shadow: Option<StaticRaster>,
     bounds: Rect,
     content_bounds: ContentBounds,
     scale: [f32; 2],
-    completed_paint: Paint,
+    stroke: SplitStroke,
     marker: PlotMarker,
 }
 
@@ -52,7 +53,7 @@ struct RemainingStroke {
 }
 
 pub struct RouteFrame {
-    pub state: RouteFrameState,
+    pub progress: f32,
     pub bounds: Rect,
     /// Unrotated selection rectangle in scene pixels; rotation uses its center.
     pub content_bounds: ContentBounds,
@@ -113,8 +114,65 @@ pub(crate) fn stroke_paint(color: &str, width: f32, opacity: f32) -> Paint {
     paint
 }
 
+/// How every route draws its line each frame: whole in `remaining`, then the stretch behind the split
+/// in `completed` on top. The whole line never changes, so its path is built once and a frame builds
+/// only the completed stretch. Segments wholly outside `within` are left out of both, so a line that
+/// mostly runs off its frame strokes only what shows.
+#[derive(Clone, Debug)]
+pub(crate) struct SplitStroke {
+    /// The whole line, which the remaining side and the route plot's shadow stroke.
+    pub(crate) whole: Path,
+    /// Reached out by half a stroke and a unit of antialiasing.
+    within: Rect,
+    remaining: Paint,
+    completed: Paint,
+}
+
+impl SplitStroke {
+    /// `within` and both paints' widths are in `line`'s units.
+    pub(crate) fn new(
+        line: &ProgressLine,
+        within: Rect,
+        remaining: Paint,
+        completed: Paint,
+    ) -> Self {
+        // A segment just outside still reaches in by half its stroke, and antialiasing by a unit.
+        let reach = remaining.stroke_width().max(completed.stroke_width()) / 2.0 + 1.0;
+        let within = within.with_outset((reach, reach));
+        Self {
+            whole: line.path(within),
+            within,
+            remaining,
+            completed,
+        }
+    }
+
+    /// Draws `line`, the one this was built for, split at `progress`, with its units scaled by
+    /// `scale`. Returns where the split lands in the canvas's units, with the line's heading there in
+    /// degrees clockwise from up.
+    pub(crate) fn draw(
+        &self,
+        canvas: &Canvas,
+        line: &ProgressLine,
+        progress: f32,
+        scale: [f32; 2],
+    ) -> (Point, f32) {
+        let split = line.split(progress);
+        canvas.save();
+        canvas.scale((scale[0], scale[1]));
+        canvas.draw_path(&self.whole, &self.remaining);
+        canvas.draw_path(&line.completed_path(&split, self.within), &self.completed);
+        canvas.restore();
+        let ((x, y), (dx, dy)) = (split.point, split.direction);
+        (
+            Point::new(x * scale[0], y * scale[1]),
+            (dx * scale[0]).atan2(-dy * scale[1]).to_degrees(),
+        )
+    }
+}
+
 impl RouteLayout {
-    /// Remaining-path stroke and its unrotated raster rectangle, before any drawing.
+    /// Remaining-path stroke and the unrotated rectangle it and its shadow cover, before any drawing.
     fn remaining_stroke(
         config: &ValidatedRoutePlot,
         scene: &ValidatedScenePresentation,
@@ -145,7 +203,7 @@ impl RouteLayout {
         }
     }
 
-    /// Frame bounds from layout alone; the cached remaining raster is not drawn.
+    /// Frame bounds from layout alone; the cached shadow is not drawn.
     pub fn measure(
         config: &ValidatedRoutePlot,
         scene: &ValidatedScenePresentation,
@@ -168,59 +226,56 @@ impl RouteLayout {
             blur,
             bounds: remaining_bounds,
         } = Self::remaining_stroke(&config, &scene, &geometry);
+        let opacity = config.path.remaining_line_opacity * scene.opacity;
+        // Every segment lies inside the line's own bounds, so none is left out.
+        let stroke = SplitStroke::new(
+            &geometry.line,
+            geometry.point_bounds,
+            stroke_paint(&config.path.remaining_line_color, width / scale[0], opacity),
+            stroke_paint(
+                &config.path.completed_line_color,
+                (config.completed_line_width * scene.scale).max(1.0) / scale[0],
+                config.path.completed_line_opacity * scene.opacity,
+            ),
+        );
         // Cache at the final angle so playback can blit without resampling a rotated
         // bitmap every frame. Positions stay relative to the widget for cheap dragging.
-        let remaining_image_bounds =
-            outward(rotated_rect(remaining_bounds, config.rotation, 0.0, 0.0));
-        let remaining = StaticRaster::new(
-            raster_scale,
-            Point::new(config.x, config.y),
-            remaining_image_bounds,
-            SHAPE_COLOR_TYPE,
-            |canvas| {
-                let path = geometry.path.lock().expect("route path lock");
-                canvas.rotate(config.rotation, None);
-                let opacity = config.remaining_line_opacity * scene.opacity;
-                if blur > 0.0 {
-                    canvas.save();
-                    canvas.translate((offset[0], offset[1]));
-                    canvas.scale((scale[0], scale[1]));
-                    let mut paint = stroke_paint(&scene.shadow_color, width / scale[0], opacity);
-                    paint.set_mask_filter(MaskFilter::blur(
-                        BlurStyle::Normal,
-                        blur / scale[0],
-                        true,
-                    ));
-                    canvas.draw_path(&path, &paint);
-                    canvas.restore();
-                }
-                canvas.save();
-                canvas.scale((scale[0], scale[1]));
-                canvas.draw_path(
-                    &path,
-                    &stroke_paint(&config.remaining_line_color, width / scale[0], opacity),
-                );
-                canvas.restore();
-                Ok(())
-            },
-        )?;
+        let shadow = (blur > 0.0)
+            .then(|| {
+                StaticRaster::new(
+                    raster_scale,
+                    Point::new(config.x, config.y),
+                    outward(rotated_rect(remaining_bounds, config.rotation, 0.0, 0.0)),
+                    SHAPE_COLOR_TYPE,
+                    |canvas| {
+                        canvas.rotate(config.rotation, None);
+                        canvas.translate((offset[0], offset[1]));
+                        canvas.scale((scale[0], scale[1]));
+                        let mut paint =
+                            stroke_paint(&scene.shadow_color, width / scale[0], opacity);
+                        paint.set_mask_filter(MaskFilter::blur(
+                            BlurStyle::Normal,
+                            blur / scale[0],
+                            true,
+                        ));
+                        canvas.draw_path(&stroke.whole, &paint);
+                        Ok(())
+                    },
+                )
+            })
+            .transpose()?;
         let (bounds, content_bounds) =
             Self::measure_bounds(&config, &scene, &geometry, remaining_bounds);
-        let completed_paint = stroke_paint(
-            &config.completed_line_color,
-            (config.completed_line_width * scene.scale).max(1.0) / scale[0],
-            config.completed_line_opacity * scene.opacity,
-        );
         let marker = route_marker(&config, &scene);
         Ok(Self {
             config,
             scene,
             geometry,
-            remaining,
+            shadow,
             bounds,
             content_bounds,
             scale,
-            completed_paint,
+            stroke,
             marker,
         })
     }
@@ -250,7 +305,7 @@ impl RouteLayout {
         let radius = route_marker(config, scene).extent();
         // Allocate marker overflow for the entire path once; playback cannot resize the raster.
         raster.join(scaled_rect(geometry.point_bounds, scale).with_outset((radius, radius)));
-        if config.remaining_line_opacity > 0.0 {
+        if config.path.remaining_line_opacity > 0.0 {
             raster.join(remaining_bounds);
         }
         raster.outset((1.0, 1.0));
@@ -262,7 +317,7 @@ impl RouteLayout {
 
     pub fn frame(&self, progress: f32) -> RouteFrame {
         RouteFrame {
-            state: self.geometry.state(progress),
+            progress,
             bounds: self.bounds,
             content_bounds: self.content_bounds,
         }
@@ -271,19 +326,14 @@ impl RouteLayout {
     pub fn draw(&self, canvas: &Canvas, frame: &RouteFrame) {
         canvas.save();
         canvas.translate((self.config.x, self.config.y));
-        self.remaining.draw(canvas, None);
+        if let Some(shadow) = &self.shadow {
+            shadow.draw(canvas, None);
+        }
         canvas.rotate(self.config.rotation, None);
-        let scale = self.scale;
-        let completed: Path = self.geometry.completed_path(&frame.state);
-        canvas.save();
-        canvas.scale((scale[0], scale[1]));
-        canvas.draw_path(&completed, &self.completed_paint);
-        canvas.restore();
-        let point = (
-            frame.state.marker_x * scale[0],
-            frame.state.marker_y * scale[1],
-        );
-        self.marker.draw(canvas, point);
+        let (point, heading) =
+            self.stroke
+                .draw(canvas, &self.geometry.line, frame.progress, self.scale);
+        self.marker.draw_heading(canvas, point, heading);
         canvas.restore();
     }
 }

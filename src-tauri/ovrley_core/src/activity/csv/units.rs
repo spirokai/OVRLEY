@@ -84,6 +84,12 @@ pub(super) enum Unit {
     Celsius,
     /// Degrees Fahrenheit, converted at ingestion.
     Fahrenheit,
+    /// Kilopascals.
+    Kilopascals,
+    /// Bar, converted at ingestion.
+    Bar,
+    /// Pounds per square inch, converted at ingestion.
+    Psi,
     /// Decimal degrees for coordinates.
     DecimalDegrees,
     /// Metres per second.
@@ -163,8 +169,11 @@ pub(super) fn parse_declared_unit(value: &str) -> DeclaredUnit {
         "min" | "minute" | "minutes" => Unit::Minutes,
         "ata" => Unit::AtmospheresAbsolute,
         "fraction" => Unit::Fraction,
-        "celsius" | "°c" => Unit::Celsius,
-        "fahrenheit" | "°f" => Unit::Fahrenheit,
+        "c" | "celsius" | "°c" => Unit::Celsius,
+        "f" | "fahrenheit" | "°f" => Unit::Fahrenheit,
+        "kpa" => Unit::Kilopascals,
+        "bar" => Unit::Bar,
+        "psi" => Unit::Psi,
         "deg" | "degree" | "degrees" | "°" => Unit::Degrees,
         "m/s" | "mps" => Unit::MetresPerSecond,
         "km/h" | "kmh" | "kph" => Unit::KilometresPerHour,
@@ -278,7 +287,10 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
         Metric::FirstStopTime | Metric::TimeToSurface => matches!(unit, Unit::Minutes),
         Metric::AveragePpo2 => matches!(unit, Unit::AtmospheresAbsolute),
         Metric::FractionO2 | Metric::FractionHe => matches!(unit, Unit::Fraction),
-        Metric::WaterTemperature => matches!(unit, Unit::Celsius | Unit::Fahrenheit),
+        Metric::WaterTemperature | Metric::CoolantTemperature => {
+            matches!(unit, Unit::Celsius | Unit::Fahrenheit)
+        }
+        Metric::BoostPressure => matches!(unit, Unit::Kilopascals | Unit::Bar | Unit::Psi),
         Metric::GForce | Metric::GForceX | Metric::GForceY | Metric::GForceZ => {
             matches!(unit, Unit::G)
         }
@@ -305,6 +317,8 @@ pub(super) fn compatible(metric: Metric, unit: Unit) -> bool {
 pub(super) fn convert(value: f64, unit: Unit) -> f64 {
     match unit {
         Unit::Fahrenheit => (value - 32.0) * 5.0 / 9.0,
+        Unit::Bar => value * 100.0,
+        Unit::Psi => value * 6.894_757_293_168_361,
         Unit::Milliseconds => value / 1000.0,
         Unit::KilometresPerHour => value / 3.6,
         Unit::MilesPerHour => value * 0.44704,
@@ -319,6 +333,7 @@ pub(super) fn convert(value: f64, unit: Unit) -> f64 {
         | Unit::AtmospheresAbsolute
         | Unit::Fraction
         | Unit::Celsius
+        | Unit::Kilopascals
         | Unit::DecimalDegrees
         | Unit::MetresPerSecond
         | Unit::Metres
@@ -339,7 +354,8 @@ fn default_unit(metric: Metric) -> Unit {
         Metric::FirstStopTime | Metric::TimeToSurface => Unit::Minutes,
         Metric::AveragePpo2 => Unit::AtmospheresAbsolute,
         Metric::FractionO2 | Metric::FractionHe => Unit::Fraction,
-        Metric::WaterTemperature => Unit::Celsius,
+        Metric::WaterTemperature | Metric::CoolantTemperature => Unit::Celsius,
+        Metric::BoostPressure => Unit::Kilopascals,
         Metric::ElapsedSeconds | Metric::Timestamp => Unit::Seconds,
         Metric::Latitude | Metric::Longitude => Unit::DecimalDegrees,
         Metric::Speed => Unit::KilometresPerHour,

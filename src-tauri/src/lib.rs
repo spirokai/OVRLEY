@@ -27,6 +27,8 @@
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub mod video_server; // test seam
 
+mod map_cache_settings;
+mod map_styles;
 mod map_tile_service;
 
 #[cfg(test)]
@@ -35,8 +37,12 @@ mod video_server_tests;
 #[cfg(test)]
 mod map_tile_service_tests;
 
+#[cfg(target_os = "linux")]
+mod appimage_integration;
 mod distribution;
 mod file_ops;
+#[cfg(not(target_os = "macos"))]
+mod main_window;
 mod preview_import;
 mod progress_sink;
 mod project_file;
@@ -49,6 +55,7 @@ mod widget_preview;
 
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::inspection::VideoInspectionService;
+use ovrley_map::gpu::labels::GlyphService;
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -70,6 +77,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(video_server)
         .manage(widget_preview::PreviewActivities::default())
+        .manage(widget_preview::MapDownload::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -83,6 +91,7 @@ pub fn run() {
             tauri_commands::backend_font_capabilities,
             tauri_commands::backend_font_data,
             widget_preview::backend_preview_activity,
+            widget_preview::backend_map_prepare,
             widget_preview::backend_preview_split_table,
             widget_preview::backend_release_preview_activity,
             widget_preview::backend_preview_font,
@@ -120,6 +129,10 @@ pub fn run() {
             tauri_commands::backend_clear_preview_video,
             tauri_commands::backend_get_video_state,
             tauri_commands::backend_get_map_style_url_template,
+            tauri_commands::backend_list_map_styles,
+            tauri_commands::backend_get_map_tile_cache,
+            tauri_commands::backend_set_map_tile_cache_limit,
+            tauri_commands::backend_clear_map_tile_cache,
             tauri_commands::backend_detect_codecs,
             tauri_commands::backend_build_elevation_geometry,
             tauri_commands::backend_build_route_geometry,
@@ -138,6 +151,8 @@ pub fn run() {
         .setup(|app| {
             app.manage(distribution::detect()?);
             app.manage(raster_resources::RasterResources::default());
+            #[cfg(target_os = "linux")]
+            appimage_integration::register(app);
 
             #[cfg(debug_assertions)]
             {
@@ -158,20 +173,24 @@ pub fn run() {
                 ))),
             });
 
-            let map_tile_service = map_tile_service::MapTileService::for_application_cache(
-                app.path()
-                    .app_cache_dir()
-                    .map_err(|error| error.to_string())?,
-            )?;
+            let map_data = map_styles::MapData::new(
+                map_styles::MapStyleRegistry::load(&runtime_paths::map_style_dirs(app.handle())?)?,
+                map_tile_service::MapTileService::for_application_cache(
+                    app.path()
+                        .app_cache_dir()
+                        .map_err(|error| error.to_string())?,
+                    map_cache_settings::persisted_tile_cache_limit(app.handle())?,
+                )?,
+                Arc::new(GlyphService::open(&runtime_paths::map_font_dir(
+                    app.handle(),
+                )?)?),
+            );
+            app.manage(map_data.clone());
             app.state::<video_server::VideoServerHandle>()
-                .start_with_map_tile_service(map_tile_service)?;
+                .start_with_map_data(map_data)?;
 
             #[cfg(not(target_os = "macos"))]
-            {
-                if let Some(window) = app.get_webview_window("main") {
-                    window.set_decorations(false)?;
-                }
-            }
+            main_window::create(app)?.set_decorations(false)?;
 
             #[cfg(target_os = "macos")]
             {

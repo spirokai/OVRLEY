@@ -30,6 +30,11 @@ vi.mock('@/features/widget-editor/components/widgetEditorSections', () => ({
 }))
 
 import SidebarWidgetsTab from '@/features/widget-editor/components/SidebarWidgetsTab'
+import useWidgetDraftState from '@/features/overlay-editor/hooks/useWidgetDraftState'
+
+function Tab() {
+  return <SidebarWidgetsTab widgetLiveEdits={useWidgetDraftState()} />
+}
 
 function makeManagerState(widget) {
   return {
@@ -49,7 +54,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'label', category: 'labels', name: 'Text', data: { text: 'Hello', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-text')).toBeTruthy()
   })
 
@@ -63,7 +68,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
         data: { display_type: 'rectangle', x: 0, y: 0, opacity: 1, display_variants: { rectangle: { width: 200, height: 120 } } },
       }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-backdrop')).toBeTruthy()
   })
 
@@ -71,7 +76,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'speed', category: 'values', name: 'Speed', data: { value: 'speed', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-metric')).toBeTruthy()
   })
 
@@ -79,7 +84,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'time', category: 'values', name: 'Time', data: { value: 'time', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-time')).toBeTruthy()
   })
 
@@ -87,7 +92,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'gradient', category: 'plots', name: 'Gradient', data: { value: 'gradient', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-gradient')).toBeTruthy()
   })
 
@@ -95,7 +100,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'course', category: 'plots', name: 'Course', data: { value: 'course', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-course')).toBeTruthy()
   })
 
@@ -103,7 +108,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'elevation', category: 'plots', name: 'Elevation', data: { value: 'elevation', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-elevation')).toBeTruthy()
   })
 
@@ -111,7 +116,7 @@ describe('SidebarWidgetsTab widget type dispatch', () => {
     mockUseWidgetManager.mockReturnValue(
       makeManagerState({ id: 'w1', type: 'heading', category: 'values', name: 'Heading', data: { value: 'heading', x: 0, y: 0 } }),
     )
-    const { getByTestId } = render(<SidebarWidgetsTab />)
+    const { getByTestId } = render(<Tab />)
     expect(getByTestId('editor-metric')).toBeTruthy()
   })
 })

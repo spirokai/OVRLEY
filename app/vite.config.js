@@ -8,7 +8,7 @@ import { fileURLToPath } from 'url'
 import { defineConfig, lazyPlugins } from 'vite-plus'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import { wasmBindingsPlugin } from '../scripts/vite-wasm.mjs'
+import { wasmBindingsPlugin } from '../scripts/wasm/vite-plugin.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -103,6 +103,10 @@ export default defineConfig({
     fs: {
       allow: [path.resolve(__dirname, '..')],
     },
+  },
+  // The map tile worker imports the map module at runtime, which an IIFE worker can't rely on.
+  worker: {
+    format: 'es',
   },
   build: {
     target: 'es2020',

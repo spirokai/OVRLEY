@@ -18,10 +18,12 @@ mod protobuf;
 use std::path::Path;
 use std::process::Command;
 
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use crate::encode::ffmpeg::binary::{configure_ffmpeg_command, resolve_ffmpeg_binary};
 use crate::error::{CoreError, CoreResult};
+use crate::media::video_probe::ffprobe_creation_time;
 
 pub use parser::parse_raw_metadata;
 
@@ -75,16 +77,28 @@ pub fn extract_from_video(
     file_path: &Path,
 ) -> CoreResult<Option<DjiAc004Telemetry>> {
     let ffmpeg_path = resolve_ffmpeg_binary(repo_root)?;
-    let Some(stream_index) = detect_dji_meta_stream(&ffmpeg_path, file_path)? else {
+    let Some(stream_info) = detect_dji_meta_stream(&ffmpeg_path, file_path)? else {
         return Ok(None);
     };
 
-    let raw_data = extract_dji_meta_raw(&ffmpeg_path, file_path, stream_index)?;
-    Ok(parser::parse_raw_metadata(&raw_data))
+    let raw_data = extract_dji_meta_raw(&ffmpeg_path, file_path, stream_info.index)?;
+    Ok(parser::parse_raw_metadata(
+        &raw_data,
+        stream_info.creation_time,
+    ))
+}
+
+struct DjiMetaStreamInfo {
+    index: usize,
+    /// Video creation time; decides how the GPS clock text maps to UTC.
+    creation_time: Option<DateTime<Utc>>,
 }
 
 /// Locates the metadata track that FFmpeg should extract for AC004 parsing.
-fn detect_dji_meta_stream(ffmpeg_path: &Path, file_path: &Path) -> CoreResult<Option<usize>> {
+fn detect_dji_meta_stream(
+    ffmpeg_path: &Path,
+    file_path: &Path,
+) -> CoreResult<Option<DjiMetaStreamInfo>> {
     let ffprobe_path = ffmpeg_path.with_file_name(if cfg!(windows) {
         "ffprobe.exe"
     } else {
@@ -97,6 +111,7 @@ fn detect_dji_meta_stream(ffmpeg_path: &Path, file_path: &Path) -> CoreResult<Op
         .arg("quiet")
         .arg("-print_format")
         .arg("json")
+        .arg("-show_format")
         .arg("-show_streams")
         .arg(file_path);
     configure_ffmpeg_command(&mut command);
@@ -115,6 +130,7 @@ fn detect_dji_meta_stream(ffmpeg_path: &Path, file_path: &Path) -> CoreResult<Op
     let Some(streams) = json.get("streams").and_then(Value::as_array) else {
         return Ok(None);
     };
+    let creation_time = ffprobe_creation_time(&json).and_then(parse_rfc3339_utc);
 
     for stream in streams {
         let codec_tag = stream.get("codec_tag_string").and_then(Value::as_str);
@@ -125,12 +141,21 @@ fn detect_dji_meta_stream(ffmpeg_path: &Path, file_path: &Path) -> CoreResult<Op
 
         if codec_tag == Some("djmd") || handler_name == Some("DJI meta") {
             if let Some(index) = stream.get("index").and_then(Value::as_u64) {
-                return Ok(Some(index as usize));
+                return Ok(Some(DjiMetaStreamInfo {
+                    index: index as usize,
+                    creation_time,
+                }));
             }
         }
     }
 
     Ok(None)
+}
+
+fn parse_rfc3339_utc(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|dt| dt.with_timezone(&Utc))
 }
 
 /// Copies the DJI data track out of the container without transcoding.

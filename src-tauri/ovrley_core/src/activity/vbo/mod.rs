@@ -13,7 +13,7 @@ use crate::activity::schema::{
 };
 use crate::error::{CoreError, CoreResult};
 use crate::media::telemetry_math::{
-    backfill_lateral_g_from_lean_angle, derive_lean_from_speed_heading, lean_angle_from_lateral_g,
+    backfill_lateral_g_from_lean_angle,
 };
 use chrono::{Duration, NaiveDate, NaiveTime, SecondsFormat, Utc};
 use serde_json::json;
@@ -310,23 +310,7 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
     validate_coordinates(&latitude, &longitude, &sections.data)?;
     let g_force_x = series(layout.g_force_x, identity);
     let g_force_y = series(layout.g_force_y, identity);
-    let mut lean_angle = series(layout.lean_angle, identity);
-    if lean_angle.iter().all(Option::is_none) {
-        let speed_mps = selected_series(&sections.data, layout.speed, |value| {
-            layout.speed_to_meters_per_second(value)
-        });
-        lean_angle = derive_lean_from_speed_heading(
-            &speed_mps,
-            &series(layout.heading, identity),
-            &elapsed_seconds,
-        );
-    }
-    if lean_angle.iter().all(Option::is_none) {
-        lean_angle = series(layout.lateral_acceleration, identity)
-            .into_iter()
-            .map(|value| value.and_then(lean_angle_from_lateral_g))
-            .collect();
-    }
+    let lean_angle = series(layout.lean_angle, identity);
     let (g_force_x, g_force_y) =
         backfill_lateral_g_from_lean_angle(&g_force_x, &g_force_y, &lean_angle);
     let mut g_force = series(layout.g_force, identity);
@@ -402,6 +386,8 @@ fn build_activity_columns(sections: Sections, file_name: &str) -> CoreResult<Act
         throttle_position: series(layout.throttle_position, identity),
         brake_position: series(layout.brake_position, identity),
         engine_load: series(layout.engine_load, identity),
+        coolant_temperature: empty(),
+        boost_pressure: empty(),
         lean_angle,
         vertical_speed: selected_series(&sections.data, layout.vertical_speed, |value| {
             layout.vertical_speed_to_meters_per_second(value)

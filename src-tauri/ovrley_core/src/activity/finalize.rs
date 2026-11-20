@@ -158,10 +158,12 @@ pub fn finalize_activity_columns(
 /// recomputing the activity or threading debug state through render-facing
 /// schemas.
 fn finalize_raw_activity_with_debug(raw_activity: &RawActivity) -> CoreResult<FinalizedActivity> {
+    // Gap filling compares neighbouring samples, so it must see each instant once.
+    let merged_raw_samples = merge_equal_time_samples(&raw_activity.raw_samples);
     let (normalized_raw_samples, gap_debug) = if raw_activity.options.skip_idle_gap_fill {
-        (raw_activity.raw_samples.clone(), skipped_gap_debug())
+        (merged_raw_samples, skipped_gap_debug())
     } else {
-        insert_idle_gap_samples(&raw_activity.raw_samples)
+        insert_idle_gap_samples(&merged_raw_samples)
     };
     let columns = activity_columns_from_samples(
         raw_activity,
@@ -377,6 +379,30 @@ macro_rules! activity_input_operations {
             columns
         }
 
+        /// Merges each run of samples sharing one instant, so the timeline strictly increases.
+        /// Formats such as FIT may split one instant across records (GPS in one, heart rate in
+        /// the next); a later sample fills in the fields it carries, as CSV rows at one time do.
+        /// A sample with neither an elapsed time nor a timestamp has no instant to share.
+        fn merge_equal_time_samples(raw_samples: &[RawSample]) -> Vec<RawSample> {
+            let mut merged: Vec<RawSample> = Vec::with_capacity(raw_samples.len());
+            for sample in raw_samples {
+                let has_time = sample.elapsed_seconds.is_some() || sample.timestamp.is_some();
+                match merged.last_mut() {
+                    Some(last)
+                        if has_time
+                            && last.elapsed_seconds == sample.elapsed_seconds
+                            && last.timestamp == sample.timestamp =>
+                    {
+                        $(if sample.$sample.is_some() { last.$sample = sample.$sample; })*
+                        $(if sample.$sample_text.is_some() { last.$sample_text = sample.$sample_text.clone(); })*
+                        $(if sample.$sample_integer.is_some() { last.$sample_integer = sample.$sample_integer; })*
+                    }
+                    _ => merged.push(sample.clone()),
+                }
+            }
+            merged
+        }
+
         fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {
             let expected = columns.timestamp.len();
             for (name, len) in [
@@ -407,21 +433,47 @@ impl ActivityColumns {
     }
 }
 
+/// Recorded distance between two samples above which a repeated GPS fix counts as stale.
+const STALE_FIX_DISTANCE_METERS: f64 = 1.0;
+
 /// Builds lat/lon tuples while preserving partial GPS samples.
 ///
 /// Each coordinate is guarded independently so one bad component does not
 /// poison the whole vector shape; downstream interpolation can still decide
 /// whether enough course data exists to render.
+///
+/// A receiver that misses a fix can repeat the last one while the recorded distance keeps growing.
+/// That repeat is a missing fix rather than a stop, so it becomes a gap that route interpolation
+/// bridges, instead of stalling the rider on the map. The distance is compared sample to sample, so
+/// creep while stopped never adds up to movement. Without recorded distance a repeat stays.
 fn build_course_series(columns: &ActivityColumns) -> Vec<(Option<f64>, Option<f64>)> {
+    let mut last_fix = None;
+    let mut last_distance = None;
     columns
         .latitude
         .iter()
         .zip(&columns.longitude)
-        .map(|(latitude, longitude)| {
-            (
+        .zip(&columns.distance)
+        .map(|((latitude, longitude), distance)| {
+            let point = (
                 latitude.and_then(finite_f64),
                 longitude.and_then(finite_f64),
-            )
+            );
+            let distance = distance.and_then(finite_f64);
+            let moved = distance
+                .zip(last_distance)
+                .is_some_and(|(now, then)| now - then > STALE_FIX_DISTANCE_METERS);
+            if distance.is_some() {
+                last_distance = distance;
+            }
+            let Some(fix) = point.0.zip(point.1) else {
+                return point;
+            };
+            if moved && last_fix == Some(fix) {
+                return (None, None);
+            }
+            last_fix = Some(fix);
+            point
         })
         .collect()
 }

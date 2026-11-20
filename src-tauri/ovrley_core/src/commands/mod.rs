@@ -190,6 +190,9 @@ pub fn backend_font_data(
 
 /// Renders one transparent preview PNG for the requested second.
 ///
+/// `config_json` carries the full export scene; only the rendered window is
+/// narrowed to the requested frame, so plots keep the export range.
+///
 /// The file is written into the public downloads directory so it is easy to
 /// inspect from the desktop app during development workflows.
 pub fn backend_render_preview_frame(
@@ -198,11 +201,13 @@ pub fn backend_render_preview_frame(
     parsed_activity_json: &str,
     second: f64,
     raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
+    map_source: Option<&ovrley_map::MapSource>,
 ) -> CoreResult<Value> {
     let config = parse_config_json(config_json)?;
     let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    let validated =
+    let mut validated =
         crate::normalize::validate_render_config_with_resources(config, raster_resources)?;
+    validated.scene.narrow_to_frame(second);
     let dense_activity = build_dense_activity_report_validated(&parsed_activity, &validated)?;
     let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -218,6 +223,7 @@ pub fn backend_render_preview_frame(
         &dense_activity,
         second,
         &output_path,
+        map_source,
     )?;
 
     Ok(json!({

@@ -4,7 +4,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     render::text::parse_color,
 };
-use skia_safe::{paint::Style, Canvas, Paint, Point};
+use skia_safe::{paint::Style, Canvas, Paint, Path, PathBuilder, Point};
 
 /// Ring strokes keep a hairline width at every scene scale.
 const RING_STROKE: f32 = 1.5;
@@ -12,15 +12,40 @@ const RING_STROKE: f32 = 1.5;
 const HALO_OPACITY: f32 = 0.35;
 /// Markers never shrink below this radius, so a tiny marker stays visible.
 const MIN_RADIUS: f32 = 2.0;
+/// The caret's corners and how round each is, at radius 1, pointing up: tip, right, cutout, left.
+/// Rounding pulls the outline in far from these corners, and all of it stays within radius 1.
+const CARET_CORNERS: [((f32, f32), f32); 4] = [
+    ((0.0, -1.55), 0.38),
+    ((1.04, 1.12), 0.29),
+    ((0.0, 0.56), 0.25),
+    ((-1.04, 1.12), 0.29),
+];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MarkerVariant {
     Single,
     Ring,
     Halo,
+    Caret,
+}
+
+fn caret_path(radius: f32) -> Path {
+    let corner = |index: usize| {
+        let ((x, y), _) = CARET_CORNERS[index % CARET_CORNERS.len()];
+        Point::new(x * radius, y * radius)
+    };
+    let (last, first) = (corner(CARET_CORNERS.len() - 1), corner(0));
+    let mut path = PathBuilder::new();
+    path.move_to(Point::new((last.x + first.x) / 2.0, (last.y + first.y) / 2.0));
+    for (index, (_, rounding)) in CARET_CORNERS.iter().enumerate() {
+        path.arc_to_tangent(corner(index), corner(index + 1), rounding * radius);
+    }
+    path.close();
+    path.detach()
 }
 
 impl MarkerVariant {
+    /// The variants of a plot with no direction of travel.
     pub fn parse(value: &str, field: &str) -> WidgetResult<Self> {
         match value {
             "single" => Ok(Self::Single),
@@ -31,6 +56,19 @@ impl MarkerVariant {
             ))),
         }
     }
+
+    /// The variants of a family that draws a route, whose caret points along it.
+    pub fn parse_on_route(value: &str, field: &str) -> WidgetResult<Self> {
+        match value {
+            "caret" => Ok(Self::Caret),
+            _ => Self::parse(value, field),
+        }
+    }
+}
+
+/// A marker's scene-pixel radius from its unscaled config size.
+pub fn plot_marker_radius(size: f32, scale: f32) -> f32 {
+    (size * scale).max(MIN_RADIUS)
 }
 
 /// Prepared paints and scene-pixel radii of one marker style.
@@ -68,11 +106,11 @@ impl PlotMarker {
                 ring
             }
             MarkerVariant::Halo => paint(opacity * HALO_OPACITY),
-            MarkerVariant::Single => marker.clone(),
+            MarkerVariant::Single | MarkerVariant::Caret => marker.clone(),
         };
         Self {
             variant,
-            radius: (size * scale).max(MIN_RADIUS),
+            radius: plot_marker_radius(size, scale),
             variant_radius: variant_diameter * scale * 0.5,
             marker,
             surround,
@@ -82,7 +120,7 @@ impl PlotMarker {
     /// Distance from the marker centre to the edge of everything it paints.
     pub fn extent(&self) -> f32 {
         match self.variant {
-            MarkerVariant::Single => self.radius,
+            MarkerVariant::Single | MarkerVariant::Caret => self.radius,
             MarkerVariant::Ring => self.radius.max(self.variant_radius + RING_STROKE * 0.5),
             MarkerVariant::Halo => self.radius.max(self.variant_radius),
         }
@@ -90,11 +128,29 @@ impl PlotMarker {
 
     /// Circles need only their scene position; callers draw them outside any frame rotation.
     pub fn draw(&self, canvas: &Canvas, center: impl Into<Point>) {
+        self.draw_heading(canvas, center, 0.0);
+    }
+
+    /// As [`Self::draw`], for a family that draws a route, whose caret points `heading_deg` clockwise
+    /// from up. Its path is rebuilt here because paths aren't shared across export workers.
+    pub fn draw_heading(&self, canvas: &Canvas, center: impl Into<Point>, heading_deg: f32) {
         let center = center.into();
-        if self.variant != MarkerVariant::Single {
-            canvas.draw_circle(center, self.variant_radius, &self.surround);
+        match self.variant {
+            MarkerVariant::Caret => {
+                canvas.save();
+                canvas.translate(center);
+                canvas.rotate(heading_deg, None);
+                canvas.draw_path(&caret_path(self.radius), &self.marker);
+                canvas.restore();
+            }
+            MarkerVariant::Single => {
+                canvas.draw_circle(center, self.radius, &self.marker);
+            }
+            MarkerVariant::Ring | MarkerVariant::Halo => {
+                canvas.draw_circle(center, self.variant_radius, &self.surround);
+                canvas.draw_circle(center, self.radius, &self.marker);
+            }
         }
-        canvas.draw_circle(center, self.radius, &self.marker);
     }
 }
 

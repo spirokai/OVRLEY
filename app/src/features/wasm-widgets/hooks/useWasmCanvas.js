@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react'
 
 /** @param {object} props Widget identity, selection wrapper and canvas registration. @returns {object} Stable DOM refs. */
-export function useWasmCanvas({ id, attach, registerNode, separateRaster }) {
+export function useWasmCanvas({ id, attach, attachMapLayer, registerNode, separateRaster }) {
   const target = useRef(null)
   const wrapperRef = useCallback(
     (node) => {
@@ -17,5 +17,6 @@ export function useWasmCanvas({ id, attach, registerNode, separateRaster }) {
     },
     [attach, id, separateRaster],
   )
-  return { wrapperRef, canvasRef }
+  const mapLayerRef = useCallback((node) => attachMapLayer(id, node), [attachMapLayer, id])
+  return { wrapperRef, canvasRef, mapLayerRef }
 }

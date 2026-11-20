@@ -1,5 +1,5 @@
 [workspace]
-members = [".", "ovrley_core", "ovrley_widgets"]
+members = [".", "ovrley_core", "ovrley_map", "ovrley_widgets"]
 
 [package]
 name = "app"
@@ -9,7 +9,7 @@ authors = ["you"]
 license = "GPL-3.0-or-later"
 repository = ""
 edition = "2021"
-rust-version = "1.95"
+rust-version = "1.98"
 default-run = "app"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -19,14 +19,13 @@ name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.5.3", features = [] }
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-# TEMPORARY: devtools in release builds for WebKit debugging. Revert before release.
-tauri = { version = "2.9.5", features = ["protocol-asset", "devtools"] }
+tauri = { version = "2.12.5", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
@@ -35,6 +34,7 @@ tauri-plugin-updater = "=2.9.0"
 base64 = "0.22"
 open = "5"
 ovrley_core = { path = "ovrley_core" }
+ovrley_map = { path = "ovrley_map", features = ["gpu", "validate"] }
 ovrley_widgets = { path = "ovrley_widgets" }
 tiny_http = "0.12"
 uuid = { version = "1", features = ["v4"] }
@@ -43,6 +43,15 @@ chrono = { version = "0.4", default-features = false, features = ["std"] }
 reqwest = { version = "0.12.28", default-features = false, features = ["blocking", "rustls-tls"] }
 http = "1.4"
 http-cache-semantics = "=2.1.0"
+
+# The main window turns off a WebKitGTK feature through an API newer than the bindings, looked up at runtime.
+[target.'cfg(target_os = "linux")'.dependencies]
+webkit2gtk = "2.0.2"
+libc = "0.2"
+
+# DXGI tells whether a hardware GPU exists before WebView2 starts.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.61", features = ["Win32_Graphics_Dxgi"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2-app-kit = { version = "0.3", default-features = false, features = [
@@ -54,6 +63,11 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSView",
   "NSWindow",
 ] }
+
+# Full DWARF for opt-level-3 workspace crates is ~140 MB of every ~170 MB test
+# binary, and ovrley_core links ~60 of them. Line tables keep backtrace line numbers.
+[profile.dev]
+debug = "line-tables-only"
 
 # Per-pixel overlay conversion runs in ovrley_core; unoptimized it makes dev exports unusably slow.
 [profile.dev.package.ovrley_core]

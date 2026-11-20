@@ -82,6 +82,12 @@ export function useWidgetManager({ widgetLiveEdits }) {
       }
     }
 
+    // A map switching to top down starts with its whole route in view.
+    if (widget?.type === 'map' && updates.camera_mode === 'fixed' && widget.data.camera_mode !== 'fixed') {
+      const fit = getWidgetInteraction(liveEdits.getWidgetNode(id)).resize({ widget: { ...widget.data, ...nextUpdates }, map_view: 'fit' })
+      nextUpdates = { ...nextUpdates, ...fit }
+    }
+
     const state = useStore.getState()
     state.setConfig(updateWidgetInConfig(state.config, id, nextUpdates))
   }
@@ -124,12 +130,13 @@ export function useWidgetManager({ widgetLiveEdits }) {
   // Add widget — creates a new widget of the given type with defaults and appends to config
   const addWidget = (selection) => {
     const category = requireWidgetTypeDefinition(selection.type).collection
+    const state = useStore.getState()
     const data = createWidgetDefaults(selection, globalDefaults, {
       coursePoints: parsedActivity?.sample_course_points,
       sceneFontSize: globalDefaults.font_size,
+      unitSystem: state.unitSystem,
     })
 
-    const state = useStore.getState()
     const nextConfig = ensureWidgetIdsInConfig({ ...state.config, [category]: [...state.config[category], data] })
     state.setConfig(nextConfig)
     state.setSelectedWidgetId(nextConfig[category].at(-1).id)
@@ -145,10 +152,11 @@ export function useWidgetManager({ widgetLiveEdits }) {
     const widget = widgets.find((item) => item.id === id)
     if (!widget) return
 
+    const state = useStore.getState()
     const data = createWidgetDefaults({ type: widget.type, ...requireWidgetTypeDefinition(widget.type).resetSelection }, globalDefaults, {
       sceneFontSize: config.scene.font_size,
+      unitSystem: state.unitSystem,
     })
-    const state = useStore.getState()
     state.setConfig(replaceWidgetInConfig(state.config, id, data))
   }
 

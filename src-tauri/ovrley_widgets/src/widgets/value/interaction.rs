@@ -1,4 +1,5 @@
 //! Intrinsic resizing policy. The editor supplies gesture geometry; shared layout owns placement.
+use crate::render::preview::PreviewRasterScale;
 use crate::{
     error::WidgetResult,
     model::scene::validate_scene_presentation,
@@ -34,12 +35,13 @@ pub struct ResizeUpdate {
 
 pub fn resize_value(
     request: ResizeRequest,
+    raster_scale: PreviewRasterScale,
     activity: Option<&crate::activity::ActivitySampler>,
     fonts: &dyn FontResolver,
 ) -> WidgetResult<ResizeUpdate> {
     let mut presentation = ValuePresentation::new(
         request.origin.widget,
-        &crate::host::WidgetHost::from_scene(&request.origin.scene)?,
+        &crate::host::WidgetHost::from_scene(&request.origin.scene, raster_scale)?,
     )?;
     let config = presentation.base_mut();
     let scene = validate_scene_presentation(request.origin.scene)?;

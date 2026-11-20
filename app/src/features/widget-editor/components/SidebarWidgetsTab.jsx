@@ -16,6 +16,7 @@ import ElevationWidgetEditor from './ElevationWidgetEditor'
 import DivingProfileWidgetEditor from './DivingProfileWidgetEditor'
 import RollingChartWidgetEditor from './RollingChartWidgetEditor'
 import GradientWidgetEditor from './GradientWidgetEditor'
+import MapWidgetEditor from './MapWidgetEditor'
 import MetricWidgetEditor from './metricWidget/MetricWidgetEditor'
 import RouteMapWidgetEditor from './RouteMapWidgetEditor'
 import TextWidgetEditor from './TextWidgetEditor'
@@ -24,6 +25,7 @@ import { useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAccordionAutoscroll } from '../hooks/useAccordionAutoscroll'
 import useHeldValue from '../hooks/useHeldValue'
+import { useGestureWidget } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 
 /**
  * Widget type → editor component dispatch map.
@@ -40,6 +42,7 @@ const WIDGET_EDITOR_MAP = {
   time: TimeWidgetEditor,
   gradient: GradientWidgetEditor,
   course: RouteMapWidgetEditor,
+  map: MapWidgetEditor,
   elevation: ElevationWidgetEditor,
   diving_profile: DivingProfileWidgetEditor,
   rolling_chart: RollingChartWidgetEditor,
@@ -180,32 +183,16 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
                       onAnimationStart={(event) => handleAccordionAnimation(widget.id, 'start', event)}
                       onAnimationEnd={(event) => handleAccordionAnimation(widget.id, 'end', event)}
                     >
-                      <div className="space-y-6">
-                        <PositionSection
-                          widget={widget}
-                          setNumericField={setNumericField}
-                          updateWidgetDraft={updateWidgetDraft}
-                          commitWidgetDraft={commitWidgetDraft}
-                          headerAction={
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-foreground/20"
-                              onClick={() => resetWidget(widget.id)}
-                            >
-                              <RotateCcw className="h-3 w-3" />
-                            </Button>
-                          }
-                        />
-                        {renderWidgetEditor(
-                          widget,
-                          updateWidgetData,
-                          updateWidgetDraft,
-                          commitWidgetDraft,
-                          setNumericField,
-                          config?.scene?.font_size,
-                        )}
-                      </div>
+                      <WidgetInspector
+                        widgetLiveEdits={widgetLiveEdits}
+                        widget={widget}
+                        sceneFontSize={config?.scene?.font_size}
+                        setNumericField={setNumericField}
+                        updateWidgetData={updateWidgetData}
+                        updateWidgetDraft={updateWidgetDraft}
+                        commitWidgetDraft={commitWidgetDraft}
+                        resetWidget={resetWidget}
+                      />
                     </AccordionContent>
                   </AccordionItem>
                 </div>
@@ -214,6 +201,41 @@ export default function SidebarWidgetsTab({ widgetLiveEdits }) {
           </Accordion>
         )}
       </div>
+    </div>
+  )
+}
+
+/** Open accordion content; only this panel follows the live canvas gesture. */
+function WidgetInspector({
+  widgetLiveEdits,
+  widget: committedWidget,
+  sceneFontSize,
+  setNumericField,
+  updateWidgetData,
+  updateWidgetDraft,
+  commitWidgetDraft,
+  resetWidget,
+}) {
+  const widget = useGestureWidget(widgetLiveEdits, committedWidget)
+  return (
+    <div className="space-y-6">
+      <PositionSection
+        widget={widget}
+        setNumericField={setNumericField}
+        updateWidgetDraft={updateWidgetDraft}
+        commitWidgetDraft={commitWidgetDraft}
+        headerAction={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-foreground/20"
+            onClick={() => resetWidget(widget.id)}
+          >
+            <RotateCcw className="h-3 w-3" />
+          </Button>
+        }
+      />
+      {renderWidgetEditor(widget, updateWidgetData, updateWidgetDraft, commitWidgetDraft, setNumericField, sceneFontSize)}
     </div>
   )
 }

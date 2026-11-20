@@ -2,8 +2,8 @@
 //!
 //! Device files often skip samples while stationary, but overlay widgets expect
 //! a continuous elapsed timeline. This module inserts zero-valued idle samples
-//! only for stationary gaps, then builds the shared distance, elapsed, and
-//! progress series used by metric derivation and rendering.
+//! only for stationary gaps, then builds the shared distance and progress
+//! series used by metric derivation and rendering.
 //!
 //! The algorithms mirror the frontend migration source closely so Phase 0 can
 //! move ownership without changing importer behavior.
@@ -388,79 +388,6 @@ pub fn build_distance_series(
             }
             ovrley_widgets::interpolation::interpolate_points(&points, *elapsed)
                 .and_then(|distance| round_f64(distance, 3))
-        })
-        .collect()
-}
-
-/// Builds a monotonic elapsed-time series for every sample.
-///
-/// Explicit elapsed values win, timestamp deltas fill holes, and tiny increments
-/// break duplicate timestamps so interpolation always has a forward-moving axis.
-pub fn build_elapsed_series(raw_samples: &[RawSample], time_series: &[Option<String>]) -> Vec<f64> {
-    let explicit_elapsed: Vec<Option<f64>> = raw_samples
-        .iter()
-        .map(|sample| sample.elapsed_seconds.and_then(finite_f64))
-        .collect();
-    let has_explicit_elapsed = explicit_elapsed.iter().any(Option::is_some);
-    let valid_timestamps: Vec<Option<DateTime<Utc>>> = time_series
-        .iter()
-        .map(|value| {
-            value
-                .as_deref()
-                .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
-                .map(|value| value.with_timezone(&Utc))
-        })
-        .collect();
-    let origin = valid_timestamps.iter().flatten().next().copied();
-
-    if has_explicit_elapsed {
-        let mut elapsed_series = Vec::with_capacity(raw_samples.len());
-        let mut last_value: f64 = 0.0;
-        for index in 0..explicit_elapsed.len() {
-            if let Some(current) = explicit_elapsed[index] {
-                last_value = last_value.max(current);
-                elapsed_series.push(round_f64(last_value, 3).unwrap_or(0.0));
-                continue;
-            }
-            if let (Some(origin), Some(timestamp)) = (origin, valid_timestamps[index]) {
-                let computed = ((timestamp - origin).num_milliseconds() as f64 / 1000.0).max(0.0);
-                last_value = last_value.max(computed);
-                elapsed_series.push(round_f64(last_value, 3).unwrap_or(0.0));
-                continue;
-            }
-            if index == 0 {
-                elapsed_series.push(0.0);
-            } else {
-                last_value = elapsed_series[index - 1];
-                elapsed_series.push(round_f64(last_value, 3).unwrap_or(0.0));
-            }
-        }
-        return elapsed_series;
-    }
-
-    let Some(origin) = origin else {
-        return raw_samples
-            .iter()
-            .enumerate()
-            .map(|(index, _)| round_f64(index as f64, 3).unwrap_or(index as f64))
-            .collect();
-    };
-
-    let mut last_value: f64 = 0.0;
-    valid_timestamps
-        .iter()
-        .enumerate()
-        .map(|(index, timestamp)| {
-            let Some(timestamp) = timestamp else {
-                return round_f64(last_value, 3).unwrap_or(last_value);
-            };
-            let next_value = ((*timestamp - origin).num_milliseconds() as f64 / 1000.0).max(0.0);
-            if next_value <= last_value && index > 0 {
-                last_value += 0.001;
-                return round_f64(last_value, 3).unwrap_or(last_value);
-            }
-            last_value = next_value;
-            round_f64(next_value, 3).unwrap_or(next_value)
         })
         .collect()
 }

@@ -1,0 +1,5 @@
+interface:
+  display_name: 'Fixer'
+  short_description: "Apply a review file's findings"
+policy:
+  allow_implicit_invocation: false

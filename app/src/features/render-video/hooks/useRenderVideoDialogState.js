@@ -23,6 +23,7 @@ import {
   getVisibleAccelerationOptions,
   isOutputFormatAvailable,
   getDefaultQuality,
+  formatQualityValueLabel,
   invertQualityValue,
 } from '../utils/codecUtils'
 import { batchResultQueue, getImportedVideoExportRange, getRenderOutputExtension, getRenderSummaryItems } from '../utils/renderPresentation'
@@ -292,6 +293,7 @@ export default function useRenderVideoDialogState({
     handleQualityTypeChange,
     handleQualityValueChange,
     qualitySliderValue: settings?.qualityType === 'quality' ? invertQualityValue(settings.qualityValue) : settings?.qualityValue,
+    qualityValueLabel: settings ? formatQualityValueLabel(settings) : null,
     hasImportedVideo,
     importedVideoDuration,
     importedVideoFps,

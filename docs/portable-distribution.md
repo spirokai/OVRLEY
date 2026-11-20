@@ -24,7 +24,7 @@ This is portable from the app's perspective: FFmpeg and its DLLs are separate fr
 
 The manual release workflow explicitly passes Tauri bundle targets so it can upload installer artifacts in addition to the portable ZIP.
 
-Portable archives include a generated `THIRD_PARTY_NOTICES.txt` with the bundled FFmpeg `-version` and `-L` output. The source repository does not commit FFmpeg binaries; this notice applies to generated release archives.
+Every release ships a `THIRD_PARTY_NOTICES.txt` that `pnpm prepare:packaging` generates: the static notices in the root `THIRD_PARTY_NOTICES.txt`, the vendored Skia notices, and the bundled FFmpeg `-version` and `-L` output.
 
 ## macOS
 

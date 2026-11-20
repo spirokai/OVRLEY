@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); d=\"$CLAUDE_PROJECT_DIR\"; case \"$f\" in \"$d\"/*.rs) git -C \"$d\" ls-files --error-unmatch \"$f\" >/dev/null 2>&1 || rustfmt --edition 2021 \"$f\";; \"$d\"/app/*.js|\"$d\"/app/*.jsx|\"$d\"/app/*.json|\"$d\"/app/*.css) cd \"$d/app\" && pnpm exec vp fmt --write \"$f\" >/dev/null;; esac; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,608 @@
+//! MapLibre-style camera and view state, ported from maplibre-rs `render/camera.rs` and
+//! `render/view_state.rs`. It matches how maplibre-gl-js builds its perspective.
+//!
+//! This is the one owner of the view matrix: the GPU renderer draws roads with it and the widget
+//! projects the route with it, so the two cannot disagree. Tile identities and view regions are
+//! ported from maplibre-rs `coords.rs`.
+
+use crate::mercator::lon_lat_to_world;
+use crate::{MAX_TILE_ZOOM, TILE_SIZE};
+use cgmath::{frustum, Deg, InnerSpace, Matrix4, Rad, SquareMatrix, Vector3, Vector4};
+use std::collections::HashSet;
+use std::f64::consts::PI;
+
+/// The widest vertical field of view, 50 degrees, wider than MapLibre's 37. For one map scale a wider
+/// lens sits lower, so the road rushes past and buildings stand up more.
+const FOVY: f64 = 0.8726646259971648;
+/// The steepest camera. Past it, the far band packs so much map into so few rows that it shimmers.
+pub const MAX_PITCH_DEG: f64 = 60.0;
+/// The steepest the frame's top edge looks, from straight down. Past this the lens narrows, and past
+/// 90 the edge would miss the ground. Where the view reaches depends only on this angle, so a higher
+/// or lower camera can't change it. A follow camera keeps the full lens to about pitch 52.
+const MAX_TOP_EDGE_DEG: f64 = 85.8;
+/// MapLibre's mean earth radius, in metres.
+const EARTH_RADIUS: f64 = 6371008.8;
+/// MapLibre's default light `position: [1.15, 210, 30]` on the ground plane, at bearing 0.
+pub const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
+
+/// The most tiles one view draws. A view that reaches this may be missing some.
+pub const MAX_VIEW_TILES: usize = 512;
+/// Tiles stop at this level upstream. Deeper views draw these tiles scaled.
+const MAX_DATA_LEVEL: u8 = 14;
+
+#[rustfmt::skip]
+const OPENGL_TO_WGPU_MATRIX: Matrix4<f64> = Matrix4::new(
+    1.0, 0.0, 0.0, 0.0,
+    0.0, 1.0, 0.0, 0.0,
+    0.0, 0.0, 0.5, 0.0,
+    0.0, 0.0, 0.5, 1.0,
+);
+
+#[rustfmt::skip]
+const FLIP_Y: Matrix4<f64> = Matrix4::new(
+    1.0, 0.0, 0.0, 0.0,
+    0.0, -1.0, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0, 1.0,
+);
+
+/// Where the map is viewed from. Built only through [`MapCamera::new`], so a camera in hand is valid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapCamera {
+    lon: f64,
+    lat: f64,
+    zoom: f64,
+    pitch_deg: f64,
+    bearing_deg: f64,
+    top_padding_ratio: f64,
+}
+
+impl MapCamera {
+    /// `lon` and `lat` are the map centre in degrees. Bearing is clockwise from north.
+    /// `top_padding_ratio` is the share of the height inset from the top, as MapLibre's `padding.top`:
+    /// the centre projects to `(0.5 + ratio / 2) * height`.
+    pub fn new(
+        lon: f64,
+        lat: f64,
+        zoom: f64,
+        pitch_deg: f64,
+        bearing_deg: f64,
+        top_padding_ratio: f64,
+    ) -> Result<Self, String> {
+        if ![lon, lat, zoom, pitch_deg, bearing_deg, top_padding_ratio]
+            .iter()
+            .all(|value| value.is_finite())
+        {
+            return Err("Map camera values must be finite".to_string());
+        }
+        if !(0.0..=f64::from(MAX_TILE_ZOOM)).contains(&zoom) {
+            return Err(format!(
+                "Map camera zoom {zoom} is outside 0..={MAX_TILE_ZOOM}"
+            ));
+        }
+        if !(0.0..=MAX_PITCH_DEG).contains(&pitch_deg) {
+            return Err(format!(
+                "Map camera pitch {pitch_deg} is outside 0..={MAX_PITCH_DEG}"
+            ));
+        }
+        if !(0.0..1.0).contains(&top_padding_ratio) {
+            return Err(format!(
+                "Map camera top padding {top_padding_ratio} is outside 0..1"
+            ));
+        }
+        Ok(Self {
+            lon,
+            lat,
+            zoom,
+            pitch_deg,
+            bearing_deg,
+            top_padding_ratio,
+        })
+    }
+
+    pub const fn zoom(self) -> f64 {
+        self.zoom
+    }
+
+    pub const fn pitch_deg(self) -> f64 {
+        self.pitch_deg
+    }
+
+    /// `lon, lat, zoom, pitch, bearing, top padding`, for a renderer in another WASM module.
+    pub const fn values(self) -> [f64; 6] {
+        [
+            self.lon,
+            self.lat,
+            self.zoom,
+            self.pitch_deg,
+            self.bearing_deg,
+            self.top_padding_ratio,
+        ]
+    }
+}
+
+/// How many placements a frame names. It fades between the last two; the ones before link it to the
+/// placement history a renderer holds, even when frames reach it a little out of order.
+pub const LABEL_PLACEMENTS: usize = 4;
+
+/// How a frame draws its labels: the cameras of its placements, oldest first, and how far the fade between
+/// the last two is, from 0 at the second to last to 1 at the last. Built only through
+/// [`MapLabelDraw::new`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapLabelDraw {
+    cameras: [MapCamera; LABEL_PLACEMENTS],
+    blend: f32,
+}
+
+impl MapLabelDraw {
+    pub fn new(cameras: [MapCamera; LABEL_PLACEMENTS], blend: f32) -> Result<Self, String> {
+        if !(0.0..=1.0).contains(&blend) {
+            return Err(format!("Map label blend {blend} is outside 0..=1"));
+        }
+        Ok(Self { cameras, blend })
+    }
+
+    pub const fn cameras(self) -> [MapCamera; LABEL_PLACEMENTS] {
+        self.cameras
+    }
+
+    pub const fn blend(self) -> f32 {
+        self.blend
+    }
+}
+
+/// The output a camera draws to. One world unit is one device pixel at pixel ratio 1, so a higher
+/// ratio shows the same map sharper. Built only through [`MapViewport::new`].
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MapViewport {
+    width_px: u32,
+    height_px: u32,
+    pixel_ratio: f32,
+}
+
+impl MapViewport {
+    pub fn new(width_px: u32, height_px: u32, pixel_ratio: f32) -> Result<Self, String> {
+        if width_px == 0 || height_px == 0 {
+            return Err(format!("Map size {width_px}x{height_px} must not be empty"));
+        }
+        if !pixel_ratio.is_finite() || pixel_ratio <= 0.0 {
+            return Err(format!("Map pixel ratio {pixel_ratio} must be positive"));
+        }
+        Ok(Self {
+            width_px,
+            height_px,
+            pixel_ratio,
+        })
+    }
+
+    pub const fn width_px(self) -> u32 {
+        self.width_px
+    }
+
+    pub const fn height_px(self) -> u32 {
+        self.height_px
+    }
+
+    pub const fn pixel_ratio(self) -> f32 {
+        self.pixel_ratio
+    }
+}
+
+/// A point in clip space, before the perspective divide.
+#[derive(Clone, Copy, Debug)]
+pub struct ClipPoint {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub w: f64,
+}
+
+impl ClipPoint {
+    /// Where the point lands in the window, as shares of its width and height from the top left.
+    /// Only for a point in front of the near plane.
+    pub fn window_share(self) -> (f64, f64) {
+        (self.x / self.w * 0.5 + 0.5, 0.5 - self.y / self.w * 0.5)
+    }
+}
+
+/// The view matrix reduced to ground points, for projecting many per frame. `z >= 0` is in front
+/// of the near plane; points behind it must be clipped before dividing by `w`.
+#[derive(Clone, Copy, Debug)]
+pub struct GroundProjection {
+    x: [f64; 4],
+    y: [f64; 4],
+    z: [f64; 4],
+    w: [f64; 4],
+}
+
+impl GroundProjection {
+    /// `world_x` and `world_y` are Mercator world coordinates in `0.0..=1.0`.
+    pub fn clip(&self, world_x: f64, world_y: f64) -> ClipPoint {
+        self.clip_above(world_x, world_y, 0.0)
+    }
+
+    /// As [`Self::clip`], `height` world pixels above the ground.
+    pub fn clip_above(&self, world_x: f64, world_y: f64, height: f64) -> ClipPoint {
+        let row = |row: &[f64; 4]| row[0] * world_x + row[1] * world_y + row[2] + row[3] * height;
+        ClipPoint {
+            x: row(&self.x),
+            y: row(&self.y),
+            z: row(&self.z),
+            w: row(&self.w),
+        }
+    }
+}
+
+/// One camera on one viewport: what every frame's matrices and tile lists derive from.
+pub struct ViewState {
+    /// World position of the map centre, in pixels at `zoom`.
+    position: (f64, f64),
+    zoom: f64,
+    lat: f64,
+    pitch: Rad<f64>,
+    roll: Rad<f64>,
+    width: f64,
+    height: f64,
+    pixel_ratio: f64,
+    top_padding_ratio: f64,
+    /// Tangent of half the vertical field of view.
+    y_tan: f64,
+}
+
+/// The lens, narrowed when the frame's top edge would look past [`MAX_TOP_EDGE_DEG`]. The
+/// camera moves back as it narrows, so the centre keeps its scale and tiles in view stay level.
+fn lens_y_tan(pitch_deg: f64, top_padding_ratio: f64) -> f64 {
+    let widest = (MAX_TOP_EDGE_DEG - pitch_deg).to_radians().tan() / (1.0 + top_padding_ratio);
+    (FOVY / 2.0).tan().min(widest)
+}
+
+impl ViewState {
+    pub fn new(camera: &MapCamera, viewport: MapViewport) -> Self {
+        let (world_x, world_y) = lon_lat_to_world(camera.lon, camera.lat);
+        let pixel_ratio = f64::from(viewport.pixel_ratio);
+        let world_size = world_size(camera.zoom, pixel_ratio);
+        Self {
+            position: (world_x * world_size, world_y * world_size),
+            zoom: camera.zoom,
+            lat: camera.lat,
+            pitch: Deg(camera.pitch_deg).into(),
+            // Bearing is roll, in the opposite sense.
+            roll: Deg(-camera.bearing_deg).into(),
+            width: f64::from(viewport.width_px),
+            height: f64::from(viewport.height_px),
+            pixel_ratio,
+            top_padding_ratio: camera.top_padding_ratio,
+            y_tan: lens_y_tan(camera.pitch_deg, camera.top_padding_ratio),
+        }
+    }
+
+    pub const fn zoom(&self) -> f64 {
+        self.zoom
+    }
+
+    /// Edge of the square Mercator world in output pixels.
+    pub fn world_size(&self) -> f64 {
+        world_size(self.zoom, self.pixel_ratio)
+    }
+
+    /// World units per metre at the camera's latitude, as MapLibre scales extrusion heights.
+    pub fn metres_to_world(&self) -> f64 {
+        let circumference = 2.0 * PI * EARTH_RADIUS * self.lat.to_radians().cos();
+        self.world_size() / circumference
+    }
+
+    /// The light turned with the view, because MapLibre anchors it to the viewport. Roll is
+    /// `-bearing`, so this rotates by the bearing.
+    pub fn light_xy(&self) -> [f32; 2] {
+        let (sin, cos) = (-self.roll.0).sin_cos();
+        [
+            (cos * LIGHT_XY.0 - sin * LIGHT_XY.1) as f32,
+            (sin * LIGHT_XY.0 + cos * LIGHT_XY.1) as f32,
+        ]
+    }
+
+    /// Clip-space w of the map centre: how far it is from the camera along the view axis.
+    pub fn centre_clip_w(&self) -> f64 {
+        (self.view_projection() * Vector4::new(self.position.0, self.position.1, 0.0, 1.0)).w
+    }
+
+    /// How the ground's depth runs down the window: the map centre's clip w over a ground point's is
+    /// 1 on row `.0` and changes by `.1` per row below it. Across a plane 1/w is affine in window
+    /// coordinates, so this holds on every row. Rows count down from the top in output pixels.
+    /// `None` when the ground is not in view.
+    pub fn ground_depth_rows(&self) -> Option<(f64, f64)> {
+        let view_projection = self.view_projection();
+        let clip = |(x, y): (f64, f64)| view_projection * Vector4::new(x, y, 0.0, 1.0);
+        let centre = clip(self.position);
+        let far = self
+            .ground_corners()?
+            .map(clip)
+            .into_iter()
+            .max_by(|a, b| a.w.total_cmp(&b.w))?;
+        let row = |point: Vector4<f64>| (1.0 - point.y / point.w) * 0.5 * self.height;
+        let rows = row(far) - row(centre);
+        let per_row = if rows.abs() < 1e-6 {
+            0.0
+        } else {
+            (centre.w / far.w - 1.0) / rows
+        };
+        Some((row(centre), per_row))
+    }
+
+    fn camera_to_center_distance(&self) -> f64 {
+        (self.height / 2.0) / self.y_tan
+    }
+
+    fn x_tan(&self) -> f64 {
+        self.y_tan * self.width / self.height
+    }
+
+    fn rotation(&self) -> Matrix4<f64> {
+        Matrix4::from_angle_x(self.pitch) * Matrix4::from_angle_z(self.roll)
+    }
+
+    fn camera_matrix(&self) -> Matrix4<f64> {
+        Matrix4::from_translation(Vector3::new(0.0, 0.0, -self.camera_to_center_distance()))
+            * self.rotation()
+            * Matrix4::from_translation(Vector3::new(-self.position.0, -self.position.1, 0.0))
+    }
+
+    /// Top padding widens the frustum upward, so the top rays reach further than the bottom ones.
+    fn furthest_distance(&self, camera_height: f64) -> f64 {
+        let (x, y) = (self.x_tan(), self.y_tan);
+        let (top, bottom) = (
+            y * (1.0 + self.top_padding_ratio),
+            y * (self.top_padding_ratio - 1.0),
+        );
+        let rays = [
+            Vector3::new(x, top, 1.0),
+            Vector3::new(-x, top, 1.0),
+            Vector3::new(x, bottom, 1.0),
+            Vector3::new(-x, bottom, 1.0),
+        ];
+        let plane_normal = (self.rotation() * Vector4::new(0.0, 0.0, 1.0, 1.0)).truncate();
+        let m = Vector3::new(0.0, 0.0, camera_height);
+        rays.iter()
+            .map(|ray| m.dot(plane_normal) / ray.dot(plane_normal))
+            .fold(f64::NAN, f64::max)
+    }
+
+    /// `FLIP_Y * OPENGL_TO_WGPU_MATRIX * perspective * camera`.
+    pub fn view_projection(&self) -> Matrix4<f64> {
+        let camera_to_center_distance = self.camera_to_center_distance();
+        // Add a bit extra to avoid precision problems at exactly `furthest_distance`.
+        let far_z = self.furthest_distance(camera_to_center_distance) * 1.01;
+        let near_z = self.height / 50.0;
+        let (xmax, ymax) = (near_z * self.x_tan(), near_z * self.y_tan);
+        // Upstream shifts this frustum the other way, which moves the centre up. FLIP_Y runs after
+        // the frustum, so MapLibre's padding needs the opposite sign here.
+        let offset = self.top_padding_ratio;
+        let perspective = frustum(
+            -xmax,
+            xmax,
+            ymax * (-1.0 - offset),
+            ymax * (1.0 - offset),
+            near_z,
+            far_z,
+        );
+        FLIP_Y * OPENGL_TO_WGPU_MATRIX * perspective * self.camera_matrix()
+    }
+
+    /// The view matrix for points on the ground, taking Mercator world coordinates.
+    pub fn ground_projection(&self) -> GroundProjection {
+        let matrix = self.view_projection();
+        let world_size = self.world_size();
+        let row = |index: usize| {
+            [
+                matrix.x[index] * world_size,
+                matrix.y[index] * world_size,
+                matrix.w[index],
+                matrix.z[index],
+            ]
+        };
+        GroundProjection {
+            x: row(0),
+            y: row(1),
+            z: row(2),
+            w: row(3),
+        }
+    }
+
+    /// The window's corners on the ground, in order, in world pixels. `None` when the ground is
+    /// not in view.
+    fn ground_corners(&self) -> Option<[(f64, f64); 4]> {
+        let inverse = self.view_projection().invert()?;
+        let corners = [
+            (0.0, 0.0),
+            (self.width, 0.0),
+            (self.width, self.height),
+            (0.0, self.height),
+        ]
+        .map(|(x, y)| self.window_to_world_at_ground(x, y, &inverse));
+        corners
+            .iter()
+            .all(|corner| corner.0.is_finite() && corner.1.is_finite())
+            .then_some(corners)
+    }
+
+    /// The frustum's footprint on the ground as `(min, max)`, in Mercator world coordinates.
+    pub fn ground_bounds(&self) -> Option<((f64, f64), (f64, f64))> {
+        let size = self.world_size();
+        Some(corner_bounds(
+            &self.ground_corners()?.map(|(x, y)| (x / size, y / size)),
+        ))
+    }
+
+    /// The tiles at `level` under the frustum's footprint on the ground. `None` when the ground
+    /// is not in view.
+    pub fn create_view_region(&self, level: u8) -> Option<ViewRegion> {
+        let tile_scale = 2_f64.powi(i32::from(level)) / self.world_size();
+        let footprint = self
+            .ground_corners()?
+            .map(|(x, y)| (x * tile_scale, y * tile_scale));
+        let (min, max) = corner_bounds(&footprint);
+        Some(ViewRegion {
+            min_tile: TileId::new(level, min.0 as i32, min.1 as i32),
+            max_tile: TileId::new(level, max.0 as i32, max.1 as i32),
+            footprint,
+        })
+    }
+
+    /// The world coordinates under a window position, on the `z = 0` plane.
+    fn window_to_world_at_ground(&self, x: f64, y: f64, inverse: &Matrix4<f64>) -> (f64, f64) {
+        let near = self.window_to_world(x, y, 0.0, inverse);
+        let far = self.window_to_world(x, y, 1.0, inverse);
+        let u = -near.z / (far.z - near.z);
+        let ground = near + (far - near) * u;
+        (ground.x, ground.y)
+    }
+
+    fn window_to_world(&self, x: f64, y: f64, z: f64, inverse: &Matrix4<f64>) -> Vector3<f64> {
+        let ndc = Vector4::new(
+            2.0 * x / self.width - 1.0,
+            1.0 - 2.0 * y / self.height,
+            z,
+            1.0,
+        );
+        let unprojected = inverse * ndc;
+        unprojected.truncate() / unprojected.w
+    }
+}
+
+/// The bounding box of a footprint's corners as `(min, max)`.
+fn corner_bounds(corners: &[(f64, f64); 4]) -> ((f64, f64), (f64, f64)) {
+    corners.iter().fold(
+        ((f64::MAX, f64::MAX), (f64::MIN, f64::MIN)),
+        |(min, max), corner| {
+            (
+                (min.0.min(corner.0), min.1.min(corner.1)),
+                (max.0.max(corner.0), max.1.max(corner.1)),
+            )
+        },
+    )
+}
+
+fn world_size(zoom: f64, pixel_ratio: f64) -> f64 {
+    f64::from(TILE_SIZE) * 2_f64.powf(zoom) * pixel_ratio
+}
+
+/// A position in the tile pyramid.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TileId {
+    pub z: u8,
+    pub x: i32,
+    pub y: i32,
+}
+
+impl TileId {
+    pub const fn new(z: u8, x: i32, y: i32) -> Self {
+        Self { z, x, y }
+    }
+
+    /// Whether this tile exists on the grid.
+    pub const fn is_on_grid(self) -> bool {
+        let bounds = 1_i32 << self.z;
+        self.x >= 0 && self.y >= 0 && self.x < bounds && self.y < bounds
+    }
+
+    pub fn parent(self) -> Option<Self> {
+        (self.z > 0).then(|| Self::new(self.z - 1, self.x >> 1, self.y >> 1))
+    }
+}
+
+/// The tile level drawn at a view zoom, capped so deeper views overzoom.
+pub fn data_level(zoom: f64) -> u8 {
+    (zoom.floor() as u8).min(MAX_DATA_LEVEL)
+}
+
+/// The on-grid tiles a camera sees on a viewport.
+pub fn view_tiles(camera: &MapCamera, viewport: MapViewport) -> Vec<TileId> {
+    let view = ViewState::new(camera, viewport);
+    view.create_view_region(data_level(view.zoom()))
+        .map(|region| region.iter().collect())
+        .unwrap_or_default()
+}
+
+/// The tiles a frame needs, and how many its busiest camera sees.
+pub struct FrameTiles {
+    /// The most tiles any one camera of the frame sees.
+    pub busiest: usize,
+    /// The tiles of the frame's camera and of each of its label placements' cameras, each once, in the
+    /// order they are first seen. A label is placed from the tiles around its own camera.
+    pub tiles: Vec<TileId>,
+}
+
+/// The tiles a renderer must hold to draw a frame at `camera` with `labels`. Each distinct camera is
+/// walked once.
+pub fn frame_tiles(
+    camera: &MapCamera,
+    labels: Option<&MapLabelDraw>,
+    viewport: MapViewport,
+) -> FrameTiles {
+    let mut cameras = vec![*camera];
+    if let Some(labels) = labels {
+        for placement in labels.cameras() {
+            if !cameras.contains(&placement) {
+                cameras.push(placement);
+            }
+        }
+    }
+    let mut seen = HashSet::new();
+    let mut frame = FrameTiles {
+        busiest: 0,
+        tiles: Vec::new(),
+    };
+    for camera in &cameras {
+        let seen_by_camera = view_tiles(camera, viewport);
+        frame.busiest = frame.busiest.max(seen_by_camera.len());
+        for tile in seen_by_camera {
+            if seen.insert(tile) {
+                frame.tiles.push(tile);
+            }
+        }
+    }
+    frame
+}
+
+/// A bounding box of tiles at one level, cut to the frustum's footprint.
+pub struct ViewRegion {
+    min_tile: TileId,
+    max_tile: TileId,
+    /// The footprint's corners in order, in tile units at this level. A pitched, rotated view's
+    /// footprint fills well under half of its bounding box.
+    footprint: [(f64, f64); 4],
+}
+
+impl ViewRegion {
+    pub fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
+        let z = self.min_tile.z;
+        (self.min_tile.x..=self.max_tile.x)
+            .flat_map(move |x| {
+                (self.min_tile.y..=self.max_tile.y).map(move |y| TileId::new(z, x, y))
+            })
+            .filter(|tile| tile.is_on_grid())
+            .filter(|tile| footprint_touches(&self.footprint, *tile))
+            .take(MAX_VIEW_TILES)
+    }
+}
+
+/// Whether a tile's square meets the footprint. The bounding box already covers the square's own
+/// axes, so only the footprint's edges can separate the two.
+fn footprint_touches(footprint: &[(f64, f64); 4], tile: TileId) -> bool {
+    let (left, top) = (f64::from(tile.x), f64::from(tile.y));
+    let corners = [
+        (left, top),
+        (left + 1.0, top),
+        (left + 1.0, top + 1.0),
+        (left, top + 1.0),
+    ];
+    let edges = [0, 1, 2, 3].map(|index| (footprint[index], footprint[(index + 1) % 4]));
+    // Twice the signed area: its sign says which side of each edge is inside.
+    let winding: f64 = edges.iter().map(|(a, b)| a.0 * b.1 - b.0 * a.1).sum();
+    edges.iter().all(|(a, b)| {
+        corners.iter().any(|corner| {
+            let side = (b.0 - a.0) * (corner.1 - a.1) - (b.1 - a.1) * (corner.0 - a.0);
+            side * winding >= 0.0
+        })
+    })
+}

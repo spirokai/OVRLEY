@@ -18,6 +18,7 @@ pub fn scene_frame(config: &ValidatedRenderConfig) -> Vec<u8> {
         &activity,
         &minimal_dense_activity(),
         &[0],
+        None,
         &mut RenderProfiler::default(),
     )
     .unwrap()

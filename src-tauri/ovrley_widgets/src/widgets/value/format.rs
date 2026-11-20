@@ -419,7 +419,10 @@ pub fn convert_standard_metric_value(
             "kmh" => value * 3.6,
             _ => unreachable!("speed unit validated at ingress"),
         },
-        MetricKind::Temperature | MetricKind::CoreTemperature | MetricKind::WaterTemperature => {
+        MetricKind::Temperature
+        | MetricKind::CoreTemperature
+        | MetricKind::WaterTemperature
+        | MetricKind::CoolantTemperature => {
             if display_unit == Some("fahrenheit") {
                 (value * 9.0 / 5.0) + 32.0
             } else {
@@ -459,6 +462,12 @@ pub fn convert_standard_metric_value(
             "mmhg" => value * 750.061_561_303,
             "mbar" | "hpa" => value * 1000.0,
             _ => unreachable!("pressure unit validated at ingress"),
+        },
+        MetricKind::BoostPressure => match display_unit {
+            Some("kpa") => value,
+            Some("bar") => value / 100.0,
+            Some("psi") => value / 6.894_757_293_168_361,
+            _ => unreachable!("boost pressure unit validated at ingress"),
         },
         MetricKind::Depth | MetricKind::FirstStopDepth => match display_unit {
             Some("m") => value,
@@ -561,7 +570,27 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
 
 #[cfg(test)]
 mod tests {
-    use super::{format_balance_value, format_coordinates, format_number};
+    use super::{
+        convert_standard_metric_value, format_balance_value, format_coordinates, format_number,
+    };
+    use crate::model::types::MetricKind;
+
+    #[test]
+    fn boost_pressure_converts_from_kilopascals() {
+        let convert =
+            |unit| convert_standard_metric_value(MetricKind::BoostPressure, Some(unit), 100.0);
+        assert_eq!(convert("kpa"), 100.0);
+        assert_eq!(convert("bar"), 1.0);
+        assert!((convert("psi") - 14.503_773_8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn coolant_temperature_converts_to_fahrenheit() {
+        let convert =
+            |unit| convert_standard_metric_value(MetricKind::CoolantTemperature, Some(unit), 90.0);
+        assert_eq!(convert("celsius"), 90.0);
+        assert_eq!(convert("fahrenheit"), 194.0);
+    }
 
     #[test]
     fn balance_percent_label_omits_spaces_around_slash() {

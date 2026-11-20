@@ -29,7 +29,7 @@ export default function useProjectLifecycle({
   onSetBackgroundMode,
   startupReady = false,
 }) {
-  const { conflictingOperation, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
+  const { conflictingOperation, hasUnsavedChanges, loadedProjectPath, markNew, markSaved, projectName, status } = useProjectDocumentState()
   const { dialog: missingSourceDialog, resolveProjectSources } = useProjectSourceRecovery()
   const { answerConfirm: answerProjectConfirm, isOpen: isProjectConfirmOpen, requestConfirm: requestProjectConfirm } = useUnsavedChangesConfirm()
   const [operationPhase, setOperationPhase] = useState(null)
@@ -158,7 +158,7 @@ export default function useProjectLifecycle({
   // Create new project — asks to save unsaved changes before discarding them
   const confirmProjectTransition = useCallback(
     async (intent) => {
-      if (status === 'Saved') return true
+      if (!hasUnsavedChanges) return true
 
       setConfirmationIntent(intent)
       const action = await requestProjectConfirm()
@@ -166,7 +166,7 @@ export default function useProjectLifecycle({
       if (action === 'save') return save(false)
       return true
     },
-    [requestProjectConfirm, save, status],
+    [hasUnsavedChanges, requestProjectConfirm, save],
   )
 
   const handleNewProject = useCallback(async () => {
@@ -206,6 +206,7 @@ export default function useProjectLifecycle({
     handleOpenProject,
     handleSaveProject,
     handleSaveProjectAs,
+    hasUnsavedChanges,
     loadedProjectPath,
     loadingProject: operationPhase === 'loading',
     missingSourceDialog,
@@ -214,7 +215,10 @@ export default function useProjectLifecycle({
       open: startupDialogOpen,
       openingPath: startupOpeningPath,
       projects: startupProjects,
-      onDismiss: () => setStartupDialogOpen(false),
+      onDismiss: () => {
+        markNew()
+        setStartupDialogOpen(false)
+      },
       onNewProject: handleStartupNewProject,
       onOpenProject: handleStartupOpenProject,
     },

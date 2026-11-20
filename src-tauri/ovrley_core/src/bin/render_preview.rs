@@ -86,7 +86,7 @@ fn main() -> Result<(), String> {
                 .map_err(|error| format!("Failed to create {}: {error}", parent.display()))?;
         }
     }
-    let report = render_preview_frames(&paths, &config, &activity, &dense_activity, &frames)
+    let report = render_preview_frames(&paths, &config, &activity, &dense_activity, &frames, None)
         .map_err(|e| e.to_string())?;
 
     let json = serde_json::to_string_pretty(&report)

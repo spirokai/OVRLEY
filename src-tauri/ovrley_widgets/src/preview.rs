@@ -4,8 +4,9 @@ use crate::{
     error::{WidgetError, WidgetResult},
     preview_instance::PreviewInstance,
     preview_widget::{PreviewWidget, ResizeRequest, ResizeUpdate, WidgetRequest},
-    render::text::FontResolver,
+    render::{preview::PreviewRasterScale, text::FontResolver},
 };
+use ovrley_map::MapStyleCatalog;
 use skia_safe::{FontMgr, Typeface};
 use std::collections::BTreeMap;
 
@@ -69,11 +70,15 @@ impl FontResolver for PreviewFonts {
 pub struct PreviewSession {
     pub fonts: PreviewFonts,
     pub images: crate::widgets::raster::preview::PreviewImages,
+    /// The installed map styles, once the host has set them. No map is created before.
+    pub map_styles: Option<MapStyleCatalog>,
     activity: Option<ActivitySampler>,
     /// The editor's disabled laps, applied to every activity this session samples.
     disabled_laps: Vec<usize>,
     pub widgets: BTreeMap<u32, PreviewInstance>,
     next_id: u32,
+    /// The editor's display density; every widget rasterizes at it.
+    raster_scale: PreviewRasterScale,
 }
 
 impl PreviewSession {
@@ -108,6 +113,30 @@ impl PreviewSession {
                 )?,
             ));
         }
+        if let Some(gesture) = request.map_view {
+            if request.size.is_some() || request.factor.is_some() {
+                return Err(WidgetError::Config(
+                    "map_view cannot include size or factor".into(),
+                ));
+            }
+            let WidgetRequest::Map { widget, scene, .. } = request.origin else {
+                return Err(WidgetError::Config("map_view requires a map".into()));
+            };
+            let handle = request.handle.ok_or_else(|| {
+                WidgetError::Config("map_view requires its preview handle".into())
+            })?;
+            let Some(PreviewInstance {
+                widget: PreviewWidget::Map(map),
+                ..
+            }) = self.widgets.get_mut(&handle)
+            else {
+                return Err(WidgetError::Config("map_view requires a map handle".into()));
+            };
+            let route = map.route_extent(self.activity.as_ref())?;
+            return Ok(ResizeUpdate::MapView(
+                crate::widgets::map::interaction::adjust_map_view(widget, scene, gesture, route)?,
+            ));
+        }
         if let WidgetRequest::Backdrop { widget, scene, .. } = request.origin {
             let size = request
                 .size
@@ -128,6 +157,20 @@ impl PreviewSession {
                 .ok_or_else(|| WidgetError::Config("raster resize size is required".into()))?;
             return Ok(ResizeUpdate::Raster(
                 crate::widgets::raster::interaction::resize_raster(
+                    widget,
+                    scene,
+                    size,
+                    request.fixed,
+                    request.point,
+                )?,
+            ));
+        }
+        if let WidgetRequest::Map { widget, scene, .. } = request.origin {
+            let size = request
+                .size
+                .ok_or_else(|| WidgetError::Config("map resize size is required".into()))?;
+            return Ok(ResizeUpdate::Map(
+                crate::widgets::map::interaction::resize_map(
                     widget,
                     scene,
                     size,
@@ -293,6 +336,7 @@ impl PreviewSession {
                 )?))
             }
             WidgetRequest::DivingProfile { .. }
+            | WidgetRequest::Map { .. }
             | WidgetRequest::RollingChart { .. }
             | WidgetRequest::Elevation { .. }
             | WidgetRequest::Backdrop { .. }
@@ -392,6 +436,7 @@ impl PreviewSession {
                         point: request.point,
                         second: request.second,
                     },
+                    self.raster_scale,
                     self.activity.as_ref(),
                     &self.fonts,
                 )?,
@@ -401,6 +446,15 @@ impl PreviewSession {
     pub fn activity(&self) -> Option<&ActivitySampler> {
         self.activity.as_ref()
     }
+    /// The shell's installed map styles, as JSON. Maps created after this resolve against them.
+    pub fn replace_map_styles(&mut self, bytes: &[u8]) -> WidgetResult<()> {
+        self.map_styles = Some(
+            serde_json::from_slice(bytes)
+                .map_err(|error| WidgetError::Config(error.to_string()))?,
+        );
+        Ok(())
+    }
+
     pub fn replace_activity(&mut self, bytes: &[u8]) -> WidgetResult<()> {
         self.activity = if bytes.is_empty() {
             None
@@ -421,6 +475,9 @@ impl PreviewSession {
                 widget.invalidate_activity();
             }
             if let PreviewWidget::Route(widget) = widget {
+                widget.invalidate_activity();
+            }
+            if let PreviewWidget::Map(widget) = widget {
                 widget.invalidate_activity();
             }
             if let PreviewWidget::LapTimer(widget) = widget {
@@ -464,7 +521,13 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget = PreviewInstance::new(request, &self.fonts, &self.images)?;
+        let widget = PreviewInstance::new(
+            request,
+            self.raster_scale,
+            &self.fonts,
+            &self.images,
+            self.map_styles.as_ref(),
+        )?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -476,7 +539,34 @@ impl PreviewSession {
         self.widgets
             .get_mut(&id)
             .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?
-            .update(request, &self.fonts, &self.images)
+            .update(
+                request,
+                self.raster_scale,
+                &self.fonts,
+                &self.images,
+                self.map_styles.as_ref(),
+            )
+    }
+    /// Zoom changes only the density, so widgets re-rasterize from their applied requests.
+    pub fn set_raster_scale(&mut self, raster_scale: PreviewRasterScale) -> WidgetResult<()> {
+        if raster_scale == self.raster_scale {
+            return Ok(());
+        }
+        self.raster_scale = raster_scale;
+        // One failing widget must not leave the rest at the previous density.
+        let mut result = Ok(());
+        for widget in self.widgets.values_mut() {
+            let rebuilt = widget.set_raster_scale(
+                raster_scale,
+                &self.fonts,
+                &self.images,
+                self.map_styles.as_ref(),
+            );
+            if result.is_ok() {
+                result = rebuilt;
+            }
+        }
+        result
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {
         if !second.is_finite() {
@@ -495,6 +585,7 @@ impl PreviewSession {
                     widget.render(self.activity.as_ref(), second, &self.fonts)?
                 }
                 PreviewWidget::Route(widget) => widget.render(self.activity.as_ref(), second)?,
+                PreviewWidget::Map(widget) => widget.render(self.activity.as_ref(), second)?,
                 PreviewWidget::Value(widget) => {
                     widget.render(self.activity.as_ref(), second, &self.fonts)?
                 }

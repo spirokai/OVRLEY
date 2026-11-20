@@ -1,0 +1,12 @@
+OVRLEY FOR macOS
+
+Install
+-------
+1. Open the downloaded OVRLEY DMG.
+2. Move OVRLEY.app to your /Applications folder.
+
+Unsigned App Notice
+-------------------
+OVRLEY is ad-hoc signed and is not notarized with an Apple Developer certificate,
+so macOS gatekeeper may block it from opening by default. Use the following command to remove the quarantine attribute and allow OVRLEY to run:
+sudo xattr -cr /Applications/OVRLEY.app

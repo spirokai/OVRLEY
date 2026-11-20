@@ -31,8 +31,8 @@ test.each([
   const state = {
     config: {},
     sceneElement: document.createElement('div'),
-    setLiveWidgetDraft: vi.fn(),
-    clearWidgetDrafts: vi.fn(),
+    setGesturePatches: vi.fn(),
+    clearGesturePatches: vi.fn(),
     commitWidgetUpdate: vi.fn(),
     moveableRef: { current: { stopDrag: vi.fn(), updateRect: vi.fn() } },
   }
@@ -73,7 +73,7 @@ test.each([
   expect(controller.cancel).toHaveBeenCalled()
   expect(state.moveableRef.current.stopDrag).toHaveBeenCalledTimes(1)
   expect(state.commitWidgetUpdate).toHaveBeenCalledTimes(1)
-  expect(state.clearWidgetDrafts).toHaveBeenLastCalledWith([type])
+  expect(state.clearGesturePatches).toHaveBeenCalled()
   unmount()
   unregisterWidgetInteraction(target)
 })
@@ -133,8 +133,10 @@ test('group translation shares canonical data patches and commits once before a 
     })
     act(() => vi.advanceTimersToNextFrame())
     expect(transient).toHaveBeenLastCalledWith([true, true])
-    expect(result.current.controller.getWidgetDraft('speed')).toEqual({ x: 112.125, y: 58.25 })
-    expect(result.current.controller.getWidgetDraft('label')).toEqual({ x: 212.125, y: 83.25 })
+    expect(result.current.controller.getGesturePatch('speed')).toEqual({ x: 112.125, y: 58.25 })
+    expect(result.current.controller.getGesturePatch('label')).toEqual({ x: 212.125, y: 83.25 })
+    // Gestures never publish through the shared drafts that re-render the editor and sidebars.
+    expect(result.current.liveEdits.liveWidgetDrafts).toEqual({})
     expect(commitWidgetUpdates).not.toHaveBeenCalled()
     act(() => {
       result.current.handlers.onDragGroup({ events: [{ beforeTranslate: [20.25, 10.5] }], inputEvent: { ctrlKey: false } })
@@ -145,7 +147,8 @@ test('group translation shares canonical data patches and commits once before a 
       speed: { x: 120.25, y: 60.5 },
       label: { x: 220.25, y: 85.5 },
     })
-    expect(result.current.liveEdits.liveWidgetDrafts).toEqual({})
+    expect(result.current.controller.getGesturePatch('speed')).toBeNull()
+    expect(result.current.controller.getGesturePatch('label')).toBeNull()
     expect(vi.getTimerCount()).toBe(0)
     unmount()
     unregisterWidgetInteraction(target)

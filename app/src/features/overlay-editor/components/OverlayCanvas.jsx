@@ -9,6 +9,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
   const {
     widgets,
     scene,
+    rasterScale,
     activity,
     disabledLaps,
     globalDefaults,
@@ -20,10 +21,12 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
     widgetRefCallbacks,
     handleCanvasMouseOver,
     handleCanvasMouseLeave,
+    mapViewWidgetId,
   } = state
-  const { attach, error } = useWasmWidgets({
+  const { attach, attachMapLayer, documentRevision, error } = useWasmWidgets({
     widgets,
     scene,
+    rasterScale,
     activity,
     disabledLaps,
     defaultFont: globalDefaults.font_values,
@@ -56,11 +59,14 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
           </div>
         ) : null}
         {widgets.map((widget) => (
+          // Ids repeat across documents, so a replaced document remounts its canvases.
           <WasmWidgetCanvas
-            key={widget.id}
+            key={`${documentRevision}:${widget.id}`}
             widget={widget}
             attach={attach}
+            attachMapLayer={attachMapLayer}
             registerNode={widgetRefCallbacks[widget.id]}
+            isMapView={widget.id === mapViewWidgetId}
             handleWidgetMouseDown={handleWidgetMouseDown}
           />
         ))}

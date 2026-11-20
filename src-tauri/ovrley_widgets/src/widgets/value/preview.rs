@@ -244,8 +244,12 @@ pub(crate) fn surface(width: u32, height: u32, color_type: ColorType) -> WidgetR
 }
 
 impl PreviewWidget {
-    pub fn new(request: WidgetRequest, fonts: &dyn FontResolver) -> WidgetResult<Self> {
-        let host = WidgetHost::from_scene(&request.scene)?;
+    pub fn new(
+        request: WidgetRequest,
+        raster_scale: PreviewRasterScale,
+        fonts: &dyn FontResolver,
+    ) -> WidgetResult<Self> {
+        let host = WidgetHost::from_scene(&request.scene, raster_scale)?;
         let config = ValuePresentation::new(request.widget, &host)?;
         Self::from_validated(
             config,

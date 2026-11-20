@@ -1,4 +1,5 @@
-//! On-demand OpenFreeMap vector tile and style fetching with persistent cache storage.
+//! On-demand OpenFreeMap vector tile fetching with persistent cache storage. The styles that read
+//! these tiles are installed with the build: see `map_styles`.
 //!
 //! This module is the sole owner of tile coordinate validation, upstream tile
 //! requests, and the on-disk tile cache. The loopback server only delegates
@@ -19,20 +20,42 @@ use uuid::Uuid;
 pub(crate) const OPENFREEMAP_TILE_URL: &str =
     "https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf";
 pub(crate) const OPENFREEMAP_CACHE_NAMESPACE: &str = "openfreemap-planet";
-pub(crate) const OPENFREEMAP_STYLE_URL: &str = "https://tiles.openfreemap.org/styles/{style}";
-pub(crate) const OPENFREEMAP_STYLE_CACHE_NAMESPACE: &str = "openfreemap-styles";
-pub(crate) const MAP_STYLES: [&str; 5] = ["positron", "bright", "liberty", "dark", "fiord"];
-const TILE_CACHE_LIMIT: u64 = 500 * 1024 * 1024;
+const MIB: u64 = 1024 * 1024;
+const TILE_CACHE_LIMIT_STEP: u64 = 128 * MIB;
+pub(crate) const DEFAULT_TILE_CACHE_LIMIT: u64 = 4 * TILE_CACHE_LIMIT_STEP;
+const MIN_TILE_CACHE_LIMIT: u64 = TILE_CACHE_LIMIT_STEP;
+const MAX_TILE_CACHE_LIMIT: u64 = 40 * TILE_CACHE_LIMIT_STEP;
+
+/// The cache's current size and its configurable limit bounds and step, in bytes.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TileCacheUsage {
+    used_bytes: u64,
+    limit_bytes: u64,
+    min_limit_bytes: u64,
+    max_limit_bytes: u64,
+    limit_step_bytes: u64,
+}
+
+/// Accepts a user-configured cache limit only on a step inside the supported bounds.
+pub(crate) fn validate_tile_cache_limit(limit: u64) -> Result<u64, String> {
+    if !(MIN_TILE_CACHE_LIMIT..=MAX_TILE_CACHE_LIMIT).contains(&limit)
+        || limit % TILE_CACHE_LIMIT_STEP != 0
+    {
+        return Err(format!(
+            "Map tile cache limit {limit} must be a multiple of {TILE_CACHE_LIMIT_STEP} between {MIN_TILE_CACHE_LIMIT} and {MAX_TILE_CACHE_LIMIT} bytes"
+        ));
+    }
+    Ok(limit)
+}
 
 #[derive(Clone)]
 pub(crate) struct MapTileService {
     cache_root: PathBuf,
     source_url: String,
-    style_source_url: String,
     cache_namespace: String,
     client: Client,
     in_flight: Arc<Mutex<HashMap<TileCoordinates, Arc<InFlightTile>>>>,
-    style_gate: Arc<Mutex<()>>,
     maintenance: Arc<CacheMaintenance>,
 }
 
@@ -116,6 +139,7 @@ struct PersistentEntry {
 }
 
 impl MapTileService {
+    #[cfg(test)]
     pub(crate) fn new(
         cache_root: PathBuf,
         source_url: String,
@@ -127,7 +151,7 @@ impl MapTileService {
             cache_namespace,
             Duration::from_secs(5),
             Duration::from_secs(15),
-            TILE_CACHE_LIMIT,
+            DEFAULT_TILE_CACHE_LIMIT,
         )
     }
 
@@ -145,7 +169,7 @@ impl MapTileService {
             cache_namespace,
             connect_timeout,
             request_timeout,
-            TILE_CACHE_LIMIT,
+            DEFAULT_TILE_CACHE_LIMIT,
         )
     }
 
@@ -164,18 +188,6 @@ impl MapTileService {
             Duration::from_secs(15),
             cache_limit,
         )
-    }
-
-    #[cfg(test)]
-    pub(crate) fn with_style_source_url(
-        mut self,
-        style_source_url: String,
-    ) -> Result<Self, String> {
-        if !style_source_url.contains("{style}") {
-            return Err("Style source URL must contain a {style} placeholder".to_string());
-        }
-        self.style_source_url = style_source_url;
-        Ok(self)
     }
 
     fn with_timeouts(
@@ -217,11 +229,9 @@ impl MapTileService {
         let service = Self {
             cache_root,
             source_url,
-            style_source_url: OPENFREEMAP_STYLE_URL.to_string(),
             cache_namespace,
             client,
             in_flight: Arc::new(Mutex::new(HashMap::new())),
-            style_gate: Arc::new(Mutex::new(())),
             maintenance: Arc::new(CacheMaintenance {
                 gate: RwLock::new(()),
                 accounting: Mutex::new(CacheAccounting {
@@ -235,12 +245,45 @@ impl MapTileService {
         Ok(service)
     }
 
-    pub(crate) fn for_application_cache(application_cache: PathBuf) -> Result<Self, String> {
-        Self::new(
+    pub(crate) fn for_application_cache(
+        application_cache: PathBuf,
+        cache_limit: u64,
+    ) -> Result<Self, String> {
+        Self::with_timeouts(
             application_cache.join("tiles"),
             OPENFREEMAP_TILE_URL.to_string(),
             OPENFREEMAP_CACHE_NAMESPACE.to_string(),
+            Duration::from_secs(5),
+            Duration::from_secs(15),
+            validate_tile_cache_limit(cache_limit)?,
         )
+    }
+
+    pub(crate) fn usage(&self) -> Result<TileCacheUsage, String> {
+        let accounting = self
+            .maintenance
+            .accounting
+            .lock()
+            .map_err(|error| error.to_string())?;
+        Ok(TileCacheUsage {
+            used_bytes: accounting.total_size,
+            limit_bytes: accounting.limit,
+            min_limit_bytes: MIN_TILE_CACHE_LIMIT,
+            max_limit_bytes: MAX_TILE_CACHE_LIMIT,
+            limit_step_bytes: TILE_CACHE_LIMIT_STEP,
+        })
+    }
+
+    /// Applies a new limit and evicts least recently used tiles down to it.
+    pub(crate) fn set_limit(&self, cache_limit: u64) -> Result<TileCacheUsage, String> {
+        let cache_limit = validate_tile_cache_limit(cache_limit)?;
+        self.maintenance
+            .accounting
+            .lock()
+            .map_err(|error| error.to_string())?
+            .limit = cache_limit;
+        self.reconcile_and_evict()?;
+        self.usage()
     }
 
     pub(crate) fn resolve(&self, coordinates: TileCoordinates) -> Result<TilePayload, String> {
@@ -280,80 +323,6 @@ impl MapTileService {
             .map_err(|error| error.to_string())?
             .remove(&coordinates);
         result
-    }
-
-    pub(crate) fn resolve_style(
-        &self,
-        style: &str,
-        tile_url_template: &str,
-    ) -> Result<TilePayload, String> {
-        let _style_access = self.style_gate.lock().map_err(|error| error.to_string())?;
-        let directory = self.cache_root.join(OPENFREEMAP_STYLE_CACHE_NAMESPACE);
-        let cache_path = directory.join(format!("{style}.json"));
-
-        let (payload, cache_status) = match fs::read(&cache_path) {
-            Ok(payload) if validate_style(&payload).is_ok() => (payload, TileCacheStatus::Hit),
-            Ok(_) => {
-                remove_if_present(&cache_path)?;
-                (
-                    self.fetch_style(style, &directory, &cache_path)?,
-                    TileCacheStatus::Miss,
-                )
-            }
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => (
-                self.fetch_style(style, &directory, &cache_path)?,
-                TileCacheStatus::Miss,
-            ),
-            Err(error) => {
-                return Err(format!(
-                    "Failed to read cached map style {}: {error}",
-                    cache_path.display()
-                ));
-            }
-        };
-
-        Ok(TilePayload {
-            bytes: rewrite_style(&payload, tile_url_template)?,
-            cache_status,
-        })
-    }
-
-    fn fetch_style(
-        &self,
-        style: &str,
-        directory: &Path,
-        cache_path: &Path,
-    ) -> Result<Vec<u8>, String> {
-        let upstream_url = self.style_source_url.replace("{style}", style);
-        let response = self
-            .client
-            .get(upstream_url)
-            .send()
-            .map_err(|error| format!("Map style upstream request failed: {error}"))?;
-        if response.status() != reqwest::StatusCode::OK || !is_json_response(response.headers()) {
-            return Err(format!(
-                "Map style upstream returned invalid HTTP response {}",
-                response.status().as_u16()
-            ));
-        }
-        let payload = response
-            .bytes()
-            .map_err(|error| format!("Failed to read map style upstream response: {error}"))?
-            .to_vec();
-        validate_style(&payload)?;
-
-        fs::create_dir_all(directory).map_err(|error| {
-            format!(
-                "Failed to create map style cache directory {}: {error}",
-                directory.display()
-            )
-        })?;
-        let temporary = directory.join(format!(".{}.json.tmp", Uuid::new_v4()));
-        write_synced(&temporary, &payload)?;
-        remove_if_present(cache_path)?;
-        fs::rename(&temporary, cache_path)
-            .map_err(|error| format!("Failed to promote map style into cache: {error}"))?;
-        Ok(payload)
     }
 
     fn resolve_owned(&self, coordinates: TileCoordinates) -> Result<TilePayload, String> {
@@ -726,7 +695,6 @@ impl MapTileService {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub(crate) fn clear(&self) -> Result<(), String> {
         let _maintenance = self
             .maintenance
@@ -816,11 +784,8 @@ fn scan_persistent_entries(cache_root: &Path) -> Result<Vec<PersistentEntry>, St
         }
     }
 
-    let style_cache_root = cache_root.join(OPENFREEMAP_STYLE_CACHE_NAMESPACE);
+    // Everything else goes, the styles earlier versions cached here included.
     for artifact in files {
-        if artifact.starts_with(&style_cache_root) {
-            continue;
-        }
         if !valid_files.contains(&artifact) {
             remove_if_present(&artifact)?;
         }
@@ -1005,55 +970,6 @@ fn is_vector_tile_response(headers: &reqwest::header::HeaderMap) -> bool {
         })
 }
 
-fn is_json_response(headers: &reqwest::header::HeaderMap) -> bool {
-    headers
-        .get(CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(';').next())
-        .is_some_and(|media_type| media_type.trim().eq_ignore_ascii_case("application/json"))
-}
-
-fn validate_style(payload: &[u8]) -> Result<(), String> {
-    let style: serde_json::Value = serde_json::from_slice(payload)
-        .map_err(|error| format!("OpenFreeMap style is not valid JSON: {error}"))?;
-    if style.get("version").and_then(serde_json::Value::as_u64) != Some(8) {
-        return Err("OpenFreeMap style must use style specification version 8".to_string());
-    }
-    let source = style
-        .get("sources")
-        .and_then(|sources| sources.get("openmaptiles"))
-        .and_then(serde_json::Value::as_object)
-        .ok_or_else(|| {
-            "OpenFreeMap style is missing its required openmaptiles source".to_string()
-        })?;
-    if source.get("type").and_then(serde_json::Value::as_str) != Some("vector") {
-        return Err("OpenFreeMap style openmaptiles source must be vector tiles".to_string());
-    }
-    Ok(())
-}
-
-fn rewrite_style(payload: &[u8], tile_url_template: &str) -> Result<Vec<u8>, String> {
-    let mut style: serde_json::Value = serde_json::from_slice(payload)
-        .map_err(|error| format!("Cached OpenFreeMap style is not valid JSON: {error}"))?;
-    let source = style
-        .get_mut("sources")
-        .and_then(|sources| sources.get_mut("openmaptiles"))
-        .and_then(serde_json::Value::as_object_mut)
-        .ok_or_else(|| {
-            "OpenFreeMap style is missing its required openmaptiles source".to_string()
-        })?;
-    source.remove("url");
-    source.insert("tiles".to_string(), serde_json::json!([tile_url_template]));
-    source.insert("minzoom".to_string(), serde_json::json!(0));
-    source.insert("maxzoom".to_string(), serde_json::json!(14));
-    source.insert(
-        "attribution".to_string(),
-        serde_json::json!("<a href=\"https://openfreemap.org\">OpenFreeMap</a> <a href=\"https://www.openmaptiles.org/\">&copy; OpenMapTiles</a> Data from <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>"),
-    );
-    serde_json::to_vec(&style)
-        .map_err(|error| format!("Failed to serialize OpenFreeMap style: {error}"))
-}
-
 fn cache_request(request: &reqwest::blocking::Request) -> Result<http::Request<()>, String> {
     let mut cache_request = http::Request::builder()
         .method(request.method().clone())
@@ -1127,11 +1043,6 @@ pub(crate) fn parse_tile_path(path: &str) -> Option<TileCoordinates> {
         x,
         y,
     })
-}
-
-pub(crate) fn parse_style_path(path: &str) -> Option<&'static str> {
-    let style = path.strip_prefix("/styles/")?;
-    MAP_STYLES.into_iter().find(|candidate| *candidate == style)
 }
 
 fn parse_decimal(value: &str) -> Option<u32> {

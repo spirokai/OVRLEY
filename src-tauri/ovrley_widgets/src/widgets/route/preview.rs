@@ -41,9 +41,13 @@ pub struct PreviewRoute {
 }
 
 impl PreviewRoute {
-    pub fn new(widget: CoursePlotConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn new(
+        widget: CoursePlotConfig,
+        scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
         let config = validate_route_plot(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Self::from_validated(config, validate_scene_presentation(scene)?, &host)
     }
 
@@ -76,10 +80,11 @@ impl PreviewRoute {
         &mut self,
         widget: CoursePlotConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         transient: bool,
     ) -> WidgetResult<()> {
         let config = validate_route_plot(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let window = host.plot_window(config.show_full_activity);
         let preview_duration = host.placeholder_duration()?;
         let preview_raster_scale = host.raster_scale;
@@ -98,7 +103,7 @@ impl PreviewRoute {
             self.layout = None;
         }
         if let Some(layout) = self.layout.as_mut() {
-            // Prepared paths ignore x/y, but the cached remaining raster sits on the position's
+            // Prepared paths ignore x/y, but the cached shadow raster sits on the position's
             // sub-pixel grid, so a move rebuilds the layout from them.
             if layout.config != config
                 || self.preview_raster_scale != preview_raster_scale
@@ -142,7 +147,7 @@ impl PreviewRoute {
         let samples = self.samples.as_ref().expect("route samples prepared");
         self.placeholder = samples.len() < 2;
         self.prepared_geometry = Some(Arc::new(if self.placeholder {
-            RouteGeometry::placeholder(&self.config)?
+            RouteGeometry::placeholder(&self.config)
         } else {
             RouteGeometry::new(&self.config, samples)?
         }));
@@ -160,7 +165,7 @@ impl PreviewRoute {
         {
             if self.placeholder_geometry.is_none() {
                 self.placeholder_geometry =
-                    Some(Arc::new(RouteGeometry::placeholder(&self.config)?));
+                    Some(Arc::new(RouteGeometry::placeholder(&self.config)));
             }
             Ok(self
                 .placeholder_geometry
@@ -204,7 +209,7 @@ impl PreviewRoute {
         scale_route(&mut config, factor);
         if commit {
             let geometry = if self.placeholder {
-                RouteGeometry::placeholder(&config)?
+                RouteGeometry::placeholder(&config)
             } else {
                 RouteGeometry::new(
                     &config,
@@ -213,7 +218,7 @@ impl PreviewRoute {
             };
             self.prepared_geometry = Some(Arc::new(geometry));
             if self.placeholder_geometry.is_some() {
-                self.placeholder_geometry = Some(Arc::new(RouteGeometry::placeholder(&config)?));
+                self.placeholder_geometry = Some(Arc::new(RouteGeometry::placeholder(&config)));
             }
             self.layout = None;
             self.last_progress = None;

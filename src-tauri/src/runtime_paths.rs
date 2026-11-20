@@ -8,6 +8,7 @@
 //! Allowed dependencies: `ovrley_core`, `tauri`.
 //! Forbidden dependencies: none (this is a utility module for the shell layer).
 
+use crate::map_styles::MapStyleDirs;
 use ovrley_core::paths::AppPaths;
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
@@ -29,19 +30,44 @@ pub(crate) fn source_repo_root() -> PathBuf {
 /// user's documents directory in `OVRLEY`, with templates in `templates/`,
 /// render outputs at the root, and runtime scratch data in `.runtime/`.
 pub(crate) fn app_paths(app: &AppHandle) -> Result<AppPaths, String> {
-    let repo_root = source_repo_root();
+    let paths =
+        AppPaths::from_runtime_roots(source_repo_root(), resource_root(app)?, user_data_root(app)?);
+    paths.ensure_dirs().map_err(|e| e.to_string())?;
+    Ok(paths)
+}
+
+/// The installed map styles' folders: `map-styles` in the build, which a development build reads
+/// from `assets/`, and `map-styles` in the user's OVRLEY folder.
+pub(crate) fn map_style_dirs(app: &AppHandle) -> Result<MapStyleDirs, String> {
+    let bundled = if cfg!(debug_assertions) {
+        source_repo_root().join("assets").join("map-styles")
+    } else {
+        resource_root(app)?.join("map-styles")
+    };
+    Ok(MapStyleDirs {
+        bundled,
+        user: user_data_root(app)?.join("map-styles"),
+    })
+}
+
+/// The bundled map fonts' folder: `fonts/map` in the checkout in development, in the build's resources
+/// otherwise.
+pub(crate) fn map_font_dir(app: &AppHandle) -> Result<PathBuf, String> {
+    Ok(resource_root(app)?.join("fonts").join("map"))
+}
+
+/// The checkout in development, the build's resources otherwise.
+fn resource_root(app: &AppHandle) -> Result<PathBuf, String> {
     // cfg!() is intentional here, not #[cfg(debug_assertions)]. Both branches
     // must compile because this function serves both debug and release builds.
     // #[cfg] would exclude the release branch during debug compilation, causing
     // compile errors when a debug build of the app runs in dev mode.
-    let resource_root = if cfg!(debug_assertions) {
-        repo_root.clone()
+    if cfg!(debug_assertions) {
+        Ok(source_repo_root())
     } else {
-        portable_resource_root().unwrap_or(app.path().resource_dir().map_err(|e| e.to_string())?)
-    };
-    let paths = AppPaths::from_runtime_roots(repo_root, resource_root, user_data_root(app)?);
-    paths.ensure_dirs().map_err(|e| e.to_string())?;
-    Ok(paths)
+        portable_resource_root()
+            .map_or_else(|| app.path().resource_dir().map_err(|e| e.to_string()), Ok)
+    }
 }
 
 /// Returns the `OVRLEY` user data root inside the user's documents directory.

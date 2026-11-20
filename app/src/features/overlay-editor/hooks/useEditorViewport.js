@@ -2,7 +2,7 @@
  * Viewport measurement, cursor-anchored zoom, scrolling, and scene snap guides.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { matchKeyboardShortcut } from '@/lib/keyboard-shortcuts'
 import { clamp } from '@/lib/utils'
 import { getEditorGridSize, getGridGuidelines } from '../utils/overlayEditorUtils'
@@ -93,17 +93,20 @@ export function useEditorViewport({ contentSize, onZoomLevelChange, sceneElement
   useEffect(() => observeViewport(viewportRef, setViewportSize), [])
   const fitScale = useMemo(() => getFitScale(viewportSize, contentSize), [contentSize, viewportSize])
   const displayScale = fitScale * zoomLevel
-  const wheelHandler = useCallback(
-    (event) => handleWheel({ onZoomLevelChange, sceneElement, zoomAnchorRef, zoomLevel }, event),
-    [onZoomLevelChange, sceneElement, zoomLevel],
-  )
+  // React registers wheel listeners as passive, so its onWheel cannot preventDefault and the native scroll would fight the zoom anchor.
+  useLayoutEffect(() => {
+    const node = scrollViewportRef.current
+    if (!node) return
+    const wheel = handleWheel.bind(null, { onZoomLevelChange, sceneElement, zoomAnchorRef, zoomLevel })
+    node.addEventListener('wheel', wheel, { passive: false })
+    return () => node.removeEventListener('wheel', wheel)
+  }, [onZoomLevelChange, sceneElement, zoomLevel])
   useLayoutEffect(() => applyZoomAnchor(zoomAnchorRef, scrollViewportRef, sceneElement), [displayScale, sceneElement])
   const gridSize = getEditorGridSize(sceneSize)
   const horizontalGuidelines = useMemo(() => getGridGuidelines(sceneSize.height, gridSize, snapToGrid), [gridSize, sceneSize.height, snapToGrid])
   const verticalGuidelines = useMemo(() => getGridGuidelines(sceneSize.width, gridSize, snapToGrid), [gridSize, sceneSize.width, snapToGrid])
   return {
     displayScale,
-    handleWheel: wheelHandler,
     scrollViewportRef,
     viewportRef,
     horizontalGuidelines,

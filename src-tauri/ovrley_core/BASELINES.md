@@ -22,10 +22,10 @@ In powershell from src-tauri/ovrley_core:
 
 ```bash
 # Record/update baselines (after intentional output changes)
-$env:OVRLEY_RECORD_BASELINES='1'; cargo test -p ovrley_core --test render_baseline_suite -- --ignored --nocapture
+$env:OVRLEY_RECORD_BASELINES='1'; cargo test -p ovrley_core --test it render_baseline_suite:: -- --ignored --nocapture
 
 # Compare against committed baselines (normal CI run)
-$env:OVRLEY_RECORD_BASELINES='0'; cargo test -p ovrley_core --test render_baseline_suite -- --ignored --nocapture
+$env:OVRLEY_RECORD_BASELINES='0'; cargo test -p ovrley_core --test it render_baseline_suite:: -- --ignored --nocapture
 ```
 
 ### Flag explanations

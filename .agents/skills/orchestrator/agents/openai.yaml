@@ -1,0 +1,5 @@
+interface:
+  display_name: 'Orchestrator'
+  short_description: 'Run implementer, reviewer and fixer in fresh agents'
+policy:
+  allow_implicit_invocation: false

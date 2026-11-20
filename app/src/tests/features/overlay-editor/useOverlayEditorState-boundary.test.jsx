@@ -95,7 +95,7 @@ describe('useOverlayEditorState module contract', () => {
       expect(target.style.left).toBe('100px')
       expect(target.style.top).toBe('60px')
       expect(canvas.style.left).toBe('90px')
-      expect(canvas.style.transform).toBe('none')
+      expect(canvas.style.transform).toBe('')
     }
     // Fractional content keeps a whole-pixel offset plus a translate, so the box is exact.
     presentWidgetGeometry(
@@ -135,7 +135,7 @@ describe('useOverlayEditorState module contract', () => {
     act(() => wasmRef(node))
     expect(result.current.widgetLiveEdits.getWidgetNode('speed-widget')).toBe(node)
 
-    rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, ...buildDisplayTypeChangeUpdate(speed, 'linear') }] } })
+    rerender({ config: { ...DEFAULT_CONFIG, values: [{ ...speed, ...buildDisplayTypeChangeUpdate(speed, 'linear', 'metric') }] } })
     const linearRef = result.current.widgetRefCallbacks['speed-widget']
     expect(linearRef).toBe(wasmRef)
     act(() => {

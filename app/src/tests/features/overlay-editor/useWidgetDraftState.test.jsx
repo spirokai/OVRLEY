@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vite-plus/test'
-import useWidgetDraftState, { useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
+import useWidgetDraftState, { useGestureWidget, useWidgetDraftView } from '@/features/overlay-editor/hooks/useWidgetDraftState'
 
 describe('live widget draft publication', () => {
   beforeEach(() => vi.useFakeTimers({ toFake: ['requestAnimationFrame', 'cancelAnimationFrame'] }))
@@ -67,4 +67,29 @@ describe('live widget draft publication', () => {
     unmount()
     expect(vi.getTimerCount()).toBe(0)
   })
+})
+
+test('canvas gestures reach only gesture subscribers', () => {
+  const speed = { id: 'speed', type: 'speed', data: { x: 100, y: 50 } }
+  const other = { id: 'other', type: 'speed', data: { x: 10, y: 10 } }
+  const draftRenders = vi.fn()
+  const { result } = renderHook(() => {
+    const controller = useWidgetDraftState()
+    return { controller, speed: useGestureWidget(controller, speed), other: useGestureWidget(controller, other) }
+  })
+  const { result: draftView } = renderHook(() => {
+    draftRenders()
+    return useWidgetDraftView(result.current.controller)
+  })
+  draftRenders.mockClear()
+
+  act(() => result.current.controller.setGesturePatches({ speed: { x: 120.5, y: 60 } }))
+  expect(result.current.speed.data).toEqual({ x: 120.5, y: 60 })
+  expect(result.current.other).toBe(other)
+  expect(draftRenders).not.toHaveBeenCalled()
+  expect(draftView.current.liveWidgetDrafts).toEqual({})
+
+  act(() => result.current.controller.clearGesturePatches())
+  expect(result.current.speed).toBe(speed)
+  expect(draftRenders).not.toHaveBeenCalled()
 })

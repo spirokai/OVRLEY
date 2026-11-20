@@ -28,12 +28,14 @@ function setup() {
     _ovrley_preview_widget_update: vi.fn(() => 0),
     _ovrley_preview_widget_destroy: vi.fn(),
     _ovrley_preview_render: vi.fn(() => 0),
+    _ovrley_preview_raster_scale: vi.fn(() => 0),
   }
   const error = vi.fn()
   const session = createPreviewSession(module, error)
   const snapshot = {
     widgets: [{ id: 'r', type: 'raster', data: { resourceId: 'image', path: '/image.png' } }],
     scene: {},
+    rasterScale: 1,
     defaultFont: 'Inter.ttf',
     activityId: null,
     second: 0,
@@ -61,6 +63,24 @@ test('raster loads once, creates without waiting for fonts, and ignores playhead
   expect(rasterPreviewPng).toHaveBeenCalledTimes(1)
   session.dispose()
   expect(module._ovrley_preview_destroy).toHaveBeenCalledOnce()
+})
+
+test('a zoom burst applies the latest density once per frame without resending widget configs', async () => {
+  rasterPreviewPng.mockResolvedValue('AQID')
+  const { module, session, snapshot } = setup()
+  session.setSnapshot(snapshot)
+  await Promise.resolve()
+  vi.advanceTimersToNextFrame()
+  expect(module._ovrley_preview_raster_scale.mock.calls).toEqual([[1, 1]])
+  for (const rasterScale of [0.6, 0.65, 0.7]) session.setSnapshot({ ...snapshot, rasterScale })
+  vi.advanceTimersToNextFrame()
+  expect(module._ovrley_preview_raster_scale.mock.calls).toEqual([
+    [1, 1],
+    [1, 0.7],
+  ])
+  expect(module._ovrley_preview_widget_create).toHaveBeenCalledOnce()
+  expect(module._ovrley_preview_widget_update).not.toHaveBeenCalled()
+  session.dispose()
 })
 
 test('elevation playback uploads changed pixels while translation only presents geometry', async () => {

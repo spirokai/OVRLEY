@@ -104,6 +104,7 @@ pub fn batch_video_plan(
             inspection,
             request,
             None,
+            None,
             std::sync::Arc::new(Capture(std::sync::Mutex::new(send))),
         )
         .map_err(|error| CoreError::Config(format!("Submission failed: {error:?}")))?;
@@ -166,6 +167,8 @@ pub fn empty_dense_series() -> DenseSeriesReport {
         power: vec![],
         engine_power: vec![],
         engine_load: vec![],
+        coolant_temperature: vec![],
+        boost_pressure: vec![],
         temperature: vec![],
         depth: vec![],
         first_stop_depth: vec![],
@@ -264,6 +267,8 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
         power: vec![],
         engine_power: vec![],
         engine_load: vec![],
+        coolant_temperature: vec![],
+        boost_pressure: vec![],
         temperature: vec![],
         depth: vec![],
         first_stop_depth: vec![],

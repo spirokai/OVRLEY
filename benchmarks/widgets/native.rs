@@ -36,6 +36,8 @@ struct Case {
     dynamic: bool,
     request: Option<Value>,
     split_table: Option<String>,
+    /// Whether a preview backend's map canvas shows under the widget.
+    map_layer: bool,
 }
 
 fn main() -> Result<(), String> {
@@ -118,6 +120,10 @@ fn main() -> Result<(), String> {
     }
     let mut results = Vec::new();
     for (case, config) in plan.cases.iter().zip(configs) {
+        // Export would need a map source, and this benchmark has none.
+        if case.map_layer {
+            continue;
+        }
         eprintln!("[native] {}", case.id);
         let setup = Instant::now();
         let activity_path = plan
@@ -155,6 +161,7 @@ fn main() -> Result<(), String> {
             &dense,
             size,
             0,
+            ovrley_core::render::ExportMapJob { source: None, frame_indices: &[], controller: &ovrley_core::encode::progress::RenderController::default() },
             &mut prepare_profiler,
         )
         .map_err(|e| e.to_string())?;

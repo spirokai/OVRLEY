@@ -68,4 +68,14 @@ function DialogDescription({ className, ...props }) {
   return <DialogPrimitive.Description data-slot="dialog-description" className={cn(className)} {...props} />
 }
 
-export { Dialog, DialogContent, DialogDescription, DialogTitle }
+/**
+ * Renders a control that closes the enclosing dialog through its `onOpenChange`.
+ *
+ * @param {object} props - Dialog close props.
+ * @returns {JSX.Element} Rendered dialog close control.
+ */
+function DialogClose(props) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />
+}
+
+export { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle }

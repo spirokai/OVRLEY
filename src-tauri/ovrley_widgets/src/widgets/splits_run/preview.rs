@@ -45,9 +45,13 @@ pub struct PreviewSplitsRun {
 }
 
 impl PreviewSplitsRun {
-    pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn new(
+        widget: ValueConfig,
+        scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
         let config = validate_splits_run(widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Ok(Self::from_validated(
             config,
             validate_scene_presentation(scene)?,

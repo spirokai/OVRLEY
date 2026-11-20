@@ -166,6 +166,19 @@ export async function suggestRenderOutputPath(outputKind, rememberedDirectory) {
   })
 }
 
+/**
+ * Downloads the tiles a project's maps will show in the background, replacing any earlier download.
+ * Progress arrives as `map-prepare` events.
+ * @param {string} activityId Native snapshot identity.
+ * @param {object[]} widgets Effective map widgets. None just stops the last download.
+ * @param {object} scene Effective scene.
+ * @param {number} rasterScale Preview session density; it sets the maps' pixel ratio and so their tile zoom.
+ * @returns {Promise<void>} Settles when this download ends, rejecting if a tile failed.
+ */
+export function prepareMapTiles(activityId, widgets, scene, rasterScale) {
+  return invokeCommand('backend_map_prepare', { activityId, widgets, scene, rasterScale })
+}
+
 /** @param {string} activityId Native snapshot identity. @returns {Promise<ArrayBuffer>} Original-density activity bytes. */
 export function previewActivity(activityId) {
   return invokeCommand('backend_preview_activity', { activityId })
@@ -300,8 +313,73 @@ export async function getPlatformInfo() {
   return typeof payload === 'string' ? JSON.parse(payload) : payload
 }
 
+// The installed styles are read once at startup, so one request serves every caller.
+let installedMapStyles = null
+
 /**
- * Returns the Rust-owned loopback URL template for cached OpenFreeMap styles.
+ * Lists the installed map styles, in the order the editor shows them. The first is what a map
+ * draws when its own style isn't installed. Outside the desktop app none are installed.
+ *
+ * @returns {Promise<{id: string, label: string, background: number[]}[]>} Installed styles.
+ */
+export function listMapStyles() {
+  if (!hasTauriRuntime()) return Promise.resolve([])
+  if (installedMapStyles === null) {
+    installedMapStyles = invokeCommand('backend_list_map_styles').then((styles) => {
+      const valid =
+        Array.isArray(styles) &&
+        styles.length > 0 &&
+        styles.every(
+          (style) =>
+            typeof style?.id === 'string' &&
+            typeof style.label === 'string' &&
+            Array.isArray(style.background) &&
+            style.background.length === 3 &&
+            style.background.every((channel) => Number.isInteger(channel) && channel >= 0 && channel <= 255),
+        )
+      if (!valid) throw new Error('Invalid map style catalog returned by backend')
+      return styles
+    })
+    // A failed request is made again by the next caller.
+    installedMapStyles.catch(() => {
+      installedMapStyles = null
+    })
+  }
+  return installedMapStyles
+}
+
+/**
+ * The map tile cache's size and limit, in bytes. Every cache command returns this shape.
+ * @typedef {{usedBytes: number, limitBytes: number, minLimitBytes: number, maxLimitBytes: number, limitStepBytes: number}} MapTileCacheUsage
+ */
+
+/**
+ * Reads the map tile cache usage. The cache only exists in the desktop runtime.
+ * @returns {Promise<MapTileCacheUsage>} Current usage and limit bounds.
+ */
+export function getMapTileCache() {
+  return invokeCommand('backend_get_map_tile_cache')
+}
+
+/**
+ * Saves and applies a new map tile cache limit; least recently used tiles are evicted down to it.
+ * @param {number} limitBytes - New limit in bytes, on a reported step within the reported bounds.
+ * @returns {Promise<MapTileCacheUsage>} Usage after eviction.
+ */
+export function setMapTileCacheLimit(limitBytes) {
+  return invokeCommand('backend_set_map_tile_cache_limit', { limitBytes })
+}
+
+/**
+ * Deletes every cached map tile.
+ * @returns {Promise<MapTileCacheUsage>} Usage after clearing.
+ */
+export function clearMapTileCache() {
+  return invokeCommand('backend_clear_map_tile_cache')
+}
+
+/**
+ * Returns the Rust-owned loopback URL template for the installed map styles.
  * The null browser result is intentional: the map service only exists in the
  * desktop runtime.
  *
@@ -720,26 +798,6 @@ export async function buildElevationGeometry(config, parsedActivity) {
   const safeConfig = safeJsonStringify(config)
   const safeParsedActivity = safeJsonStringify(parsedActivity)
   return apiCall('backend_build_elevation_geometry', {
-    configJson: safeConfig,
-    parsedActivityJson: safeParsedActivity,
-  })
-}
-
-/**
- * Builds route widget geometry from config and activity data.
- *
- * Returns simplified, projected geometry points for the route preview
- * without rendering a Skia surface. The JS frontend uses this to avoid
- * duplicating the geometry pipeline.
- *
- * @param {*} config - Overlay template configuration data.
- * @param {*} parsedActivity - Normalized activity payload used by the app.
- * @returns {Promise<object>} Promise resolving to route geometry (points, progressValues, bbox, etc.).
- */
-export async function buildRouteGeometry(config, parsedActivity) {
-  const safeConfig = safeJsonStringify(config)
-  const safeParsedActivity = safeJsonStringify(parsedActivity)
-  return apiCall('backend_build_route_geometry', {
     configJson: safeConfig,
     parsedActivityJson: safeParsedActivity,
   })

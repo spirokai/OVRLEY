@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider'
 import { VideoPreviewSurface } from '@/features/video-preview'
 import useVideoSyncPreview from '../hooks/useVideoSyncPreview'
-import { VIDEO_SYNC_MAP_STYLES, VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH, VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH } from '../data/videoSyncConstants'
+import { VIDEO_SYNC_NAVIGATION_MAP_MAX_PITCH, VIDEO_SYNC_NAVIGATION_MAP_MIN_PITCH } from '../data/videoSyncConstants'
 
 function CourseLocationAction({ actionPoint, onConfirm }) {
   const { t } = useTranslation()
@@ -32,7 +32,7 @@ function CourseLocationAction({ actionPoint, onConfirm }) {
   )
 }
 
-function MapStyleSelector({ style, onStyleChange }) {
+function MapStyleSelector({ style, styleOptions, onStyleChange }) {
   const label = useTranslation().t('videoSync.mapStyle', 'Map style')
   return (
     <div className="absolute bottom-2 left-2 z-10" onClick={(event) => event.stopPropagation()}>
@@ -41,9 +41,9 @@ function MapStyleSelector({ style, onStyleChange }) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {VIDEO_SYNC_MAP_STYLES.map((styleName) => (
-            <SelectItem key={styleName} value={styleName}>
-              {styleName.charAt(0).toUpperCase() + styleName.slice(1)}
+          {styleOptions.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
             </SelectItem>
           ))}
         </SelectContent>
@@ -52,11 +52,11 @@ function MapStyleSelector({ style, onStyleChange }) {
   )
 }
 
-function VideoSyncMapPreview({ containerRef, actionPoint, onConfirmActionPoint, onStyleChange, style }) {
+function VideoSyncMapPreview({ containerRef, actionPoint, onConfirmActionPoint, onStyleChange, style, styleOptions }) {
   return (
     <div className="relative isolate h-full w-full bg-surface-elevated" data-testid="maplibre-map">
       <div ref={containerRef} className="h-full w-full" />
-      <MapStyleSelector style={style} onStyleChange={onStyleChange} />
+      {style !== null && <MapStyleSelector style={style} styleOptions={styleOptions} onStyleChange={onStyleChange} />}
       <CourseLocationAction actionPoint={actionPoint} onConfirm={onConfirmActionPoint} />
     </div>
   )
@@ -122,6 +122,7 @@ export default function VideoSyncPreviewScreens({
     speedCanvasRef,
     speedError,
     style,
+    styleOptions,
     onStyleChange,
   } = useVideoSyncPreview({
     activity,
@@ -165,6 +166,7 @@ export default function VideoSyncPreviewScreens({
           onConfirmActionPoint={onConfirmActionPoint}
           onStyleChange={onStyleChange}
           style={style}
+          styleOptions={styleOptions}
         />
       </div>
     </div>
