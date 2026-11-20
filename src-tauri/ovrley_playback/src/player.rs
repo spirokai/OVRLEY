@@ -1,12 +1,12 @@
-//! A video player: MDK decodes the media (with audio) and renders each frame into a Metal texture
-//! the caller owns.
+//! A video player: MDK decodes the media (with audio) and renders each frame into a texture the
+//! caller owns: Metal on macOS, D3D12 on Windows.
 //!
 //! Adapted from Gyroflow's `qml-video-rs` (MIT, Copyright (c) 2021 AdrianEddy), whose MDK
 //! integration drove this work: the decoder list, the player setup and above all the teardown
 //! order, which is where MDK integrations crash.
 //!
 //! Threads: MDK calls [`Callbacks`] from its own threads. Everything else, [`Player::render`]
-//! and dropping the player above all, belongs on the thread that owns the Metal queue (the UI
+//! and dropping the player above all, belongs on the thread that owns the GPU queue (the UI
 //! thread).
 
 
@@ -14,6 +14,10 @@ use cpp::cpp;
 use std::ffi::{c_char, c_void, CStr, CString};
 
 cpp! {{
+    #ifdef _WIN32
+    #include <d3d11.h> // before RenderAPI.h, which declares D3D11RenderAPI and D3D12RenderAPI
+    #include <d3d12.h> // only after these
+    #endif
     #include <mdk/Player.h>
     #include <mdk/RenderAPI.h>
     #include <mdk/VideoFrame.h>
@@ -45,6 +49,7 @@ cpp! {{
         void* rust = nullptr;
         std::atomic<int> rotation{-1}; // clockwise degrees of the first frame, -1 before it
         std::atomic<bool> loaded{false};
+        std::atomic<uint64_t> delivered{0}; // decoded frames MDK handed toward rendering
     };
 
     struct OvrleyMediaSummary {
@@ -141,6 +146,7 @@ impl Player {
                 // Called with MDK's video mutex held: it reads the rotation of the first frame only.
                 // VideoFrame::rotation() is counter-clockwise; stored clockwise.
                 p->player->onFrame<mdk::VideoFrame>([p](mdk::VideoFrame& frame, int) -> int {
+                    if (frame && frame.timestamp() != mdk::TimestampEOS) p->delivered.fetch_add(1, std::memory_order_relaxed);
                     if (p->rotation.load(std::memory_order_relaxed) >= 0) return 0;
                     if (frame && frame.timestamp() != mdk::TimestampEOS) {
                         int ccw = frame.rotation() % 360;
@@ -191,6 +197,7 @@ impl Player {
     /// # Safety
     /// The three must be valid Metal objects, alive until the target is replaced or the player is
     /// dropped. Call on the render thread.
+    #[cfg(target_os = "macos")]
     pub unsafe fn set_metal_target(
         &self,
         device: *const c_void,
@@ -199,11 +206,51 @@ impl Player {
     ) {
         let raw = self.raw;
         cpp!([raw as "OvrleyPlayer*", device as "const void*", queue as "const void*", texture as "const void*"] {
+            #ifdef __APPLE__
             mdk::MetalRenderAPI ra{};
             ra.device = device;
             ra.cmdQueue = queue;
             ra.texture = texture;
             raw->player->setRenderAPI(&ra);
+            #endif
+        })
+    }
+
+    /// Renders into `texture` (`ID3D12Resource*`, a 2D render target) through `queue`
+    /// (`ID3D12CommandQueue*`, a direct queue of the texture's device). MDK records its own
+    /// command list and submits it on that queue, so the caller's later submissions see the frame.
+    ///
+    /// # Safety
+    /// Both must be valid D3D12 objects, alive until the target is replaced or the player is
+    /// dropped. Call on the render thread.
+    #[cfg(windows)]
+    pub unsafe fn set_d3d12_target(&self, queue: *const c_void, texture: *const c_void) {
+        let raw = self.raw;
+        cpp!([raw as "OvrleyPlayer*", queue as "const void*", texture as "const void*"] {
+            #ifdef _WIN32
+            mdk::D3D12RenderAPI ra{};
+            ra.cmdQueue = static_cast<ID3D12CommandQueue*>(const_cast<void*>(queue));
+            ra.rt = static_cast<ID3D12Resource*>(const_cast<void*>(texture));
+            raw->player->setRenderAPI(&ra);
+            #endif
+        })
+    }
+
+    /// Renders into `texture` (`ID3D11Texture2D*`, a 2D render target) on its device's immediate
+    /// context, which MDK flushes after each `renderVideo()`.
+    ///
+    /// # Safety
+    /// The texture must be a valid D3D11 texture, alive until the target is replaced or the player is
+    /// dropped. Call on the render thread.
+    #[cfg(windows)]
+    pub unsafe fn set_d3d11_target(&self, texture: *const c_void) {
+        let raw = self.raw;
+        cpp!([raw as "OvrleyPlayer*", texture as "const void*"] {
+            #ifdef _WIN32
+            mdk::D3D11RenderAPI ra{};
+            ra.rtv = static_cast<ID3D11DeviceChild*>(const_cast<void*>(texture));
+            raw->player->setRenderAPI(&ra);
+            #endif
         })
     }
 
@@ -282,6 +329,12 @@ impl Player {
     pub fn set_loop(&self, count: i32) {
         let raw = self.raw;
         unsafe { cpp!([raw as "OvrleyPlayer*", count as "int"] { raw->player->setLoop(count); }) }
+    }
+
+    /// How many decoded frames MDK has delivered toward rendering (`onFrame`), since the player was made.
+    pub fn delivered_frames(&self) -> u64 {
+        let raw = self.raw;
+        unsafe { cpp!([raw as "OvrleyPlayer*"] -> u64 as "uint64_t" { return raw->delivered.load(); }) }
     }
 
     /// The first frame's clockwise rotation, once it was decoded.
@@ -390,13 +443,17 @@ pub fn version() -> String {
     format!("{}.{}.{}", (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff)
 }
 
-/// The decoders: `MDK_DECODERS` (comma-separated) when set, else the spike's default (D9).
+/// The decoders: `MDK_DECODERS` (comma-separated) when set, else the spike's default (D9): the
+/// platform's hardware decoder that renders without a copy, then FFmpeg's software decoder.
+/// Windows: `D3D12` (FFmpeg's d3d12va) and `MFT:d3d=12` are the decoders MDK renders zero-copy
+/// into a D3D12 target.
 pub fn decoders_from_env() -> Vec<String> {
     match std::env::var("MDK_DECODERS") {
         Ok(list) if !list.trim().is_empty() => list
             .split(',')
             .map(|name| name.trim().to_string())
             .collect(),
+        _ if cfg!(windows) => vec!["D3D12".into(), "MFT:d3d=12".into(), "FFmpeg".into()],
         _ => vec!["VT:duration=0".into(), "FFmpeg".into()],
     }
 }

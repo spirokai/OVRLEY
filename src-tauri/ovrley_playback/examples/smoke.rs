@@ -1,7 +1,8 @@
 //! Step 1 smoke run: open a clip, wait for the first frame (`"size"` event), read its size and
 //! rotation, tear down. No render target is set; MDK decodes without drawing.
 //!
-//! `MDK_SDK=… cargo run -p ovrley_playback --example smoke -- <clip>`
+//! `MDK_SDK=… cargo run -p ovrley_playback --example smoke -- <clip>`; on Windows
+//! `$MDK_SDK/bin/x64` must be on `PATH`.
 
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -32,16 +33,23 @@ fn main() {
     player.set_state(ovrley_playback::player::State::Paused);
 
     let deadline = started + Duration::from_secs(10);
+    let mut decoder = String::new();
     loop {
         let left = deadline.saturating_duration_since(Instant::now());
         match receiver.recv_timeout(left) {
+            // MDK's `video.decoder` property is empty on Windows; the event names the decoder.
+            Ok(ovrley_playback::player::Event::Media {
+                category, detail, ..
+            }) if category == "decoder.video" => decoder = detail,
             Ok(ovrley_playback::player::Event::Media {
                 category, detail, ..
             }) if detail == "size" => {
                 log::info!("first frame after {:?} ({category})", started.elapsed());
                 break;
             }
-            Ok(ovrley_playback::player::Event::Status { new, .. }) if new & ovrley_playback::player::status::INVALID != 0 => {
+            Ok(ovrley_playback::player::Event::Status { new, .. })
+                if new & ovrley_playback::player::status::INVALID != 0 =>
+            {
                 panic!("MDK could not open {path}")
             }
             Ok(_) => {}
@@ -53,10 +61,7 @@ fn main() {
         player.media_summary().expect("a video stream")
     );
     log::info!("frame rotation {:?}", player.frame_rotation());
-    log::info!(
-        "video decoder property {:?}",
-        player.property("video.decoder")
-    );
+    log::info!("video decoder {decoder:?}");
     drop(player);
     log::info!("torn down; waiting for the delayed delete");
     std::thread::sleep(Duration::from_millis(1500));

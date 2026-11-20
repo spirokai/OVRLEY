@@ -53,7 +53,7 @@ impl Projections {
         self.widget_drawer.project(&window, store);
         self.maps.project(store);
         self.scene_settings.project(&window, store);
-        #[cfg(all(feature = "video-playback", target_os = "macos"))]
+        #[cfg(all(feature = "video-playback", any(target_os = "macos", windows)))]
         features::video_playback::project(store);
     }
 }
@@ -214,11 +214,30 @@ pub fn run(
     #[cfg(debug_assertions)]
     crate::snapshot::start_if_requested(&window, &dispatcher);
 
-    #[cfg(all(feature = "video-playback", target_os = "macos"))]
+    // `OVRLEY_FRAME_RATE=1` logs how many frames the window rendered each second (a measurement aid).
+    let _frame_rate = std::env::var_os("OVRLEY_FRAME_RATE").map(|_| {
+        let frames = std::rc::Rc::new(std::cell::Cell::new(0u32));
+        let counted = frames.clone();
+        window
+            .window()
+            .set_rendering_notifier(move |state, _| {
+                if matches!(state, slint::RenderingState::AfterRendering) {
+                    counted.set(counted.get() + 1);
+                }
+            })
+            .expect("no other rendering notifier is set");
+        let timer = slint::Timer::default();
+        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(1), move || {
+            log::info!("window: {} frames rendered this second", frames.replace(0));
+        });
+        timer
+    });
+
+    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows)))]
     features::video_playback::start_if_requested(&window, gpu.as_ref(), &dispatcher.handle());
     let _gpu = gpu;
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
-    #[cfg(all(feature = "video-playback", target_os = "macos"))]
+    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows)))]
     features::video_playback::shutdown();
     dispatcher.flush_preferences();
     result

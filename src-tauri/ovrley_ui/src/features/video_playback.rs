@@ -1,5 +1,6 @@
 //! Video playback (Phase 6B spike, branch spike/mdk-macos, never merged): MDK renders the video
-//! into a wgpu texture on the shared Metal device and queue, shown as the canvas's `video-frame`.
+//! into a wgpu texture on the shared device and queue (Metal on macOS, DX12 on Windows), shown as
+//! the canvas's `video-frame`.
 //!
 //! `OVRLEY_PLAYBACK`:
 //! - `1`: MDK is the video clock inside clips and follows the store elsewhere (steps 2 and 4; D10
@@ -8,9 +9,15 @@
 //!   store (step 3).
 //!
 //! `OVRLEY_PLAYBACK_SIZE=canvas` sizes the texture to the canvas in physical pixels (step 6);
-//! otherwise it is a fixed 1920×1080. `MDK_DECODERS` overrides the decoders (step 5).
+//! `OVRLEY_PLAYBACK_SIZE=<w>x<h>` fixes it at that size (e.g. 16x16 makes MDK's draw nearly free,
+//! to measure its GPU cost); otherwise it is a fixed 1920×1080. `MDK_DECODERS` overrides the decoders (step 5).
 //!
-//! Everything here runs on the UI thread, which owns the Metal queue (D7): MDK's render callback
+//! Windows: `OVRLEY_PLAYBACK_TARGET=d3d11` renders through D3D11 instead: MDK
+//! draws into a texture of our own D3D11 device on the same adapter, which the DX12 device opens
+//! through a shared handle, with a shared fence between the two (see [`d3d11`]). For D3D11
+//! decoders, which otherwise cross into MDK's D3D12 renderer.
+//!
+//! Everything here runs on the UI thread, which owns the GPU queue (D7): MDK's render callback
 //! only posts a render to it.
 
 use crate::platform::gpu::GpuDevice;
@@ -27,8 +34,6 @@ use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-
-type Metal = wgpu::wgc::api::Metal;
 
 const FIXED_SIZE: (u32, u32) = (1920, 1080);
 /// A canvas size counts as settled after this long without a change (step 6).
@@ -47,6 +52,9 @@ enum Mode {
 struct Target {
     texture: wgpu::Texture,
     size: (u32, u32),
+    /// The D3D11 texture MDK draws into, when the target is D3D11 (it backs `texture`).
+    #[cfg(windows)]
+    _d3d11_texture: Option<windows::Win32::Graphics::Direct3D11::ID3D11Texture2D>,
 }
 
 /// What the follower last told MDK.
@@ -80,6 +88,8 @@ struct Stats {
     drift_max: f64,
     /// Since playback started, for the drift over the clip's length.
     drift_total_max: f64,
+    /// MDK's delivered-frame count at the last flush.
+    delivered_seen: u64,
 }
 
 impl Stats {
@@ -98,6 +108,7 @@ impl Stats {
             drift_last: 0.0,
             drift_max: 0.0,
             drift_total_max: 0.0,
+            delivered_seen: 0,
         }
     }
 
@@ -136,7 +147,12 @@ impl Stats {
         }
     }
 
-    fn flush(&mut self, position_ms: i64) {
+    fn flush(&mut self, position_ms: i64, delivered: u64) {
+        log::info!(
+            "playback: MDK delivered {} decoded frames this second",
+            delivered - self.delivered_seen
+        );
+        self.delivered_seen = delivered;
         if self.renders > 0 {
             log::info!(
                 "playback: renderVideo {} calls, mean {:.2} ms, worst {:.2} ms",
@@ -181,9 +197,12 @@ struct VideoPlayback {
     gpu: GpuDevice,
     mode: Mode,
     canvas_sized: bool,
-    // Dropped before `target`: the player releases its GPU resources first.
+    // Dropped before `target` and `d3d11`: the player releases its GPU resources first.
     player: ovrley_playback::player::Player,
     target: Option<Target>,
+    /// `OVRLEY_PLAYBACK_TARGET=d3d11`: the D3D11 device MDK draws on.
+    #[cfg(windows)]
+    d3d11: Option<d3d11::Device>,
     pending: Arc<AtomicBool>,
     seek_started: Arc<Mutex<std::collections::VecDeque<(Instant, i64, bool)>>>,
     /// While dragging, one seek at a time; the latest target waits here (latest wins).
@@ -209,12 +228,37 @@ pub fn start_if_requested(window: &AppWindow, gpu: Option<&GpuDevice>, dispatch:
         other => panic!("OVRLEY_PLAYBACK={other}: expected 1 or loop"),
     };
     let Some(gpu) = gpu else {
-        log::error!("playback: no shared GPU device; playback needs Metal");
+        log::error!("playback: no shared GPU device; playback needs Metal or DX12");
         return;
     };
     ovrley_playback::player::install_log_handler();
     let decoders = ovrley_playback::player::decoders_from_env();
-    let canvas_sized = std::env::var("OVRLEY_PLAYBACK_SIZE").as_deref() == Ok("canvas");
+    let (canvas_sized, initial_size) = match std::env::var("OVRLEY_PLAYBACK_SIZE") {
+        Err(_) => (false, FIXED_SIZE),
+        Ok(value) if value == "canvas" => (true, FIXED_SIZE),
+        Ok(value) => {
+            let parsed = value
+                .split_once('x')
+                .and_then(|(width, height)| {
+                    Some((width.parse::<u32>().ok()?, height.parse::<u32>().ok()?))
+                })
+                .filter(|&(width, height)| width > 0 && height > 0);
+            (
+                false,
+                parsed.unwrap_or_else(|| {
+                    panic!("OVRLEY_PLAYBACK_SIZE={value}: expected canvas or <width>x<height>")
+                }),
+            )
+        }
+    };
+    #[cfg(windows)]
+    let d3d11 = match std::env::var("OVRLEY_PLAYBACK_TARGET").as_deref() {
+        Err(_) | Ok("d3d12") => None,
+        Ok("d3d11") => Some(
+            d3d11::Device::new(gpu).expect("a D3D11 device sharing textures with the DX12 device"),
+        ),
+        Ok(other) => panic!("OVRLEY_PLAYBACK_TARGET={other}: expected d3d11 or d3d12"),
+    };
     log::info!(
         "playback: MDK {}, mode {mode:?}, decoders {decoders:?}, canvas-sized {canvas_sized}",
         ovrley_playback::player::version()
@@ -243,7 +287,8 @@ pub fn start_if_requested(window: &AppWindow, gpu: Option<&GpuDevice>, dispatch:
     stats_timer.start(slint::TimerMode::Repeated, Duration::from_secs(1), || {
         with_video_playback(|state| {
             let position = state.player.position();
-            state.stats.flush(position);
+            let delivered = state.player.delivered_frames();
+            state.stats.flush(position, delivered);
         })
     });
     let resize_timer = slint::Timer::default();
@@ -264,6 +309,8 @@ pub fn start_if_requested(window: &AppWindow, gpu: Option<&GpuDevice>, dispatch:
         canvas_sized,
         player,
         target: None,
+        #[cfg(windows)]
+        d3d11,
         pending,
         seek_started,
         scrub_waiting: None,
@@ -275,7 +322,7 @@ pub fn start_if_requested(window: &AppWindow, gpu: Option<&GpuDevice>, dispatch:
         _timers: [stats_timer, resize_timer],
     };
     VIDEO_PLAYBACK.with(|cell| *cell.borrow_mut() = Some(state));
-    with_video_playback(|state| state.set_target(FIXED_SIZE));
+    with_video_playback(|state| state.set_target(initial_size));
     if mode == Mode::Follow {
         // The video clock (Phase 6B): MDK owns playback inside clips, as the <video> element does in
         // React; the timeline clock plays outside them.
@@ -320,7 +367,9 @@ fn render_posted() {
     });
     // Outside the borrow: the dispatch projects, which comes back into the video playback state.
     if let Some((dispatch, piece, second)) = frame {
-        dispatch.dispatch(move |store, _| playback::video_clock_frame(store, &piece, second, false, Instant::now()));
+        dispatch.dispatch(move |store, _| {
+            playback::video_clock_frame(store, &piece, second, false, Instant::now())
+        });
     }
 }
 
@@ -341,7 +390,9 @@ fn check_end() {
         Some((state.dispatch.clone(), piece, last_frame))
     });
     if let Some((dispatch, piece, second)) = ended {
-        dispatch.dispatch(move |store, _| playback::video_clock_frame(store, &piece, second, true, Instant::now()));
+        dispatch.dispatch(move |store, _| {
+            playback::video_clock_frame(store, &piece, second, true, Instant::now())
+        });
     }
 }
 
@@ -392,12 +443,67 @@ fn on_event(event: Event, seeks: &Mutex<std::collections::VecDeque<(Instant, i64
     }
 }
 
+/// Hands MDK the shared Metal device and queue and the texture (D5).
+///
+/// # Safety
+/// The device, queue and texture must outlive the player or its next target.
+#[cfg(target_os = "macos")]
+unsafe fn set_render_target(
+    gpu: &GpuDevice,
+    player: &ovrley_playback::player::Player,
+    texture: &wgpu::Texture,
+) {
+    type Metal = wgpu::wgc::api::Metal;
+    let device =
+        unsafe { gpu.device.as_hal::<Metal>() }.expect("the shared device is Metal (gpu.rs)");
+    let queue = unsafe { gpu.queue.as_hal::<Metal>() }.expect("the shared queue is Metal");
+    let raw_texture = unsafe { texture.as_hal::<Metal>() }.expect("a Metal texture");
+    unsafe {
+        player.set_metal_target(
+            &**device.raw_device() as *const _ as *const c_void,
+            queue.as_raw() as *const _ as *const c_void,
+            raw_texture.raw_handle() as *const _ as *const c_void,
+        )
+    };
+}
+
+/// Hands MDK the shared DX12 queue and the texture's resource (D5). MDK submits its draw on that
+/// queue, ahead of Slint's next frame, which samples the texture.
+///
+/// # Safety
+/// The queue and texture must outlive the player or its next target.
+#[cfg(windows)]
+unsafe fn set_render_target(
+    gpu: &GpuDevice,
+    player: &ovrley_playback::player::Player,
+    texture: &wgpu::Texture,
+) {
+    use windows_core::Interface;
+    type Dx12 = wgpu::wgc::api::Dx12;
+    let queue = unsafe { gpu.queue.as_hal::<Dx12>() }.expect("the shared queue is DX12 (gpu.rs)");
+    let resource = unsafe { texture.as_hal::<Dx12>() }.expect("a DX12 texture");
+    unsafe {
+        player.set_d3d12_target(
+            Interface::as_raw(queue.as_raw()) as *const c_void,
+            Interface::as_raw(resource.raw_resource()) as *const c_void,
+        )
+    };
+}
+
 impl VideoPlayback {
     /// Renders into the target. While MDK is the clock, a new frame is returned for the store.
     fn render(&mut self) -> Option<(DispatchHandle, String, f64)> {
         self.target.as_ref()?;
         let started = Instant::now();
+        #[cfg(windows)]
+        if let Some(d3d11) = self.d3d11.as_mut() {
+            d3d11.before_render();
+        }
         let ts = self.player.render();
+        #[cfg(windows)]
+        if let Some(d3d11) = self.d3d11.as_mut() {
+            d3d11.after_render();
+        }
         let took = started.elapsed();
         self.stats.render_time += took;
         self.stats.render_worst = self.stats.render_worst.max(took);
@@ -406,7 +512,8 @@ impl VideoPlayback {
         self.stats.record_render(ts);
         if new_frame && self.follow.playing {
             // How far MDK's clock (audio-led) is ahead of the frame just drawn.
-            self.stats.record_drift(self.player.position() as f64 - ts * 1000.0);
+            self.stats
+                .record_drift(self.player.position() as f64 - ts * 1000.0);
         }
         if let Some(window) = self.window.upgrade() {
             window.window().request_redraw();
@@ -418,6 +525,45 @@ impl VideoPlayback {
 
     /// Creates the texture MDK renders into and hands it to MDK and Slint (D5, D6).
     fn set_target(&mut self, size: (u32, u32)) {
+        #[cfg(windows)]
+        let mut d3d11_texture = None;
+        #[cfg(windows)]
+        let texture = match &self.d3d11 {
+            Some(d3d11) => {
+                let (shared, texture) = d3d11
+                    .create_target(&self.gpu, size)
+                    .expect("a D3D11 texture shared with the DX12 device");
+                // SAFETY: the texture lives in `self.target` until the next target is set.
+                unsafe {
+                    self.player
+                        .set_d3d11_target(windows_core::Interface::as_raw(&shared) as *const c_void)
+                };
+                d3d11_texture = Some(shared);
+                texture
+            }
+            None => self.create_shared_device_target(size),
+        };
+        #[cfg(not(windows))]
+        let texture = self.create_shared_device_target(size);
+        self.player.set_surface_size(size.0 as i32, size.1 as i32);
+        let image = slint::Image::try_from(texture.clone())
+            .expect("an Rgba8Unorm texture with TEXTURE_BINDING | RENDER_ATTACHMENT");
+        if let Some(window) = self.window.upgrade() {
+            window.global::<OverlayEditor>().set_video_frame(image);
+        }
+        log::info!("playback: render target {}×{}", size.0, size.1);
+        self.target = Some(Target {
+            texture,
+            size,
+            #[cfg(windows)]
+            _d3d11_texture: d3d11_texture,
+        });
+        // Paused, nothing else redraws the current frame into the new texture.
+        let _ = self.render();
+    }
+
+    /// A texture on the shared device, handed to MDK as its Metal or D3D12 target.
+    fn create_shared_device_target(&self, size: (u32, u32)) -> wgpu::Texture {
         let texture = self.gpu.device.create_texture(&wgpu::TextureDescriptor {
             label: Some("video playback frame"),
             size: wgpu::Extent3d {
@@ -432,41 +578,10 @@ impl VideoPlayback {
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::RENDER_ATTACHMENT,
             view_formats: &[],
         });
-        // SAFETY: the shared device is Metal (gpu.rs); the device and queue outlive the player
-        // (`self.gpu`), and the texture lives in `self.target` until the next target is set.
-        unsafe {
-            let device = {
-                let hal = self
-                    .gpu
-                    .device
-                    .as_hal::<Metal>()
-                    .expect("the shared device is Metal");
-                &**hal.raw_device() as *const _ as *const c_void
-            };
-            let queue = {
-                let hal = self
-                    .gpu
-                    .queue
-                    .as_hal::<Metal>()
-                    .expect("the shared queue is Metal");
-                hal.as_raw() as *const _ as *const c_void
-            };
-            let raw_texture = {
-                let hal = texture.as_hal::<Metal>().expect("a Metal texture");
-                hal.raw_handle() as *const _ as *const c_void
-            };
-            self.player.set_metal_target(device, queue, raw_texture);
-        }
-        self.player.set_surface_size(size.0 as i32, size.1 as i32);
-        let image = slint::Image::try_from(texture.clone())
-            .expect("an Rgba8Unorm texture with TEXTURE_BINDING | RENDER_ATTACHMENT");
-        if let Some(window) = self.window.upgrade() {
-            window.global::<OverlayEditor>().set_video_frame(image);
-        }
-        log::info!("playback: render target {}×{}", size.0, size.1);
-        self.target = Some(Target { texture, size });
-        // Paused, nothing else redraws the current frame into the new texture.
-        let _ = self.render();
+        // SAFETY: the device and queue outlive the player (`self.gpu`), and the texture lives in
+        // `self.target` until the next target is set.
+        unsafe { set_render_target(&self.gpu, &self.player, &texture) };
+        texture
     }
 
     /// Step 6: follows the canvas's physical size once it settled.
@@ -502,7 +617,10 @@ impl VideoPlayback {
         if exact {
             self.scrub_waiting = None;
         }
-        self.seek_started.lock().expect("seek mutex").push_back((Instant::now(), ms, exact));
+        self.seek_started
+            .lock()
+            .expect("seek mutex")
+            .push_back((Instant::now(), ms, exact));
         if !self.player.seek(ms, exact) {
             log::warn!("playback: MDK refused a seek to {ms} ms");
             // No result will come for it.
@@ -520,6 +638,7 @@ impl VideoPlayback {
             ..Follow::default()
         };
         self.stats = Stats::new(fps);
+        self.stats.delivered_seen = self.player.delivered_frames();
     }
 
     /// Step 3: the first imported video (or `OVRLEY_PLAYBACK_FILE`) on a loop.
@@ -544,7 +663,9 @@ impl VideoPlayback {
     fn follow(&mut self, store: &Store) {
         let program = &store.player.timeline.timeline().committed.program;
         let second = store.editor.selected_second;
-        let Some(target) = resolve_preview_target(program, second) else { return };
+        let Some(target) = resolve_preview_target(program, second) else {
+            return;
+        };
         let video = store
             .video_import
             .imported_videos
@@ -556,7 +677,9 @@ impl VideoPlayback {
         }
         let source_ms = (target.source_second * 1000.0).round() as i64;
         let state = store.editor.preview_playback_state;
-        let video_clock = state == PreviewPlaybackState::Playing && store.editor.preview_playback_source == PlaybackSource::Video && target.is_inside;
+        let video_clock = state == PreviewPlaybackState::Playing
+            && store.editor.preview_playback_source == PlaybackSource::Video
+            && target.is_inside;
 
         if self.media.as_deref() != Some(video.path.as_str()) {
             self.open(&video.path.clone(), source_ms, video.fps.as_f64());
@@ -576,14 +699,22 @@ impl VideoPlayback {
                     self.seek(source_ms, true);
                 }
                 self.follow.piece = Some(target.piece.id.clone());
-                self.follow.piece_last_frame_second = Some(target.piece.fps.frames_to_seconds(target.piece.source_end_frame - 1));
+                self.follow.piece_last_frame_second = Some(
+                    target
+                        .piece
+                        .fps
+                        .frames_to_seconds(target.piece.source_end_frame - 1),
+                );
                 self.follow.last_frame = None;
                 if !self.follow.playing {
                     self.player.set_state(State::Playing);
                     self.follow.playing = true;
                     self.stats.drift_total_max = 0.0;
                 }
-                log::info!("playback: video clock plays piece {} from {source_ms} ms", target.piece.id);
+                log::info!(
+                    "playback: video clock plays piece {} from {source_ms} ms",
+                    target.piece.id
+                );
             }
         } else {
             if self.follow.playing {
@@ -591,7 +722,10 @@ impl VideoPlayback {
                 self.follow.playing = false;
                 self.follow.piece = None;
                 self.follow.last_frame = None;
-                log::info!("playback: paused at {source_ms} ms (MDK at {} ms), {state:?}", self.player.position());
+                log::info!(
+                    "playback: paused at {source_ms} ms (MDK at {} ms), {state:?}",
+                    self.player.position()
+                );
                 // The store decides where the pause lands.
                 self.follow.last_seek_ms = None;
             }
@@ -605,7 +739,8 @@ impl VideoPlayback {
                     }
                 }
                 _ => {
-                    let committed_scrub = self.follow.last_state == Some(PreviewPlaybackState::Scrubbing);
+                    let committed_scrub =
+                        self.follow.last_state == Some(PreviewPlaybackState::Scrubbing);
                     if committed_scrub || self.follow.last_seek_ms != Some(source_ms) {
                         self.seek(source_ms, true);
                     }
@@ -613,5 +748,223 @@ impl VideoPlayback {
             }
         }
         self.follow.last_state = Some(state);
+    }
+}
+
+/// The D3D11 target (`OVRLEY_PLAYBACK_TARGET=d3d11`) moves D3D11 frames into wgpu a D3D11 device on the shared device's adapter, whose
+/// textures the DX12 device opens through NT handles. One fence, shared by both, orders the two
+/// queues on the GPU around each `renderVideo()`; the UI thread never waits.
+#[cfg(windows)]
+mod d3d11 {
+    use super::GpuDevice;
+    use slint::wgpu_30::wgpu;
+    use windows::core::{Interface, PCWSTR};
+    use windows::Win32::Foundation::{CloseHandle, GENERIC_ALL, HANDLE, HMODULE};
+    use windows::Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL_11_1};
+    use windows::Win32::Graphics::Direct3D11::{
+        D3D11CreateDevice, ID3D11Device, ID3D11Device5, ID3D11DeviceContext, ID3D11DeviceContext4,
+        ID3D11Fence, ID3D11Multithread, ID3D11Texture2D, D3D11_BIND_RENDER_TARGET,
+        D3D11_BIND_SHADER_RESOURCE, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+        D3D11_CREATE_DEVICE_VIDEO_SUPPORT, D3D11_FENCE_FLAG_SHARED, D3D11_RESOURCE_MISC_SHARED,
+        D3D11_RESOURCE_MISC_SHARED_NTHANDLE, D3D11_SDK_VERSION, D3D11_TEXTURE2D_DESC,
+        D3D11_USAGE_DEFAULT,
+    };
+    use windows::Win32::Graphics::Direct3D12::{
+        ID3D12CommandQueue, ID3D12Device, ID3D12Fence, ID3D12Resource,
+    };
+    use windows::Win32::Graphics::Dxgi::Common::{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_SAMPLE_DESC};
+    use windows::Win32::Graphics::Dxgi::{
+        CreateDXGIFactory1, IDXGIAdapter, IDXGIFactory4, IDXGIResource1, DXGI_SHARED_RESOURCE_READ,
+        DXGI_SHARED_RESOURCE_WRITE,
+    };
+
+    type Dx12 = wgpu::wgc::api::Dx12;
+
+    pub struct Device {
+        device: ID3D11Device,
+        context: ID3D11DeviceContext4,
+        device12: ID3D12Device,
+        queue: ID3D12CommandQueue,
+        fence11: ID3D11Fence,
+        fence12: ID3D12Fence,
+        value: u64,
+    }
+
+    /// Opens an NT handle on the DX12 device and closes it.
+    fn open_shared<T: Interface>(
+        device12: &ID3D12Device,
+        handle: HANDLE,
+    ) -> windows::core::Result<T> {
+        let mut opened: Option<T> = None;
+        let result = unsafe { device12.OpenSharedHandle(handle, &mut opened) };
+        unsafe { CloseHandle(handle) }?;
+        result?;
+        Ok(opened.expect("OpenSharedHandle succeeded"))
+    }
+
+    impl Device {
+        pub fn new(gpu: &GpuDevice) -> windows::core::Result<Self> {
+            let device12 = unsafe { gpu.device.as_hal::<Dx12>() }
+                .expect("the shared device is DX12 (gpu.rs)")
+                .raw_device()
+                .clone();
+            let queue = unsafe { gpu.queue.as_hal::<Dx12>() }
+                .expect("the shared queue is DX12")
+                .as_raw()
+                .clone();
+            let factory: IDXGIFactory4 = unsafe { CreateDXGIFactory1() }?;
+            let adapter: IDXGIAdapter =
+                unsafe { factory.EnumAdapterByLuid(device12.GetAdapterLuid()) }?;
+
+            let mut device = None;
+            let mut context: Option<ID3D11DeviceContext> = None;
+            unsafe {
+                D3D11CreateDevice(
+                    &adapter,
+                    D3D_DRIVER_TYPE_UNKNOWN,
+                    HMODULE::default(),
+                    D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
+                    Some(&[D3D_FEATURE_LEVEL_11_1]),
+                    D3D11_SDK_VERSION,
+                    Some(&mut device),
+                    None,
+                    Some(&mut context),
+                )
+            }?;
+            let device: ID3D11Device = device.expect("D3D11CreateDevice succeeded");
+            let context: ID3D11DeviceContext4 =
+                context.expect("D3D11CreateDevice succeeded").cast()?;
+            // MDK's decoder threads share the immediate context with renderVideo() on the UI thread.
+            let _ = unsafe {
+                device
+                    .cast::<ID3D11Multithread>()?
+                    .SetMultithreadProtected(true)
+            };
+
+            let mut fence11: Option<ID3D11Fence> = None;
+            unsafe {
+                device.cast::<ID3D11Device5>()?.CreateFence(
+                    0,
+                    D3D11_FENCE_FLAG_SHARED,
+                    &mut fence11,
+                )
+            }?;
+            let fence11 = fence11.expect("CreateFence succeeded");
+            let handle =
+                unsafe { fence11.CreateSharedHandle(None, GENERIC_ALL.0, PCWSTR::null()) }?;
+            let fence12: ID3D12Fence = open_shared(&device12, handle)?;
+            log::info!(
+                "playback: D3D11 target device on the shared adapter, fence shared with DX12"
+            );
+            Ok(Self {
+                device,
+                context,
+                device12,
+                queue,
+                fence11,
+                fence12,
+                value: 0,
+            })
+        }
+
+        /// A D3D11 render target MDK draws into, and the same memory as a wgpu texture Slint samples.
+        pub fn create_target(
+            &self,
+            gpu: &GpuDevice,
+            size: (u32, u32),
+        ) -> windows::core::Result<(ID3D11Texture2D, wgpu::Texture)> {
+            let desc = D3D11_TEXTURE2D_DESC {
+                Width: size.0,
+                Height: size.1,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: DXGI_FORMAT_R8G8B8A8_UNORM,
+                SampleDesc: DXGI_SAMPLE_DESC {
+                    Count: 1,
+                    Quality: 0,
+                },
+                Usage: D3D11_USAGE_DEFAULT,
+                BindFlags: (D3D11_BIND_RENDER_TARGET.0 | D3D11_BIND_SHADER_RESOURCE.0) as u32,
+                CPUAccessFlags: 0,
+                MiscFlags: (D3D11_RESOURCE_MISC_SHARED.0 | D3D11_RESOURCE_MISC_SHARED_NTHANDLE.0)
+                    as u32,
+            };
+            let mut texture = None;
+            unsafe { self.device.CreateTexture2D(&desc, None, Some(&mut texture)) }?;
+            let texture: ID3D11Texture2D = texture.expect("CreateTexture2D succeeded");
+            let handle = unsafe {
+                texture.cast::<IDXGIResource1>()?.CreateSharedHandle(
+                    None,
+                    (DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE).0,
+                    PCWSTR::null(),
+                )
+            }?;
+            let resource: ID3D12Resource = open_shared(&self.device12, handle)?;
+
+            let extent = wgpu::Extent3d {
+                width: size.0,
+                height: size.1,
+                depth_or_array_layers: 1,
+            };
+            let hal = unsafe {
+                wgpu::hal::dx12::Device::texture_from_raw(
+                    resource,
+                    wgpu::TextureFormat::Rgba8Unorm,
+                    wgpu::TextureDimension::D2,
+                    extent,
+                    1,
+                    1,
+                )
+            };
+            // Slint only samples it. A shared texture starts in COMMON, which D3D12 promotes to a
+            // shader-read state implicitly and decays back after each submission, so wgpu's tracked
+            // state (sampled) never needs a barrier that would hold it against D3D11.
+            let texture12 = unsafe {
+                gpu.device.create_texture_from_hal::<Dx12>(
+                    hal,
+                    &wgpu::TextureDescriptor {
+                        label: Some("video playback frame (D3D11)"),
+                        size: extent,
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        usage: wgpu::TextureUsages::TEXTURE_BINDING
+                            | wgpu::TextureUsages::RENDER_ATTACHMENT,
+                        view_formats: &[],
+                    },
+                    wgpu::TextureUses::RESOURCE,
+                )
+            };
+            Ok((texture, texture12))
+        }
+
+        /// Before MDK draws: D3D11 waits on the GPU for what DX12 already submitted (Slint's last
+        /// frame, which samples the texture MDK is about to overwrite).
+        pub fn before_render(&mut self) {
+            self.value += 1;
+            unsafe {
+                self.queue
+                    .Signal(&self.fence12, self.value)
+                    .expect("signal the shared fence on DX12");
+                self.context
+                    .Wait(&self.fence11, self.value)
+                    .expect("wait on the shared fence on D3D11");
+            }
+        }
+
+        /// After MDK drew: DX12 waits on the GPU for D3D11's draw before Slint's next frame samples it.
+        pub fn after_render(&mut self) {
+            self.value += 1;
+            unsafe {
+                self.context
+                    .Signal(&self.fence11, self.value)
+                    .expect("signal the shared fence on D3D11");
+                self.context.Flush();
+                self.queue
+                    .Wait(&self.fence12, self.value)
+                    .expect("wait on the shared fence on DX12");
+            }
+        }
     }
 }

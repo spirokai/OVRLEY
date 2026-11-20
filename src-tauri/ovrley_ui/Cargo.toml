@@ -14,8 +14,8 @@ dev-windows = []
 # Dev only (`pnpm dev:native:live`, with SLINT_LIVE_PREVIEW=1): saving a .slint file reloads the
 # UI inside the running app. Never in release builds.
 live-preview = ["slint/live-preview"]
-# Phase 6B spike (branch spike/mdk-macos, never merged): video playback in the canvas. Runs only
-# with OVRLEY_PLAYBACK set; needs MDK_SDK at build time.
+# Phase 6B spike (branch spike/mdk-macos, never merged): video playback in the canvas, macOS and
+# Windows. Runs only with OVRLEY_PLAYBACK set; needs MDK_SDK at build time.
 video-playback = ["dep:ovrley_playback"]
 
 [[bin]]
@@ -71,6 +71,23 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
   "NSWindow",
   "NSButton",
   "NSControl",
+] }
+
+[target.'cfg(windows)'.dependencies]
+ovrley_playback = { path = "../ovrley_playback", optional = true }
+# The raw D3D12 pointers wgpu's DX12 objects wrap, for video playback. wgpu-hal's version.
+windows-core = { version = "0.62", default-features = false }
+# Video playback's D3D11 target (`OVRLEY_PLAYBACK_TARGET=d3d11`): a D3D11 device and a texture and
+# fence shared with the DX12 device. wgpu-hal's version.
+windows = { version = "0.62", default-features = false, features = [
+  "std",
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Direct3D12",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
 ] }
 
 # The Wayland drop listener (winit reports no drops on Wayland).

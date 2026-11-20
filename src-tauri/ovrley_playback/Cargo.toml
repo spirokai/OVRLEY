@@ -1,6 +1,7 @@
 [package]
 # Phase 6B spike (branch spike/mdk-macos, never merged): video playback rendered into a texture
-# of the shared wgpu device. macOS only, with MDK through the `cpp` crate over its C++ API.
+# of the shared wgpu device. macOS (Metal) and Windows (D3D12), with MDK through the `cpp` crate
+# over its C++ API.
 name = "ovrley_playback"
 version = "0.1.0"
 edition = "2021"

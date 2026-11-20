@@ -8,9 +8,9 @@
 mod translations;
 
 fn main() {
-    // Video playback: mdk.framework is found through an rpath to the SDK, which only the final
-    // binary can carry.
-    if std::env::var_os("CARGO_FEATURE_VIDEO_PLAYBACK").is_some() {
+    // Video playback: on macOS mdk.framework is found through an rpath to the SDK, which only the
+    // final binary can carry. Windows has no rpath: `$MDK_SDK/bin/x64` goes on PATH at run time.
+    if std::env::var_os("CARGO_FEATURE_VIDEO_PLAYBACK").is_some() && std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         println!("cargo:rerun-if-env-changed=MDK_SDK");
         let sdk = std::env::var("MDK_SDK").expect("the video-playback feature needs MDK_SDK");
         println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{sdk}/lib");
