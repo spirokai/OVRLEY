@@ -440,6 +440,7 @@
     "timeSourceGps": "Временная метка GPS",
     "timeSourceMetadata": "Метаданные",
     "timeSourceFilename": "Имя файла",
+    "timeSourceTimecode": "Таймкод",
     "unknown": "Неизвестно",
     "unknownTimeSource": "Неизвестный источник времени ({{value}})",
     "unpinDrawer": "Открепить панель",

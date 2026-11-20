@@ -440,6 +440,7 @@
     "timeSourceGps": "GPS zaman damgası",
     "timeSourceMetadata": "Meta veriler",
     "timeSourceFilename": "Dosya adı",
+    "timeSourceTimecode": "Zaman kodu",
     "unknown": "Bilinmiyor",
     "unknownTimeSource": "Bilinmeyen zaman kaynağı ({{value}})",
     "unpinDrawer": "Panel sabitlemesini kaldır",

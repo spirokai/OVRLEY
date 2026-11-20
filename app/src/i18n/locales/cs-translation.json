@@ -440,6 +440,7 @@
     "timeSourceGps": "Časové razítko GPS",
     "timeSourceMetadata": "Metadata",
     "timeSourceFilename": "Název souboru",
+    "timeSourceTimecode": "Časový kód",
     "unknown": "Neznámé",
     "unknownTimeSource": "Neznámý zdroj času ({{value}})",
     "unpinDrawer": "Odepnout panel",

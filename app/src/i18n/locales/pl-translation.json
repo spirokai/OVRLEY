@@ -440,6 +440,7 @@
     "timeSourceGps": "Znacznik czasu GPS",
     "timeSourceMetadata": "Metadane",
     "timeSourceFilename": "Nazwa pliku",
+    "timeSourceTimecode": "Kod czasowy",
     "unknown": "Nieznane",
     "unknownTimeSource": "Nieznane ({{value}})",
     "unpinDrawer": "Odepnij panel",

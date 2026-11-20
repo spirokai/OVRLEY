@@ -440,6 +440,7 @@
     "timeSourceGps": "Carimbo de data/hora GPS",
     "timeSourceMetadata": "Metadados",
     "timeSourceFilename": "Nome",
+    "timeSourceTimecode": "Timecode",
     "unknown": "Desconhecido",
     "unknownTimeSource": "Fonte de horário desconhecida ({{value}})",
     "unpinDrawer": "Desafixar painel",

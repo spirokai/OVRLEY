@@ -440,6 +440,7 @@
     "timeSourceGps": "GPS-tijdstempel",
     "timeSourceMetadata": "Metagegevens",
     "timeSourceFilename": "Bestandsnaam",
+    "timeSourceTimecode": "Tijdcode",
     "unknown": "Onbekend",
     "unknownTimeSource": "Onbekende tijdbron ({{value}})",
     "unpinDrawer": "Paneel losmaken",

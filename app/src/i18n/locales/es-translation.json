@@ -440,6 +440,7 @@
     "timeSourceGps": "Marca de tiempo GPS",
     "timeSourceMetadata": "Metadatos",
     "timeSourceFilename": "Nombre",
+    "timeSourceTimecode": "Código de tiempo",
     "unknown": "Desconocido",
     "unknownTimeSource": "Origen de tiempo desconocido ({{value}})",
     "unpinDrawer": "Desfijar panel",

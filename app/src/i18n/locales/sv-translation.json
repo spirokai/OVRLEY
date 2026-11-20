@@ -440,6 +440,7 @@
     "timeSourceGps": "GPS-tidsstämpel",
     "timeSourceMetadata": "Metadata",
     "timeSourceFilename": "Filnamn",
+    "timeSourceTimecode": "Tidskod",
     "unknown": "Okänd",
     "unknownTimeSource": "Okänd tidskälla ({{value}})",
     "unpinDrawer": "Lossa panel",

@@ -39,6 +39,9 @@ const HIDDEN_FRAME_TOLERANCE: f64 = 1e-4;
 /// the file-system modification time is usually when the file was copied, not
 /// recorded.
 ///
+/// A metadata creation time (1–3) is then refined by a time-of-day `timecode`
+/// tag when one fits, see [`timecode_sync_time`].
+///
 /// # Phases
 /// 1. Resolve ffprobe binary and spawn the subprocess
 /// 2. Parse JSON output into structured metadata fields
@@ -88,7 +91,13 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
 
     // ── PHASE 2: PARSE JSON INTO STRUCTURED METADATA ──
     let json: Value = serde_json::from_slice(&output.stdout)?;
+    Ok(metadata_from_ffprobe_json(file_path, &json))
+}
 
+/// Builds [`SourceVideoMetadata`] from ffprobe `-show_format -show_streams`
+/// JSON output (phases 2–4 of [`probe_video`]).
+pub fn metadata_from_ffprobe_json(file_path: &str, json: &Value) -> SourceVideoMetadata {
+    // test seam
     let mut metadata = SourceVideoMetadata {
         path: file_path.to_string(),
         duration: None,
@@ -220,13 +229,117 @@ pub fn probe_video(repo_root: &Path, file_path: &str) -> CoreResult<SourceVideoM
         log::warn!("No creation time found in video metadata.");
     }
 
+    // 4. A time-of-day timecode refines the metadata creation time to the
+    //    first frame. A non-zero resolved UTC offset proves creation_time was
+    //    real UTC, so the result is absolute; a zero offset stays ambiguous.
+    if metadata.time_source.as_deref() == Some("ffprobe") {
+        let timecode = read_timecode(json, video_stream);
+        let fps = metadata.fps_num.zip(metadata.fps_den);
+        let resolved = timecode
+            .zip(metadata.creation_time.as_deref())
+            .and_then(|(timecode, creation_time)| timecode_sync_time(timecode, fps, creation_time));
+        if let Some(resolved) = resolved {
+            log::debug!(
+                "Timecode {:?} resolved to {} (UTC offset {} min)",
+                timecode,
+                resolved.sync_time,
+                resolved.utc_offset_minutes
+            );
+            if resolved.utc_offset_minutes != 0 {
+                metadata.time_source = Some("timecode".to_string());
+            }
+            metadata.creation_time = Some(resolved.sync_time);
+        } else if let Some(timecode) = timecode {
+            log::debug!("Ignoring timecode {} that is not a time of day near creation_time", timecode);
+        }
+    }
+
     // ffprobe timestamps are a salvage sync fallback, not authoritative
     // provenance. Keep both fields until the frontend fully moves to syncTime.
     metadata.sync_time = metadata.creation_time.clone();
 
     log::debug!("Final selected creation time: {:?}", metadata.creation_time);
 
-    Ok(metadata)
+    metadata
+}
+
+/// Most a camera's `creation_time` may differ from its time-of-day timecode
+/// (after removing the UTC offset) for the timecode to be trusted. GoPro
+/// HERO12 stamps `creation_time` ~50 s after the first frame.
+const MAX_CREATION_TIME_DRIFT_SECONDS: f64 = 300.0;
+
+/// A timecode-derived first-frame time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TimecodeSync {
+    /// RFC 3339 UTC timestamp (millisecond precision) of the first frame.
+    pub sync_time: String,
+    /// Camera UTC offset implied by timecode vs. `creation_time`.
+    pub utc_offset_minutes: i32,
+}
+
+/// Interprets a `HH:MM:SS:FF` timecode as the camera's local time of day at
+/// the first frame and anchors it to `creation_time` (UTC).
+///
+/// Accepted only when the timecode sits a real UTC offset (whole, half or
+/// three-quarter hour, −12:00..+14:00) away from `creation_time`, within
+/// [`MAX_CREATION_TIME_DRIFT_SECONDS`]. The result therefore never moves more
+/// than that from `creation_time`. Record-run timecodes starting at
+/// `HH:00:00` (e.g. `01:00:00:00`) are rejected as counters, not clocks.
+/// Returns `None` for malformed input or when no offset fits.
+pub fn timecode_sync_time(timecode: &str, fps: Option<(u32, u32)>, creation_time: &str) -> Option<TimecodeSync> {
+    // test seam
+    let parts: Vec<u32> = timecode
+        .split([':', ';', '.'])
+        .map(|part| part.parse::<u32>().ok())
+        .collect::<Option<_>>()?;
+    let [hours, minutes, seconds, frames] = parts[..] else {
+        return None;
+    };
+    if hours >= 24 || minutes >= 60 || seconds >= 60 || (minutes == 0 && seconds == 0) {
+        return None;
+    }
+    let frame_seconds = match fps {
+        Some((num, den)) => {
+            let nominal_fps = (num as f64 / den as f64).ceil();
+            if frames as f64 >= nominal_fps {
+                return None;
+            }
+            frames as f64 * den as f64 / num as f64
+        }
+        None => 0.0,
+    };
+    let timecode_of_day = (hours * 3600 + minutes * 60 + seconds) as f64 + frame_seconds;
+
+    let creation = chrono::DateTime::parse_from_rfc3339(creation_time).ok()?.with_timezone(&chrono::Utc);
+    let midnight = creation.date_naive().and_hms_opt(0, 0, 0)?.and_utc();
+    let creation_of_day = (creation - midnight).num_milliseconds() as f64 / 1000.0;
+    let difference = timecode_of_day - creation_of_day;
+
+    let wrap_day = |seconds: f64| (seconds + 43_200.0).rem_euclid(86_400.0) - 43_200.0;
+    let (utc_offset_minutes, drift) = (-12 * 4..=14 * 4)
+        .map(|quarter| quarter * 15)
+        .filter(|offset_minutes: &i32| offset_minutes.abs() % 60 != 15)
+        .map(|offset_minutes| (offset_minutes, wrap_day(difference - offset_minutes as f64 * 60.0)))
+        .min_by(|(_, a), (_, b)| a.abs().total_cmp(&b.abs()))?;
+    if drift.abs() > MAX_CREATION_TIME_DRIFT_SECONDS {
+        return None;
+    }
+
+    let sync = creation + chrono::Duration::milliseconds((drift * 1000.0).round() as i64);
+    Some(TimecodeSync {
+        sync_time: sync.to_rfc3339_opts(chrono::SecondsFormat::Millis, true),
+        utc_offset_minutes,
+    })
+}
+
+/// Reads the `timecode` tag from the video stream, then any other stream
+/// (e.g. a `tmcd` data track), then the container.
+fn read_timecode<'a>(json: &'a Value, video_stream: Option<&'a Value>) -> Option<&'a str> {
+    let tag = |value: &'a Value| value.get("tags")?.get("timecode")?.as_str();
+    video_stream
+        .and_then(tag)
+        .or_else(|| json.get("streams")?.as_array()?.iter().find_map(tag))
+        .or_else(|| json.get("format").and_then(tag))
 }
 
 /// Selects a video's creation timestamp from ffprobe JSON

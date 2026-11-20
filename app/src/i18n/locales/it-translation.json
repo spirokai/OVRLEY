@@ -440,6 +440,7 @@
     "timeSourceGps": "Timestamp GPS",
     "timeSourceMetadata": "Metadati",
     "timeSourceFilename": "Nome file",
+    "timeSourceTimecode": "Timecode",
     "unknown": "Sconosciuto",
     "unknownTimeSource": "Sorgente temporale sconosciuta ({{value}})",
     "unpinDrawer": "Sgancia pannello",

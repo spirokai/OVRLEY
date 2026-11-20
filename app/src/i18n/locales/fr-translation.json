@@ -440,6 +440,7 @@
     "timeSourceGps": "Horodatage GPS",
     "timeSourceMetadata": "Métadonnées",
     "timeSourceFilename": "Nom de fichier",
+    "timeSourceTimecode": "Timecode",
     "unknown": "Inconnu",
     "unknownTimeSource": "Inconnu ({{value}})",
     "unpinDrawer": "Désépingler le panneau",

@@ -12,6 +12,7 @@ const TIME_SOURCE_KEYS = {
   gps: 'toolbar.timeSourceGps',
   ffprobe: 'toolbar.timeSourceMetadata',
   filename: 'toolbar.timeSourceFilename',
+  timecode: 'toolbar.timeSourceTimecode',
 }
 
 /**
