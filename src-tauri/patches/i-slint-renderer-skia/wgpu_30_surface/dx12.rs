@@ -1,7 +1,9 @@
 // Copyright © SixtyFPS GmbH <info@slint.dev>
 // SPDX-License-Identifier: GPL-3.0-only OR LicenseRef-Slint-Royalty-free-2.0 OR LicenseRef-Slint-Software-3.0
 
-use windows::Win32::Graphics::Direct3D12::{D3D12_RESOURCE_STATE_PRESENT, ID3D12Resource};
+use windows::Win32::Graphics::Direct3D12::{
+    D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATES, ID3D12Resource,
+};
 use windows::Win32::Graphics::Dxgi::Common::DXGI_STANDARD_MULTISAMPLE_QUALITY_PATTERN;
 use windows::Win32::Graphics::Dxgi::Common::{
     DXGI_FORMAT_B8G8R8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
@@ -16,6 +18,7 @@ unsafe fn wrap_dx12_texture(
     height: i32,
     gr_context: &mut skia_safe::gpu::DirectContext,
     resource: ID3D12Resource,
+    resource_state: D3D12_RESOURCE_STATES,
     dxgi_format: windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT,
     color_type: skia_safe::ColorType,
     color_space: skia_safe::ColorSpace,
@@ -23,7 +26,7 @@ unsafe fn wrap_dx12_texture(
     let texture_info = skia_safe::gpu::d3d::TextureResourceInfo {
         resource,
         alloc: None,
-        resource_state: D3D12_RESOURCE_STATE_PRESENT,
+        resource_state,
         format: dxgi_format,
         sample_count: 1,
         level_count: 1,
@@ -42,12 +45,17 @@ unsafe fn wrap_dx12_texture(
     )
 }
 
+/// Wraps `texture`, which is in `resource_state`, for Skia to draw into. OVRLEY: upstream always
+/// passes `PRESENT`, but a texture `WGPUSurface::transition_to_color_target` made a color target
+/// is in `RENDER_TARGET`.
+///
 /// # Safety
 /// The caller must ensure `texture` was created by a DX12-backed wgpu device and remains
 /// valid for the lifetime of the returned `skia_safe::Surface`.
 pub unsafe fn make_dx12_surface(
     gr_context: &mut skia_safe::gpu::DirectContext,
     texture: &wgpu::Texture,
+    resource_state: D3D12_RESOURCE_STATES,
 ) -> Option<skia_safe::Surface> {
     // SAFETY: texture is borrowed for the duration of this call; the D3D12 resource is
     // ref-counted (COM) and cloned into Skia's internal BackendRenderTarget via wrap_dx12_texture.
@@ -74,6 +82,7 @@ pub unsafe fn make_dx12_surface(
             size.height as i32,
             gr_context,
             resource,
+            resource_state,
             dxgi_format,
             color_type,
             super::attachment_color_space(texture),

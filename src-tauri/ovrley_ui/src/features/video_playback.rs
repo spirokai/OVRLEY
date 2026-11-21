@@ -51,6 +51,8 @@ enum Mode {
 
 struct Target {
     texture: wgpu::Texture,
+    /// The canvas's `video-frame`: the texture as a Slint image.
+    image: slint::Image,
     size: (u32, u32),
     /// The D3D11 texture MDK draws into, when the target is D3D11 (it backs `texture`).
     #[cfg(windows)]
@@ -515,8 +517,11 @@ impl VideoPlayback {
             self.stats
                 .record_drift(self.player.position() as f64 - ts * 1000.0);
         }
-        if let Some(window) = self.window.upgrade() {
-            window.window().request_redraw();
+        // MDK drew into the same texture. Setting its image again marks the canvas's video item
+        // dirty (Slint never counts two wgpu-texture images as equal), so partial rendering
+        // repaints the video's area; a redraw request alone repaints nothing.
+        if let (Some(window), Some(target)) = (self.window.upgrade(), self.target.as_ref()) {
+            window.global::<OverlayEditor>().set_video_frame(target.image.clone());
         }
         let piece = self.follow.piece.clone().filter(|_| new_frame)?;
         self.follow.last_frame = Some((ts, Instant::now()));
@@ -549,11 +554,12 @@ impl VideoPlayback {
         let image = slint::Image::try_from(texture.clone())
             .expect("an Rgba8Unorm texture with TEXTURE_BINDING | RENDER_ATTACHMENT");
         if let Some(window) = self.window.upgrade() {
-            window.global::<OverlayEditor>().set_video_frame(image);
+            window.global::<OverlayEditor>().set_video_frame(image.clone());
         }
         log::info!("playback: render target {}×{}", size.0, size.1);
         self.target = Some(Target {
             texture,
+            image,
             size,
             #[cfg(windows)]
             _d3d11_texture: d3d11_texture,

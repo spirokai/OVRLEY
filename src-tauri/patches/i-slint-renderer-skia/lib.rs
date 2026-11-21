@@ -536,7 +536,8 @@ impl SkiaRenderer {
         Self::new_with_surface_factory(
             context,
             metal_wgpu_surface_factory,
-            create_partial_renderer_state(None),
+            // OVRLEY: the wgpu window surface draws into a persistent scene, see `default_wgpu_30`.
+            PartialRenderingState::default().into(),
         )
     }
 
@@ -546,7 +547,8 @@ impl SkiaRenderer {
         Self::new_with_surface_factory(
             context,
             vulkan_wgpu_surface_factory,
-            create_partial_renderer_state(None),
+            // OVRLEY: the wgpu window surface draws into a persistent scene, see `default_wgpu_30`.
+            PartialRenderingState::default().into(),
         )
     }
 
@@ -556,7 +558,8 @@ impl SkiaRenderer {
         Self::new_with_surface_factory(
             context,
             direct3d_wgpu_surface_factory,
-            create_partial_renderer_state(None),
+            // OVRLEY: the wgpu window surface draws into a persistent scene, see `default_wgpu_30`.
+            PartialRenderingState::default().into(),
         )
     }
 
@@ -566,7 +569,12 @@ impl SkiaRenderer {
         Self::new_with_surface_factory(
             context,
             surface_factory::<wgpu_30_surface::WGPUSurface>,
-            create_partial_renderer_state(None),
+            // OVRLEY: the window surface keeps its previous frame in a persistent scene, so Slint
+            // repaints only the dirty regions (`WGPUSurface::render_scene`). Upstream enables
+            // partial rendering here only through `SLINT_SKIA_PARTIAL_RENDERING`, and its surface
+            // reports buffer age 0, which repaints everything anyway. A surface that keeps the
+            // full repaint still reports age 0.
+            PartialRenderingState::default().into(),
         )
     }
 

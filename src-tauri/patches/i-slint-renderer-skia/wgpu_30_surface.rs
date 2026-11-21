@@ -49,6 +49,11 @@ pub struct WGPUSurface {
     textures_to_transition_for_sampling: RefCell<Vec<wgpu::Texture>>,
     pub(crate) backend: Backend,
     alpha_modes: Vec<wgpu::CompositeAlphaMode>,
+    /// OVRLEY: whether the window is drawn into `scene` with partial rendering (see
+    /// [`WGPUSurface::render_scene`]).
+    scene_enabled: bool,
+    /// OVRLEY: the window's persistent scene and the scale factor it was drawn at.
+    scene: RefCell<Option<(wgpu::Texture, f32)>>,
 }
 
 /// The alpha mode to composite the surface with: a translucent one when the window is
@@ -114,6 +119,14 @@ impl WGPUSurface {
         // With only `RENDER_ATTACHMENT`, wgpu makes the CAMetalLayer `framebufferOnly`,
         // which breaks Skia reading back the backdrop for backdrop-blur.
         surface_config.usage |= swapchain_capabilities.usages & wgpu::TextureUsages::COPY_SRC;
+        // OVRLEY: the window is drawn into a persistent scene with partial rendering and copied into
+        // each swapchain image (see `render_scene`). A surface that can't be a copy destination, or
+        // `OVRLEY_SKIA_FULL_REDRAW` (to compare), keeps upstream's full repaint of every frame.
+        let scene_enabled = swapchain_capabilities.usages.contains(wgpu::TextureUsages::COPY_DST)
+            && std::env::var_os("OVRLEY_SKIA_FULL_REDRAW").is_none();
+        if scene_enabled {
+            surface_config.usage |= wgpu::TextureUsages::COPY_DST;
+        }
         if let Some(mode) = composite_alpha_mode(transparent, &swapchain_capabilities.alpha_modes) {
             surface_config.alpha_mode = mode;
         }
@@ -144,6 +157,8 @@ impl WGPUSurface {
             textures_to_transition_for_sampling: RefCell::new(Vec::new()),
             backend,
             alpha_modes: swapchain_capabilities.alpha_modes,
+            scene_enabled,
+            scene: RefCell::new(None),
         })
     }
 
@@ -163,6 +178,8 @@ impl WGPUSurface {
             textures_to_transition_for_sampling: RefCell::new(Vec::new()),
             backend,
             alpha_modes: vec![],
+            scene_enabled: false,
+            scene: RefCell::new(None),
         }
     }
 
@@ -235,6 +252,125 @@ impl WGPUSurface {
         } else {
             Err("Skia renderer: submitting the rendering to the GPU failed".into())
         }
+    }
+
+    /// OVRLEY: draws the window into the persistent scene with partial rendering, then copies the
+    /// whole scene into the swapchain image `frame`.
+    ///
+    /// The scene keeps the previous frame, so Slint repaints only what changed (buffer age 1)
+    /// instead of the whole window. The copy is wgpu's own write of the frame, so it replaces
+    /// upstream's clear pass and present-ordering submission (see [`crate::Surface::render`]).
+    fn render_scene(
+        &self,
+        gr_context: &mut skia_safe::gpu::DirectContext,
+        frame: wgpu::SurfaceTexture,
+        scale_factor: f32,
+        callback: &dyn Fn(
+            &skia_safe::Canvas,
+            Option<&mut skia_safe::gpu::DirectContext>,
+            u8,
+        ) -> Result<Option<DirtyRegion>, PlatformError>,
+        pre_present_callback: &RefCell<Option<Box<dyn FnMut()>>>,
+    ) -> Result<DrawOutcome, PlatformError> {
+        let size = frame.texture.size();
+        let format = frame.texture.format();
+        let mut scene_slot = self.scene.borrow_mut();
+        let reused = scene_slot.as_ref().is_some_and(|(scene, drawn_at)| {
+            scene.size() == size && scene.format() == format && *drawn_at == scale_factor
+        });
+        if !reused {
+            *scene_slot = Some((self.create_scene(size, format), scale_factor));
+        }
+        let (scene, _) = scene_slot.as_ref().expect("the scene was created above");
+        // A new scene holds nothing yet: age 0 makes Slint repaint the whole window into it.
+        let back_buffer_age = if reused { 1 } else { 0 };
+
+        if let Err(error) = self.draw_scene(gr_context, scene, back_buffer_age, callback) {
+            // What the scene holds is unknown now; the next frame repaints a new one whole.
+            *scene_slot = None;
+            return Err(error);
+        }
+
+        let mut encoder =
+            self.wgpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Slint scene copy"),
+            });
+        encoder.copy_texture_to_texture(scene.as_image_copy(), frame.texture.as_image_copy(), size);
+        self.wgpu.queue.submit(Some(encoder.finish()));
+
+        if let Some(pre_present_callback) = pre_present_callback.borrow_mut().as_mut() {
+            pre_present_callback();
+        }
+
+        self.wgpu.queue.present(frame);
+
+        Ok(DrawOutcome::Success)
+    }
+
+    /// OVRLEY: a scene texture for a swapchain of `size` and `format`, cleared through wgpu.
+    ///
+    /// Skia draws into it behind wgpu's back. Without the clear wgpu would count it as never
+    /// written and zero it before every copy out of it.
+    fn create_scene(&self, size: wgpu::Extent3d, format: wgpu::TextureFormat) -> wgpu::Texture {
+        let scene = self.wgpu.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("Slint scene"),
+            size,
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format,
+            // Skia's Vulkan backend wraps only images it can copy from and into, and samples the
+            // scene for backdrop blur; the frame copy reads it.
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+                | wgpu::TextureUsages::COPY_SRC
+                | wgpu::TextureUsages::COPY_DST
+                | wgpu::TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
+        });
+        let view = scene.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder =
+            self.wgpu.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Slint scene init"),
+            });
+        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Slint scene init"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: &view,
+                depth_slice: None,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT),
+                    store: wgpu::StoreOp::Store,
+                },
+            })],
+            depth_stencil_attachment: None,
+            timestamp_writes: None,
+            occlusion_query_set: None,
+            multiview_mask: None,
+        });
+        self.wgpu.queue.submit(Some(encoder.finish()));
+        scene
+    }
+
+    /// OVRLEY: lets Slint repaint what changed of the window into `scene`.
+    fn draw_scene(
+        &self,
+        gr_context: &mut skia_safe::gpu::DirectContext,
+        scene: &wgpu::Texture,
+        back_buffer_age: u8,
+        callback: &dyn Fn(
+            &skia_safe::Canvas,
+            Option<&mut skia_safe::gpu::DirectContext>,
+            u8,
+        ) -> Result<Option<DirtyRegion>, PlatformError>,
+    ) -> Result<(), PlatformError> {
+        self.transition_to_color_target(scene)?;
+        let mut skia_surface = self.backend.make_surface(gr_context, scene).ok_or_else(|| {
+            PlatformError::from("Failed to wrap the scene texture as a Skia render target")
+        })?;
+        callback(skia_surface.canvas(), Some(&mut *gr_context), back_buffer_age)?;
+        self.backend.release_surface(gr_context, &mut skia_surface)?;
+        self.flush_and_submit(gr_context)
     }
 }
 
@@ -378,7 +514,17 @@ impl crate::Surface for WGPUSurface {
     }
 
     fn name(&self) -> &'static str {
-        if self.surface.is_some() { "wgpu" } else { "wgpu-texture" }
+        match (&self.surface, self.scene_enabled) {
+            (None, _) => "wgpu-texture",
+            // OVRLEY: partial rendering into the persistent scene.
+            (Some(_), true) => "wgpu-partial",
+            (Some(_), false) => "wgpu",
+        }
+    }
+
+    // OVRLEY: the window's scene keeps its previous frame.
+    fn use_partial_rendering(&self) -> bool {
+        self.surface.is_some() && self.scene_enabled
     }
 
     fn resize_event(&self, size: PhysicalWindowSize) -> Result<(), PlatformError> {
@@ -412,7 +558,7 @@ impl crate::Surface for WGPUSurface {
 
     fn render(
         &self,
-        _window: &Window,
+        window: &Window,
         _size: PhysicalWindowSize,
         callback: &dyn Fn(
             &skia_safe::Canvas,
@@ -451,6 +597,18 @@ impl crate::Surface for WGPUSurface {
                 }
             }
         };
+
+        // OVRLEY: the frame is acquired before Slint draws, so a skipped frame leaves the dirty
+        // regions for the next one.
+        if self.scene_enabled {
+            return self.render_scene(
+                gr_context,
+                frame,
+                window.scale_factor(),
+                callback,
+                pre_present_callback,
+            );
+        }
 
         // Skia renders through the raw backend queue, invisible to wgpu's usage
         // tracking, so `Queue::present` would treat the frame as never written
@@ -720,7 +878,13 @@ impl Backend {
             #[cfg(target_vendor = "apple")]
             Self::Metal => unsafe { metal::make_metal_surface(gr_context, texture) },
             #[cfg(target_family = "windows")]
-            Self::Dx12 => unsafe { dx12::make_dx12_surface(gr_context, texture) },
+            Self::Dx12 => unsafe {
+                dx12::make_dx12_surface(
+                    gr_context,
+                    texture,
+                    windows::Win32::Graphics::Direct3D12::D3D12_RESOURCE_STATE_RENDER_TARGET,
+                )
+            },
             #[cfg(skia_wgpu_vulkan)]
             Self::Vulkan { .. } => unsafe {
                 vulkan::make_vulkan_surface(
@@ -747,7 +911,13 @@ impl Backend {
             #[cfg(target_vendor = "apple")]
             Self::Metal => unsafe { metal::make_metal_surface(gr_context, texture) },
             #[cfg(target_family = "windows")]
-            Self::Dx12 => unsafe { dx12::make_dx12_surface(gr_context, texture) },
+            Self::Dx12 => unsafe {
+                dx12::make_dx12_surface(
+                    gr_context,
+                    texture,
+                    windows::Win32::Graphics::Direct3D12::D3D12_RESOURCE_STATE_PRESENT,
+                )
+            },
             #[cfg(skia_wgpu_vulkan)]
             Self::Vulkan { .. } => unsafe {
                 vulkan::make_vulkan_surface(
