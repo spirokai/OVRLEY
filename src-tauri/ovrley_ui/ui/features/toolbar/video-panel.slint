@@ -41,11 +41,13 @@ component LabeledField inherits VerticalLayout {
 // Its trash button shows on hover and focus; Delete and Backspace remove it while it has focus.
 component VideoCard inherits Rectangle {
     in property <VideoCardView> card;
-    property <bool> active: touch.has-hover || focus.has-focus;
+    // Overlapping touch areas each own their hover, so the card counts the name's and the trash's.
+    property <bool> hovered: touch.has-hover || name.has-hover || trash.has-hover;
+    property <bool> active: root.hovered || focus.has-focus;
 
     border-radius: Theme.radius-xs * 1rem;
     border-width: 1px;
-    border-color: root.card.selected ? Theme.primary : touch.has-hover ? Theme.border : transparent;
+    border-color: root.card.selected ? Theme.primary : root.hovered ? Theme.border : transparent;
     background: root.card.selected ? Theme.surface-accent-soft : Theme.surface-darken;
     clip: true;
     touch := TouchArea {
@@ -131,7 +133,7 @@ component VideoCard inherits Rectangle {
                 }
             }
         }
-        SimpleTooltip {
+        name := SimpleTooltip {
             content: root.card.filename;
             align: PlacementAlign.start;
             wrap-text: true;
@@ -154,7 +156,8 @@ component VideoCard inherits Rectangle {
             }
         }
     }
-    if root.active: Button {
+    trash := Button {
+        visible: root.active;
         x: parent.width - self.width - 0.25rem;
         y: 0.25rem;
         variant: ButtonVariant.ghost;
