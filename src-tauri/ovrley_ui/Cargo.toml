@@ -78,9 +78,11 @@ ovrley_playback = { path = "../ovrley_playback", optional = true }
 # The raw D3D12 pointers wgpu's DX12 objects wrap, for video playback. wgpu-hal's version.
 windows-core = { version = "0.62", default-features = false }
 # Video playback's D3D11 target (`OVRLEY_PLAYBACK_TARGET=d3d11`): a D3D11 device and a texture and
-# fence shared with the DX12 device. wgpu-hal's version.
+# fence shared with the DX12 device; the Windows build, for the window's edge. wgpu-hal's version.
 windows = { version = "0.62", default-features = false, features = [
   "std",
+  "Wdk_System_SystemServices",
+  "Win32_System_SystemInformation",
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Graphics_Direct3D",

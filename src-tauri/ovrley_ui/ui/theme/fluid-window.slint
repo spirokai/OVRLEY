@@ -4,6 +4,11 @@ import { Theme, WindowMetrics } from "theme.slint";
 import { TooltipLayerView } from "../components/tooltip-layer.slint";
 import { AlertLayerView } from "../components/alert-layer.slint";
 
+// What a frameless window draws of its own frame: nothing (the system draws it, or the window is
+// maximised), a 1px `border` edge, as the app's other borders, or that edge with the content
+// clipped to rounded corners over a transparent window.
+export enum WindowFrame { none, edge, rounded }
+
 // The one place that holds the scaling formula: the React root's
 // `font-size: clamp(9px, 0.584vw + 5.5px, 14.6px)`. Every rem in the UI follows it. It also hosts
 // the window's tooltip layer, above the content.
@@ -14,9 +19,8 @@ export component FluidWindow inherits Window {
     default-font-size: max(9px, min(14.6px, WindowMetrics.width * 0.00584 + 5.5px));
     default-font-family: Theme.font-sans;
     default-font-weight: Theme.font-weight-normal;
-    // A frameless window whose system draws no corners or edge (Linux): the content is clipped to
-    // rounded corners over a transparent window, with a 1px `border`, as the app's other borders.
-    in property <bool> rounded-frame;
+    in property <WindowFrame> drawn-frame;
+    property <bool> rounded-frame: root.drawn-frame == WindowFrame.rounded;
     property <length> frame-radius: root.rounded-frame ? 8px : 0px;
     background: root.rounded-frame ? transparent : Theme.background;
 
@@ -46,7 +50,7 @@ export component FluidWindow inherits Window {
         // Last, so the error alert stays above everything in the main tree (D12).
         AlertLayerView { }
     }
-    if root.rounded-frame: Rectangle {
+    if root.drawn-frame != WindowFrame.none: Rectangle {
         border-radius: root.frame-radius;
         border-width: 1px;
         border-color: Theme.border;

@@ -89,6 +89,25 @@ fn window_attributes(attributes: winit::window::WindowAttributes) -> winit::wind
     attributes
 }
 
+/// Whether this is Windows before 11 (build 22000), which draws a frameless window without an
+/// edge; Windows 11's DWM edges and rounds it.
+#[cfg(windows)]
+pub fn is_windows_10() -> bool {
+    use windows::Wdk::System::SystemServices::RtlGetVersion;
+    use windows::Win32::System::SystemInformation::OSVERSIONINFOW;
+    let mut version = OSVERSIONINFOW {
+        dwOSVersionInfoSize: std::mem::size_of::<OSVERSIONINFOW>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: `version` is an OSVERSIONINFOW with its size set, as RtlGetVersion requires. Unlike
+    // `GetVersionExW`, it reports the real version to an app without a compatibility manifest.
+    if let Err(error) = unsafe { RtlGetVersion(&mut version) }.ok() {
+        log::warn!("could not read the Windows version: {error}");
+        return false;
+    }
+    version.dwBuildNumber < 22000
+}
+
 /// The window opens maximised, and leaving that restores the 1920×1080 preferred size, which winit
 /// (unlike Tauri's tao) does not constrain to a smaller screen. A restored window larger than its
 /// monitor shrinks to 90% of it, centred.

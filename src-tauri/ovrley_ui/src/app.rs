@@ -113,6 +113,9 @@ pub fn run(
     agent_socket: ovrley_mcp::link::SocketLocation,
 ) -> Result<(), String> {
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
+    // Window chrome, not app state: written to the global directly, like the maximised state.
+    #[cfg(windows)]
+    window.global::<crate::AppShell>().set_windows_10(platform::is_windows_10());
     let paths = Arc::new(paths);
     let video_tools = Arc::new(ovrley_app::store::services::NativeVideoTools::open(Arc::clone(&paths), app_cache_dir, &preferences)?);
     let ui_post: Arc<dyn ovrley_app::store::services::UiPost> = Arc::new(SlintUiPost);

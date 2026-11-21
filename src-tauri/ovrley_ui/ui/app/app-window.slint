@@ -1,4 +1,4 @@
-import { FluidWindow } from "../theme/fluid-window.slint";
+import { FluidWindow, WindowFrame } from "../theme/fluid-window.slint";
 import { Theme } from "../theme/theme.slint";
 import { AppShell, AreaReport } from "../features/app-shell/index.slint";
 import { AppHeader } from "../features/app-shell/app-header.slint";
@@ -34,8 +34,13 @@ export component AppWindow inherits FluidWindow {
     preferred-height: 1080px;
     no-frame: Platform.os != OperatingSystemType.macos;
     resize-border-width: Platform.os == OperatingSystemType.macos ? 0px : 6px;
-    // macOS and Windows round a frameless window themselves; Linux draws it square and edgeless.
-    rounded-frame: Platform.os == OperatingSystemType.linux && !AppShell.window-maximized;
+    // macOS and Windows 11 round and edge a frameless window themselves. Linux draws it square and
+    // edgeless, so the app rounds and edges it. Windows 10 draws it square and edgeless too; the app
+    // edges it, and the corners stay square: its DX12 swapchain has no alpha to show them through.
+    drawn-frame: AppShell.window-maximized ? WindowFrame.none
+        : Platform.os == OperatingSystemType.linux ? WindowFrame.rounded
+        : AppShell.windows-10 ? WindowFrame.edge
+        : WindowFrame.none;
 
     property <length> control-panel-width: 26.5rem;
     // macOS centres the traffic lights on the header's midline.

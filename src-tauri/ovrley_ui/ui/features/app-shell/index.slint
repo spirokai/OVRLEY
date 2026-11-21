@@ -45,6 +45,9 @@ export global AppShell {
     in property <bool> traffic-light-inset;
     // The window is maximised or fullscreen, written from winit's resize events. It opens maximised.
     in property <bool> window-maximized: true;
+    // Windows before 11 (build 22000), whose frameless window has no edge. Set once by the
+    // platform layer before the window shows.
+    in property <bool> windows-10;
     // A file hovers the window and drops are accepted (D10).
     in property <bool> file-drag-hovering;
     // `isProcessing`: an import or a template load runs; the workspace shows the loading overlay.
