@@ -174,6 +174,11 @@ pub fn mark_controls(store: &Store) -> MarkControls {
 
 /// A mark button: a landmark at the playhead's video second (`addLandmarkAtPlayhead`).
 pub fn add_landmark_at_playhead(store: &mut Store, kind: LandmarkKind) -> Result<String, String> {
+    let marks = mark_controls(store);
+    let disabled = if kind == LandmarkKind::Location { marks.location_disabled_reason } else { marks.mark_disabled_reason };
+    if let Some(reason) = disabled {
+        return Err(reason);
+    }
     let offset = slice::find_video_sync_target(store).map(|clip| clip.offset_seconds()).ok_or("A video must be loaded before adding a manual video sync landmark")?;
     slice::add_landmark(store, kind, store.editor.selected_second - offset)
 }

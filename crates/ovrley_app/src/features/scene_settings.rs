@@ -25,7 +25,7 @@ use crate::store::slices::template::{
 };
 use crate::store::Store;
 use ovrley_core::normalize::template::template_manifest;
-use ovrley_widgets::model::document::{js_round, number};
+use ovrley_widgets::model::document::{is_color_field_key, js_round, normalize_hex_color, number};
 use serde_json::{Map, Value};
 
 /// `ASPECT_RATIOS`: id and label key.
@@ -73,16 +73,21 @@ pub fn resolutions(aspect_ratio: &str) -> &'static [Resolution] {
     }
 }
 
+/// The longest side of an overlay sized by hand or by an agent: 8K UHD, in either orientation. A
+/// size that comes from a video or a file is kept as it is.
+pub const MAX_SCENE_SIDE: u32 = 8200;
+
 const ALL_RATIOS: [&str; 5] = ["16:9", "9:16", "1:1", "4:3", "21:9"];
 
-/// The global defaults the sliders draft.
-const SLIDER_KEYS: [&str; 5] = [
-    "opacity",
-    "scale",
-    "border_thickness",
-    "shadow_strength",
-    "shadow_distance",
-];
+/// The global defaults the sliders draft, with each slider's range and step.
+fn slider_range(key: &str) -> Option<(f64, f64, f64)> {
+    match key {
+        "opacity" => Some((0.0, 1.0, 0.01)),
+        "scale" => Some((0.5, 2.0, 0.01)),
+        "border_thickness" | "shadow_strength" | "shadow_distance" => Some((0.0, 20.0, 1.0)),
+        _ => None,
+    }
+}
 
 /// A label-font edit waiting for the family's capabilities (D6).
 #[derive(Clone, Debug, PartialEq)]
@@ -115,7 +120,12 @@ impl PendingFontEdit {
 
 impl std::fmt::Debug for PendingFontEdit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("PendingFontEdit").field("edit", &self.edit).field("family", &self.family).field("document_revision", &self.document_revision).finish()
+        formatter
+            .debug_struct("PendingFontEdit")
+            .field("edit", &self.edit)
+            .field("family", &self.family)
+            .field("document_revision", &self.document_revision)
+            .finish()
     }
 }
 
@@ -179,7 +189,10 @@ fn resolution_id(store: &Store) -> String {
 
 /// `useFpsMode`'s mode.
 fn fps_mode(store: &Store) -> String {
-    store.scene_settings.fps_mode.value(store.render_settings.fps)
+    store
+        .scene_settings
+        .fps_mode
+        .value(store.render_settings.fps)
 }
 
 fn select(id: &str, label: String, value: String, options: Vec<OptionView>) -> Cell {
@@ -411,6 +424,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
         )
     };
     let whole = |key: &str| crate::js::number_to_string(num(key));
+    let range = |key: &str| slider_range(key).expect("a slider's key");
     let opacity = num("opacity");
     let scale = num("scale");
     let reset = Cell::new(
@@ -512,7 +526,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
                             "opacity",
                             t(locale, "scene-settings.transparency", "Transparency"),
                             opacity,
-                            (0.0, 1.0, 0.01),
+                            range("opacity"),
                             js_round(opacity * 100.0).to_string(),
                             "%",
                         );
@@ -525,7 +539,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
                         "scale",
                         t(locale, "scene-settings.scale", "Scale"),
                         scale,
-                        (0.5, 2.0, 0.01),
+                        range("scale"),
                         format!("{scale:.2}"),
                         "x",
                     )),
@@ -533,7 +547,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
                         "border_thickness",
                         t(locale, "scene-settings.borderThickness", "Border Thickness"),
                         num("border_thickness"),
-                        (0.0, 20.0, 1.0),
+                        range("border_thickness"),
                         whole("border_thickness"),
                         "px",
                     )),
@@ -545,7 +559,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
                                 "shadow_strength",
                                 t(locale, "scene-settings.shadowStrength", "Shadow Strength"),
                                 num("shadow_strength"),
-                                (0.0, 20.0, 1.0),
+                                range("shadow_strength"),
                                 whole("shadow_strength"),
                                 "",
                             ),
@@ -553,7 +567,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
                                 "shadow_distance",
                                 t(locale, "scene-settings.shadowDistance", "Shadow Distance"),
                                 num("shadow_distance"),
-                                (0.0, 20.0, 1.0),
+                                range("shadow_distance"),
                                 whole("shadow_distance"),
                                 "",
                             ),
@@ -578,9 +592,41 @@ pub fn describe(store: &Store) -> Vec<Block> {
     )
 }
 
-/// The global defaults' keys, as the template manifest lists them.
-pub fn global_default_keys() -> Vec<&'static str> {
-    template_manifest().globals.keys().map(String::as_str).collect()
+/// Checks a global default given outright, as the controls limit theirs: a key of the template
+/// manifest, a value of that key's type, inside its slider's range.
+///
+/// # Errors
+///
+/// The reason, for the agent that gave the value.
+pub fn validate_global_default(key: &str, value: &Value) -> Result<(), String> {
+    let globals = &template_manifest().globals;
+    let Some(default) = globals.get(key) else {
+        let keys: Vec<&String> = globals.keys().collect();
+        return Err(format!(
+            "Unknown global default {key}; the keys are {keys:?}"
+        ));
+    };
+    if std::mem::discriminant(default) != std::mem::discriminant(value) {
+        return Err(format!("{key} takes a value like {default}, not {value}"));
+    }
+    if let Some(text) = value.as_str() {
+        if is_color_field_key(key) && normalize_hex_color(text, "").is_empty() {
+            return Err(format!("{key} takes a hex colour, not {value}"));
+        }
+        if text.trim().is_empty() {
+            return Err(format!("{key} must not be empty"));
+        }
+    }
+    if let Some(number) = value.as_f64() {
+        match slider_range(key) {
+            Some((min, max, _)) if !(min..=max).contains(&number) => {
+                return Err(format!("{key} must be between {min} and {max}"));
+            }
+            None if number <= 0.0 => return Err(format!("{key} must be positive")),
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 /// `sanitizeNumber`: commas dropped, then `parseInt(…, 10) || 0` (stripping leading zeros first
@@ -637,14 +683,36 @@ pub fn set_fps(store: &mut Store, fps: u32) -> Result<(), String> {
 /// `changeGlobalDefault`: the labels' font waits for its family's capabilities, answering `reply`
 /// once applied or dropped; the rest apply now. A scale set outright (an agent's) scales about the
 /// widgets' bounds, as the slider does.
-pub fn change_global_default(store: &mut Store, services: &mut Services, key: &str, value: Value, reply: Option<FontEditReply>) -> Result<(), String> {
+pub fn change_global_default(
+    store: &mut Store,
+    services: &mut Services,
+    key: &str,
+    value: Value,
+    reply: Option<FontEditReply>,
+) -> Result<(), String> {
     if key == "font_text" {
-        let family = value.as_str().ok_or("font_text takes a font id")?.to_string();
-        queue_font_edit(store, services, FontEdit::Set(family.clone()), family, reply);
+        let family = value
+            .as_str()
+            .ok_or("font_text takes a font id")?
+            .to_string();
+        queue_font_edit(
+            store,
+            services,
+            FontEdit::Set(family.clone()),
+            family,
+            reply,
+        );
         return Ok(());
     }
     let origin = (key == "scale").then(|| scale_origin(store));
-    let result = set_global_default(&mut store.editor, &mut store.template, key, value, &no_label_change, origin);
+    let result = set_global_default(
+        &mut store.editor,
+        &mut store.template,
+        key,
+        value,
+        &no_label_change,
+        origin,
+    );
     if let Some(reply) = reply {
         reply(store, result.clone());
     }
@@ -653,38 +721,73 @@ pub fn change_global_default(store: &mut Store, services: &mut Services, key: &s
 
 /// `resetGlobalDefaults`, once the default labels' font is known, about the widgets' bounds.
 pub fn reset_globals(store: &mut Store, services: &mut Services, reply: Option<FontEditReply>) {
-    let family = template_manifest().globals.get("font_text").and_then(Value::as_str).expect("the manifest has a labels' font").to_string();
+    let family = template_manifest()
+        .globals
+        .get("font_text")
+        .and_then(Value::as_str)
+        .expect("the manifest has a labels' font")
+        .to_string();
     queue_font_edit(store, services, FontEdit::Reset, family, reply);
 }
 
 /// Waits for the family; a newer edit replaces an older one, which is dropped.
-fn queue_font_edit(store: &mut Store, services: &mut Services, edit: FontEdit, family: String, reply: Option<FontEditReply>) {
+fn queue_font_edit(
+    store: &mut Store,
+    services: &mut Services,
+    edit: FontEdit,
+    family: String,
+    reply: Option<FontEditReply>,
+) {
     request_font_capabilities(store, services, &family);
     if let Some(replaced) = store.scene_settings.pending_font.take() {
         replaced.answer(store, Err("A newer font change replaced this one".into()));
     }
-    store.scene_settings.pending_font = Some(PendingFontEdit { edit, family, document_revision: store.editor.editor_document_revision, reply });
+    store.scene_settings.pending_font = Some(PendingFontEdit {
+        edit,
+        family,
+        document_revision: store.editor.editor_document_revision,
+        reply,
+    });
     apply_pending_font_edit(store);
 }
 
 /// Reconcile step: applies the pending label-font edit once its family's capabilities are in, if
 /// the document is still the one it was made on. A failed load (reported by the request) drops it.
 pub fn apply_pending_font_edit(store: &mut Store) {
-    let Some(family_id) = store.scene_settings.pending_font.as_ref().map(|pending| pending.family.clone()) else {
+    let Some(family_id) = store
+        .scene_settings
+        .pending_font
+        .as_ref()
+        .map(|pending| pending.family.clone())
+    else {
         return;
     };
     let fonts = &store.widget_editor.fonts;
     if !fonts.capabilities_requested(&family_id) {
-        let pending = store.scene_settings.pending_font.take().expect("checked above");
-        pending.answer(store, Err(format!("The font {family_id} could not be read")));
+        let pending = store
+            .scene_settings
+            .pending_font
+            .take()
+            .expect("checked above");
+        pending.answer(
+            store,
+            Err(format!("The font {family_id} could not be read")),
+        );
         return;
     }
     let Some(family) = fonts.capabilities(&family_id).cloned() else {
         return;
     };
-    let pending = store.scene_settings.pending_font.take().expect("checked above");
+    let pending = store
+        .scene_settings
+        .pending_font
+        .take()
+        .expect("checked above");
     if pending.document_revision != store.editor.editor_document_revision {
-        pending.answer(store, Err("The template changed before the font was ready".into()));
+        pending.answer(
+            store,
+            Err("The template changed before the font was ready".into()),
+        );
         return;
     }
     let label_style = |italic: bool, weight: f64| {
@@ -721,7 +824,7 @@ pub fn apply_pending_font_edit(store: &mut Store) {
 /// `draftGlobalDefault`: a slider's live value. The first scale draft captures the widgets' bounds,
 /// and each moves every widget about them, so the canvas follows the drag.
 pub fn draft_global_default(store: &mut Store, key: &str, value: f64) -> Result<(), String> {
-    if !SLIDER_KEYS.contains(&key) {
+    if slider_range(key).is_none() {
         return Err(format!("{key} is not a global default slider"));
     }
     if key == "scale" {
@@ -836,11 +939,10 @@ pub fn edit(
                         "Unknown resolution preset \"{resolution}\" for aspect ratio \"{ratio}\""
                     )
                 })?;
-            set_scene_size(store, u64::from(width), u64::from(height));
-            Ok(())
+            set_scene_size(store, width, height)
         }
         "width" | "height" => {
-            let value = sanitize_number(&text(&input)?);
+            let value = sanitize_number(&text(&input)?).min(i64::from(MAX_SCENE_SIDE));
             store.editor.edit_config(|config| {
                 config.scene.insert(id.into(), Value::from(value));
             });
@@ -848,13 +950,20 @@ pub fn edit(
         }
         "framerate" => {
             let mode = text(&input)?;
-            match store.scene_settings.fps_mode.select(&mode, store.render_settings.fps) {
+            match store
+                .scene_settings
+                .fps_mode
+                .select(&mode, store.render_settings.fps)
+            {
                 Some(fps) => set_fps(store, fps),
                 None => Ok(()),
             }
         }
         "custom_fps" => {
-            let fps = store.scene_settings.fps_mode.custom(js_number(&text(&input)?));
+            let fps = store
+                .scene_settings
+                .fps_mode
+                .custom(js_number(&text(&input)?));
             set_fps(store, fps)
         }
         "update_rate" => {
@@ -877,7 +986,7 @@ pub fn edit(
         | "border_color" | "shadow_color" | "color_units" => {
             change_global_default(store, services, id, Value::String(text(&input)?), None)
         }
-        key if SLIDER_KEYS.contains(&key) => match input {
+        key if slider_range(key).is_some() => match input {
             // A typed value commits at once, as the slider's release does.
             Input::Number(value) => {
                 draft_global_default(store, key, value)?;
@@ -889,11 +998,22 @@ pub fn edit(
     }
 }
 
-fn set_scene_size(store: &mut Store, width: u64, height: u64) {
+/// The overlay's size, as one edit.
+///
+/// # Errors
+///
+/// When a side is longer than [`MAX_SCENE_SIDE`].
+pub fn set_scene_size(store: &mut Store, width: u32, height: u32) -> Result<(), String> {
+    if width.max(height) > MAX_SCENE_SIDE {
+        return Err(format!(
+            "The scene size is at most {MAX_SCENE_SIDE} pixels a side (8K), not {width}x{height}"
+        ));
+    }
     store.editor.edit_config(|config| {
         config.scene.insert("width".into(), Value::from(width));
         config.scene.insert("height".into(), Value::from(height));
     });
+    Ok(())
 }
 
 #[cfg(test)]
@@ -910,11 +1030,14 @@ mod tests {
     }
 
     fn run(dispatcher: &Dispatcher, id: &'static str, input: Input) {
-        dispatcher.dispatch(move |store, services| edit(store, services, id, input, false).unwrap());
+        dispatcher
+            .dispatch(move |store, services| edit(store, services, id, input, false).unwrap());
     }
 
     fn cell(dispatcher: &Dispatcher, id: &str) -> Option<Cell> {
-        dispatcher.with_store(|store| crate::features::widget_editor::blocks::find(&describe(store), id).cloned())
+        dispatcher.with_store(|store| {
+            crate::features::widget_editor::blocks::find(&describe(store), id).cloned()
+        })
     }
 
     fn selected(dispatcher: &Dispatcher, id: &str) -> String {
@@ -939,37 +1062,80 @@ mod tests {
     #[test]
     fn custom_modes_hold_across_unrelated_edits_and_leave_when_the_value_changes() {
         let (dispatcher, _) = settings(json!({}));
-        dispatcher.dispatch(|store, _| store.editor.edit_config(|config| {
-            config.scene.insert("width".into(), json!(1920));
-            config.scene.insert("height".into(), json!(1080));
-        }));
+        dispatcher.dispatch(|store, _| {
+            store.editor.edit_config(|config| {
+                config.scene.insert("width".into(), json!(1920));
+                config.scene.insert("height".into(), json!(1080));
+            })
+        });
         assert_eq!(selected(&dispatcher, "resolution"), "1080p");
-        assert!(cell(&dispatcher, "width").is_none(), "a preset hides the size fields");
+        assert!(
+            cell(&dispatcher, "width").is_none(),
+            "a preset hides the size fields"
+        );
         run(&dispatcher, "resolution", Input::Text("custom".into()));
         run(&dispatcher, "framerate", Input::Text("custom".into()));
-        assert_eq!((selected(&dispatcher, "resolution"), selected(&dispatcher, "framerate")), ("custom".into(), "custom".into()));
+        assert_eq!(
+            (
+                selected(&dispatcher, "resolution"),
+                selected(&dispatcher, "framerate")
+            ),
+            ("custom".into(), "custom".into())
+        );
         assert!(cell(&dispatcher, "width").is_some() && cell(&dispatcher, "custom_fps").is_some());
-        dispatcher.dispatch(|store, _| store.editor.edit_config(|config| {
-            config.scene.insert("start".into(), json!(12));
-        }));
-        assert_eq!((selected(&dispatcher, "resolution"), selected(&dispatcher, "framerate")), ("custom".into(), "custom".into()), "unrelated edits keep the modes");
+        dispatcher.dispatch(|store, _| {
+            store.editor.edit_config(|config| {
+                config.scene.insert("start".into(), json!(12));
+            })
+        });
+        assert_eq!(
+            (
+                selected(&dispatcher, "resolution"),
+                selected(&dispatcher, "framerate")
+            ),
+            ("custom".into(), "custom".into()),
+            "unrelated edits keep the modes"
+        );
 
+        run(&dispatcher, "width", Input::Text("76800".into()));
+        dispatcher
+            .with_store(|store| assert_eq!(scene_size(store).0, 7680, "a typed size stops at 8K"));
         run(&dispatcher, "width", Input::Text("1,280".into()));
         run(&dispatcher, "height", Input::Text("0720".into()));
         dispatcher.dispatch(|store, _| set_fps(store, 60).unwrap());
-        assert_eq!((selected(&dispatcher, "resolution"), selected(&dispatcher, "framerate")), ("720p".into(), "60".into()), "a real change returns to the presets");
+        assert_eq!(
+            (
+                selected(&dispatcher, "resolution"),
+                selected(&dispatcher, "framerate")
+            ),
+            ("720p".into(), "60".into()),
+            "a real change returns to the presets"
+        );
     }
 
     #[test]
     fn presets_follow_the_aspect_ratio_and_a_custom_ratio_keeps_the_size() {
         let (dispatcher, _) = settings(json!({}));
         run(&dispatcher, "aspect_ratio", Input::Text("9:16".into()));
-        dispatcher.with_store(|store| assert_eq!((store.template.aspect_ratio.as_str(), scene_size(store)), ("9:16", (2160, 3840))));
+        dispatcher.with_store(|store| {
+            assert_eq!(
+                (store.template.aspect_ratio.as_str(), scene_size(store)),
+                ("9:16", (2160, 3840))
+            )
+        });
         run(&dispatcher, "resolution", Input::Text("1080p-v".into()));
         dispatcher.with_store(|store| assert_eq!(scene_size(store), (1080, 1920)));
         run(&dispatcher, "aspect_ratio", Input::Text("custom".into()));
-        dispatcher.with_store(|store| assert_eq!((store.template.aspect_ratio.as_str(), scene_size(store)), ("custom", (1080, 1920))));
-        assert!(cell(&dispatcher, "resolution").unwrap().disabled, "a custom ratio has no presets");
+        dispatcher.with_store(|store| {
+            assert_eq!(
+                (store.template.aspect_ratio.as_str(), scene_size(store)),
+                ("custom", (1080, 1920))
+            )
+        });
+        assert!(
+            cell(&dispatcher, "resolution").unwrap().disabled,
+            "a custom ratio has no presets"
+        );
         assert!(cell(&dispatcher, "width").is_some());
     }
 
@@ -978,54 +1144,132 @@ mod tests {
         let (dispatcher, _) = settings(json!({}));
         run(&dispatcher, "framerate", Input::Text("60".into()));
         run(&dispatcher, "update_rate", Input::Text("6".into()));
-        dispatcher.with_store(|store| assert_eq!((store.render_settings.fps, store.render_settings.widget_update_rate), (60.0, 6)));
+        dispatcher.with_store(|store| {
+            assert_eq!(
+                (
+                    store.render_settings.fps,
+                    store.render_settings.widget_update_rate
+                ),
+                (60.0, 6)
+            )
+        });
         run(&dispatcher, "framerate", Input::Text("24".into()));
-        dispatcher.with_store(|store| assert_eq!((store.render_settings.fps, store.render_settings.widget_update_rate), (24.0, 1), "24 fps offers no 1/6"));
+        dispatcher.with_store(|store| {
+            assert_eq!(
+                (
+                    store.render_settings.fps,
+                    store.render_settings.widget_update_rate
+                ),
+                (24.0, 1),
+                "24 fps offers no 1/6"
+            )
+        });
         run(&dispatcher, "custom_fps", Input::Text("50".into()));
         assert_eq!(selected(&dispatcher, "framerate"), "custom");
         run(&dispatcher, "custom_fps", Input::Text("30".into()));
-        assert_eq!(selected(&dispatcher, "framerate"), "30", "a preset typed in leaves custom");
-        let CellKind::Tabs { options, .. } = cell(&dispatcher, "update_rate").unwrap().kind else { panic!() };
-        assert_eq!(options.iter().map(|option| option.label.as_str()).collect::<Vec<_>>(), ["1/1", "1/2", "1/3", "1/5"]);
+        assert_eq!(
+            selected(&dispatcher, "framerate"),
+            "30",
+            "a preset typed in leaves custom"
+        );
+        let CellKind::Tabs { options, .. } = cell(&dispatcher, "update_rate").unwrap().kind else {
+            panic!()
+        };
+        assert_eq!(
+            options
+                .iter()
+                .map(|option| option.label.as_str())
+                .collect::<Vec<_>>(),
+            ["1/1", "1/2", "1/3", "1/5"]
+        );
     }
 
     #[test]
     fn a_scale_drag_moves_the_widgets_live_and_commits_once_about_their_bounds() {
-        let (dispatcher, _) = settings(json!({"values": [value("speed", "a", 100.0), value("speed", "b", 300.0)]}));
+        let (dispatcher, _) =
+            settings(json!({"values": [value("speed", "a", 100.0), value("speed", "b", 300.0)]}));
         let before = dispatcher.with_store(|store| store.history.past.len());
         let origin = dispatcher.with_store(scale_origin);
-        dispatcher.dispatch(|store, services| edit(store, services, "scale", Input::Number(1.5), true).unwrap());
-        dispatcher.dispatch(|store, services| edit(store, services, "scale", Input::Number(2.0), true).unwrap());
+        dispatcher.dispatch(|store, services| {
+            edit(store, services, "scale", Input::Number(1.5), true).unwrap()
+        });
+        dispatcher.dispatch(|store, services| {
+            edit(store, services, "scale", Input::Number(2.0), true).unwrap()
+        });
         dispatcher.with_store(|store| {
-            assert_eq!(store.drafts.scale_origin(), Some(origin), "the first draft captures the bounds");
-            let x = store.drafts.widget_draft("b").unwrap()["x"].as_f64().unwrap();
-            assert_eq!(x, origin.0 + (300.0 - origin.0) * 2.0, "the drafts scale about the bounds");
-            assert_eq!(store.editor.config.widget("b").unwrap()["x"].as_f64(), Some(300.0), "nothing commits while dragging");
+            assert_eq!(
+                store.drafts.scale_origin(),
+                Some(origin),
+                "the first draft captures the bounds"
+            );
+            let x = store.drafts.widget_draft("b").unwrap()["x"]
+                .as_f64()
+                .unwrap();
+            assert_eq!(
+                x,
+                origin.0 + (300.0 - origin.0) * 2.0,
+                "the drafts scale about the bounds"
+            );
+            assert_eq!(
+                store.editor.config.widget("b").unwrap()["x"].as_f64(),
+                Some(300.0),
+                "nothing commits while dragging"
+            );
         });
         dispatcher.dispatch(|store, _| commit_global_defaults(store).unwrap());
         dispatcher.with_store(|store| {
             assert_eq!(store.template.global_defaults["scale"], json!(2));
-            assert_eq!(store.editor.config.widget("b").unwrap()["x"].as_f64().unwrap(), origin.0 + (300.0 - origin.0) * 2.0);
-            assert!(store.drafts.widget_draft("b").is_none() && store.drafts.scale_origin().is_none());
+            assert_eq!(
+                store.editor.config.widget("b").unwrap()["x"]
+                    .as_f64()
+                    .unwrap(),
+                origin.0 + (300.0 - origin.0) * 2.0
+            );
+            assert!(
+                store.drafts.widget_draft("b").is_none() && store.drafts.scale_origin().is_none()
+            );
             assert_eq!(store.history.past.len(), before + 1, "one undo step");
         });
     }
 
     #[test]
     fn the_labels_font_waits_for_its_family_and_the_latest_edit_wins() {
-        let (dispatcher, fakes) = settings(json!({"labels": [{"id": "label", "text": "A", "x": 1, "y": 2, "font": "Oxanium.ttf", "font_weight": 900, "italic": true, "letter_spacing": -1.25}]}));
+        let (dispatcher, fakes) = settings(
+            json!({"labels": [{"id": "label", "text": "A", "x": 1, "y": 2, "font": "Oxanium.ttf", "font_weight": 900, "italic": true, "letter_spacing": -1.25}]}),
+        );
         run(&dispatcher, "font_text", Input::Text("Arial.ttf".into()));
         run(&dispatcher, "font_text", Input::Text("Rajdhani.ttf".into()));
-        assert_eq!(dispatcher.with_store(|store| store.editor.config.widget("label").unwrap()["font"].clone()), json!("Oxanium.ttf"), "nothing applies before the family is read");
-        settle(&dispatcher, &fakes, |store| store.scene_settings.pending_font.is_none());
+        assert_eq!(
+            dispatcher
+                .with_store(|store| store.editor.config.widget("label").unwrap()["font"].clone()),
+            json!("Oxanium.ttf"),
+            "nothing applies before the family is read"
+        );
+        settle(&dispatcher, &fakes, |store| {
+            store.scene_settings.pending_font.is_none()
+        });
         dispatcher.with_store(|store| {
             let label = store.editor.config.widget("label").unwrap();
-            assert_eq!((label["font"].clone(), label["italic"].clone(), label["letter_spacing"].clone()), (json!("Rajdhani.ttf"), json!(false), json!(-1.25)));
-            assert_eq!(store.template.global_defaults["font_text"], json!("Rajdhani.ttf"));
+            assert_eq!(
+                (
+                    label["font"].clone(),
+                    label["italic"].clone(),
+                    label["letter_spacing"].clone()
+                ),
+                (json!("Rajdhani.ttf"), json!(false), json!(-1.25))
+            );
+            assert_eq!(
+                store.template.global_defaults["font_text"],
+                json!("Rajdhani.ttf")
+            );
             assert_eq!(store.media.error_message, None);
         });
         settle(&dispatcher, &fakes, |_| true);
-        assert_eq!(dispatcher.with_store(|store| store.template.global_defaults["font_text"].clone()), json!("Rajdhani.ttf"), "the replaced edit never applies");
+        assert_eq!(
+            dispatcher.with_store(|store| store.template.global_defaults["font_text"].clone()),
+            json!("Rajdhani.ttf"),
+            "the replaced edit never applies"
+        );
     }
 
     #[test]
@@ -1037,13 +1281,25 @@ mod tests {
             assert!(matches!(crate::features::widget_editor::blocks::find(&describe(store), "color_values").unwrap().kind, CellKind::Color { ref value } if value.eq_ignore_ascii_case("#ffaa00")));
         });
         run(&dispatcher, "reset_globals", Input::Press);
-        settle(&dispatcher, &fakes, |store| store.scene_settings.pending_font.is_none());
-        dispatcher.with_store(|store| assert_eq!(*store.template.global_defaults, template_manifest().globals));
+        settle(&dispatcher, &fakes, |store| {
+            store.scene_settings.pending_font.is_none()
+        });
+        dispatcher.with_store(|store| {
+            assert_eq!(*store.template.global_defaults, template_manifest().globals)
+        });
     }
 
     #[test]
     fn scene_numbers_sanitize_as_react_does() {
-        for (raw, expected) in [("1,920", 1920), ("007", 7), ("", 0), ("abc", 0), ("12px", 12), ("-5", -5), ("0", 0)] {
+        for (raw, expected) in [
+            ("1,920", 1920),
+            ("007", 7),
+            ("", 0),
+            ("abc", 0),
+            ("12px", 12),
+            ("-5", -5),
+            ("0", 0),
+        ] {
             assert_eq!(sanitize_number(raw), expected, "{raw}");
         }
     }

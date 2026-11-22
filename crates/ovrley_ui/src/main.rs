@@ -47,7 +47,7 @@ fn serve_mcp() -> ExitCode {
         }
     };
     let mut client = ovrley_mcp::link::LinkClient::new(ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir));
-    match ovrley_mcp::protocol::run_stdio(&mut client, output) {
+    match ovrley_mcp::protocol::serve(std::io::stdin().lock(), output, &mut client) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             log::error!("the MCP connection failed: {error}");

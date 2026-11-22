@@ -143,6 +143,11 @@ impl PlayerState {
 /// The `player` reconcile step: the timeline derivations, then the playback effects (D6) and the
 /// viewport rules (D7), in React's effect order.
 pub fn reconcile_player(store: &mut Store) {
+    // A cut question that went away unanswered (the videos were cleared or replaced) cancels the
+    // call that waits on it, which dropping the reply does.
+    if store.video_import.cut_removal_request.is_none() {
+        store.player.cut_removal_reply = None;
+    }
     // A nudge commits when its clip loses the keyboard (React: the clip's blur).
     if let Some(nudge) = &store.player.clip_nudge {
         if focused_clip(store).as_ref() != Some(&nudge.lane) {

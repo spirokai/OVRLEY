@@ -69,7 +69,14 @@ pub fn update_rate_options(fps: f64) -> Vec<u32> {
     if let Some(preset) = preset_update_rates(fps) {
         return preset.to_vec();
     }
-    let divisors: Vec<u32> = (2..=fps / 3).filter(|divisor| fps.is_multiple_of(*divisor)).collect();
+    // In pairs up to the square root: this runs on the UI thread, for any rate up to `u32::MAX`.
+    let mut divisors: Vec<u32> = (1..=fps.isqrt())
+        .filter(|divisor| fps.is_multiple_of(*divisor))
+        .flat_map(|divisor| [divisor, fps / divisor])
+        .filter(|divisor| (2..=fps / 3).contains(divisor))
+        .collect();
+    divisors.sort_unstable();
+    divisors.dedup();
     if divisors.len() <= 3 {
         return std::iter::once(1).chain(divisors).collect();
     }

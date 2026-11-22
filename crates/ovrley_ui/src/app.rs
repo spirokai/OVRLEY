@@ -152,8 +152,8 @@ pub fn run(
     );
     platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());
 
-    // The first window serves agents; a later one logs that it does not (Q6).
-    let _agent_link = match ovrley_mcp::link::serve(agent_socket, platform::agent_bridge_hooks()) {
+    // The first window serves agents; a later one logs that it does not.
+    let _agent_link = match ovrley_mcp::link::serve(agent_socket, platform::AgentWindow) {
         Ok(server) => server,
         Err(error) => {
             log::warn!("agents cannot reach this window: {error}");

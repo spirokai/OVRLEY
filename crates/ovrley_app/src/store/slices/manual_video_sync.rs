@@ -377,6 +377,29 @@ pub fn set_turn_threshold(store: &mut Store, degrees: f64) -> Result<(), String>
     Ok(())
 }
 
+/// Both thresholds, either kept when `None`: both change, or neither.
+///
+/// # Errors
+///
+/// When either value is outside its range.
+pub fn set_thresholds(store: &mut Store, kmh: Option<f64>, degrees: Option<f64>) -> Result<(), String> {
+    // The second one's range first, so that its refusal leaves the first unchanged.
+    if let Some(degrees) = degrees {
+        validate_threshold(degrees, TURN_THRESHOLD_RANGE, "Manual video sync turnThresholdDegrees")?;
+    }
+    if let Some(kmh) = kmh {
+        set_speed_threshold(store, kmh)?;
+    }
+    if let Some(degrees) = degrees {
+        set_turn_threshold(store, degrees)?;
+    }
+    Ok(())
+}
+
+/// Two offsets this close name one candidate: JSON can change an offset's last bit, and a frame is
+/// thousands of times longer.
+const SAME_OFFSET_SECONDS: f64 = 1e-6;
+
 /// `applyVideoSyncCandidate`: only from a fresh result holding that offset. Candidates place the
 /// target clip; every clip moves by the same amount, and the playhead with them.
 pub fn apply_candidate(store: &mut Store, scope: MatchScope, offset: f64) -> Result<(), String> {
@@ -384,13 +407,12 @@ pub fn apply_candidate(store: &mut Store, scope: MatchScope, offset: f64) -> Res
     if result.status != CandidateStatus::Fresh {
         return Err("Cannot apply a stale manual video sync candidate".into());
     }
-    if !result
+    let offset = result
         .candidates
         .iter()
-        .any(|candidate| candidate.offset == offset)
-    {
-        return Err("Manual video sync candidate is not part of the current result".into());
-    }
+        .map(|candidate| candidate.offset)
+        .find(|candidate| (candidate - offset).abs() <= SAME_OFFSET_SECONDS)
+        .ok_or("Manual video sync candidate is not part of the current result")?;
     let target = require_target(store)?;
     crate::store::slices::video_import::shift_video_offsets(
         store,

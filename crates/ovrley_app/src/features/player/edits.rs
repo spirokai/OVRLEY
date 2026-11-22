@@ -29,10 +29,8 @@ pub fn resolve_selected_segment(store: &Store) -> Option<(&Clip, Segment)> {
     Some((clip, segment))
 }
 
-fn plan_trim(store: &Store, side: TrimSide) -> Option<(String, i64, TrimPlan)> {
-    let (clip, source_second) = resolve_edit_target(store)?;
-    let frame = clip.fps().seconds_to_frames(source_second);
-    plan_video_trim(clip, side, frame).map(|plan| (clip.id().to_string(), frame, plan))
+fn can_trim(store: &Store, side: TrimSide) -> bool {
+    resolve_edit_target(store).is_some_and(|(clip, second)| plan_video_trim(clip, side, clip.fps().seconds_to_frames(second)).is_some())
 }
 
 /// The toolbar's state of the commands (`useVideoCuts`'s model).
@@ -52,8 +50,8 @@ pub fn video_edit_state(store: &Store) -> VideoEditState {
         excluded: resolve_selected_segment(store)
             .map(|(_, segment)| segment.edits.excluded)
             .or_else(|| target.map(|(clip, second)| find_segment_at(clip, second).edits.excluded)),
-        can_trim_start: plan_trim(store, TrimSide::Start).is_some(),
-        can_trim_end: plan_trim(store, TrimSide::End).is_some(),
+        can_trim_start: can_trim(store, TrimSide::Start),
+        can_trim_end: can_trim(store, TrimSide::End),
     }
 }
 
@@ -74,12 +72,25 @@ pub fn toggle_excluded_at_playhead(store: &mut Store) -> bool {
     set_video_segment_excluded(store, &video_id, &segment.key, !segment.edits.excluded).is_ok()
 }
 
-/// Trims an end of the target clip at the playhead (`planVideoTrim`).
+/// Trims an end of the target clip at the playhead.
 pub fn trim_at_playhead(store: &mut Store, side: TrimSide) -> bool {
-    let Some((video_id, frame, plan)) = plan_trim(store, side) else { return false };
+    let Some((clip, second)) = resolve_edit_target(store) else { return false };
+    let (video_id, frame) = (clip.id().to_string(), clip.fps().seconds_to_frames(second));
+    trim_clip(store, &video_id, side, frame).is_ok()
+}
+
+/// Trims an end of a clip at a frame: a new trim, or the end's trim moved.
+///
+/// # Errors
+///
+/// When the clip is not on the timeline or the frame cannot trim that end.
+pub fn trim_clip(store: &mut Store, video_id: &str, side: TrimSide, frame: i64) -> Result<(), String> {
+    let clips = &store.player.timeline.timeline().committed.clips;
+    let clip = clips.iter().find(|clip| clip.id() == video_id).ok_or_else(|| format!("There is no video {video_id}."))?;
+    let plan = plan_video_trim(clip, side, frame).ok_or("The clip cannot be trimmed there: the frame is on the clip's edge or past a cut.")?;
     match plan {
-        TrimPlan::Trim => trim_video(store, &video_id, side, frame).is_ok(),
-        TrimPlan::Move { cut_id } => move_cut(store, &video_id, &cut_id, frame).is_ok(),
+        TrimPlan::Trim => trim_video(store, video_id, side, frame).map(drop),
+        TrimPlan::Move { cut_id } => move_cut(store, video_id, &cut_id, frame),
     }
 }
 

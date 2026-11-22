@@ -9,7 +9,7 @@ license = "GPL-3.0-or-later"
 
 [features]
 # JSON schemas for the MCP tools' arguments; enabled by ovrley_mcp only.
-schema = ["dep:schemars"]
+schema = ["dep:schemars", "ovrley_core/schema"]
 
 # The benchmarks build their cases from the editor's logic, so their binaries belong to this crate.
 [[bin]]

@@ -14,6 +14,44 @@ pub type AgentResult = Result<Value, String>;
 /// What an agent reads when the call it waits for is dropped without an answer.
 pub const CANCELLED: &str = "The request was cancelled before OVRLEY could answer.";
 
+/// A path an agent gave, which is absolute: checked when the arguments are read.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+#[serde(try_from = "String")]
+pub struct AbsolutePath(String);
+
+impl TryFrom<String> for AbsolutePath {
+    type Error = String;
+
+    fn try_from(path: String) -> Result<Self, Self::Error> {
+        if std::path::Path::new(&path).is_absolute() {
+            Ok(Self(path))
+        } else {
+            Err(format!("The path must be absolute: {path}"))
+        }
+    }
+}
+
+impl From<AbsolutePath> for String {
+    fn from(path: AbsolutePath) -> Self {
+        path.0
+    }
+}
+
+#[cfg(feature = "schema")]
+impl schemars::JsonSchema for AbsolutePath {
+    fn inline_schema() -> bool {
+        true
+    }
+
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        String::schema_name()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        String::json_schema(generator)
+    }
+}
+
 /// Answers one tool call, once.
 pub struct AgentReply(Option<Box<dyn FnOnce(AgentResult) + Send>>);
 

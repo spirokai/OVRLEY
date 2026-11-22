@@ -1,318 +1,288 @@
-//! Sync Doctor's manual sync tools (Phase 8 D13): the landmarks, the course location, the
-//! sensitivity, the two searches and applying a candidate. A tool that changes the manual sync
-//! opens Sync Doctor on its Manual Sync tab, so the edit shows in the timeline and the drawer.
+//! Sync Doctor's manual sync tools: the landmarks, the course location, the sensitivity, the two
+//! searches and applying a candidate. A tool that changed the manual sync opens Sync Doctor on
+//! its Manual Sync tab, so the change shows.
 
-use crate::catalog::{input_schema, Answer, Reply, ToolDefinition, ToolOutcome};
+use crate::catalog::{Answer, NoArguments, Tool, ToolError, ToolResult};
 use ovrley_app::features::video_sync::matching::MatchScope;
 use ovrley_app::features::video_sync::{self as sync, describe_result, describe_video_sync};
 use ovrley_app::store::agent::AgentReply;
 use ovrley_app::store::services::Services;
-use ovrley_app::store::slices::manual_video_sync as slice;
+use ovrley_app::store::slices::manual_video_sync as manual;
 use ovrley_app::store::Store;
 use ovrley_core::media::manual_video_sync::LandmarkKind;
 use schemars::JsonSchema;
-use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use serde_json::{json, Value};
+
+const NOT_UNDOABLE: &str = "Not undoable: the manual sync is outside the editor history.";
 
 /// A new landmark.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct LandmarkAddArguments {
+struct AddArguments {
     #[serde(rename = "type")]
-    pub kind: LandmarkKind,
+    kind: LandmarkKind,
     /// The second in the target video; without it, the playhead's, as the mark buttons place it.
-    pub video_second: Option<f64>,
+    video_second: Option<f64>,
 }
 
 /// A landmark's new second.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct LandmarkMoveArguments {
+struct MoveArguments {
     /// A landmark id from `video_sync_get`.
-    pub id: String,
+    id: String,
     /// The second in the target video, inside it.
-    pub video_second: f64,
+    video_second: f64,
 }
 
 /// A landmark's new type.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct LandmarkTypeArguments {
-    pub id: String,
+struct RetypeArguments {
+    id: String,
     #[serde(rename = "type")]
-    pub kind: LandmarkKind,
+    kind: LandmarkKind,
 }
 
 /// A landmark.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct LandmarkIdArguments {
-    pub id: String,
+struct LandmarkArguments {
+    id: String,
 }
 
 /// The course location.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct LocationArguments {
+struct LocationArguments {
     /// The activity second of the place the video's location landmark shows.
-    pub activity_second: f64,
+    activity_second: f64,
 }
 
 /// The detection sensitivity; omitted fields keep their value.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct SensitivityArguments {
+struct SensitivityArguments {
     /// Speed below which the rider counts as stopped, in km/h (1 to 10).
-    pub speed_threshold_kmh: Option<f64>,
+    speed_threshold_kmh: Option<f64>,
     /// The least heading change that counts as a turn, in degrees (70 to 180).
-    pub turn_threshold_degrees: Option<f64>,
+    turn_threshold_degrees: Option<f64>,
 }
 
 /// A search.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct CalculateArguments {
+struct SearchArguments {
     /// `all` (Sync All Landmarks) or `location` (Match Location Only).
-    pub scope: MatchScope,
+    scope: MatchScope,
 }
 
 /// A candidate to apply.
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
-pub struct CandidateApplyArguments {
-    pub scope: MatchScope,
+struct CandidateArguments {
+    scope: MatchScope,
     /// A candidate's `offsetSeconds` from that scope's fresh result.
-    pub offset_seconds: f64,
+    offset_seconds: f64,
 }
 
-const NOT_UNDOABLE: &str = "Not undoable: the manual sync is outside the editor history.";
-
-pub fn tools() -> Vec<ToolDefinition> {
-    let tool = |name, title, description, input_schema, read_only| ToolDefinition {
-        name,
-        title,
-        description,
-        input_schema,
-        read_only,
-    };
+pub(crate) fn tools() -> Vec<Tool> {
     vec![
-        tool(
+        Tool::read(
             "video_sync_get",
             "Read the manual sync",
-            "Sync Doctor's manual sync: the target video (the first clip), the landmarks with their video and timeline seconds, the \
-             course location, the sensitivity and its ranges, the detected events, and both searches with their eligibility and \
-             results.",
-            input_schema::<crate::catalog::NoArguments>(),
-            true,
+            "Sync Doctor's manual sync: the target video (the first clip), the landmarks with \
+             their video and timeline seconds, the course location, the sensitivity and its \
+             ranges, the detected events, and both searches with their eligibility and results.",
+            get,
         ),
-        tool(
+        Tool::edit(
             "video_sync_landmark_add",
             "Mark a landmark",
-            "Adds a stop, leftTurn, rightTurn or location landmark in the target video, at videoSecond or at the playhead as the mark \
-             buttons do. At most five, at most one location. Replies with its id. Not undoable.",
-            input_schema::<LandmarkAddArguments>(),
-            false,
+            "Adds a stop, leftTurn, rightTurn or location landmark in the target video, at \
+             videoSecond or at the playhead as the mark buttons do. At most five, at most one \
+             location. Replies with its id. Not undoable.",
+            add_landmark,
         ),
-        tool("video_sync_landmark_move", "Move a landmark", "Moves a landmark to another second of the target video. Not undoable.", input_schema::<LandmarkMoveArguments>(), false),
-        tool("video_sync_landmark_set_type", "Retype a landmark", "Changes a landmark's type; only one landmark can be the location. Not undoable.", input_schema::<LandmarkTypeArguments>(), false),
-        tool("video_sync_landmark_remove", "Delete a landmark", "Deletes one landmark. Not undoable.", input_schema::<LandmarkIdArguments>(), false),
-        tool("video_sync_landmarks_clear", "Clear the landmarks", "Deletes every landmark. Not undoable.", input_schema::<crate::catalog::NoArguments>(), false),
-        tool(
+        Tool::edit(
+            "video_sync_landmark_move",
+            "Move a landmark",
+            "Moves a landmark to another second of the target video. Not undoable.",
+            move_landmark,
+        ),
+        Tool::edit(
+            "video_sync_landmark_set_type",
+            "Retype a landmark",
+            "Changes a landmark's type; only one landmark can be the location. Not undoable.",
+            retype_landmark,
+        ),
+        Tool::edit(
+            "video_sync_landmark_remove",
+            "Delete a landmark",
+            "Deletes one landmark. Not undoable.",
+            remove_landmark,
+        )
+        .destructive(),
+        Tool::edit(
+            "video_sync_landmarks_clear",
+            "Clear the landmarks",
+            "Deletes every landmark. Not undoable.",
+            clear_landmarks,
+        )
+        .destructive(),
+        Tool::edit(
             "video_sync_location_set",
             "Set the course location",
-            "Sets the place on the activity's course that the video's location landmark shows, as Set location on the map does. Not \
-             undoable.",
-            input_schema::<LocationArguments>(),
-            false,
+            "Sets the place on the activity's course that the video's location landmark shows, as \
+             Set location on the map does. Not undoable.",
+            set_location,
         ),
-        tool("video_sync_location_clear", "Clear the course location", "Clears the course location. Not undoable.", input_schema::<crate::catalog::NoArguments>(), false),
-        tool(
+        Tool::edit(
+            "video_sync_location_clear",
+            "Clear the course location",
+            "Clears the course location. Not undoable.",
+            clear_location,
+        )
+        .destructive(),
+        Tool::edit(
             "video_sync_sensitivity_set",
             "Set the detection sensitivity",
-            "Sets the stop speed and the turn angle the activity's events are detected with; a search that ran runs again, as a slider \
-             release does. Not undoable.",
-            input_schema::<SensitivityArguments>(),
-            false,
+            "Sets the stop speed and the turn angle the activity's events are detected with; a \
+             search that ran runs again, as a slider release does. Not undoable.",
+            set_sensitivity,
         ),
-        tool(
+        Tool::waiting(
             "video_sync_calculate",
             "Search for sync offsets",
-            "Runs Sync All Landmarks (all) or Match Location Only (location). Fails with the button's explanation when the search \
-             cannot run. The reply waits for the search and holds its candidates; it fails when the landmarks changed meanwhile. Not \
-             undoable.",
-            input_schema::<CalculateArguments>(),
-            false,
+            "Runs Sync All Landmarks (all) or Match Location Only (location). Fails with the \
+             button's explanation when the search cannot run. The reply waits for the search and \
+             holds its candidates; it fails when the landmarks changed meanwhile. Not undoable.",
+            calculate,
         ),
-        tool(
+        Tool::edit(
             "video_sync_candidate_apply",
             "Apply a sync offset",
-            "Moves the target video to a candidate's offset from that scope's fresh result; every video moves by the same amount, and \
-             the playhead with them. One undo step.",
-            input_schema::<CandidateApplyArguments>(),
-            false,
+            "Moves the target video to a candidate's offset from that scope's fresh result; every \
+             video moves by the same amount, and the playhead with them. One undo step.",
+            apply_candidate,
         ),
     ]
 }
 
-/// Whether `name` is one of these tools.
-pub fn handles(name: &str) -> bool {
-    tools().iter().any(|tool| tool.name == name)
-}
-
-fn arguments<T: DeserializeOwned>(value: Value) -> Result<T, ToolOutcome> {
-    let value = if value.is_null() { json!({}) } else { value };
-    serde_json::from_value(value)
-        .map_err(|error| ToolOutcome::InvalidParams(format!("Invalid arguments: {error}")))
-}
-
-/// The manual sync after an edit, with the undo note.
-fn answer(store: &Store) -> Result<Answer, ToolOutcome> {
-    let mut state = describe_video_sync(store);
-    state["undo"] = json!(NOT_UNDOABLE);
-    Ok(Answer::Now(ToolOutcome::Ok(state)))
-}
-
-/// `ovrley_summary.videoSync`: the target video, the landmark count, whether a location is set,
-/// both results' status.
-pub fn summary(store: &Store) -> Value {
+/// `ovrley_summary`'s `videoSync`: the target video, the landmark count, whether a location is
+/// set, and both searches' status.
+pub(crate) fn summary(store: &Store) -> Value {
+    let manual = &store.manual_video_sync;
+    let results = &store.manual_video_sync_results;
     json!({
-        "targetVideoId": store.manual_video_sync.video_id,
-        "landmarkCount": store.manual_video_sync.landmarks.len(),
-        "locationSet": store.manual_video_sync.detected_location_second.is_some(),
-        "searches": { "all": store.manual_video_sync_results.all.status.name(), "location": store.manual_video_sync_results.location.status.name() },
+        "targetVideoId": manual.video_id,
+        "landmarkCount": manual.landmarks.len(),
+        "locationSet": manual.detected_location_second.is_some(),
+        "searches": {
+            "all": results.all.status.name(),
+            "location": results.location.status.name(),
+        },
     })
 }
 
-pub fn call(
-    name: &str,
-    arguments_value: Value,
+/// The manual sync after an edit, which Sync Doctor now shows.
+fn answer_edit(store: &mut Store) -> Value {
+    store.layout.open_manual_video_sync();
+    let mut state = describe_video_sync(store);
+    state["undo"] = json!(NOT_UNDOABLE);
+    state
+}
+
+fn get(_: NoArguments, store: &Store, _: &Services) -> ToolResult {
+    Ok(describe_video_sync(store))
+}
+
+fn add_landmark(args: AddArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    let id = match args.video_second {
+        Some(second) => manual::add_landmark(store, args.kind, second)?,
+        None => sync::add_landmark_at_playhead(store, args.kind)?,
+    };
+    let mut state = answer_edit(store);
+    state["id"] = json!(id);
+    Ok(state)
+}
+
+fn move_landmark(args: MoveArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::move_landmark(store, &args.id, args.video_second)?;
+    Ok(answer_edit(store))
+}
+
+fn retype_landmark(args: RetypeArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::set_landmark_kind(store, &args.id, args.kind)?;
+    Ok(answer_edit(store))
+}
+
+fn remove_landmark(args: LandmarkArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::remove_landmark(store, &args.id)?;
+    Ok(answer_edit(store))
+}
+
+fn clear_landmarks(_: NoArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::clear_landmarks(store);
+    Ok(answer_edit(store))
+}
+
+fn set_location(args: LocationArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    if store.media.parsed_activity.is_none() {
+        return Err(ToolError::Failed("A course location needs an activity.".into()));
+    }
+    manual::set_detected_location(store, args.activity_second)?;
+    Ok(answer_edit(store))
+}
+
+fn clear_location(_: NoArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::clear_detected_location(store);
+    Ok(answer_edit(store))
+}
+
+fn set_sensitivity(args: SensitivityArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::set_thresholds(store, args.speed_threshold_kmh, args.turn_threshold_degrees)?;
+    Ok(answer_edit(store))
+}
+
+fn calculate(
+    args: SearchArguments,
     store: &mut Store,
     services: &mut Services,
-    reply: Reply,
-) -> Result<Answer, ToolOutcome> {
-    if name != "video_sync_get" {
-        // The window shows what an agent does.
-        store.layout.open_manual_video_sync();
-    }
-    let failed = ToolOutcome::Failed;
-    match name {
-        "video_sync_get" => {
-            arguments::<crate::catalog::NoArguments>(arguments_value)?;
-            Ok(Answer::Now(ToolOutcome::Ok(describe_video_sync(store))))
-        }
-        "video_sync_landmark_add" => {
-            let arguments: LandmarkAddArguments = arguments(arguments_value)?;
-            let id = match arguments.video_second {
-                Some(second) => slice::add_landmark(store, arguments.kind, second),
-                None => {
-                    let marks = sync::mark_controls(store);
-                    let reason = if arguments.kind == LandmarkKind::Location {
-                        marks.location_disabled_reason
-                    } else {
-                        marks.mark_disabled_reason
-                    };
-                    if let Some(reason) = reason {
-                        return Err(failed(reason));
-                    }
-                    sync::add_landmark_at_playhead(store, arguments.kind)
-                }
-            }
-            .map_err(failed)?;
-            let mut state = describe_video_sync(store);
-            state["id"] = json!(id);
-            state["undo"] = json!(NOT_UNDOABLE);
-            Ok(Answer::Now(ToolOutcome::Ok(state)))
-        }
-        "video_sync_landmark_move" => {
-            let arguments: LandmarkMoveArguments = arguments(arguments_value)?;
-            slice::move_landmark(store, &arguments.id, arguments.video_second).map_err(failed)?;
-            answer(store)
-        }
-        "video_sync_landmark_set_type" => {
-            let arguments: LandmarkTypeArguments = arguments(arguments_value)?;
-            slice::set_landmark_kind(store, &arguments.id, arguments.kind).map_err(failed)?;
-            answer(store)
-        }
-        "video_sync_landmark_remove" => {
-            let arguments: LandmarkIdArguments = arguments(arguments_value)?;
-            slice::remove_landmark(store, &arguments.id).map_err(failed)?;
-            answer(store)
-        }
-        "video_sync_landmarks_clear" => {
-            arguments::<crate::catalog::NoArguments>(arguments_value)?;
-            slice::clear_landmarks(store);
-            answer(store)
-        }
-        "video_sync_location_set" => {
-            let arguments: LocationArguments = arguments(arguments_value)?;
-            if store.media.parsed_activity.is_none() {
-                return Err(failed("A course location needs an activity.".into()));
-            }
-            slice::set_detected_location(store, arguments.activity_second).map_err(failed)?;
-            answer(store)
-        }
-        "video_sync_location_clear" => {
-            arguments::<crate::catalog::NoArguments>(arguments_value)?;
-            slice::clear_detected_location(store);
-            answer(store)
-        }
-        "video_sync_sensitivity_set" => {
-            let arguments: SensitivityArguments = arguments(arguments_value)?;
-            if let Some(kmh) = arguments.speed_threshold_kmh {
-                slice::set_speed_threshold(store, kmh).map_err(failed)?;
-            }
-            if let Some(degrees) = arguments.turn_threshold_degrees {
-                slice::set_turn_threshold(store, degrees).map_err(failed)?;
-            }
-            answer(store)
-        }
-        "video_sync_calculate" => {
-            let arguments: CalculateArguments = arguments(arguments_value)?;
-            sync::calculate(
-                store,
-                services,
-                arguments.scope,
-                Some(AgentReply::new(move |result| reply(result.into()))),
-            )
-            .map_err(failed)?;
-            Ok(Answer::Later)
-        }
-        "video_sync_candidate_apply" => {
-            let arguments: CandidateApplyArguments = arguments(arguments_value)?;
-            slice::apply_candidate(store, arguments.scope, arguments.offset_seconds)
-                .map_err(failed)?;
-            ovrley_app::features::player::reconcile_player(store);
-            let mut result = describe_result(store, arguments.scope);
-            result["videos"] = crate::player::describe_videos(store);
-            Ok(Answer::Now(ToolOutcome::Ok(result)))
-        }
-        other => Err(ToolOutcome::InvalidParams(format!("Unknown tool: {other}"))),
-    }
+    reply: AgentReply,
+) -> Result<Answer, ToolError> {
+    sync::calculate(store, services, args.scope, Some(reply))?;
+    store.layout.open_manual_video_sync();
+    Ok(Answer::Later)
+}
+
+fn apply_candidate(args: CandidateArguments, store: &mut Store, _: &mut Services) -> ToolResult {
+    manual::apply_candidate(store, args.scope, args.offset_seconds)?;
+    ovrley_app::features::player::reconcile_player(store);
+    store.layout.open_manual_video_sync();
+    let mut result = describe_result(store, args.scope);
+    result["videos"] = crate::timeline::describe_videos(store);
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::catalog::call as run_tool;
-    use ovrley_app::store::services::fakes::{fake_services, Fakes};
+    use crate::testing::{video_metadata, Editor};
+    use ovrley_app::store::slices::layout::VideoSyncDrawerTab;
     use ovrley_app::store::slices::media::{ActivitySummary, ImportedActivity};
-    use ovrley_app::store::Dispatcher;
-    use std::sync::mpsc::{channel, Receiver};
     use std::sync::Arc;
 
-    /// Agent edits on, a 100 s moving activity and a 30 s clip at offset 0 as the sync target.
-    fn dispatcher() -> (Dispatcher, Fakes) {
-        let (parts, fakes) = fake_services(json!({}));
-        let mut store = Store::default();
-        store.agent_session.allow_agent_edits = true;
-        store.theme = Some(ovrley_app::lib::template::ThemeColors { ice: "#86aaaa".into(), aqua: "#40e0d0".into(), teal: "#005b5b".into(), accent: "#ad5013".into() });
+    /// A 100 s moving activity, and a 30 s clip at offset 0 as the sync target.
+    fn editor() -> Editor {
         let activity = ovrley_core::activity::schema::ParsedActivity {
             sample_elapsed_seconds: (0..=100).map(f64::from).collect(),
             speed: vec![Some(3.0); 101],
             heading: vec![Some(0.0); 101],
             ..Default::default()
         };
+        let mut store = Store::default();
         store.media.activity_summary = Some(ActivitySummary {
             duration_seconds: 100.0,
             ..ActivitySummary::of(&activity)
@@ -321,259 +291,137 @@ mod tests {
             activity: Arc::new(activity),
             preview_bytes: Arc::new(Vec::new()),
         });
-        let dispatcher = Dispatcher::new(store, parts);
-        dispatcher.dispatch(|store, _| {
-            let metadata = ovrley_core::media::SourceVideoMetadata {
-                path: "/videos/clip.mp4".into(),
-                duration: Some(30.0),
-                fps_num: Some(30),
-                fps_den: Some(1),
-                resolution: Some(ovrley_core::media::Resolution { width: 1920, height: 1080 }),
-                ..Default::default()
-            };
-            let clip = ovrley_app::lib::video_program::create_imported_video(&metadata, "clip".into(), 0).unwrap();
-            ovrley_app::store::slices::video_import::commit_video_collection(store, vec![clip], ovrley_app::lib::video_program::VideoEditsMap::from([("clip".to_string(), Default::default())]));
+        let editor = Editor::with(store, json!({}));
+        editor.dispatcher.dispatch(|store, _| {
+            use ovrley_app::lib::video_program::{create_imported_video, VideoEditsMap};
+            use ovrley_app::store::slices::video_import::commit_video_collection;
+            let metadata = video_metadata("/videos/clip.mp4", 30.0);
+            let clip = create_imported_video(&metadata, "clip".into(), 0).unwrap();
+            let edits = VideoEditsMap::from([(
+                "clip".to_string(),
+                ovrley_core::media::video_edits::VideoEdits::default(),
+            )]);
+            let collection = vec![clip];
+            commit_video_collection(store, collection, edits);
         });
-        (dispatcher, fakes)
+        editor
     }
 
-    fn start(
-        dispatcher: &Dispatcher,
-        name: &'static str,
-        arguments: Value,
-    ) -> (Option<ToolOutcome>, Receiver<ToolOutcome>) {
-        let (sender, receiver) = channel();
-        let answer = dispatcher
-            .dispatch_with_result(move |store, services| {
-                run_tool(
-                    name,
-                    arguments,
-                    store,
-                    services,
-                    Box::new(move |outcome| sender.send(outcome).unwrap()),
-                )
-            })
-            .unwrap();
-        (
-            match answer {
-                Answer::Now(outcome) => Some(outcome),
-                Answer::Later => None,
-            },
-            receiver,
-        )
-    }
-
-    fn ok(dispatcher: &Dispatcher, name: &'static str, arguments: Value) -> Value {
-        match start(dispatcher, name, arguments).0 {
-            Some(ToolOutcome::Ok(value)) => value,
-            other => panic!("{name}: {other:?}"),
-        }
-    }
-
-    fn wait(
-        dispatcher: &Dispatcher,
-        fakes: &Fakes,
-        receiver: &Receiver<ToolOutcome>,
-    ) -> ToolOutcome {
-        for _ in 0..600 {
-            if let Ok(outcome) = receiver.try_recv() {
-                return outcome;
-            }
-            fakes.ui_post.drain(dispatcher);
-            std::thread::sleep(std::time::Duration::from_millis(5));
-        }
-        panic!("no reply");
+    fn add_location(editor: &Editor, activity_second: f64) -> Value {
+        let added = editor.ok(
+            "video_sync_landmark_add",
+            json!({"type": "location", "videoSecond": 4}),
+        );
+        editor.ok("video_sync_location_set", json!({"activitySecond": activity_second}));
+        added["id"].clone()
     }
 
     #[test]
     fn landmark_tools_edit_the_manual_sync_and_open_sync_doctor() {
-        let (dispatcher, _) = dispatcher();
-        let steps = dispatcher.with_store(|store| store.history.past.len());
-        let added = ok(
-            &dispatcher,
-            "video_sync_landmark_add",
-            json!({"type": "stop", "videoSecond": 4}),
+        let editor = editor();
+        let steps = editor.undo_steps();
+        editor.invalid("video_sync_landmark_move", json!({"bogus": 1}));
+        editor.failed("video_sync_landmark_remove", json!({"id": "none"}));
+        assert!(
+            !editor.dispatcher.with_store(|store| store.layout.left_drawer_visible),
+            "a refused call opens nothing"
         );
-        let id = added["id"].as_str().unwrap().to_string();
+        let added = editor.ok("video_sync_landmark_add", json!({"type": "stop", "videoSecond": 4}));
+        let id = &added["id"];
         assert_eq!(added["landmarks"][0]["videoSecond"], json!(4.0));
         assert_eq!(added["undo"], json!(NOT_UNDOABLE));
-        dispatcher.with_store(|store| {
-            assert_eq!(
-                store.layout.video_sync_drawer_tab,
-                ovrley_app::store::slices::layout::VideoSyncDrawerTab::Manual
-            );
-            assert_eq!(store.history.past.len(), steps, "landmarks are not undo steps");
+        editor.dispatcher.with_store(|store| {
+            assert!(store.layout.left_drawer_visible);
+            assert_eq!(store.layout.video_sync_drawer_tab, VideoSyncDrawerTab::Manual);
         });
-        ok(
-            &dispatcher,
-            "video_sync_landmark_move",
-            json!({"id": id, "videoSecond": 6}),
-        );
-        let retyped = ok(
-            &dispatcher,
-            "video_sync_landmark_set_type",
-            json!({"id": id, "type": "location"}),
-        );
+        assert_eq!(editor.undo_steps(), steps, "landmarks are not undo steps");
+        editor.ok("video_sync_landmark_move", json!({"id": id, "videoSecond": 6}));
+        let retype = json!({"id": id, "type": "location"});
+        let retyped = editor.ok("video_sync_landmark_set_type", retype);
         assert_eq!(retyped["landmarks"][0]["type"], json!("location"));
-        assert!(matches!(
-            start(
-                &dispatcher,
-                "video_sync_landmark_add",
-                json!({"type": "location", "videoSecond": 1})
-            )
-            .0,
-            Some(ToolOutcome::Failed(_))
-        ));
-        ok(&dispatcher, "video_sync_landmark_remove", json!({"id": id}));
-        ok(
-            &dispatcher,
-            "video_sync_landmark_add",
-            json!({"type": "leftTurn"}),
-        );
-        let cleared = ok(&dispatcher, "video_sync_landmarks_clear", json!({}));
-        assert_eq!(cleared["landmarks"], json!([]));
-        dispatcher.dispatch(|store, _| store.editor.selected_second = 50.0);
-        let ToolOutcome::Failed(reason) = start(
-            &dispatcher,
-            "video_sync_landmark_add",
-            json!({"type": "stop"}),
-        )
-        .0
-        .unwrap() else {
-            panic!()
-        };
+        editor.failed("video_sync_landmark_add", json!({"type": "location", "videoSecond": 1}));
+        editor.ok("video_sync_landmark_remove", json!({"id": id}));
+        editor.ok("video_sync_landmark_add", json!({"type": "leftTurn"}));
+        assert_eq!(editor.ok("video_sync_landmarks_clear", json!({}))["landmarks"], json!([]));
+        editor.dispatcher.dispatch(|store, _| store.editor.selected_second = 50.0);
         assert_eq!(
-            reason,
+            editor.failed("video_sync_landmark_add", json!({"type": "stop"})),
             "Move the playhead inside the video to mark a landmark"
         );
     }
 
     #[test]
     fn location_and_sensitivity_tools_check_their_ranges() {
-        let (dispatcher, _) = dispatcher();
-        let state = ok(
-            &dispatcher,
-            "video_sync_location_set",
-            json!({"activitySecond": 12.5}),
-        );
+        let editor = editor();
+        let state = editor.ok("video_sync_location_set", json!({"activitySecond": 12.5}));
         assert_eq!(state["detectedLocationSecond"], json!(12.5));
+        let state = editor.ok("video_sync_location_clear", json!({}));
+        assert_eq!(state["detectedLocationSecond"], Value::Null);
+        let thresholds = |speed: f64, turn: f64| {
+            json!({"speedThresholdKmh": speed, "turnThresholdDegrees": turn})
+        };
+        editor.ok("video_sync_sensitivity_set", thresholds(6.0, 170.0));
+        editor.failed("video_sync_sensitivity_set", thresholds(7.0, 200.0));
+        let sensitivity = &editor.ok("video_sync_get", json!({}))["sensitivity"];
         assert_eq!(
-            ok(&dispatcher, "video_sync_location_clear", json!({}))["detectedLocationSecond"],
-            Value::Null
+            (&sensitivity["speedThresholdKmh"], &sensitivity["turnThresholdDegrees"]),
+            (&json!(6.0), &json!(170.0)),
+            "a refused call changes neither"
         );
-        let state = ok(
-            &dispatcher,
-            "video_sync_sensitivity_set",
-            json!({"speedThresholdKmh": 6, "turnThresholdDegrees": 170}),
-        );
-        assert_eq!(
-            (
-                state["sensitivity"]["speedThresholdKmh"].clone(),
-                state["sensitivity"]["turnThresholdDegrees"].clone()
-            ),
-            (json!(6.0), json!(170.0))
-        );
-        assert!(matches!(
-            start(
-                &dispatcher,
-                "video_sync_sensitivity_set",
-                json!({"turnThresholdDegrees": 200})
-            )
-            .0,
-            Some(ToolOutcome::Failed(_))
-        ));
     }
 
     #[test]
     fn a_search_answers_when_its_worker_does_and_applying_is_one_undo_step() {
-        let (dispatcher, fakes) = dispatcher();
-        let steps = dispatcher.with_store(|store| store.history.past.len());
-        ok(
-            &dispatcher,
-            "video_sync_landmark_add",
-            json!({"type": "location", "videoSecond": 4}),
+        let editor = editor();
+        let steps = editor.undo_steps();
+        add_location(&editor, 12.0);
+        assert_eq!(
+            editor.failed("video_sync_calculate", json!({"scope": "all"})),
+            "At least two landmarks are required"
         );
-        ok(
-            &dispatcher,
-            "video_sync_location_set",
-            json!({"activitySecond": 12}),
-        );
-        let ToolOutcome::Failed(reason) =
-            start(&dispatcher, "video_sync_calculate", json!({"scope": "all"}))
-                .0
-                .unwrap()
-        else {
-            panic!()
-        };
-        assert_eq!(reason, "At least two landmarks are required");
-        let (now, receiver) = start(
-            &dispatcher,
-            "video_sync_calculate",
-            json!({"scope": "location"}),
-        );
-        assert!(now.is_none(), "the reply waits for the worker");
-        let ToolOutcome::Ok(result) = wait(&dispatcher, &fakes, &receiver) else {
-            panic!()
-        };
+        let waiting = editor.start("video_sync_calculate", json!({"scope": "location"}));
+        assert!(waiting.answer.is_none(), "the reply waits for the worker");
+        let result = editor.finish(waiting).unwrap();
         assert_eq!(result["status"], json!("fresh"));
         assert_eq!(result["candidates"][0]["offsetSeconds"], json!(8.0));
-        let applied = ok(
-            &dispatcher,
+        // An offset that went through JSON can differ in its last bit.
+        let offset = 8.0_f64.next_up();
+        let applied = editor.ok(
             "video_sync_candidate_apply",
-            json!({"scope": "location", "offsetSeconds": 8.0}),
+            json!({"scope": "location", "offsetSeconds": offset}),
         );
         assert_eq!(applied["candidates"][0]["applied"], json!(true));
-        dispatcher.with_store(|store| assert_eq!(store.history.past.len(), steps + 1));
-        assert!(matches!(
-            start(
-                &dispatcher,
-                "video_sync_candidate_apply",
-                json!({"scope": "location", "offsetSeconds": 9.0})
-            )
-            .0,
-            Some(ToolOutcome::Failed(_))
-        ));
+        assert_eq!(editor.undo_steps(), steps + 1);
+        editor.failed(
+            "video_sync_candidate_apply",
+            json!({"scope": "location", "offsetSeconds": 9.0}),
+        );
     }
 
     #[test]
     fn a_search_dropped_by_a_landmark_edit_says_so() {
-        let (dispatcher, fakes) = dispatcher();
-        ok(
-            &dispatcher,
-            "video_sync_landmark_add",
-            json!({"type": "location", "videoSecond": 4}),
-        );
-        ok(
-            &dispatcher,
-            "video_sync_location_set",
-            json!({"activitySecond": 12}),
-        );
-        let (_, receiver) = start(
-            &dispatcher,
-            "video_sync_calculate",
-            json!({"scope": "location"}),
-        );
-        ok(
-            &dispatcher,
-            "video_sync_landmark_move",
-            json!({"id": dispatcher.with_store(|store| store.manual_video_sync.landmarks[0].id().to_string()), "videoSecond": 5}),
-        );
-        let ToolOutcome::Failed(message) = wait(&dispatcher, &fakes, &receiver) else {
-            panic!()
-        };
-        assert!(message.contains("dropped"));
+        let editor = editor();
+        let id = add_location(&editor, 12.0);
+        let waiting = editor.start("video_sync_calculate", json!({"scope": "location"}));
+        editor.ok("video_sync_landmark_move", json!({"id": id, "videoSecond": 5}));
+        let result = editor.finish(waiting);
+        assert!(matches!(&result, Err(ToolError::Failed(reason)) if reason.contains("dropped")));
     }
 
     #[test]
     fn the_summary_and_get_describe_the_manual_sync() {
-        let (dispatcher, _) = dispatcher();
-        let state = ok(&dispatcher, "video_sync_get", json!({}));
+        let editor = editor();
+        let state = editor.ok("video_sync_get", json!({}));
         assert_eq!(state["targetVideo"]["id"], json!("clip"));
         assert_eq!(state["sensitivity"]["turnRange"], json!([70.0, 180.0]));
-        let summary = dispatcher.with_store(summary);
         assert_eq!(
-            summary,
-            json!({"targetVideoId": "clip", "landmarkCount": 0, "locationSet": false, "searches": {"all": "idle", "location": "idle"}})
+            editor.dispatcher.with_store(summary),
+            json!({
+                "targetVideoId": "clip",
+                "landmarkCount": 0,
+                "locationSet": false,
+                "searches": {"all": "idle", "location": "idle"},
+            })
         );
     }
 }

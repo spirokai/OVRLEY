@@ -1,6 +1,6 @@
 [package]
-# OVRLEY's MCP server (D13): the stdio protocol of the `ovrley --mcp` process, the local socket to
-# the running window, the bridge that runs tool calls on the window's UI thread, and the tools.
+# OVRLEY's MCP server: the stdio protocol of the `ovrley --mcp` process, the local socket to the
+# running window, the bridge that runs tool calls on the window's UI thread, and the tools.
 name = "ovrley_mcp"
 version.workspace = true
 edition = "2021"
@@ -12,6 +12,7 @@ license = "GPL-3.0-or-later"
 ovrley_app = { path = "../ovrley_app", features = ["schema"] }
 ovrley_widgets = { path = "../ovrley_widgets", features = ["schema"] }
 ovrley_core = { path = "../ovrley_core", features = ["schema"] }
+ovrley_services = { path = "../ovrley_services" }
 interprocess = "2"
 log = "0.4"
 schemars = "1"

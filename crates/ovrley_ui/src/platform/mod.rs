@@ -191,66 +191,21 @@ pub fn install_ui_dispatch(dispatch: DispatchHandle, window: slint::Weak<AppWind
     APP_WINDOW.with(|slot| *slot.borrow_mut() = Some(window));
 }
 
-/// The window's side of MCP (D13): each call runs on the UI thread as one dispatch, and the
-/// connection's thread waits for its outcome; each connection is an agent session.
-pub fn agent_bridge_hooks() -> ovrley_mcp::link::BridgeHooks {
-    use ovrley_mcp::catalog::{self, ToolOutcome};
-    use std::sync::Arc;
-    ovrley_mcp::link::BridgeHooks {
-        call: Arc::new(|tool: String, arguments: serde_json::Value| {
-            use std::sync::mpsc;
-            enum Message {
-                Outcome(ToolOutcome),
-                Deferred,
-            }
-            let (sender, receiver) = mpsc::channel::<Message>();
-            // The dispatch's answer and the reply are separate: a call that fails at once drops the
-            // reply it was given, which answers "cancelled", before the dispatch returns the reason.
-            let (reply_sender, reply_receiver) = mpsc::channel::<ToolOutcome>();
-            let reply: catalog::Reply = Box::new(move |outcome| {
-                // The connection may be gone (the agent quit while it waited); nobody reads then.
-                let _ = reply_sender.send(outcome);
+/// The window, as the MCP socket's threads reach it.
+pub struct AgentWindow;
+
+impl ovrley_mcp::link::Window for AgentWindow {
+    fn post(&self, job: ovrley_mcp::link::UiJob) -> Result<(), ovrley_mcp::link::WindowClosed> {
+        slint::invoke_from_event_loop(move || {
+            UI_DISPATCH.with(|slot| match slot.borrow().as_ref() {
+                Some(dispatch) => job(dispatch),
+                None => log::error!("an agent reached the window before the dispatcher existed"),
             });
-            let posted = slint::invoke_from_event_loop(move || {
-                let answer = UI_DISPATCH.with(|slot| {
-                    slot.borrow()
-                        .as_ref()
-                        .and_then(|dispatch| dispatch.dispatch_with_result(move |store, services| catalog::call(&tool, arguments, store, services, reply)))
-                });
-                let message = match answer {
-                    Some(catalog::Answer::Now(outcome)) => Message::Outcome(outcome),
-                    Some(catalog::Answer::Later) => Message::Deferred,
-                    None => Message::Outcome(ToolOutcome::Failed("OVRLEY is busy. Try again.".into())),
-                };
-                let _ = sender.send(message);
-            });
-            if posted.is_err() {
-                return ToolOutcome::Failed("OVRLEY is closing.".into());
-            }
-            match receiver.recv_timeout(ovrley_mcp::link::CALL_TIMEOUT) {
-                Ok(Message::Outcome(outcome)) => outcome,
-                // D15: a call that waits for a worker or the user has no timeout. It ends with the
-                // reply; a reply dropped unanswered answers that the call was cancelled.
-                Ok(Message::Deferred) => reply_receiver
-                    .recv()
-                    .unwrap_or_else(|_| ToolOutcome::Failed(ovrley_app::store::agent::CANCELLED.into())),
-                Err(_) => ToolOutcome::Failed("OVRLEY did not answer in time. The change may still be applied.".into()),
-            }
-        }),
-        session: Arc::new(|open: bool| {
-            let posted = slint::invoke_from_event_loop(move || {
-                dispatch_ui(move |store, _| {
-                    if open {
-                        store.agent_session.session_opened();
-                    } else {
-                        store.agent_session.session_closed();
-                    }
-                })
-            });
-            if let Err(error) = posted {
-                log::debug!("an agent session changed after the event loop ended: {error}");
-            }
-        }),
+        })
+        .map_err(|error| {
+            log::debug!("the event loop takes no agent work: {error}");
+            ovrley_mcp::link::WindowClosed
+        })
     }
 }
 

@@ -60,10 +60,11 @@ With the Flatpak, `command` is `flatpak` and `args` are `["run", "cc.ovrley.OVRL
 | Agent edits are turned off in OVRLEY. …          | "Allow agent edits" is off. Reading is refused too.                |
 | OVRLEY is busy. Try again.                       | The window could not take the call at that moment.                 |
 | OVRLEY did not answer in time. …                 | The window took over 10 seconds. The change may still be applied.  |
+| The connection to OVRLEY was lost …              | The window went away during the call, which is not sent again.     |
 | OVRLEY is closing.                               | The window was closing.                                            |
 | The request was cancelled before OVRLEY could answer. | What the call waited for went away without an answer.         |
 
-Malformed arguments and unknown tools are JSON-RPC invalid-params errors.
+Malformed arguments and unknown tools are JSON-RPC invalid-params errors. Tools that can lose what undo does not bring back carry `destructiveHint`.
 
 ## Tools
 
@@ -80,7 +81,7 @@ Start with `ovrley_summary`. Each tool's full description and input schema come 
 - `global_default_set`: one global default, applied to the widgets that follow it
 - `global_defaults_reset`: every global default back to the app's
 - `aspect_ratio_set`: the overlay's aspect ratio
-- `scene_size_set`: the overlay's size
+- `scene_size_set`: the overlay's size, up to 7680 pixels a side (8K)
 - `fps_set`: the render frame rate
 - `widget_update_rate_set`: how often widgets update
 

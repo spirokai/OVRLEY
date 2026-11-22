@@ -4600,6 +4600,7 @@ dependencies = [
  "log",
  "ovrley_app",
  "ovrley_core",
+ "ovrley_services",
  "ovrley_widgets",
  "schemars",
  "serde",

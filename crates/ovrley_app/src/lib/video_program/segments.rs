@@ -49,7 +49,9 @@ pub fn resolve_cut_frame(clip: &Clip, source_second: f64) -> Option<i64> {
 }
 
 /// Which end of a clip a trim applies to.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "lowercase")]
 pub enum TrimSide {
     Start,
     End,

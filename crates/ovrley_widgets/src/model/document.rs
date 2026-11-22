@@ -1027,7 +1027,7 @@ pub fn course_widget_dimensions(
 }
 
 /// A drawer selection: a widget type, its display, a drawer group's preset, and a display mode.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct WidgetSelection {
@@ -1035,13 +1035,13 @@ pub struct WidgetSelection {
     #[serde(rename = "type")]
     pub kind: String,
     /// The display, for types with several (for example `text`, `linear` or `arc`).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_type: Option<String>,
     /// A drawer group's preset fields (for example a map's `{"camera_mode": "fixed"}`).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub preset: Map<String, Value>,
     /// The display-owned mode selection (for example the lap timer's mode).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<String>,
 }
 

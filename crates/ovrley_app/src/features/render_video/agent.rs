@@ -1,6 +1,6 @@
 //! What agents do with the render dialog (Phase 7 D10): read the options, start a render as the
 //! dialog's Start does (the window shows it), follow its progress (start, then wait: Q3) and
-//! cancel it. `ovrley_mcp::render` turns tool calls into these.
+//! cancel it. `ovrley_mcp` hands its tool calls to these.
 
 use super::codecs::{
     codec_selection, default_quality, is_format_available,
@@ -10,27 +10,43 @@ use super::request::{detected_codecs, render_settings_draft, render_transport, R
 use super::session::{cancel_render, is_renderer_busy, RenderTarget};
 use super::*;
 use crate::lib::update_rate::update_rate_options;
-use crate::store::agent::AgentReply;
+use crate::store::agent::{AbsolutePath, AgentReply};
 use ovrley_core::encode::quality::validate_quality;
 use ovrley_core::encode::render_settings::{QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
 use ovrley_core::render_jobs::contracts::{BatchItemOutcome, BatchPhase};
 use serde_json::{json, Value};
+use std::num::NonZeroU32;
 
-/// The settings `render_start` takes; unset ones keep the dialog's defaults.
-#[derive(Clone, Debug, Default)]
+/// A render's settings; unset ones take the dialog's defaults (the committed settings, then the
+/// dialog's rules).
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
 pub struct AgentRenderOptions {
+    /// The output format: prores or qtrle (transparent), h264 or hevc (full video).
     pub format: Option<OutputFormat>,
+    /// The encoder's acceleration; render_options lists the available ones per format.
     pub acceleration: Option<Acceleration>,
+    /// transparent (the overlay alone) or composite (over the videos; needs videos).
     pub export_mode: Option<ExportMode>,
+    /// combined (one file) or separate (one file per video; needs more than one video).
     pub output_mode: Option<OutputMode>,
-    pub fps: Option<u32>,
+    /// The frame rate; locked to the videos' rate for a full video export.
+    pub fps: Option<NonZeroU32>,
+    /// The widget update rate divisor, one of render_options' widgetUpdateRates.
     pub widget_update_rate: Option<u32>,
+    /// MP4 rate control: quality (a CRF) or bitrate (Mbps).
     pub quality_type: Option<QualityType>,
+    /// The CRF (1–51) or the bitrate in Mbps.
     pub quality_value: Option<f64>,
+    /// Render the whole external activity as one transparent file, whatever the videos cover.
     pub render_full_activity: Option<bool>,
-    pub output_path: Option<String>,
-    pub output_folder: Option<String>,
-    pub overwrite: bool,
+    /// The output file, absolute; default: the suggested file in the remembered folder.
+    pub output_path: Option<AbsolutePath>,
+    /// The folder of separate files, absolute; default: the saved folder. It is saved.
+    pub output_folder: Option<AbsolutePath>,
+    /// Replace an existing output file. Without it, OVRLEY asks the user and the call waits.
+    pub overwrite: Option<bool>,
 }
 
 /// A start waiting for the review (videos), then for its submission.
@@ -125,20 +141,8 @@ pub fn render_options(store: &Store) -> Value {
     })
 }
 
-fn absolute(path: &str) -> Result<(), String> {
-    if std::path::Path::new(path).is_absolute() {
-        Ok(())
-    } else {
-        Err(format!("The path must be absolute: {path}"))
-    }
-}
-
 /// Applies the options to the open dialog's draft, through the dialog's own handlers.
-fn apply_options(
-    store: &mut Store,
-    services: &mut Services,
-    options: &AgentRenderOptions,
-) -> Result<(), String> {
+fn apply_options(store: &mut Store, options: &AgentRenderOptions) -> Result<(), String> {
     let has_videos = store.video_import.has_videos();
     if let Some(mode) = options.export_mode {
         if mode == ExportMode::Composite && !has_videos {
@@ -161,7 +165,7 @@ fn apply_options(
                 "The frame rate is locked to the videos' rate for a full video export.".into(),
             );
         }
-        set_custom_fps(store, f64::from(fps));
+        set_custom_fps(store, f64::from(fps.get()));
     }
     if let Some(format) = options.format {
         if !is_format_available(format, PlatformOs::current(), detected_codecs(store)) {
@@ -250,14 +254,11 @@ fn apply_options(
         set_render_full_activity(store, enabled);
     }
     if let Some(path) = &options.output_path {
-        absolute(path)?;
-        set_output_path(store, path.clone());
+        set_output_path(store, path.clone().into());
     }
     if let Some(folder) = &options.output_folder {
-        absolute(folder)?;
-        set_batch_output_folder(store, Some(folder.clone()));
+        set_batch_output_folder(store, Some(folder.clone().into()));
     }
-    let _ = services;
     Ok(())
 }
 
@@ -287,12 +288,12 @@ pub fn agent_start(
             .clone()
             .unwrap_or_else(|| "The render dialog could not open.".into())));
     }
-    if let Err(error) = apply_options(store, services, &options) {
+    if let Err(error) = apply_options(store, &options) {
         close_render_dialog(store);
         return reply.send(Err(error));
     }
     store.render_dialog.agent.start = Some(PendingAgentStart {
-        overwrite: options.overwrite,
+        overwrite: options.overwrite.unwrap_or(false),
         reply,
     });
 }
