@@ -39,6 +39,8 @@ pub struct SkiaItemRenderer<'a> {
     surface: Option<&'a dyn crate::Surface>,
     state_stack: Vec<RenderState>,
     current_state: RenderState,
+    /// OVRLEY: set while a cached layer's bounds are computed, see `get_current_clip`.
+    placing_layer: bool,
     image_cache: &'a ItemCache<Option<skia_safe::Image>>,
     layer_cache: &'a ItemCache<Option<(PhysicalPoint, skia_safe::Image)>>,
     path_cache: &'a ItemCache<Option<(Vector2D<f32, PhysicalPx>, skia_safe::Path)>>,
@@ -69,6 +71,7 @@ impl<'a> SkiaItemRenderer<'a> {
             window,
             surface,
             state_stack: Vec::new(),
+            placing_layer: false,
             current_state: RenderState {
                 alpha: 1.0,
                 transform: i_slint_core::lengths::ItemTransform::identity(),
@@ -574,9 +577,13 @@ impl<'a> SkiaItemRenderer<'a> {
     }
 
     fn render_and_blend_layer(&mut self, item_rc: &ItemRc) -> RenderingResult {
-        if let Some((layer_offset, layer_image)) =
-            i_slint_core::item_rendering::render_layer(self, item_rc)
-        {
+        self.placing_layer = true;
+        let layer = i_slint_core::item_rendering::render_layer(self, item_rc);
+        self.placing_layer = false;
+        if let Some((layer_offset, layer_image)) = layer {
+            // OVRLEY: whole pixels from the item, as `render_into_layer` draws it: the alignment
+            // below then puts the content in the same place whatever the layer's bounds are.
+            let layer_offset = layer_offset.floor();
             self.canvas.translate(skia_safe::Vector::from((layer_offset.x, layer_offset.y)));
             let _saved_canvas = self.pixel_align_origin_auto_restore();
             self.canvas.draw_image_with_sampling_options(
@@ -975,7 +982,17 @@ impl ItemRenderer for SkiaItemRenderer<'_> {
     }
 
     fn get_current_clip(&self) -> LogicalRect {
-        from_skia_rect(&self.canvas.local_clip_bounds().unwrap_or_default()) / self.scale_factor
+        // OVRLEY: a cached layer outlives the frame, so its bounds come from the whole target. The
+        // clip also holds the region this frame repaints, which would crop and move the layer.
+        let bounds = if self.placing_layer {
+            self.canvas.local_to_device_as_3x3().invert().map(|device_to_local| {
+                let target = skia_safe::Rect::from_isize(self.canvas.base_layer_size());
+                device_to_local.map_rect(target).0
+            })
+        } else {
+            self.canvas.local_clip_bounds()
+        };
+        from_skia_rect(&bounds.unwrap_or_default()) / self.scale_factor
     }
 
     fn translate(&mut self, distance: LogicalVector) {
@@ -1156,8 +1173,14 @@ impl<'a> LayerRenderer<'a> for SkiaItemRenderer<'a> {
         _item_rc: &ItemRc,
         physical_size: euclid::Size2D<f32, PhysicalPx>,
     ) -> Option<Self::LayerTarget> {
+        let mut size = to_skia_size(&physical_size).to_ceil();
+        if !size.is_empty() {
+            // OVRLEY: room for flooring the origin in `render_into_layer`.
+            size.width += 1;
+            size.height += 1;
+        }
         let image_info = crate::image_info(
-            to_skia_size(&physical_size).to_ceil(),
+            size,
             skia_safe::ColorType::RGBA8888,
             skia_safe::AlphaType::Premul,
         );
@@ -1183,7 +1206,9 @@ impl<'a> LayerRenderer<'a> for SkiaItemRenderer<'a> {
             self.text_layout_cache,
             self.box_shadow_cache,
         );
-        sub_renderer.translate(-bounding_rect.origin.to_vector());
+        // OVRLEY: from a whole pixel, as `render_and_blend_layer` places the layer.
+        let origin = (bounding_rect.origin * self.scale_factor).floor() / self.scale_factor;
+        sub_renderer.translate(-origin.to_vector());
 
         i_slint_core::item_rendering::render_item_children(
             &mut sub_renderer,

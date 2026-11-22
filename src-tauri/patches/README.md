@@ -17,6 +17,11 @@ upstream crate is bumped, copy the new version here and re-apply the changes.
   clear. A swapchain that can't be a copy destination keeps the upstream path, and so does
   `OVRLEY_SKIA_FULL_REDRAW=1`, which exists to compare the two. `SLINT_DEBUG_PERFORMANCE` names the
   surface `wgpu-partial` when the scene is used.
+- `itemrenderer.rs`, cached layers (`cache-rendering-hint`): a layer's bounds come from the whole
+  render target and its origin is a whole pixel from the item. Upstream takes the bounds from the
+  current clip, which with partial rendering is the region being repainted, and rounds wherever
+  that leaves the layer's origin: the timeline's lanes jumped a pixel and lost their overflow
+  whenever something in them changed.
 - `wgpu_30_surface/dx12.rs`, `make_dx12_surface`: takes the resource state the texture is in.
   Upstream always tells Skia `PRESENT`, also for a texture `transition_to_color_target` has made a
   render target.
