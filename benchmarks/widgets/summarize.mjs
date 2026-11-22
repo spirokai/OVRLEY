@@ -3,10 +3,10 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const mean = ({ ms }) => ms.reduce((sum, value) => sum + value, 0) / ms.length
-const renderOperation = { native: 'frame.draw', 'native-preview': 'preview.render', wasm: 'wasm.render' }
+const renderOperation = { native: 'frame.draw', 'native-preview': 'preview.render' }
 const drawMean = ({ backend, stages, ms }) => stages[renderOperation[backend]].total_ms / ms.length
 
-/** @param {object[]} results Native and/or WASM playback results. @returns {string} Markdown averages and operation timings. */
+/** @param {object[]} results Export and/or preview playback results. @returns {string} Markdown averages and operation timings. */
 export function formatSummary(results) {
   if (!Array.isArray(results) || !results.length) throw new Error('Expected a non-empty array of benchmark results')
   const widgets = new Map()
@@ -44,23 +44,14 @@ export function formatSummary(results) {
   }
   const ranked = [...widgets].sort((a, b) => Math.max(...Object.values(b[1]).map(drawMean)) - Math.max(...Object.values(a[1]).map(drawMean)))
   const lines = [
-    '| Widget | Native preview ms/frame | WASM preview ms/frame | WASM / native preview |',
+    '| Widget | Preview ms/frame | Export draw ms/frame | Export total ms/frame |',
     '| --- | ---: | ---: | ---: |',
     ...ranked.map(
       ([id, rows]) =>
-        `| ${id} | ${rows['native-preview'] ? drawMean(rows['native-preview']).toFixed(4) : '—'} | ${rows.wasm ? drawMean(rows.wasm).toFixed(4) : '—'} | ${rows['native-preview'] && rows.wasm && drawMean(rows['native-preview']) > 0 ? `${(drawMean(rows.wasm) / drawMean(rows['native-preview'])).toFixed(2)}x` : '—'} |`,
+        `| ${id} | ${rows['native-preview'] ? drawMean(rows['native-preview']).toFixed(4) : '—'} | ${rows.native ? drawMean(rows.native).toFixed(4) : '—'} | ${rows.native ? mean(rows.native).toFixed(4) : '—'} |`,
     ),
     '',
-    'Native preview and WASM preview run the same `PreviewSession` with the same fonts, activity, frame times, widget-sized premultiplied surface, unchanged-value skips, RGBA readback, alpha conversion, and geometry serialization. Both exclude setup, JavaScript pixel copying, and canvas upload. WASM additionally crosses the browser ABI; native preview calls the session directly.',
-    '',
-    '| Widget | Native export draw ms/frame | Native export total ms/frame | WASM playback ms/frame |',
-    '| --- | ---: | ---: | ---: |',
-    ...ranked.map(
-      ([id, rows]) =>
-        `| ${id} | ${rows.native ? drawMean(rows.native).toFixed(4) : '—'} | ${rows.native ? mean(rows.native).toFixed(4) : '—'} | ${rows.wasm ? mean(rows.wasm).toFixed(4) : '—'} |`,
-    ),
-    '',
-    'These workflow timings have different scopes. Native export draw uses `frame.draw`, excluding full-scene restoration and surface wrapping; its total includes those operations. WASM playback also includes geometry handling, pixel copying, and canvas upload. Do not interpret export draw versus WASM preview as a like-for-like backend ratio.',
+    'The preview renders each widget into its own surface with the `PreviewSession` the editor uses, including readback and alpha conversion; setup and presentation are excluded. Export draw uses `frame.draw`, excluding full-scene restoration and surface wrapping; its total includes those operations. The scopes differ, so preview against export is not a like-for-like ratio.',
     '',
     'Operation averages use all measured playback frames, including frames that skipped a redraw. Avg ms/call uses the operation count.',
     '',
@@ -85,7 +76,7 @@ async function main() {
   if (!/^\d+-\d+$/.test(id) || extra.length) throw new Error('Usage: pnpm benchmark:widgets:summary <run-id>')
   const directory = resolve(dirname(fileURLToPath(import.meta.url)), '../../debug/benchmarks/widgets', id)
   const names = await readdir(directory)
-  const files = ['native.json', 'native-preview.json', 'wasm.json'].filter((name) => names.includes(name))
+  const files = ['native.json', 'native-preview.json'].filter((name) => names.includes(name))
   if (!files.length) throw new Error(`${id}: no benchmark result files found`)
   const results = (await Promise.all(files.map(async (name) => JSON.parse(await readFile(join(directory, name), 'utf8'))))).flat()
   const output = join(directory, 'summary.md')

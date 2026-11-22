@@ -1,7 +1,6 @@
 import { parseArgs } from 'node:util'
 import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync } from 'node:fs'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,8 +21,7 @@ const { values } = parseArgs({
   },
 })
 const frames = Number(values.frames),
-  warmup = Number(values.warmup),
-  fps = 30
+  warmup = Number(values.warmup)
 if (
   !/^\d+$/.test(values.frames) ||
   !Number.isSafeInteger(frames) ||
@@ -34,10 +32,10 @@ if (
 )
   throw new Error('frames must be positive and warmup non-negative integers')
 if (
-  !['both', 'native', 'native-preview', 'wasm'].includes(values.backend) ||
+  !['both', 'native', 'native-preview'].includes(values.backend) ||
   ['build', 'run', 'plan', 'list'].filter((key) => values[key]).length > 1
 )
-  throw new Error('Choose one mode and backend: both, native, native-preview, or wasm')
+  throw new Error('Choose one mode and backend: both, native, or native-preview')
 const json = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const save = (path, value) => writeFile(path, JSON.stringify(value, null, 2) + '\n')
 const fingerprint = async (path) => {
@@ -53,143 +51,34 @@ const child = (binary, args, cwd = root) =>
 
 async function main() {
   if (values.build) {
-    await child('cargo', ['build', '-p', 'ovrley_core', '--release', '--bin', 'benchmark_widgets', '--locked'], root)
-    await child(process.execPath, [join(root, 'scripts/wasm/build.mjs')])
+    await child('cargo', ['build', '-p', 'ovrley_app', '--release', '--bin', 'benchmark_widgets', '--locked'])
     return
   }
-  const { createServer } = await import('vite-plus')
-  const { artifactDir } = await import('../../scripts/wasm/build.mjs')
-  const files = new Map(['js', 'wasm'].map((ext) => [`/wasm-bindings/wasm_bindings.${ext}`, join(artifactDir, `wasm_bindings.${ext}`)]))
-  const serve = async (req, res, next) => {
-    const path = new URL(req.url, 'http://localhost').pathname
-    if (path === '/') {
-      res.setHeader('Content-Type', 'text/html')
-      res.end('<canvas></canvas><script type="module">import {play} from "/benchmarks/widgets/browser.js"; window.play = play</script>')
-      return
-    }
-    if (!files.has(path)) return next()
-    try {
-      res.setHeader(
-        'Content-Type',
-        path.endsWith('.wasm') ? 'application/wasm' : path.endsWith('.js') ? 'text/javascript' : 'application/octet-stream',
-      )
-      res.end(await readFile(files.get(path)))
-    } catch (error) {
-      res.statusCode = 500
-      res.end(error.message)
-    }
+  const binary = join(root, 'target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`)
+  if (!values.run && !values.plan) {
+    await child(binary, ['--list'])
+    return
   }
-  const server = await createServer({
-    configFile: false,
-    root,
-    publicDir: false,
-    optimizeDeps: { entries: ['benchmarks/widgets/browser.js'] },
-    resolve: { alias: { '@': join(root, 'app/src') } },
-    plugins: [
-      {
-        name: 'widget-benchmark',
-        configureServer: (server) => {
-          server.middlewares.use(serve)
-        },
-      },
-    ],
-    server: {
-      host: '127.0.0.1',
-      port: 0,
-      hmr: false,
-      watch: null,
-      headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' },
-    },
-  })
-  try {
-    const { createCases, fixtures } = await server.ssrLoadModule('/benchmarks/widgets/browser.js')
-    // Absent local fixtures fail only the cases that use them.
-    const activities = Object.fromEntries(
-      (
-        await Promise.all(
-          Object.entries(fixtures).map(async ([id, [name]]) => {
-            const path = join(root, 'debug/activities', name)
-            if (!existsSync(path)) return null
-            const { parsed_activity: activity } = await json(path)
-            if (!activity || !Array.isArray(activity.sample_elapsed_seconds) || activity.sample_elapsed_seconds.length < 2)
-              throw new Error(`${name}: missing parsed activity timeline`)
-            return [id, activity]
-          }),
-        )
-      ).filter((entry) => entry !== null),
-    )
-    const cases = createCases({
-      activities,
-      template: await json(join(root, 'templates/futuristic-hud.json')),
-      image: join(root, 'assets/icons/128x128@2x.png'),
-      frames,
-      warmup,
-      fps,
-      only: values.case,
-    })
-    if (!values.run && !values.plan) {
-      console.info(cases.map((entry) => entry.id).join('\n'))
-      return
-    }
-    const directory = join(root, 'debug/benchmarks/widgets', `${Date.now()}-${process.pid}`)
-    await mkdir(directory, { recursive: true })
-    const paths = {}
-    for (const [id, activity] of Object.entries(activities)) {
-      paths[id] = join(directory, `${id}.json`)
-      await save(paths[id], activity)
-      files.set(`/data/${id}.json`, paths[id])
-    }
-    const fonts = [...new Map(cases.flatMap((entry) => entry.fonts).map((request) => [JSON.stringify(request), request])).values()]
-    const plan = { root, frames, warmup, fps, activities: paths, cases, fonts }
-    const planPath = join(directory, 'plan.json')
-    await save(planPath, plan)
-    console.info(`Plan: ${planPath}`)
-    if (!values.run) return
-    const binary = join(root, 'target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`)
-    await child(binary, ['--fonts', planPath])
-    const resources = await json(join(directory, 'fonts.json'))
-    for (const font of resources) files.set(`/data/${font.path}`, join(directory, font.path))
-    for (const entry of cases) if (entry.split_table !== null) files.set(`/data/${entry.split_table}`, join(directory, entry.split_table))
-    files.set('/data/image.png', join(root, 'assets/icons/128x128@2x.png'))
-    const results = []
-    const environment = { cpu: cpus()[0].model, os: platform(), artifacts: { native: await fingerprint(binary) } }
-    if (['both', 'wasm'].includes(values.backend)) environment.artifacts.wasm = await fingerprint(join(artifactDir, 'wasm_bindings.wasm'))
-    if (['both', 'native'].includes(values.backend)) {
-      await child(binary, ['--run', planPath])
-      results.push(...(await json(join(directory, 'native.json'))))
-    }
-    if (['both', 'native-preview'].includes(values.backend)) {
-      await child(binary, ['--run-preview', planPath])
-      results.push(...(await json(join(directory, 'native-preview.json'))))
-    }
-    if (['both', 'wasm'].includes(values.backend)) {
-      const { chromium } = await import('@playwright/test')
-      await server.listen()
-      const browser = await chromium.launch({ channel: 'chromium', headless: true })
-      environment.browser = browser.version()
-      try {
-        const page = await browser.newPage({ viewport: { width: 3840, height: 2160 }, deviceScaleFactor: 1 })
-        await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`)
-        await page.waitForFunction(() => window.play !== undefined)
-        for (const entry of cases) {
-          console.info(`[wasm] ${entry.id}`)
-          results.push(await page.evaluate((input) => window.play(input), { entry, frames, warmup, fps, fonts: resources }))
-          await save(
-            join(directory, 'wasm.json'),
-            results.filter((result) => result.backend === 'wasm'),
-          )
-          await save(join(directory, 'results.json'), { plan, environment, results })
-        }
-      } finally {
-        await browser.close()
-      }
-    }
-    await save(join(directory, 'results.json'), { plan, environment, results })
-    await writeFile(join(directory, 'summary.md'), formatSummary(results))
-    console.info(`Results: ${directory}`)
-  } finally {
-    await server.close()
+  const directory = join(root, 'debug/benchmarks/widgets', `${Date.now()}-${process.pid}`)
+  await mkdir(directory, { recursive: true })
+  const planPath = join(directory, 'plan.json')
+  await child(binary, ['--plan', directory, root, String(frames), String(warmup), ...(values.case === undefined ? [] : [values.case])])
+  console.info(`Plan: ${planPath}`)
+  if (!values.run) return
+  await child(binary, ['--fonts', planPath])
+  const results = []
+  for (const [backend, mode] of [
+    ['native', '--run'],
+    ['native-preview', '--run-preview'],
+  ]) {
+    if (!['both', backend].includes(values.backend)) continue
+    await child(binary, [mode, planPath])
+    results.push(...(await json(join(directory, `${backend}.json`))))
   }
+  const environment = { cpu: cpus()[0].model, os: platform(), artifacts: { native: await fingerprint(binary) } }
+  await save(join(directory, 'results.json'), { plan: await json(planPath), environment, results })
+  await writeFile(join(directory, 'summary.md'), formatSummary(results))
+  console.info(`Results: ${directory}`)
 }
 main().catch((error) => {
   console.error(error.message)

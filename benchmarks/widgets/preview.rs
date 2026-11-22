@@ -1,9 +1,45 @@
-//! Runs the browser preview implementation natively, including sampling and RGBA readback.
+//! Runs the editor's preview session, including sampling and RGBA readback.
 use super::Plan;
+use ovrley_services::map_styles::{MapStyleDirs, MapStyleRegistry};
+use ovrley_widgets::error::WidgetResult;
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
+use ovrley_widgets::widgets::map::preview::{
+    MapFrameFactory, MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{fs, path::Path, time::Instant};
+use std::{
+    fs,
+    path::Path,
+    sync::{mpsc, Arc},
+    time::Instant,
+};
+
+/// Blank map frames, ready at once: a map case times the widget drawn over its map, not the map.
+struct BlankFrames;
+
+impl MapFrameFactory for BlankFrames {
+    fn provider(
+        &self,
+        _style: &ovrley_services::map_styles::MapStyleInfo,
+        _sample_count: u32,
+    ) -> Arc<dyn MapFrameProvider> {
+        Arc::new(BlankFrames)
+    }
+}
+
+impl MapFrameProvider for BlankFrames {
+    fn frame(&self, request: &MapFrameRequest, spare: Option<Vec<u8>>) -> WidgetResult<MapFrameReply> {
+        let (width, height) = (request.viewport.width_px(), request.viewport.height_px());
+        let bytes = width as usize * height as usize * 4;
+        let pixels = spare.filter(|pixels| pixels.len() == bytes).unwrap_or_else(|| vec![0; bytes]);
+        let (reply, answer) = mpsc::channel();
+        reply
+            .send(MapFramePixels::new(width, height, pixels).map_err(|error| error.to_string()))
+            .expect("the answer is held");
+        Ok(answer)
+    }
+}
 
 #[derive(Deserialize)]
 struct FontResource {
@@ -20,11 +56,19 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
         .iter()
         .map(|font| fs::read(directory.join(&font.path)).map_err(|error| error.to_string()))
         .collect::<Result<Vec<_>, _>>()?;
+    let styles = MapStyleRegistry::load(&MapStyleDirs {
+        bundled: plan.root.join("assets/map-styles"),
+        user: directory.join("map-styles"),
+    })?;
     let mut results = Vec::new();
     for case in &plan.cases {
         eprintln!("[native-preview] {}", case.id);
         let setup = Instant::now();
         let mut session = PreviewSession::default();
+        session.maps.styles = Some(styles.catalog().clone());
+        if case.map_layer {
+            session.maps.frames = Some(Arc::new(BlankFrames));
+        }
         for (resource, bytes) in fonts.iter().zip(&font_bytes) {
             let request: FontRequest = serde_json::from_value(resource.request.clone())
                 .map_err(|error| error.to_string())?;
@@ -74,7 +118,7 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
                     .map_err(|error| error.to_string())
             })
             .transpose()?;
-        // Match browser.js: initial render, then warmup, then the measured interval.
+        // An initial render, then warmup, then the measured interval.
         if case.dynamic {
             session
                 .render(case.start_frame as f64 / f64::from(plan.fps))

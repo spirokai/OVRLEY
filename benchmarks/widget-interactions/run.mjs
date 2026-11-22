@@ -4,14 +4,10 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { cpus, platform } from 'node:os'
-import { createRequire } from 'node:module'
-import { fileURLToPath, pathToFileURL } from 'node:url'
-import { createServer } from 'vite-plus'
-import { chromium } from '@playwright/test'
-import { artifactDir } from '../../scripts/wasm/build.mjs'
+import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const appRequire = createRequire(join(root, 'app/package.json'))
+const binary = join(root, 'target/release', `benchmark_interactions${process.platform === 'win32' ? '.exe' : ''}`)
 const execute = promisify(execFile)
 const json = async (path) => JSON.parse(await readFile(path, 'utf8'))
 const save = (path, value) => writeFile(path, JSON.stringify(value, null, 2) + '\n')
@@ -25,7 +21,6 @@ const { values } = parseArgs({
     operation: { type: 'string', default: 'all' },
     label: { type: 'string', default: 'baseline' },
     compare: { type: 'string' },
-    'rect-stacks': { type: 'boolean', default: false },
   },
 })
 const protocol = {}
@@ -40,8 +35,6 @@ if (!Number.isSafeInteger(protocol.frames * protocol.burst) || !Number.isSafeInt
 if (!['all', 'text', 'mixed'].includes(values.workload) || !['all', 'drag', 'resize'].includes(values.operation))
   throw new Error('Choose workload all/text/mixed and operation all/drag/resize')
 if (!/^[a-zA-Z0-9_-]+$/.test(values.label)) throw new Error('label must contain only letters, numbers, underscores, or hyphens')
-if (values['rect-stacks'] && values.compare !== undefined)
-  throw new Error('Rectangle stack capture adds diagnostic overhead; run it without --compare')
 protocol.workloads = values.workload === 'all' ? ['text', 'mixed'] : [values.workload]
 protocol.operations = values.operation === 'all' ? ['drag', 'resize'] : [values.operation]
 
@@ -65,23 +58,20 @@ function summary(results, baseline) {
   const lines = [
     `# Widget interactions: ${values.label}`,
     '',
-    `${protocol.widgets} selected widgets; ${protocol.frames} measured input frames; ${protocol.warmup} warm-up frames; ${protocol.burst} mouse moves per frame. Playhead paused at 60 seconds.`,
+    `${protocol.widgets} selected widgets; ${protocol.frames} measured input frames; ${protocol.warmup} warm-up frames; ${protocol.burst} pointer moves per frame. Playhead paused at 60 seconds.`,
     '',
-    ...(values['rect-stacks']
-      ? ['Rectangle stack capture is enabled. Timings include diagnostic overhead and are not comparable to normal runs.', '']
-      : []),
-    '| Case | First input → group geometry ms | Frame interval avg ms | p95 ms | Max ms | Intervals >25 ms | Config updates | Canvas uploads | Mouseup CPU ms |',
+    '| Case | First input → group geometry ms | Frame avg ms | p95 ms | Max ms | Frames >16.7 ms | Widget redraws | Redrawn MiB | Release ms |',
     '| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |',
   ]
   for (const row of results) {
-    const frame = stats(row.frame_intervals_ms)
+    const frame = stats(row.frame_ms)
     lines.push(
-      `| ${row.id} | ${row.first_presentation_ms.toFixed(2)} | ${frame.avg_ms.toFixed(2)} | ${frame.p95_ms.toFixed(2)} | ${frame.max_ms.toFixed(2)} | ${row.frame_intervals_ms.filter((ms) => ms > 25).length} | ${row.stages['wasm.config_update']?.length ?? 0} | ${row.stages['canvas.upload']?.length ?? 0} | ${row.release_ms.toFixed(2)} |`,
+      `| ${row.id} | ${row.first_presentation_ms.toFixed(2)} | ${frame.avg_ms.toFixed(2)} | ${frame.p95_ms.toFixed(2)} | ${frame.max_ms.toFixed(2)} | ${row.frame_ms.filter((ms) => ms > 1000 / 60).length} | ${row.counters.redraws} | ${(row.counters.redrawn_bytes / 1048576).toFixed(2)} | ${row.release_ms.toFixed(2)} |`,
     )
   }
   lines.push(
     '',
-    'Frame intervals are observed browser refresh intervals, including rendering and browser work. The initial response probe waits for every selected widget to present changed geometry and runs separately from steady-state timing.',
+    'A frame is the CPU time of its pointer moves and of the preview redraw that follows them. The first-input probe and the release are timed on their own.',
     '',
     '| Case | Stage | Calls | Total ms | ms/input frame | p95 ms/call | Max ms/call |',
     '| --- | --- | ---: | ---: | ---: | ---: | ---: |',
@@ -93,11 +83,10 @@ function summary(results, baseline) {
         `| ${row.id} | ${name} | ${stage.calls} | ${stage.total_ms.toFixed(2)} | ${(stage.total_ms / protocol.frames).toFixed(3)} | ${stage.p95_ms.toFixed(3)} | ${stage.max_ms.toFixed(3)} |`,
       )
     }
-    lines.push(`| ${row.id} | canvas.upload MiB | — | ${(row.counters['canvas.upload.bytes'] / 1048576).toFixed(2)} MiB | — | — | — |`)
   }
   lines.push(
     '',
-    '`raf.render` is the production preview callback; `raf.bound publishDrafts` is draft publication. Callback names may be renamed by the development transformer. Stage timers overlap: WASM, serialization, and canvas work are inside the preview callback; DOM measurements are also inside Moveable. Do not add nested stages. Canvas upload measures API submission, and geometry presentation does not measure physical display latency.',
+    '`update` is one pointer move through the update loop (the action, the reconcile steps and the history step). `preview` is one redraw: config sync, layout and Skia raster. The window is not measured: projections, uploads and presentation.',
     '',
   )
   if (baseline) {
@@ -111,8 +100,8 @@ function summary(results, baseline) {
       const before = baseline.results.find((entry) => entry.id === row.id)
       for (const [name, oldMs, newMs] of [
         ['First input → group geometry', before.first_presentation_ms, row.first_presentation_ms],
-        ['Frame interval p95', stats(before.frame_intervals_ms).p95_ms, stats(row.frame_intervals_ms).p95_ms],
-        ['Mouseup CPU', before.release_ms, row.release_ms],
+        ['Frame p95', stats(before.frame_ms).p95_ms, stats(row.frame_ms).p95_ms],
+        ['Release', before.release_ms, row.release_ms],
       ])
         lines.push(`| ${row.id} | ${name} | ${oldMs.toFixed(2)} | ${newMs.toFixed(2)} | ${delta(oldMs, newMs)} |`)
     }
@@ -135,7 +124,7 @@ async function main() {
   if (values.compare !== undefined) {
     if (
       baseline === null ||
-      baseline.schema !== 1 ||
+      baseline.schema !== 2 ||
       typeof baseline.label !== 'string' ||
       JSON.stringify(baseline.protocol) !== JSON.stringify(protocol) ||
       !Array.isArray(baseline.results)
@@ -150,9 +139,9 @@ async function main() {
         row.first_presentation_ms < 0 ||
         !Number.isFinite(row.release_ms) ||
         row.release_ms < 0 ||
-        !Array.isArray(row.frame_intervals_ms) ||
-        row.frame_intervals_ms.length !== protocol.frames ||
-        !row.frame_intervals_ms.every((ms) => Number.isFinite(ms) && ms >= 0)
+        !Array.isArray(row.frame_ms) ||
+        row.frame_ms.length !== protocol.frames ||
+        !row.frame_ms.every((ms) => Number.isFinite(ms) && ms >= 0)
       )
         throw new Error(`Invalid baseline frame measurements for ${row.id}`)
       for (const samples of Object.values(row.stages)) {
@@ -162,152 +151,39 @@ async function main() {
     }
     if (expected.size !== 0) throw new Error(`Baseline is missing cases: ${[...expected].join(', ')}`)
   }
-  // All rendering artifacts must already exist. This runner never invokes a build or installs a browser.
-  const wasmPath = join(artifactDir, 'wasm_bindings.wasm')
-  const [wasmBytes, wasmStat] = await Promise.all([readFile(wasmPath), stat(wasmPath)])
-  const { parsed_activity: activity } = await json(join(root, 'debug/activities/afternoon-ride-parse-debug.json'))
-  if (!activity || !Array.isArray(activity.sample_elapsed_seconds) || activity.sample_elapsed_seconds.length < 2)
-    throw new Error('The ride fixture is missing its parsed activity timeline')
-  const template = await json(join(root, 'templates/futuristic-hud.json'))
+  // The binary must already exist. This runner never invokes a build.
+  const [binaryBytes, binaryStat] = await Promise.all([readFile(binary), stat(binary)])
   const directory = join(root, 'debug/benchmarks/widget-interactions', `${Date.now()}-${values.label}-${process.pid}`)
   await mkdir(directory, { recursive: true })
-  const files = new Map([
-    ['/wasm-bindings/wasm_bindings.js', join(artifactDir, 'wasm_bindings.js')],
-    ['/wasm-bindings/wasm_bindings.wasm', wasmPath],
-    ['/data/activity.json', join(directory, 'activity.json')],
-    ['/data/fonts.json', join(directory, 'fonts.json')],
-  ])
-  await save(files.get('/data/activity.json'), activity)
-  const { default: react } = await import(pathToFileURL(appRequire.resolve('@vitejs/plugin-react')).href)
-  const server = await createServer({
-    configFile: false,
-    root,
-    publicDir: false,
-    resolve: {
-      alias: {
-        '@': join(root, 'app/src'),
-        react: join(root, 'app/node_modules/react'),
-        'react-dom': join(root, 'app/node_modules/react-dom'),
-        zustand: join(root, 'app/node_modules/zustand'),
-      },
+  const { stdout: commit } = await execute('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true })
+  const { stdout: dirty } = await execute('git', ['status', '--short'], { cwd: root, windowsHide: true })
+  const output = {
+    schema: 2,
+    label: values.label,
+    protocol,
+    environment: {
+      cpu: cpus()[0].model,
+      os: platform(),
+      commit: commit.trim(),
+      working_tree: dirty.trim(),
+      binary: { path: binary, sha256: createHash('sha256').update(binaryBytes).digest('hex'), modified_at: binaryStat.mtime.toISOString() },
     },
-    optimizeDeps: { entries: ['benchmarks/widget-interactions/browser.jsx'] },
-    plugins: [
-      react(),
-      {
-        name: 'interaction-benchmark',
-        enforce: 'pre',
-        resolveId(source, importer) {
-          if (
-            source.replaceAll('\\', '/').endsWith('/app/src/api/backend') &&
-            importer?.replaceAll('\\', '/').endsWith('/wasm-widgets/utils/previewSession.js')
-          )
-            return join(root, 'benchmarks/widget-interactions/backend.js')
-        },
-        configureServer(server) {
-          server.middlewares.use(async (req, res, next) => {
-            const path = new URL(req.url, 'http://localhost').pathname
-            if (path === '/') {
-              res.setHeader('Content-Type', 'text/html')
-              res.end(`<!doctype html><html><head><style>
-                :root { --app-scale: 1; --theme-color-accent: #ed9238; --theme-color-ice: #aacccc; }
-                body { margin: 0; background: #101820; color: white; font: 12px sans-serif; }
-                .app-shell, .viewport, .scroll, .stage { width: 100vw; height: 100vh; position: relative; }
-                .stage { display: grid; place-items: center; }
-                .relative { position: relative; } .absolute, .badge { position: absolute; } .inset-0 { inset: 0; }
-                .pointer-events-none, .badge { pointer-events: none; } .overflow-visible { overflow: visible; }
-                .z-1 { z-index: 1; } .z-2 { z-index: 2; } .z-3 { z-index: 3; } .z-10 { z-index: 10; }
-              </style></head><body><div id="root" class="app-shell"></div>
-              <script type="module" src="/benchmarks/widget-interactions/browser.jsx"></script></body></html>`)
-              return
-            }
-            if (!files.has(path)) return next()
-            try {
-              res.setHeader(
-                'Content-Type',
-                path.endsWith('.wasm') ? 'application/wasm' : path.endsWith('.js') ? 'text/javascript' : 'application/octet-stream',
-              )
-              res.end(await readFile(files.get(path)))
-            } catch (error) {
-              res.statusCode = 500
-              res.end(error.message)
-            }
-          })
-        },
-      },
-    ],
-    server: {
-      host: '127.0.0.1',
-      port: 0,
-      hmr: false,
-      watch: null,
-      headers: { 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp' },
-    },
-  })
-  let browser
-  try {
-    const { createFixture } = await server.ssrLoadModule('/benchmarks/widget-interactions/fixture.js')
-    const fixtures = protocol.workloads.map((workload) => createFixture({ workload, count: protocol.widgets, activity, template }))
-    const fonts = [...new Map(fixtures.flatMap((fixture) => fixture.fonts).map((request) => [JSON.stringify(request), request])).values()]
-    const planPath = join(directory, 'plan.json')
-    await save(planPath, { root, frames: 1, warmup: 0, fps: 30, activities: {}, cases: [], fonts })
-    await execute(join(root, 'target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`), ['--fonts', planPath], {
-      cwd: root,
-      windowsHide: true,
-    })
-    for (const font of await json(files.get('/data/fonts.json'))) files.set(`/data/${font.path}`, join(directory, font.path))
-    await save(join(directory, 'fixtures.json'), fixtures)
-    await server.listen()
-    browser = await chromium.launch({ channel: 'chromium', headless: true })
-    const page = await browser.newPage({ viewport: { width: 1600, height: 1000 }, deviceScaleFactor: 1 })
-    page.on('pageerror', (error) => console.error(`[browser] ${error.message}`))
-    const { stdout: commit } = await execute('git', ['rev-parse', 'HEAD'], { cwd: root, windowsHide: true })
-    const { stdout: dirty } = await execute('git', ['status', '--short'], { cwd: root, windowsHide: true })
-    const output = {
-      schema: 1,
-      label: values.label,
-      protocol,
-      environment: {
-        cpu: cpus()[0].model,
-        os: platform(),
-        browser: browser.version(),
-        viewport: [1600, 1000],
-        commit: commit.trim(),
-        working_tree: dirty.trim(),
-        rect_stacks: values['rect-stacks'],
-        wasm: { path: wasmPath, sha256: createHash('sha256').update(wasmBytes).digest('hex'), modified_at: wasmStat.mtime.toISOString() },
-      },
-      results: [],
-    }
-    for (const fixture of fixtures) {
-      for (const operation of protocol.operations) {
-        console.info(`[interactions] ${fixture.workload}-${operation}: ${protocol.widgets} widgets`)
-        await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/${values['rect-stacks'] ? '?rect-stacks' : ''}`)
-        await page.waitForFunction(() => window.runInteractionBenchmark !== undefined, undefined, { timeout: 60000 })
-        const row = await page.evaluate((input) => window.runInteractionBenchmark(input), {
-          fixture,
-          activity,
-          operation,
-          frames: protocol.frames,
-          warmup: protocol.warmup,
-          burst: protocol.burst,
-          count: protocol.widgets,
-        })
-        output.results.push(row)
-        const report = summary(output.results, baseline)
-        await save(join(directory, 'results.json'), output)
-        await writeFile(join(directory, 'summary.md'), report)
-        const frame = stats(row.frame_intervals_ms)
-        console.info(
-          `  first response ${row.first_presentation_ms.toFixed(2)} ms; frame p95 ${frame.p95_ms.toFixed(2)} ms; config updates ${row.stages['wasm.config_update']?.length ?? 0}`,
-        )
-      }
-    }
-    console.info(`Results: ${directory}`)
-  } finally {
-    if (browser) await browser.close()
-    await server.close()
+    results: [],
   }
+  for (const workload of protocol.workloads) {
+    for (const operation of protocol.operations) {
+      console.info(`[interactions] ${workload}-${operation}: ${protocol.widgets} widgets`)
+      const path = join(directory, `${workload}-${operation}.json`)
+      const counts = [protocol.widgets, protocol.frames, protocol.warmup, protocol.burst].map(String)
+      await execute(binary, [root, path, ...counts, workload, operation], { cwd: root, windowsHide: true, maxBuffer: 1 << 26 })
+      const row = await json(path)
+      output.results.push(row)
+      await save(join(directory, 'results.json'), output)
+      await writeFile(join(directory, 'summary.md'), summary(output.results, baseline))
+      console.info(`  first response ${row.first_presentation_ms.toFixed(2)} ms; frame p95 ${stats(row.frame_ms).p95_ms.toFixed(2)} ms`)
+    }
+  }
+  console.info(`Results: ${directory}`)
 }
 
 main().catch((error) => {

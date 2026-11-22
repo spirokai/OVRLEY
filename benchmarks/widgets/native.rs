@@ -1,4 +1,5 @@
-//! --fonts prepares resources and validates configs; only --run renders frames.
+//! --list and --plan define the cases; --fonts prepares resources and validates configs; only
+//! --run and --run-preview render frames.
 use ovrley_core::{
     activity::{
         build_dense_activity_report_validated, parse_activity_json, splits::derive_split_table,
@@ -15,7 +16,12 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::PathBuf, time::Instant};
 
+mod cases;
+#[path = "../editor.rs"]
+mod editor;
 mod preview;
+
+const USAGE: &str = "Usage: benchmark_widgets --list | --plan <directory> <root> <frames> <warmup> [case] | --fonts|--run|--run-preview|--validate <plan.json>";
 
 #[derive(Deserialize)]
 struct Plan {
@@ -36,18 +42,34 @@ struct Case {
     dynamic: bool,
     request: Option<Value>,
     split_table: Option<String>,
-    /// Whether a preview backend's map canvas shows under the widget.
+    /// Whether a map shows under the widget.
     map_layer: bool,
 }
 
 fn main() -> Result<(), String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    match args.as_slice() {
+        ["--list"] => {
+            cases::list();
+            return Ok(());
+        }
+        ["--plan", directory, root, frames, warmup, only @ ..] if only.len() <= 1 => {
+            let count = |text: &str| text.parse::<usize>().map_err(|_| "Invalid frame counts".to_string());
+            return cases::write_plan(
+                directory.as_ref(),
+                root.as_ref(),
+                count(frames)?,
+                count(warmup)?,
+                only.first().copied(),
+            );
+        }
+        _ => {}
+    }
     let [mode, path] = args.as_slice() else {
-        return Err(
-            "Usage: benchmark_widgets --fonts|--run|--run-preview|--validate <plan.json>".into(),
-        );
+        return Err(USAGE.into());
     };
-    if !["--fonts", "--run", "--run-preview", "--validate"].contains(&mode.as_str()) {
+    if !["--fonts", "--run", "--run-preview", "--validate"].contains(mode) {
         return Err("Unknown benchmark mode".into());
     }
     let path = PathBuf::from(path);
@@ -66,10 +88,10 @@ fn main() -> Result<(), String> {
                 .map_err(|e| format!("{}: {e}", case.id))
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if mode == "--validate" {
+    if *mode == "--validate" {
         return Ok(());
     }
-    if mode == "--run-preview" {
+    if *mode == "--run-preview" {
         return preview::run(&plan, directory);
     }
     let paths = AppPaths::from_runtime_roots(
@@ -77,7 +99,7 @@ fn main() -> Result<(), String> {
         plan.root.clone(),
         directory.join("runtime"),
     );
-    if mode == "--fonts" {
+    if *mode == "--fonts" {
         let mut fonts = Vec::new();
         for (index, request) in plan.fonts.iter().enumerate() {
             let font: FontRequest =
@@ -146,7 +168,7 @@ fn main() -> Result<(), String> {
             .enumerate()
         {
             if (*second - index as f64 / f64::from(plan.fps)).abs() > 1e-6 {
-                return Err("Native frame timeline differs from browser timeline".into());
+                return Err("Export frame timeline differs from the preview's".into());
             }
         }
         let size = FrameSize {

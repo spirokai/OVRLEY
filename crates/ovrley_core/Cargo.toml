@@ -39,9 +39,3 @@ schema = ["dep:schemars"]
 
 [dev-dependencies]
 anyhow = "1.0"
-
-[[bin]]
-name = "benchmark_widgets"
-path = "../../benchmarks/widgets/native.rs"
-test = false
-bench = false

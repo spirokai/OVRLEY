@@ -1,4 +1,4 @@
-//! Map label benchmark, native side. `--plan` writes the cases both backends replay (cameras, label
+//! Map label benchmark, native side. `--plan` writes the cases to replay (cameras, label
 //! placements and tiles per frame) and needs no tiles. `--run` replays them through the export path:
 //! `MapTileSizer` measures every tile (which lays labels out and rasterizes their glyphs), then
 //! `GpuMapRenderer` loads each frame's view and renders it with a blocking readback.
@@ -20,13 +20,15 @@ use std::{fs, thread};
 
 const FPS: f64 = 30.0;
 const STYLE: &str = "liberty";
-/// The map widget's defaults (`assets/standard-widgets.json`).
+/// The map widget's default (`assets/standard-widgets.json`), as are the pitch and the line width.
 const MSAA_SAMPLES: u32 = 4;
+/// The benchmark's own. The widget's default is 17.5.
 const FOLLOW_ZOOM: f64 = 16.0;
 const FOLLOW_PITCH: f64 = 50.0;
 const FOLLOW_TOP_PADDING: f64 = 0.45;
 const LINE_WIDTH: f32 = 6.0;
-/// `ovrley_widgets::widgets::map::camera`: a fixed camera fits the route into 500 units with an 8% margin.
+/// The top-down camera fits the route's longer side into 500 units, with the 8% margin of
+/// `ovrley_widgets::widgets::map::content`'s fit.
 const FIXED_ROUTE_SPAN: f64 = 500.0 * (1.0 - 0.08 * 2.0);
 const LABEL_STEP_SECONDS: f64 = 0.3;
 /// Chase speed along the route.
