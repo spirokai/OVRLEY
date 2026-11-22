@@ -1,5 +1,5 @@
-# The one Rust toolchain for the native app, the WASM bindings and CI. scripts/wasm/build.mjs and
-# the workflows read the version from here; rustup selects it for every directory in the repo.
+# The one Rust toolchain for the app and CI. The workflows read the version from here; rustup
+# selects it for every directory in the repo.
 [toolchain]
 channel = "1.98.1"
 profile = "minimal"

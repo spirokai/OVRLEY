@@ -28,9 +28,5 @@ thiserror = "2"
 unicode-segmentation = "=1.12.0"
 image = { version = "0.25", default-features = false }
 ovrley_map = { path = "../ovrley_map" }
-skia-safe = { version = "=0.157.0", features = ["binary-cache"] }
-
-# Native builds take only rust-skia's prebuilt binary. The Wasm bundle is a source build
-# (`pnpm wasm:skia:build`), which `no-compile` would refuse.
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-skia-safe = { version = "=0.157.0", features = ["no-compile"] }
+# `no-compile`: only rust-skia's prebuilt binary, never a source build.
+skia-safe = { version = "=0.157.0", features = ["binary-cache", "no-compile"] }

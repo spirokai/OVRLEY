@@ -7,8 +7,7 @@
 //!
 //! Both hosts share the draw path, so they draw the same map. Export loads tiles on threads and reads
 //! frames back, below. Its tile data is fetched and held by the job before its first frame, so a tile
-//! that fails here fails the export rather than drawing a blank patch. The editor preview compiles
-//! this crate to WASM, decodes tiles in workers and presents to a canvas over WebGL2 (`web`).
+//! that fails here fails the export rather than drawing a blank patch.
 //!
 //! The `gpu` feature is the opt-in: without it, `ovrley_map` stays free of `wgpu`.
 
@@ -17,14 +16,9 @@ mod pipelines;
 mod pool;
 mod style;
 mod tile;
-#[cfg(any(target_arch = "wasm32", test))]
-mod web;
 
 pub use pool::{GpuPoolSizes, PoolEntries};
-#[cfg(not(target_arch = "wasm32"))]
 pub use pool::{MapTileSizer, MeasuredTile};
-#[cfg(target_arch = "wasm32")]
-pub use web::MapTileDecoder;
 
 use crate::{
     data_level, MapCamera, MapLabelDraw, MapRouteDraw, MapRouteLine, MapRoutePoint,
@@ -44,10 +38,7 @@ use std::ops::Range;
 use std::sync::{Arc, Mutex};
 use style::{parse_style, ParsedStyle};
 use tile::{ExtrusionVertex, LayerKind, PreparedTile, DEFAULT_TOLERANCE, TILE_UNITS};
-#[cfg(target_arch = "wasm32")]
-use web::Output;
 use wgpu::util::DeviceExt;
-#[cfg(not(target_arch = "wasm32"))]
 use {
     crate::MapDataSource,
     labels::{GlyphBitmap, GlyphId},
@@ -638,7 +629,6 @@ impl GpuMapRenderer {
 }
 
 /// Where export's frames go: a texture, read back to pixels.
-#[cfg(not(target_arch = "wasm32"))]
 struct Output {
     color: wgpu::Texture,
     color_view: wgpu::TextureView,
@@ -646,7 +636,6 @@ struct Output {
     padded_bytes_per_row: u32,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl Output {
     fn new(device: &wgpu::Device, viewport: MapViewport) -> Self {
         let (width, height) = (viewport.width_px(), viewport.height_px());
@@ -682,7 +671,6 @@ impl Output {
 }
 
 /// The glyph service's bitmap of a glyph, which the atlas is filled from.
-#[cfg(not(target_arch = "wasm32"))]
 fn service_bitmap(
     source: &dyn MapDataSource,
 ) -> impl Fn(GlyphId) -> Result<Arc<GlyphBitmap>, String> + '_ {
@@ -690,7 +678,6 @@ fn service_bitmap(
 }
 
 /// Export: tile loading across threads, and frames read back to pixels.
-#[cfg(not(target_arch = "wasm32"))]
 impl GpuMapRenderer {
     /// Opens a GPU device and reads the style. Fails loudly on invalid configuration, without any
     /// adapter, or when the device cannot hold the pools. Without a GPU, a software rasterizer draws
@@ -942,7 +929,6 @@ impl GpuMapRenderer {
 
 /// The adapter a renderer opens: a GPU when there is one. Some backends only offer their software
 /// rasterizer when asked.
-#[cfg(not(target_arch = "wasm32"))]
 fn request_adapter() -> Result<wgpu::Adapter, String> {
     let instance =
         wgpu::Instance::new(wgpu::InstanceDescriptor::new_without_display_handle_from_env());
@@ -968,7 +954,6 @@ pub enum MapAdapterSupport {
 }
 
 /// Which adapter a renderer would open, without opening a device. Blocking.
-#[cfg(not(target_arch = "wasm32"))]
 pub fn probe_adapter() -> MapAdapterSupport {
     match request_adapter() {
         Ok(adapter) if adapter.get_info().device_type == wgpu::DeviceType::Cpu => {

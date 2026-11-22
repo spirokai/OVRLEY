@@ -7,17 +7,14 @@
 //! cutoff 0.25 at 24 px with a 3 px buffer, the values the label shader's constants assume. Faces
 //! with a `texture_scale` of 2 (CJK) are made at twice that.
 //!
-//! Everything here is pure Rust on plain IEEE arithmetic, so native and WASM make the same bytes. The
+//! Everything here is pure Rust on plain IEEE arithmetic, so every platform makes the same bytes. The
 //! one transcendental (the coverage gamma table) goes through `libm`, not the platform's `pow`.
 
 use super::text::{font_chain, Face, FontGlyph, GlyphBitmap, GlyphMetrics, BUFFER, ONE_EM};
 use ab_glyph::{point, Font, FontRef, PxScale, ScaleFont};
-#[cfg(not(target_arch = "wasm32"))]
 use memmap2::Mmap;
 use std::collections::HashMap;
-#[cfg(not(target_arch = "wasm32"))]
 use std::fs::File;
-#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::sync::{Arc, OnceLock, RwLock};
 
@@ -50,50 +47,25 @@ pub(crate) trait GlyphLookup: Sync {
     fn glyph(&self, font: &str, character: char) -> Result<Option<FontGlyph>, String>;
 }
 
-/// A font file's bytes: memory-mapped natively, so the OS loads only the outlines actually used, or
-/// handed over whole where there are no files.
-enum FontBytes {
-    #[cfg(not(target_arch = "wasm32"))]
-    Mapped(Mmap),
-    Owned(Box<[u8]>),
-}
-
-impl FontBytes {
-    fn as_slice(&self) -> &[u8] {
-        match self {
-            #[cfg(not(target_arch = "wasm32"))]
-            Self::Mapped(map) => map,
-            Self::Owned(bytes) => bytes,
-        }
-    }
-}
-
-/// One face's font, over its file's bytes.
+/// One face's font, over its memory-mapped file, so the OS loads only the outlines actually used.
 struct FaceFile {
-    /// Borrows `bytes`. Declared first so it is dropped first.
+    /// Borrows `_map`. Declared first so it is dropped first.
     font: FontRef<'static>,
-    bytes: FontBytes,
+    _map: Mmap,
 }
 
 impl FaceFile {
-    fn new(face: Face, bytes: FontBytes) -> Result<Self, String> {
-        // SAFETY: neither a mapping's nor a boxed slice's bytes move when their owner does, and `font`
-        // is dropped before `bytes`.
-        let slice: &'static [u8] = unsafe {
-            std::slice::from_raw_parts(bytes.as_slice().as_ptr(), bytes.as_slice().len())
-        };
-        let font = FontRef::try_from_slice(slice)
-            .map_err(|error| format!("{}: {error}", face.file_name()))?;
-        Ok(Self { font, bytes })
-    }
-
-    #[cfg(not(target_arch = "wasm32"))]
     fn open(face: Face, path: &Path) -> Result<Self, String> {
         let file = File::open(path).map_err(|error| format!("{}: {error}", path.display()))?;
         // SAFETY: the bundled font files are not modified while the app runs.
         let map =
             unsafe { Mmap::map(&file) }.map_err(|error| format!("{}: {error}", path.display()))?;
-        Self::new(face, FontBytes::Mapped(map))
+        // SAFETY: a mapping's bytes do not move when their owner does, and `font` is dropped before
+        // `_map`.
+        let slice: &'static [u8] = unsafe { std::slice::from_raw_parts(map.as_ptr(), map.len()) };
+        let font = FontRef::try_from_slice(slice)
+            .map_err(|error| format!("{}: {error}", face.file_name()))?;
+        Ok(Self { font, _map: map })
     }
 }
 
@@ -108,7 +80,6 @@ pub struct GlyphService {
 
 impl GlyphService {
     /// Opens every bundled face in `directory` (`fonts/map/`).
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn open(directory: &Path) -> Result<Self, String> {
         let faces = Face::ALL
             .into_iter()
@@ -122,42 +93,11 @@ impl GlyphService {
         Ok(Self::with_faces(faces))
     }
 
-    /// The service over the bundled font files' bytes, one per [`Face::ALL`], in its order: what a
-    /// host without the files fetched from the shell.
-    pub fn from_files(files: Vec<Vec<u8>>) -> Result<Self, String> {
-        if files.len() != Face::ALL.len() {
-            return Err(format!(
-                "The map glyph service needs {} font files, got {}",
-                Face::ALL.len(),
-                files.len()
-            ));
-        }
-        let faces = Face::ALL
-            .into_iter()
-            .zip(files)
-            .map(|(face, bytes)| {
-                Ok((
-                    face,
-                    FaceFile::new(face, FontBytes::Owned(bytes.into_boxed_slice()))?,
-                ))
-            })
-            .collect::<Result<_, String>>()?;
-        Ok(Self::with_faces(faces))
-    }
-
     fn with_faces(faces: HashMap<Face, FaceFile>) -> Self {
         Self {
             faces,
             made: RwLock::new(HashMap::new()),
         }
-    }
-
-    /// The bytes of the bundled font file `name`, which the shell serves to hosts without the files.
-    pub fn font_file(&self, name: &str) -> Option<&[u8]> {
-        Face::ALL
-            .into_iter()
-            .find(|face| face.file_name() == name)
-            .map(|face| self.faces[&face].bytes.as_slice())
     }
 
     /// The distance field of a character a face has, which the atlas holds under that key.
@@ -565,28 +505,5 @@ mod tests {
             service.bitmap(cjk.face, '北').unwrap().width as f32,
             cjk.metrics.width * 2.0 + 12.0
         );
-    }
-
-    #[test]
-    fn a_service_over_the_files_it_serves_makes_the_same_glyphs() {
-        let opened = service();
-        let files = Face::ALL
-            .iter()
-            .map(|face| opened.font_file(face.file_name()).unwrap().to_vec())
-            .collect();
-        let handed = GlyphService::from_files(files).unwrap();
-        for character in ['P', 'ž', 'ש', '北'] {
-            let [a, b] = [&opened, &handed].map(|service| {
-                service
-                    .glyph("Noto Sans Regular", character)
-                    .unwrap()
-                    .unwrap()
-            });
-            assert_eq!(a, b);
-            assert_eq!(
-                opened.bitmap(a.face, character).unwrap(),
-                handed.bitmap(b.face, character).unwrap()
-            );
-        }
     }
 }

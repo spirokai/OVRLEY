@@ -15,7 +15,6 @@ use std::collections::{btree_map, BTreeMap, HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::ops::Range;
-#[cfg(not(target_arch = "wasm32"))]
 use {
     super::labels::{GlyphId, GlyphService},
     super::style::ParsedStyle,
@@ -62,7 +61,6 @@ impl PoolEntries {
         }
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     fn of<V>(layers: &[PreparedLayer<V>]) -> Self {
         Self {
             vertices: layers.iter().map(|layer| layer.vertices.len() as u64).sum(),
@@ -217,7 +215,6 @@ impl<V: Pod> BufferPool<V> {
 
     /// Forgets every layer, so the next ones fill the buffers from the start. Frames recorded after
     /// this draw only what is uploaded after it.
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn clear(&mut self) {
         self.index = RingIndex::default();
     }
@@ -373,20 +370,17 @@ impl RingIndex {
 }
 
 /// What one tile asks of a renderer: room in the geometry pools, and the glyphs of its labels.
-#[cfg(not(target_arch = "wasm32"))]
 pub struct MeasuredTile {
     pub pools: GpuPoolSizes,
     pub glyphs: BTreeSet<GlyphId>,
 }
 
 /// Tessellates tiles to count their geometry, and lays out their labels, without touching the GPU.
-#[cfg(not(target_arch = "wasm32"))]
 pub struct MapTileSizer {
     style: ParsedStyle,
     glyphs: Arc<GlyphService>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 impl MapTileSizer {
     /// Reads the style a renderer of `config` draws. Fails loudly on an invalid style.
     pub fn new(config: &GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {

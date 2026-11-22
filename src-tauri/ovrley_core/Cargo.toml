@@ -34,16 +34,11 @@ objc2 = "0.6.3"
 objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
 
 [features]
-canvas-parity = []
 # JSON schemas of the state types tools take (`ovrley_mcp`).
 schema = ["dep:schemars"]
 
 [dev-dependencies]
 anyhow = "1.0"
-
-[[test]]
-name = "canvas_parity_tests"
-required-features = ["canvas-parity"]
 
 [[bin]]
 name = "benchmark_widgets"

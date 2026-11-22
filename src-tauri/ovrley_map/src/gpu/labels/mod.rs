@@ -14,7 +14,7 @@
 mod glyphs;
 mod layout;
 mod placement;
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests;
 mod text;
 
@@ -22,8 +22,6 @@ pub use glyphs::{GlyphId, GlyphService};
 pub use text::{Face, GlyphBitmap};
 
 pub(crate) use glyphs::GlyphLookup;
-#[cfg(any(target_arch = "wasm32", test))]
-pub(crate) use layout::Paint;
 pub(crate) use layout::{lay_out, GlyphQuad, LabelSymbol, LineSymbol, SymbolKind};
 pub(crate) use text::{font_chain, TextAnchor, TextJustify, ONE_EM};
 
@@ -386,7 +384,6 @@ impl LabelLayers {
 
     /// Puts as many of `glyphs` in the atlas as fit, without clearing it. Export knows every glyph
     /// it will use before its first frame.
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) fn preload_atlas(
         &mut self,
         queue: &wgpu::Queue,

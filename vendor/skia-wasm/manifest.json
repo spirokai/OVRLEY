@@ -1,9 +1,0 @@
-{
-  "revision": "30669978c3f39a73e8a7ac74eead8d414eb1891d",
-  "rustVersion": "1.98.1",
-  "emscriptenVersion": "6.0.9",
-  "target": "wasm32-unknown-emscripten",
-  "features": ["binary-cache", "embed-icudtl", "pdf", "jpeg"],
-  "cflags": ["-fwasm-exceptions", "-msimd128", "-msse4.1"],
-  "sha256": "0644ba1a33c3c21f5a6ed1489b466b6bb8b4f0bab70286e754b427415a5421aa"
-}

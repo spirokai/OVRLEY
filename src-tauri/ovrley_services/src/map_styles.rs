@@ -191,12 +191,6 @@ impl MapData {
         &self.tiles
     }
 
-    /// The bundled map font file `name`, for the preview's decode workers, which lay labels out with the
-    /// same glyph service export uses.
-    pub fn font_file(&self, name: &str) -> Option<Vec<u8>> {
-        self.glyphs.font_file(name).map(<[u8]>::to_vec)
-    }
-
     /// What a render's maps draw from.
     pub fn map_source(&self) -> MapSource {
         MapSource {

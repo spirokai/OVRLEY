@@ -1,4 +1,4 @@
-//! Map vocabulary shared by native and WASM, plus the renderer and the style validator.
+//! Map vocabulary shared by the app and export, plus the renderer and the style validator.
 //!
 //! Without features this crate has no wgpu, so `ovrley_widgets` can depend on it from WASM. The `gpu`
 //! feature adds the renderer that export and the preview's map module draw with. The `validate`
@@ -69,7 +69,7 @@ pub trait MapDataSource: Send + Sync {
     /// The vector tile at `z/x/y`, with `z` at most 14.
     fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String>;
     /// The bundled map fonts' glyphs, opened once by the shell. Tile threads call it directly.
-    #[cfg(all(feature = "gpu", not(target_arch = "wasm32")))]
+    #[cfg(feature = "gpu")]
     fn glyphs(&self) -> Arc<gpu::labels::GlyphService>;
 }
 

@@ -4,23 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "tauri": "node scripts/tauri.mjs",
     "preinstall": "node scripts/require-pnpm.mjs",
     "postinstall": "node scripts/install-ffmpeg.mjs && node scripts/install-mdk.mjs",
-    "dev": "pnpm tauri dev",
-    "build": "pnpm tauri build",
-    "dev:frontend": "cd app && pnpm dev",
-    "wasm:build": "node scripts/wasm/build.mjs",
-    "wasm:skia:build": "node scripts/wasm/build-skia.mjs",
-    "build:frontend": "cd app && pnpm build",
     "prepare:packaging": "node packaging/resources.mjs",
-    "lint:frontend": "cd app && pnpm lint",
-    "lint": "pnpm lint:frontend",
-    "format:frontend": "cd app && pnpm format",
-    "format": "pnpm format:frontend",
-    "format:check": "pnpm --dir app format:check",
-    "check": "vp check app vite.config.js",
-    "test": "pnpm --dir app test",
     "release": "semantic-release",
     "dev:native": "cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley",
     "dev:native:live": "SLINT_LIVE_PREVIEW=1 cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley --features live-preview",
@@ -33,22 +19,14 @@
     "benchmark:widgets:build": "node benchmarks/widgets/run.mjs --build",
     "benchmark:widgets:summary": "node benchmarks/widgets/summarize.mjs",
     "benchmark:interactions": "node benchmarks/widget-interactions/run.mjs",
-    "benchmark:map-labels": "node benchmarks/map-labels/run.mjs",
-    "prepare": "vp config"
+    "benchmark:map-labels": "node benchmarks/map-labels/run.mjs"
   },
   "keywords": [],
   "author": "",
   "license": "GPL-3.0-or-later",
   "packageManager": "pnpm@10.25.0",
   "devDependencies": {
-    "@playwright/test": "^1.52.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
-    "@tauri-apps/cli": "^2.12.4",
-    "eslint-plugin-react": "^7.37.5",
-    "semantic-release": "^25.0.3",
-    "vite-plus": "catalog:"
-  },
-  "dependencies": {
-    "@tauri-apps/plugin-shell": "~2.3.3"
+    "semantic-release": "^25.0.3"
   }
 }

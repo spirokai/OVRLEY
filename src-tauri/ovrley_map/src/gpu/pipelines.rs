@@ -758,9 +758,6 @@ struct PatternImage {
     rgba: &'static [u8],
 }
 
-#[cfg(any(target_arch = "wasm32", test))]
-pub(crate) const PATTERN_COUNT: usize = IMAGES.len();
-
 const IMAGES: [PatternImage; 2] = [
     PatternImage {
         name: "wetland_bg_11",

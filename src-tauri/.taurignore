@@ -1,2 +1,0 @@
-# Vite watches these; changes must not restart the native application.
-/wasm-bindings/
