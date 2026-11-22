@@ -15,6 +15,7 @@ use crate::store::services::{MapAdapterSupport, MapFrameFactory, MapStyleCatalog
 use crate::store::Store;
 use ovrley_widgets::model::document::merge_widget_data;
 use serde_json::{json, Map, Value};
+use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -54,8 +55,9 @@ pub struct MapTileCacheState {
     pub draft_limit: Option<u64>,
     /// Whether a cache command is running; it disables Clear.
     pub pending: bool,
-    /// The newest command: only its answer applies, since the slider stays live meanwhile.
-    latest: u64,
+    /// The commands given while one runs, since the slider stays live meanwhile. They run one after
+    /// another, so the newest is also the last to reach the cache and the settings file.
+    queued: VecDeque<Option<u64>>,
 }
 
 impl MapTileCacheState {
@@ -419,13 +421,19 @@ pub fn draft_tile_cache_limit(store: &mut Store, limit: u64) {
     store.maps.tile_cache.draft_limit = Some(limit);
 }
 
-/// Runs a cache command on a worker. Only the newest command's answer applies; a failure goes to
-/// the error alert. A limit that applied is saved, as the Tauri command saves it.
+/// Runs a cache command on a worker, after the ones given before it. Only the newest command's
+/// answer shows; a failure goes to the error alert. A limit that applied is saved.
 fn run_tile_cache_command(store: &mut Store, services: &mut Services, limit: Option<u64>) {
     let cache = &mut store.maps.tile_cache;
-    cache.latest += 1;
+    if cache.pending {
+        cache.queued.push_back(limit);
+        return;
+    }
     cache.pending = true;
-    let command = cache.latest;
+    start_tile_cache_command(services, limit);
+}
+
+fn start_tile_cache_command(services: &mut Services, limit: Option<u64>) {
     let maps = services.maps.clone();
     services.workers.spawn("map-tile-cache", move || {
         let result = match limit {
@@ -436,14 +444,16 @@ fn run_tile_cache_command(store: &mut Store, services: &mut Services, limit: Opt
             if let (Ok(usage), Some(_)) = (&result, limit) {
                 services.preferences.set(crate::store::services::MAP_TILE_CACHE_LIMIT_KEY, Value::from(usage.limit_bytes));
             }
-            let cache = &mut store.maps.tile_cache;
+            let next = store.maps.tile_cache.queued.pop_front();
             match result {
-                Ok(usage) if command == cache.latest => cache.usage = Some(usage),
+                Ok(usage) if next.is_none() => store.maps.tile_cache.usage = Some(usage),
                 Ok(_) => {}
                 Err(error) => store.media.set_error_message(error),
             }
-            let cache = &mut store.maps.tile_cache;
-            if command == cache.latest {
+            if let Some(next) = next {
+                start_tile_cache_command(services, next);
+            } else {
+                let cache = &mut store.maps.tile_cache;
                 cache.draft_limit = None;
                 cache.pending = false;
             }
@@ -483,6 +493,16 @@ mod tests {
         data.insert("id".into(), json!("m"));
         let collection = catalog().require_widget("map").unwrap().collection.clone();
         let (dispatcher, fakes) = editor_with(json!({ collection.as_str(): [data] }));
+        // The first font load reads the system's fonts, which can outlast the editor's own wait.
+        for _ in 0..2000 {
+            if dispatcher.with_store(|store| store.preview.presented().contains_key("m")) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+            fakes.ui_post.drain(&dispatcher);
+            dispatcher.dispatch(crate::features::widget_preview::preview_frame);
+        }
+        assert!(dispatcher.with_store(|store| store.preview.presented().contains_key("m")), "the map never rendered");
         dispatcher.dispatch(|store, _| {
             crate::features::overlay_editor::set_viewport_metrics(
                 store,
@@ -495,7 +515,7 @@ mod tests {
 
     /// Runs worker results until none are left.
     fn drain(dispatcher: &Dispatcher, fakes: &Fakes) {
-        for _ in 0..200 {
+        for _ in 0..2000 {
             std::thread::sleep(Duration::from_millis(5));
             if fakes.ui_post.posted.lock().unwrap().is_empty() {
                 continue;
@@ -616,7 +636,7 @@ mod tests {
         dispatcher.dispatch(request);
         assert_eq!(dispatcher.with_store(next_deadline), Some(deadline), "an unchanged request keeps its timer");
         dispatcher.dispatch(move |store, services| tick(store, services, deadline));
-        for _ in 0..200 {
+        for _ in 0..2000 {
             if !fakes.maps.prepared.lock().unwrap().is_empty() {
                 break;
             }
@@ -638,7 +658,7 @@ mod tests {
         dispatcher.dispatch(|store, services| commit_tile_cache_limit(store, services, 1 << 30));
         dispatcher.dispatch(|store, services| commit_tile_cache_limit(store, services, 768 << 20));
         assert!(dispatcher.with_store(|store| store.maps.tile_cache.pending));
-        for _ in 0..200 {
+        for _ in 0..2000 {
             fakes.ui_post.drain(&dispatcher);
             if !dispatcher.with_store(|store| store.maps.tile_cache.pending) {
                 break;
@@ -661,7 +681,7 @@ mod tests {
         let (dispatcher, fakes) = map_editor();
         let ride = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ovrley_core/tests/fixtures/activity/test-ride.fit").to_string_lossy().into_owned();
         dispatcher.dispatch(move |store, services| crate::features::app_shell::import_activity(store, services, ride, None));
-        for _ in 0..400 {
+        for _ in 0..2000 {
             fakes.ui_post.drain(&dispatcher);
             dispatcher.dispatch(crate::features::widget_preview::preview_frame);
             if dispatcher.with_store(|store| !store.media.is_processing && store.preview.presented().contains_key("m")) {

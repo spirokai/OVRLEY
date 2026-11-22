@@ -330,11 +330,11 @@ pub(crate) mod tests {
 
     #[test]
     fn the_missing_proxy_nearest_the_playhead_renders_first() {
-        let videos = [
-            simple("a", 10.0, 0),
-            simple("b", 10.0, 1),
-            simple("c", 10.0, 2),
-        ];
+        // A path per video: joins with the same content share one proxy.
+        let videos = [("a", 0), ("b", 1), ("c", 2)].map(|(id, order)| ImportedVideo {
+            path: format!("/videos/{id}.mp4"),
+            ..simple(id, 10.0, order)
+        });
         let jobs = list_jobs(&build_timeline_program(
             &videos,
             &edits_at(&videos, &[("b", 20.0), ("c", 100.0)]),
