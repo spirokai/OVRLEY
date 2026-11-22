@@ -192,6 +192,18 @@ pub fn run(
         EventResult::Propagate
     });
 
+    // A resize reports before the header is laid out at its new size, so the traffic lights follow
+    // the header's height itself.
+    #[cfg(target_os = "macos")]
+    {
+        let header = window.as_weak();
+        window.on_header_height_changed(move |height| {
+            if let Some(app) = header.upgrade() {
+                app.window().with_winit_window(|winit_window| platform::macos::apply_traffic_light_inset(winit_window, f64::from(height)));
+            }
+        });
+    }
+
     // `useAppBootstrap`'s shell part runs on the first event-loop turn.
     let startup = dispatcher.handle();
     let shown = window.as_weak();

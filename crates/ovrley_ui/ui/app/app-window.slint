@@ -47,6 +47,11 @@ export component AppWindow inherits FluidWindow {
     property <length> control-panel-width: 26.5rem;
     // macOS centres the traffic lights on the header's midline.
     out property <length> header-height: header.height;
+    // The header follows the rem and its content, so its height also changes after a resize.
+    callback header-height-changed(length);
+    changed header-height => {
+        root.header-height-changed(self.header-height);
+    }
 
     // The root focus scope (D7). Slint delivers a key to the focused element and bubbles what it
     // rejects to its parents, so `key-pressed` sees only keys no control used. A click on empty space
