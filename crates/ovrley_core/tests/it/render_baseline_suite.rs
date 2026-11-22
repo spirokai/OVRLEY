@@ -2,10 +2,10 @@
 //! baseline suite.
 //!
 //! Normal compare run:
-//! `cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`
+//! `cargo test -p ovrley_core --test it render_baseline_suite:: -- --ignored --nocapture`
 //!
 //! Baseline record/update run:
-//! `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`
+//! `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test it render_baseline_suite:: -- --ignored --nocapture`
 
 #[path = "../common/render_baseline_support.rs"]
 mod render_baseline_support;

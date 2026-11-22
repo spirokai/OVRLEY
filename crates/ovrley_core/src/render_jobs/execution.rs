@@ -116,7 +116,7 @@ impl RenderExecutionService {
         Ok(reservation)
     }
 
-    /// The JSON entry of the Tauri command: parses the config, and the activity once the output
+    /// The JSON entry: parses the config, and the activity once the output
     /// is accepted, then submits as [`Self::submit_single_config`] does.
     #[allow(clippy::too_many_arguments)]
     pub fn submit_single(

@@ -4,7 +4,7 @@
 //! render-only scene fields set on it, read once through core's render config ingress
 //! (`parse_config_value`). `SceneConfig` requires the activity window, which the durable scene
 //! leaves out, so the fields are set on the effective JSON before that one typed read. Core
-//! validates at submission, as it does for the Tauri app; nothing here validates a render again.
+//! validates at submission; nothing here validates a render again.
 
 use super::codecs::is_qsv_full_codec;
 use crate::lib::activity::{resolve_activity_window, ActivityWindow};

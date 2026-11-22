@@ -1,6 +1,6 @@
 # NEW WIDGET SPEC — heading_compass
 
-Spec for a new widget or display type for OVRLEY. `adding-new-widgets.md` turns it into
+Spec for a new widget or display type for OVRLEY. `SKILL.md` turns it into
 implementation. Leave a section empty when its activation line is off.
 
 ## TRIAGE

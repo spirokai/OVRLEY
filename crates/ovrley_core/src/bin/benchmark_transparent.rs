@@ -1,6 +1,6 @@
 //! Transparent (alpha-channel) overlay encoding benchmark binary.
 //!
-//! Iterates over each available transparent codec (currently `qtrle`), runs 3
+//! Iterates over each available transparent codec, runs 3
 //! full transparent overlay renders per codec, and writes aggregated timing
 //! and file-size results to `debug/benchmarks/transparent.json`.
 //!

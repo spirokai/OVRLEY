@@ -1,50 +1,49 @@
 # Encoding Benchmark Suite
 
-Performance benchmarks for ovrley overhead-video encoding. Each benchmark
-runs real renders through `ovrley_core` and writes aggregated timing & file-size
-results to a JSON file in this directory.
+Performance benchmarks for encoding. Each one runs real renders through
+`ovrley_core` and writes aggregated timing and file-size results to a JSON
+file under `debug/benchmarks/` at the repository root.
+
+They take a parsed activity (a debug build writes one to `debug/activities/`
+when it imports a file) and a template, and cool down between codec groups,
+so a run takes a while. The commands build in debug; add `--release` after
+`cargo run` to measure what ships.
 
 ## Transparent Overlay Benchmark
 
-Loops over all available transparent codecs (`prores_ks`, etc.), runs 3
-full renders per codec at a fixed 60-second activity window (300s–360s),
-and measures job time + output file size.
+Runs 3 full renders of each available transparent codec (`prores_ks`,
+`prores_ks_vulkan`, `prores_videotoolbox`, `qtrle`) at a fixed 60-second
+activity window (300s-360s), and measures job time and output file size.
 
 - **Use case:** Compare transparent (alpha-channel) codec performance
 - **Output:** `debug/benchmarks/transparent.json`
 
 ```bash
-# Usage: cargo run -p ovrley_core --bin benchmark_transparent -- <activity-path> <template-path>
-cargo run -p ovrley_core --bin benchmark_transparent -- debug/activities/Test_FIT-parse-debug.json templates/recent-template.json
+pnpm benchmark:transparent <activity-path> <template-path>
 ```
-
-H:\tools\cyclemetry\src-tauri\ovrley_core\tests\fixtures\video\test-4k.mp4
 
 ## Composite Overlay Benchmark
 
-Loops over all available composite codec profiles (software, NVENC, QSV,
-VideoToolbox, VAAPI, AMF), runs 3 full composite renders per codec over a
-60-second activity+video window, and measures job time + output file size.
+Runs 3 full composite renders of each available composite codec profile
+(software, NVENC, QSV, VideoToolbox, VAAPI, AMF) over a 60-second
+activity and video window, and measures job time and output file size.
 
 - **Use case:** Compare video compositing codec performance
 - **Output:** `debug/benchmarks/composite.json`
 
 ```bash
-# Usage: cargo run -p ovrley_core --bin benchmark_composite -- <activity-path> <template-path> <video-path>
-cargo run -p ovrley_core --bin benchmark_composite -- debug/activities/Test_FIT-parse-debug.json templates/recent-template.json debug/benchmarks/test-4k.mp4
+pnpm benchmark:composite <activity-path> <template-path> <video-path>
 ```
 
 ## Widget Update Rate Benchmark
 
-Tests how widget update rate (1, 2, 3, 6 activity-seconds between widget
-recomputes) affects composite render throughput. Runs 3 iterations per
-(codec, update_rate) pair for each available GPU composite codec
-(`nnvgpu_h264`, `qsv_full_h264`).
+Tests how the widget update rate (a recompute every 1, 2, 3 or 6 frames)
+affects composite render throughput. Runs 3 iterations per (codec, rate)
+pair for the available ones of `nnvgpu_h264` and `qsv_full_h264`.
 
-- **Use case:** Determine optimal widget update rate for performance/quality
+- **Use case:** Determine the best widget update rate for performance and quality
 - **Output:** `debug/benchmarks/update_rate.json`
 
 ```bash
-# Usage: cargo run -p ovrley_core --bin benchmark_widget_rate -- <activity-path> <template-path> <video-path>
-cargo run -p ovrley_core --bin benchmark_widget_rate -- debug/activities/Test_FIT-parse-debug.json templates/recent-template.json debug/benchmarks/test-4k.mp4
+pnpm benchmark:widget-rate <activity-path> <template-path> <video-path>
 ```

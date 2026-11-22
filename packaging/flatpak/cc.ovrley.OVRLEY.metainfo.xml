@@ -14,12 +14,12 @@
     </p>
     <p>Features:</p>
     <ul>
-      <li>Import FIT, GPX, SRT, IGC, CSV and VBO files, or telemetry embedded in supported camera videos</li>
+      <li>Import FIT, GPX, TCX, SRT, IGC, CSV and VBO files, or telemetry embedded in supported camera videos</li>
       <li>Drag-and-drop editor with live preview, reusable templates and undo/redo</li>
       <li>More than 40 widgets and animated gauges for speed, heart rate, power, G-force, lap times, maps and more</li>
       <li>Export transparent overlays for editors such as DaVinci Resolve, or final video with the overlay baked in</li>
       <li>Hardware-accelerated export with NVIDIA NVENC and VAAPI (Intel and AMD)</li>
-      <li>Works fully offline: all processing happens on your computer</li>
+      <li>All processing happens on your computer; only map tiles are downloaded</li>
     </ul>
   </description>
   <launchable type="desktop-id">cc.ovrley.OVRLEY.desktop</launchable>

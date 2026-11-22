@@ -2,9 +2,7 @@
 //! size and camera straight away, so a resize shows more or less of the map and never stretches it.
 //!
 //! Export's frames reach the widget through a [`MapFrameProvider`] its host implements:
-//! `ovrley_widgets` compiles to WASM and never depends on the renderer. The WASM editor preview has
-//! none: its map is a canvas under the widget, not an image inside it (see
-//! [`PreviewMap::set_layer_ready`]). The native editor preview streams frames from a
+//! `ovrley_widgets` never depends on the renderer. The editor preview streams frames from a
 //! [`MapFrameFactory`]: it never waits for one, and keeps showing the last frame until the next
 //! arrives.
 use super::{
@@ -142,7 +140,7 @@ pub trait MapFrameFactory: Send + Sync {
 pub struct PreviewMaps {
     /// The installed styles, which the host sets once it has them: until then no map is created.
     pub styles: Option<MapStyleCatalog>,
-    /// A native host's frames. The WASM host has none: its canvas draws the map under the widget.
+    /// The host's frames.
     pub frames: Option<Arc<dyn MapFrameFactory>>,
 }
 

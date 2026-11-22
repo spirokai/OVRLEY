@@ -16,7 +16,7 @@ use crate::store::services::Services;
 use crate::store::slices::layout::DrawerPreference;
 use crate::store::Store;
 
-/// The preference key, shared with the React app.
+/// The preference key, as the React app wrote it.
 pub const DRAWER_PREFERENCE_KEY: &str = "leftDrawer";
 
 /// `useDrawerPreference`'s `lastObservedPreferenceRef`.

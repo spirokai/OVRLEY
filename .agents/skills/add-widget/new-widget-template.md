@@ -1,6 +1,6 @@
 # NEW WIDGET TEMPLATE
 
-Spec for a new widget or display type. Fill this in — `adding-new-widgets.md` turns it into
+Spec for a new widget or display type. Fill this in — `SKILL.md` turns it into
 implementation. Leave a section empty when its activation line is off.
 
 ## TRIAGE

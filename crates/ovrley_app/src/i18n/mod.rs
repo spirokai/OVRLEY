@@ -24,7 +24,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// The preference key, shared with the React app.
+/// The preference key, as the React app wrote it.
 pub const LANGUAGE_PREFERENCE_KEY: &str = "lng";
 
 /// Each locale's catalog, in [`LOCALES`] order; English's is the template.

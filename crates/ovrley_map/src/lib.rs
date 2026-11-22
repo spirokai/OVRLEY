@@ -1,7 +1,7 @@
 //! Map vocabulary shared by the app and export, plus the renderer and the style validator.
 //!
-//! Without features this crate has no wgpu, so `ovrley_widgets` can depend on it from WASM. The `gpu`
-//! feature adds the renderer that export and the preview's map module draw with. The `validate`
+//! Without features this crate has no wgpu, which `ovrley_widgets` does not need. The `gpu`
+//! feature adds the renderer that export and the preview draw with. The `validate`
 //! feature adds what the shell registers installed styles with.
 //!
 //! What a map draws: which installed style and which layers. The shell registers the installed styles

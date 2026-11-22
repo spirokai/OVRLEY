@@ -1,5 +1,5 @@
 This directory stores rendered frame baselines for the integration suite in
-`crates/ovrley_core/tests/render_baseline_suite.rs`.
+`crates/ovrley_core/tests/it/render_baseline_suite.rs`.
 
 Subdirectories:
 
@@ -8,4 +8,4 @@ Subdirectories:
 - `composite/` for decoded composite-video frame baselines
 
 Record/update baselines with:
-`OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`
+`OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test it render_baseline_suite:: -- --ignored --nocapture`

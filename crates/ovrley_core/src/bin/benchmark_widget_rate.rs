@@ -41,7 +41,7 @@ const CODECS: &[(&str, &str)] = &[
     ("qsv_full_h264", "qsv_full_h264"),
 ];
 
-/// Widget update rates tested (activity-seconds between widget recomputes).
+/// Widget update rates tested (frames between widget recomputes).
 const UPDATE_RATES: &[u32] = &[1, 2, 3, 6];
 
 /// Parses three positional CLI arguments: activity path, template path, video path.

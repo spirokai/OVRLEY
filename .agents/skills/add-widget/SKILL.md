@@ -5,9 +5,8 @@ description: Add OVRLEY widgets, metric display types, or derived metrics from a
 
 # Add a widget
 
-Implement the supplied widget across the editor, WASM preview, and native export. Rust crate
-paths below start under `src-tauri/`; frontend paths under `app/src/`. Confirm owners against
-current code before editing.
+Implement the supplied widget across the editor, its preview, and export. Crate paths below
+start under `crates/`. Confirm owners against current code before editing.
 
 ## 1. Establish the specification
 
@@ -58,7 +57,7 @@ Add availability names to `activitySeries.attributes.core`/`.extended`; use
 `activity.coverageSource` for another column's coverage. Modes declare `activity` dependencies.
 Add SVGs referenced by `icon.assetFile` to `assets/widget-icons/` using the supported subset
 in `ovrley_widgets/src/render/svg.rs`. Current metric icons are compile-required. Add all name,
-display/mode, and control translations to `app/src/i18n/locales/*-translation.json`.
+display/mode, and control translations to `locales/ovrley.pot` and each `locales/<lang>.po`.
 
 **Complete when:** manifests declare every configuration field and telemetry dependency;
 referenced icons and translations exist.
@@ -118,31 +117,30 @@ Dispatch for a metric display:
 - `ovrley_core/src/normalize/widgets.rs` — the `validate_render_value` arm. Export needs nothing else.
 
 Independent families also extend config collections/`ValidatedRenderConfig`, the
-`ValidatedWidget` enum, and the layer list in `render/engine.rs`. Reuse the existing WASM ABI.
+`ValidatedWidget` enum, and the layer list in `render/engine.rs`.
 
 **Complete when:** both hosts build the family from one validated config, with complete
 validation, sampling, caching, geometry, and resize dispatch for every requested display.
 
 ## 5. Wire the editor (new displays/families)
 
-Register display sections in `DISPLAY_SECTION` in `MetricWidgetEditor.jsx` under
-`features/widget-editor/components/metricWidget/`; independent editors in `WIDGET_EDITOR_MAP`
-in `components/SidebarWidgetsTab.jsx`. Keep components presentational. Persist boxed settings
-in `display_variants.<type>` and use `lib/widget/widget-resolver.js` for edits/projection.
+Editors are declarative descriptions in `ovrley_app/src/features/widget_editor/`, which one
+Slint component renders:
 
-Check behavior-specific seams:
+- `displays.rs` — a metric display's section.
+- `editors.rs` — an independent type's editor; `sections.rs` — the shared sections.
+- `rules.rs` — an edit that patches more than its own field, beside the renderer's own geometry.
+- A glyph a description names must exist in the `Icons` global and `ovrley_ui/src/hooks/icons.rs`.
 
-- `features/wasm-widgets/utils/previewSession.js` `widgetFonts` — request exactly the fonts and
-  weights the family resolves (none when its text is hidden); a missing request fails the preview.
-- `features/wasm-widgets/utils/widgetGestureGeometry.js` `widgetResizeGeometry` — list framed
-  displays that resize by `size`; the rest send a uniform `factor`.
-- `features/overlay-editor/utils/overlayEditorUtils.js` — `maintainAspectRatio` (boxed displays
-  are unlocked unless listed), rotation, and edge handles.
-- `features/widget-editor/utils/widgetSize.js` — inspector size sliders for uniform displays.
-- `useWasmWidgetInteractions.js`/`widgetInteraction.js` (gestures) and
-  `WasmWidgetCanvas.jsx`/`widgetPresentation.js` (layering/pixel placement).
+Check behavior-specific seams, in `ovrley_app/src/features/`:
 
-Put editor-side transformations (e.g. clamped list edits) in `features/widget-editor/utils/`.
+- `widget_preview.rs` `widget_fonts` — request exactly the fonts and weights the family resolves
+  (none when its text is hidden); a missing request fails the preview. `widget_layer` — layering.
+- `overlay_editor/geometry.rs` — framed displays that resize by `size`; the rest by a `factor`.
+- `overlay_editor/interaction.rs` `resize_options` — aspect ratio, rotation, and edge handles.
+
+The same edits reach agents through `widget_update` and `widget_get`'s editor fields: check that
+the new fields work there too.
 
 **Complete when:** all controls and specified gestures update the canonical config, survive
 display switching/save/reload, and present the correct resources and geometry.
@@ -150,36 +148,33 @@ display switching/save/reload, and present the correct resources and geometry.
 ## 6. Verify behavior and fidelity
 
 Test derivations with known inputs/outputs, including gaps and boundaries. Extend relevant
-parser, family, and editor tests. `manifest_activity_tests.rs` covers generated numeric columns;
-`widget-catalog.test.jsx` covers manifest creation, icons, and persistence. For a new
-display or family also extend:
+parser, family, and editor tests. `manifest_activity_tests.rs` covers generated numeric columns.
+For a new display or family also extend, in `ovrley_core/tests/it/`:
 
-- `ovrley_core/tests/display_type_tests.rs` — serde round trip and layout mode.
-- `ovrley_core/tests/wasm_widget_preview_tests.rs` — a `<family>_preview()` fixture (its scene
-  scale is 1.7, so content is scaled); a preview-vs-`render_full_frames` pixel test across samples
-  with unchanged-sample revision skips and malformed-field ingress errors; a resize test that
-  checks the fixed corner. Add the fixture to `every_family_preview()`, give
+- `display_type_tests.rs` — serde round trip and layout mode.
+- `wasm_widget_preview_tests.rs` (preview against export, despite its old name) — a
+  `<family>_preview()` fixture (its scene scale is 1.7, so content is scaled); a pixel test
+  across samples with unchanged-sample revision skips and malformed-field ingress errors; a
+  resize test that checks the fixed corner. Add the fixture to `every_family_preview()`, give
   `every_family_parsed_activity()` the metric's column, and raise the atlas test's value count
   and layer range.
-- `benchmarks/widgets/browser.js` — one case per visual variant.
+
+And add one case per visual variant to `benchmarks/widgets/cases.rs`.
 
 Run from repo root:
 
 ```sh
-pnpm check
-pnpm test
-cargo test --manifest-path crates/ovrley_core/Cargo.toml
+cargo test --workspace --features ovrley_ui/dev-windows
 ```
 
-Follow repository build authorization rules for `pnpm wasm:build` and `pnpm dev`; bindings
-reuse `vendor/skia-wasm`. Verify playback, editing, gestures, save/reload, and native export.
+Verify playback, editing, gestures, save/reload, and export in the app (`pnpm dev:native`).
 Compare actual output with the blueprint at matching size/state, correct visible differences,
 and check preview/export agreement. Without the app, a throwaway test can write
 `widget.pixels()` (premultiplied RGBA) and `geometry()` to the scratchpad for inspection;
 delete it afterwards.
 
 With approval, `pnpm benchmark:widgets:build` then `pnpm benchmark:widgets --run --case <case>`
-(one case per run) measures preview, WASM, and export cost; results land in
+(one case per run) measures preview and export cost; results land in
 `debug/benchmarks/widgets/`.
 
 **Complete when:** behavior and derivations satisfy the template, available visual comparisons

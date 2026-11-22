@@ -1,8 +1,8 @@
 //! Offline preview render binary.
 //!
 //! Renders one or more still-frame preview images (PNG) from an activity
-//! payload and overlay config. Used as a subprocess by the frontend to
-//! generate the preview thumbnails shown in the timeline scrubber.
+//! payload and overlay config. A diagnostic tool:
+//! the app does not run it.
 //!
 //! Supports single-second (`--second`) and batch (`--seconds a,b,c`)
 //! previews. Outputs a timing summary JSON to stdout, and optionally a

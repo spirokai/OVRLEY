@@ -1,7 +1,7 @@
 //! UI-independent application logic for the Slint frontend.
 //!
-//! `lib`, `hooks`, `store` and `features` mirror the same folders of `app/src`. The components
-//! themselves live in ovrley_ui; their state, actions and computation live here.
+//! `lib`, `hooks`, `store` and `features` mirror the folders of the React app it was ported
+//! from. The components themselves live in ovrley_ui; their state, actions and computation live here.
 
 pub mod features;
 pub mod hooks;

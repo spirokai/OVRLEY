@@ -1,7 +1,7 @@
 //! Strict `.oly` project archive boundary.
 //!
-//! The project envelope is validated here before frontend orchestration sees it.
-//! Widget config normalization belongs to the frontend project-load seam, while
+//! The project envelope is validated here before the app sees it.
+//! Widget config normalization belongs to the app's project-load seam, while
 //! archive and platform-path details do not leak into application state.
 
 use crate::raster_resources::RasterResources;

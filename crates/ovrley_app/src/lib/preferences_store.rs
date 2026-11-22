@@ -1,11 +1,10 @@
-//! Port of `lib/preferences-store.js`: the `ovrley-settings.json` preferences that the React app
-//! keeps through `tauri-plugin-store`.
+//! Port of `lib/preferences-store.js`: the `ovrley-settings.json` preferences.
 //!
-//! Both apps read and write the same file with the same keys and values (plan D8):
+//! The file, keys and values are those the Tauri releases wrote, so an update keeps them (plan D8):
 //! - the whole object is read once at startup; a missing file is the documented first run, and a
 //!   file that is not a JSON object fails loudly;
 //! - every write rewrites the whole object, pretty-printed as the plugin's default serializer does,
-//!   so keys owned by other phases or by the React app are kept;
+//!   so keys the app does not read are kept;
 //! - writes are debounced by 100 ms, as the plugin's `autoSave`, go to a temporary file followed by
 //!   a rename, and are flushed when the store is dropped.
 

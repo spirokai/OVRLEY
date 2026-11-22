@@ -26,7 +26,6 @@ The review file is your whole scope: you change what its findings name, at the s
    Done when every finding number has exactly one outcome.
 
 3. **Check the touched code.**
-   - Frontend files: `pnpm exec vp fmt <files> --write` and `pnpm exec vp lint <files>` from `app/`, plus the single test files that cover them (`pnpm exec vp test run <paths>`).
    - Rust: `cargo test` for the touched crate, narrowed to the relevant test names.
    - Builds and the full suite are out of scope.
 

@@ -1,9 +1,8 @@
 //! Offline overlay rendering binary.
 //!
-//! This binary accepts pre-built activity and config JSON files (typically
-//! produced by the frontend) and runs a single-pass Skia + ffmpeg render
-//! without a Tauri window. It is used as a subprocess by the frontend so that
-//! long renders don't block the UI.
+//! This binary accepts pre-built activity and config JSON files and runs a
+//! single-pass Skia + ffmpeg render without a window. It is a diagnostic tool:
+//! the app does not run it.
 //!
 //! Responsibilities:
 //! - Deserialize activity data and render config.
@@ -65,7 +64,7 @@ fn set_ffmpeg_string(config: &mut Value, key: &str, value: Option<String>) -> Re
 ///
 /// # Output
 ///
-/// Prints `{"filename":"<output>"}` to stdout on success so the frontend can
+/// Prints `{"filename":"<output>"}` to stdout on success so a script can
 /// pick up the generated file path.
 fn main() -> Result<(), String> {
     let args = std::env::args().collect::<Vec<_>>();

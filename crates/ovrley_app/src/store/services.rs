@@ -100,7 +100,7 @@ impl Workers {
 }
 
 /// The video tools the player uses off the UI thread (phase 4 D12): filmstrips through
-/// `ovrley_services::video_filmstrip`, the code the Tauri commands use, and codec detection.
+/// `ovrley_services::video_filmstrip`, and codec detection.
 pub trait VideoTools: Send + Sync {
     /// The strip from the disk cache, or `None` on a miss. Cheap: no decode.
     fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String>;
@@ -125,13 +125,13 @@ pub use ovrley_core::encode::ffmpeg::transition_proxy::{TransitionProxyRequest, 
 pub use ovrley_services::video_filmstrip::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
 
 /// The native video tools: the filmstrip cache in the application cache directory, with the limit
-/// the Tauri app keeps in the shared settings file, and the bundled FFmpeg.
+/// is kept in the settings file, and the bundled FFmpeg.
 pub struct NativeVideoTools {
     paths: Arc<ovrley_core::paths::AppPaths>,
     cache: ovrley_services::filmstrip_cache::FilmstripCache,
 }
 
-/// The settings key of the filmstrip cache limit, shared with the Tauri app.
+/// The settings key of the filmstrip cache limit, as the Tauri releases wrote it.
 pub const FILMSTRIP_CACHE_LIMIT_KEY: &str = "filmstripCacheLimitBytes";
 
 impl NativeVideoTools {
@@ -215,16 +215,16 @@ pub trait MapServices: Send + Sync {
     fn map_source(&self) -> Option<ovrley_core::MapSource>;
 }
 
-/// The settings key of the map tile cache limit, shared with the Tauri app.
+/// The settings key of the map tile cache limit, as the Tauri releases wrote it.
 pub const MAP_TILE_CACHE_LIMIT_KEY: &str = "mapTileCacheLimitBytes";
 
-/// The native maps over `MapData`, which the Tauri shell and export use.
+/// The native maps over `MapData`, which export uses too.
 pub struct NativeMapServices {
     data: ovrley_services::map_styles::MapData,
 }
 
 impl NativeMapServices {
-    /// Reads the installed styles and opens the tile cache, as the Tauri shell does. The saved
+    /// Reads the installed styles and opens the tile cache. The saved
     /// limit is a behaviour preference, so it stays strict: absent means the default, anything but
     /// a valid whole number of bytes fails (D11).
     pub fn open(roots: &ovrley_services::runtime_paths::RuntimeRoots, preferences: &PreferencesStore) -> Result<Self, String> {
@@ -284,7 +284,7 @@ pub use ovrley_core::render_jobs::batch::BatchServiceError;
 pub use ovrley_core::render_jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
 pub use ovrley_core::render_jobs::execution::RenderAccepted;
 
-/// The render services the Tauri app holds in `BackendState` (Phase 7 D1, D6): one execution
+/// The render services (Phase 7 D1, D6): one execution
 /// service and one inspection service, called with typed values. Submission, inspection and the
 /// preview frame block, so they run on workers; progress arrives through the mailbox.
 pub trait RenderService: Send + Sync {

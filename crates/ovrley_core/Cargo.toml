@@ -1,5 +1,5 @@
 [package]
-# Standalone Rust core for OVRLEY's Tauri backend. The crate contains activity
+# OVRLEY's core, without a UI. The crate contains activity
 # preparation, Skia overlay rendering, ffmpeg encoding, and backend command
 # helpers so those behaviors can be tested independently from the UI shell.
 name = "ovrley_core"

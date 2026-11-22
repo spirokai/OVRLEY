@@ -1,5 +1,5 @@
-//! Widget contracts and Skia drawing shared by native export and browser WASM.
-//! Hosts acquire resources; this crate performs no filesystem, IPC, or encoding work.
+//! Widget contracts and Skia drawing shared by export and the editor's preview.
+//! Hosts acquire resources; this crate performs no filesystem or encoding work.
 pub mod error;
 pub mod interpolation;
 pub mod rdp;

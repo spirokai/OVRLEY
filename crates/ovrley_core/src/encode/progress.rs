@@ -196,7 +196,7 @@ impl Default for ProgressEstimator {
     }
 }
 
-/// Backend-agnostic sink for progress events. Tauri shell emits via this;
+/// Backend-agnostic sink for progress events. The app's mailbox receives via this;
 /// tests use [`NullSink`]. Must be `Send + Sync`.
 pub trait ProgressSink: Send + Sync {
     fn emit_progress(&self, progress: &RenderProgress);

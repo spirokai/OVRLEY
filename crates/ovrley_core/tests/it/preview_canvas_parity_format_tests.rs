@@ -1,7 +1,6 @@
-//! Canvas-parity regression tests for backend preview formatting.
+//! Regression tests for preview formatting.
 //!
-//! These tests guard the last-mile display contract between the React canvas
-//! preview and the Rust preview-PNG renderer. The underlying interpolated value
+//! These tests guard the last-mile display contract of the preview-PNG renderer. The underlying interpolated value
 //! may already match, final displayed metric still needs to follow the same
 //! rounding rules to avoid visible one-unit mismatches.
 

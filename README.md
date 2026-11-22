@@ -8,7 +8,7 @@
   <img src="docs/hero.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/hero2.avif" alt="OVRLEY Dashboard Interface" width="100%" />
   <img src="docs/widgets-showcase.avif" alt="OVRLEY Widget Showcase" width="100%" />
-  <img src="docs/maps-showcase.avif" alt="OVRLEY Gauge Showcase" width="100%" />
+  <img src="docs/maps-showcase.avif" alt="OVRLEY Map Showcase" width="100%" />
 </div>
 
 <br />
@@ -17,12 +17,12 @@
   <h1><a href="https://www.ovrley.cc">WWW.OVRLEY.CC</a></h1>
   <br/>
   <br/>
-  <p>OVRLEY turns .fit, .gpx, .srt, .igc, .csv, .vbo, dive logs, and embedded .mp4 telemetry from activities, flights, dives, motorsports, and cameras into fully customizable overlays for your videos. Its visual editor lets you design the overlay while a fast native rendering engine handles the final export.</p>
+  <p>OVRLEY turns .fit, .gpx, .tcx, .srt, .igc, .csv, .vbo, dive logs, and embedded .mp4 telemetry from activities, flights, dives, motorsports, and cameras into fully customizable overlays for your videos. Its visual editor lets you design the overlay while a fast native rendering engine handles the final export.</p>
 </div>
 
 ## Features
 
-- **Broad Import Support**: Import `.fit`, `.gpx`, `.srt`, `.igc`, `.csv`, `.vbo`, and dive log files, or use telemetry embedded in supported camera videos. OVRLEY works with data from fitness devices, dive computers, drones, action cameras, and motorsport loggers.
+- **Broad Import Support**: Import `.fit`, `.gpx`, `.tcx`, `.srt`, `.igc`, `.csv`, `.vbo`, and dive log files, or use telemetry embedded in supported camera videos. OVRLEY works with data from fitness devices, dive computers, drones, action cameras, and motorsport loggers.
 - **Interactive Editor**: Drag-and-drop visual editor with live previews, reusable templates, undo/redo, centering guides, and data-availability indicators.
 - **Full Customization**: Shape every widget with your own styling, color, gradient fills, font, and size.
 - **50+ Widgets**: Show speed, heart rate and heart zones, power, cadence, heading compass, G-force, lean angle, RPM, throttle, brake position, lap times, GPS position, ascent, running splits, diving profile, camera settings, and much more.
@@ -33,22 +33,22 @@
 - **Transparent Overlays**: Export with alpha channel (in real-time speed) for maximum flexibility in post-production. Use in Premiere Pro, DaVinci Resolve, Final Cut Pro, or any editor that supports layered video.
 - **Final Video Export**: Export your final video footage with overlays baked in - no separate compositing step required. Multiple codecs, hardware-accelerated pipelines, and custom bitrate.
 - **Hardware-Accelerated Export**: Use supported NVIDIA, AMD, Intel, or Apple hardware (and VA-API on Linux) to drastically speed up video export. A typical cycling overlay exports at around 100-150 fps (H264@4K, RTX 3070-4070).
-- **Real-Time Preview**: Preview at up to 4K/30 fps directly inside the app. The preview runs on the same rendering engine as the final export, so what you see is what you get.
+- **Real-Time Preview**: Preview inside the app at up to the export's resolution, with the widgets updating at the project's frame rate divided by their update rate. The preview draws the widgets with the same rendering engine as the final export.
 - **Flexible Video Sync**: Automatically sync telemetry using camera timestamps, GPS timestamps or supported timestamps in video filenames. You can also adjust the sync by multiple approaches. Negative offsets are supported when the video starts before the telemetry.
 - **Video-Editing Timeline**: See video and telemetry as separate tracks, move through them frame by frame, zoom and pan, and choose exactly which part to export.
 - **Multiple Videos**: Load many clips at once, for example camera files split at a size limit or separate recordings. OVRLEY places every clip by its recording time, also before or after the activity, warns about overlaps and clips that differ in resolution or frame rate, and previews them continuously.
 - **Deleted Parts and Transitions**: Cut unwanted parts out of any clip and choose a transition for every join between clips or around a deleted part from 58 animated `xfade` transitions. Clips recorded back to back join seamlessly by default.
 - **One Video or Separate Files**: Export all clips together as one video with their transitions, or each clip to its own file, as final footage or transparent overlays.
-- **Keyboard Shortcuts**: Use shortcuts for playback, editing, timeline navigation, and other common actions. The help button in the top toolbar shows the full list.
+- **Keyboard Shortcuts**: Use shortcuts for playback, editing, timeline navigation, and other common actions. Settings lists them all under Shortcuts.
 - **Automatic Updates**: Installer builds can check for new versions at startup and update with your permission.
-- **100% Free & Offline**: No subscriptions. All data processing, rendering, and encoding happen locally on your machine. Your data never leaves your computer.
-- **Windows, macOS, and Linux**: Choose an installer build with automatic updates or one of the available portable/manual packages.
+- **100% Free & Local**: No subscriptions. All data processing, rendering, and encoding happen on your machine, and your files are never uploaded. Two features use the network: maps download OpenFreeMap tiles for the area they show, and builds that update themselves check GitHub for updates.
+- **Windows, macOS (Apple Silicon), and Linux**: Choose an installer build with automatic updates or one of the available portable/manual packages.
 
 > ### Using OVRLEY: Download the package for your operating system from the [latest release](https://github.com/spirokai/OVRLEY/releases/latest). Windows offers an installer and a portable ZIP, macOS uses a DMG, and Linux offers an AppImage, a DEB package, and a Flatpak. Installer, DMG, and AppImage builds can notify you when an update is available.
 
 ## Supported Files
 
-- **Fitness and outdoor activities:** `.fit` and `.gpx`
+- **Fitness and outdoor activities:** `.fit`, `.gpx`, and `.tcx`
 - **Action cameras and drones:** `.srt` files and telemetry embedded in supported `.mp4` videos, including footage from DJI, GoPro, and Insta360 devices
 - **Flight logs:** `.igc`
 - **Dive logs:** `.fit`, `.uddf`, `.ssrf`, and `.xml`
@@ -59,11 +59,20 @@ CSV support includes common exports from AiM, RaceChrono, RaceBox, LapLegend, Tr
 
 ## Project Summary
 
-The codebase utilizes a dual-stack architecture to maximize both the user experience and computational performance:
+OVRLEY is a native Rust application. Its crates are in `crates/`:
 
-- **Frontend Interface**: A React application built with Vite (`app`), providing a seamless editing environment for overlay positioning, aesthetic customization, and metric synchronization.
-- **Core Engine**: A standalone Rust backend (`ovrley_core`) utilizing Skia for frame-perfect 2D graphics rendering and FFmpeg for high-speed video compositing.
-- **Desktop Shell**: A lightweight Tauri wrapper that bridges the web-based interface with the native Rust core, granting access to the local file system and hardware resources.
+| Crate              | Role                                                                                    |
+| ------------------ | --------------------------------------------------------------------------------------- |
+| `ovrley_ui`        | The window: the Slint interface, the glue to the app's logic, and the `ovrley` binary   |
+| `ovrley_app`       | The app's state, actions and logic, without any UI                                      |
+| `ovrley_services`  | Desktop services: projects, files, map tiles and styles, paths, the updater             |
+| `ovrley_mcp`       | The MCP server for AI agents                                                            |
+| `ovrley_playback`  | Video playback with MDK, into the window's GPU textures                                 |
+| `ovrley_core`      | Activity parsing, validation, the export renderer and FFmpeg encoding                   |
+| `ovrley_widgets`   | The widgets, drawn with Skia, for the preview and the export alike                      |
+| `ovrley_map`       | The map renderer, on wgpu                                                               |
+
+[ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how they work together, and [MCP.md](docs/MCP.md) how to let an AI agent drive the app.
 
 ## Export & Codecs
 
@@ -72,6 +81,7 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 **Transparent Overlays**
 
 - `ProRes CPU`: The safest general recommendation. High quality and excellent compatibility with professional editors like Premiere Pro or DaVinci Resolve.
+- `ProRes VideoToolbox`: Apple's hardware ProRes encoder, on macOS.
 - `ProRes Vulkan`: A newer, GPU-accelerated option for ProRes. Frees up your CPU for other tasks, though hardware/driver compatibility may vary.
 - `QT RLE`: Offers significantly smaller file sizes and extremely fast export times, though with slightly lower compatibility in some basic video players.
 
@@ -79,75 +89,82 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 
 - `H.264/H.265`: Industry-standard codecs for maximum compatibility. Custom bitrate setting to balance quality and file size.
 
-**Hardware-Acceleration Options**: `NVENC/CUDA/AMF/QSV/VideoToolbox/VA-API` hardware-accelerated encoding options to take full advantage of your system and GPU to speed up export times.
+**Hardware-Acceleration Options**, where the system supports them:
+
+| System  | H.264 and H.265                                          | ProRes                |
+| ------- | -------------------------------------------------------- | --------------------- |
+| Windows | NVIDIA NVENC (with or without CUDA), AMD AMF, Intel QSV  | Vulkan                |
+| macOS   | VideoToolbox                                             | VideoToolbox, Vulkan  |
+| Linux   | NVIDIA NVENC (with or without CUDA), VA-API              | Vulkan                |
+
+CPU export is always offered.
 
 ## Dependencies
 
-- **Node.js 24 and pnpm 10.25.0**: one workspace and root lockfile. Frontend tooling uses **Vite+** (`vp`) for development, builds, linting, formatting, and Vitest tests.
-- **Rust via rustup**: rustup installs the toolchain pinned in [`rust-toolchain.toml`](rust-toolchain.toml) for both the native app and the browser preview bindings; the WASM build adds its targets.
-- **Tauri v2 platform prerequisites**: native compiler and webview development tools (MSVC Build Tools and WebView2 on Windows, Xcode Command Line Tools on macOS, system development packages on Linux).
-- **Emscripten 6.0.9** installed and activated through emsdk, plus **Python 3.10+** and **Git**.
-- **FFmpeg 8.1+ full build**: downloaded automatically into `vendor/ffmpeg` during installation.
+- **Rust via rustup**: rustup installs the toolchain pinned in [`rust-toolchain.toml`](rust-toolchain.toml).
+- **A C++17 compiler and linker**: the MSVC Build Tools on Windows, the Xcode Command Line Tools on macOS, `build-essential` on Linux. Linux also needs `pkg-config` and the development packages of fontconfig and FreeType, and the system libraries that the player links; the release workflow ([`workflow_linux.yml`](.github/workflows/workflow_linux.yml)) installs the full list.
+- **Node.js 24 and pnpm 10.25.0**, for the scripts: installation, packaging, releases and benchmarks.
+- **FFmpeg** and the **MDK SDK** (video playback): `pnpm install` downloads both into `vendor/`. On Windows, the SDK is a 7z archive: Windows' own `tar` or 7-Zip extracts it.
 
-The prebuilt Skia WASM archive ships in [`vendor/skia-wasm`](vendor/skia-wasm). Ordinary bindings builds reuse it; GN, Ninja, and libclang are only needed to rebuild Skia from source. Native Skia uses upstream prebuilt binaries.
+Skia comes from rust-skia's prebuilt binaries.
 
 ## Dev Installation
 
-After cloning, install the dependencies above and activate Emscripten 6.0.9 in your emsdk installation. Run the following from the repository root:
+Run from the repository root:
 
 ```bash
-rustup toolchain install 1.98.1 --profile minimal --target wasm32-unknown-emscripten
 pnpm install --frozen-lockfile
 ```
 
-Copy [`.env.example`](.env.example) to `.env.local` and set `EMSDK` to your SDK directory. Set `PYTHON` if the Python on PATH is older than 3.10. Both the Tauri launcher and WASM scripts load this file; shell variables take precedence. `LIBCLANG_PATH` is only needed for rebuilding Skia.
-
-Use pnpm for all packages; no separate install in `app/` is needed.
+An MDK SDK kept elsewhere is used through `MDK_SDK`, set in the shell that runs cargo (see [`.env.example`](.env.example)).
 
 ## Development
 
-Run commands from the repository root:
-
 ```bash
-pnpm dev                       # Tauri app with frontend hot reload
-pnpm dev:frontend              # Frontend server only
-pnpm wasm:build                # Build JS/WASM bindings using stored Skia
+pnpm dev:native        # The app
+pnpm dev:native:live   # The app with Slint live preview: saving a .slint file reloads the UI
+pnpm showcase:native   # The component showcase
 ```
 
-The Vite plugin builds WASM bindings on first preview access and rebuilds/reloads when renderer sources change. Production frontend builds also generate and include the bindings.
-
-### Rebuilding Skia from source
-
-Only needed when updating the stored Skia bundle. In addition to the tools above, install **LLVM/libclang** and set `LIBCLANG_PATH` (LLVM 23.1.0 is verified). The script fetches **GN** and pinned Skia sources/dependencies. It downloads **Ninja 1.13.1** on Windows; on other platforms install Ninja or set `NINJA` to its executable. Network access and several GB of disk space are required.
-
-Configure tool paths in the root `.env.local`: `EMSDK` for the SDK directory, `LIBCLANG_PATH` for the directory containing libclang, and optional `PYTHON` and `NINJA` executable paths. See [`.env.example`](.env.example); GN is managed by the script.
-
-```bash
-pnpm wasm:skia:build  # Compile Skia and regenerate vendor/skia-wasm
-pnpm wasm:build       # Verify bindings consume the regenerated bundle
-```
-
-See the [WASM setup guide](src-tauri/wasm-bindings/README.md) for toolchain details.
+`pnpm dev:native:live` sets its environment variable in POSIX shell syntax, so on Windows run it from such a shell.
 
 ## Available Test Suites
 
-The Rust backend includes several extra test suites covering rendering correctness, cross-pipeline parity, and encoding performance:
+```bash
+cargo test --workspace --features ovrley_ui/dev-windows   # Everything that is not ignored
+pnpm test:native-ui                                       # The app, services, MCP and UI component tests
+```
 
-| Suite                | Purpose                                                                                        | Docs                                                         |
-| -------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Render Baselines** | Pixel-level regression tests — rendered frames and videos compared against committed baselines | [`BASELINES.md`](crates/ovrley_core/BASELINES.md)         |
-| **Canvas Parity**    | Rust Skia vs browser SVG pixel comparison with SSIM scoring and diff images                    | [`CANVAS_PARITY.md`](crates/ovrley_core/CANVAS_PARITY.md) |
-| **Benchmarks**       | Real-render encoding benchmarks measuring job time and file size per codec/hardware profile    | [`BENCHMARKS.md`](crates/ovrley_core/BENCHMARKS.md)       |
+| Suite                | Purpose                                                                                  | Docs                                                |
+| -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| **Render Baselines** | Rendered frames and videos compared with committed baselines (ignored; run by hand)      | [`BASELINES.md`](crates/ovrley_core/BASELINES.md)   |
+
+## Benchmarks
+
+| Benchmark                   | Measures                                                         | Docs                                                    |
+| --------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------- |
+| **Encoding**                | Job time and file size per codec, and per widget update rate     | [`BENCHMARKS.md`](crates/ovrley_core/BENCHMARKS.md)     |
+| **Widgets**                 | Each widget's preview and export cost                            | [`widgets`](benchmarks/widgets/README.md)               |
+| **Widget interactions**     | Group drags and resizes: the update loop and the preview redraw  | [`widget-interactions`](benchmarks/widget-interactions/README.md) |
+| **Map labels**              | What map labels cost in export                                   | [`map-labels`](benchmarks/map-labels/README.md)         |
+| **Overlay pipeline**        | Where composite export time goes in FFmpeg                       | [`run.mjs`](benchmarks/overlay-pipeline/run.mjs)        |
 
 ## Building & Compatibility
 
-To compile a production release:
+Packaging needs cargo-packager at the pinned revision:
 
 ```bash
-pnpm run build
+pnpm install:packager
+pnpm build
 ```
 
-**Portable Distribution:** The build process bypasses traditional system installers. Instead, it generates a standalone, portable application packaged neatly within a `.zip` file. This allows for immediate extraction and execution without elevated system privileges.
+| System  | `pnpm build` makes                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------ |
+| Windows | The NSIS installer and the portable ZIP                                                          |
+| macOS   | `OVRLEY.app` and the portable ZIP; with a signing key also the updater's `.app.tar.gz`           |
+| Linux   | The Debian package, without the no-update marker that its release workflow adds                  |
+
+The DMG, the AppImage, the Flatpak and the Microsoft Store package are built by the release workflows. See [packaging](packaging/README.md).
 
 ---
 

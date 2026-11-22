@@ -2,8 +2,7 @@
 //! these tiles are installed with the build: see `map_styles`.
 //!
 //! This module is the sole owner of tile coordinate validation, upstream tile
-//! requests, and the on-disk tile cache. The loopback server only delegates
-//! matching requests here and turns the result into a local HTTP response.
+//! requests, and the on-disk tile cache.
 
 use http_cache_semantics::{AfterResponse, BeforeRequest, CachePolicy};
 use reqwest::blocking::Client;

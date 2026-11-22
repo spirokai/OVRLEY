@@ -129,7 +129,7 @@ pub fn run(
     #[cfg(windows)]
     window.global::<crate::AppShell>().set_windows_10(platform::is_windows_10());
     let paths = Arc::new(paths);
-    // The blends of earlier sessions, as the Tauri shell clears them.
+    // The blends of earlier sessions.
     ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(&paths)
         .map_err(|error| format!("Could not clear the transition previews: {error}"))?;
     let video_tools = Arc::new(ovrley_app::store::services::NativeVideoTools::open(Arc::clone(&paths), app_cache_dir, &preferences)?);

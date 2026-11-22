@@ -1,7 +1,7 @@
 //! CoreError display-string tests.
 //!
 //! Verifies every `CoreError` variant's `Display` impl produces a
-//! human-readable message that the frontend receives via Tauri IPC.
+//! human-readable message that the app shows.
 //! Ensures IO errors include the file path, FFmpeg errors include
 //! stderr, and serialization errors propagate the parse failure context.
 //!

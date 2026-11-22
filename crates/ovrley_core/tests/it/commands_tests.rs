@@ -2,7 +2,7 @@
 //!
 //! Exercises `RenderExecutionService`, `derive_composite_render_plan`, and
 //! composite timing normalization — the
-//! main Tauri-command dispatch layer. Verifies transparent vs composite
+//! main command layer. Verifies transparent vs composite
 //! branch routing, missing-field validation, sync-offset timing, overlay
 //! update-rate calculations, and default render duration derivation.
 //!

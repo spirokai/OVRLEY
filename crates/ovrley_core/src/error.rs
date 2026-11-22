@@ -13,7 +13,7 @@
 //! Related modules: consumed by every module in the crate via `use crate::error::CoreResult`.
 //!
 //! ## Display Contract
-//! Render path errors cross the Tauri boundary as structured reasons and parameters;
+//! Render path errors reach the app as structured reasons and parameters;
 //! the frontend owns their localized text. Other variants use `.to_string()` there.
 //! Display messages should be readable by end users, not Rust developers.
 //! Avoid leaking internal implementation details (paths may be an exception when

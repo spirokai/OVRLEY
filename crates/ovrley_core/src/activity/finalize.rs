@@ -84,7 +84,7 @@ impl FinalizedActivity {
 
 /// Parses the backend raw contract before finalization.
 ///
-/// This keeps Tauri command handlers thin: serde validation and activity-domain
+/// This keeps callers thin: serde validation and activity-domain
 /// error wording live beside the finalizer, while callers still pass plain JSON.
 pub fn parse_raw_activity_json(input: &str) -> CoreResult<RawActivity> {
     serde_json::from_str(input)

@@ -10,11 +10,11 @@ vendor/ffmpeg/bin/ffmpeg[.exe]
 
 Packages also carry the MDK player's libraries, which the executable links. `pnpm install` fetches its SDK into `vendor/mdk-sdk/`, and `pnpm prepare:packaging` copies the libraries a package needs to `target/packaging/player/`.
 
-`pnpm build` runs `scripts/package.mjs`: the release build, the packaging resources, cargo-packager (configured in `crates/ovrley_ui/Cargo.toml`) and, on Windows and macOS, the portable ZIP of `packaging/portable.mjs`. `pnpm install:packager` installs cargo-packager at the pinned revision, as the workflows do.
+`pnpm build` runs `scripts/package.mjs`: the release build, the packaging resources, cargo-packager (configured in `crates/ovrley_ui/Cargo.toml`) and, on Windows and macOS, the portable ZIP of `packaging/portable.mjs`. The DMG, the AppImage, the Flatpak and the Store's MSIX are built by their workflows. `pnpm install:packager` installs cargo-packager at the pinned revision, as the workflows do.
 
 The updater (`ovrley_services::updater`) reads the release's `latest.json`, which `scripts/release/create-latest-json.mjs` writes. The artifacts it installs must be signed by cargo-packager (`CARGO_PACKAGER_SIGN_PRIVATE_KEY` and its `_PASSWORD`), which signs the version too; the AppImage is signed with `cargo packager signer sign --app-version <version>`.
 
-At runtime a package's resources are found from the executable (`ovrley_services::runtime_paths`); development and CLI helper binaries use the repository. `OVRLEY_FFMPEG` and `FFMPEG_BINARY` still override all bundled paths.
+At runtime a package's resources are found from the executable (`ovrley_services::runtime_paths`); development and CLI helper binaries use the repository. `OVRLEY_FFMPEG` overrides the bundled FFmpeg. Without either, `ffmpeg` on `PATH` is used.
 
 ## Windows
 

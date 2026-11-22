@@ -1,12 +1,12 @@
 //! Core rendering and encoding library for OVRLEY.
 //!
-//! This crate is the Rust backend used by the Tauri shell. It owns the
-//! production data path from frontend JSON payloads through activity trimming,
+//! The app calls it with typed values. It owns the
+//! production data path from the render config through activity trimming,
 //! per-frame interpolation, Skia overlay rendering, ffmpeg encoding, progress
 //! tracking, and debug artifact generation.
 //!
-//! Public modules are intentionally grouped by responsibility so the Tauri
-//! command layer can stay thin while the testable business logic remains here.
+//! Public modules are intentionally grouped by responsibility so the app's
+//! services stay thin while the testable business logic remains here.
 #![recursion_limit = "256"]
 
 pub use ovrley_map::{MapDataSource, MapSource};
@@ -17,7 +17,7 @@ pub mod activity;
 pub mod benchmark_common;
 /// Shared CLI argument helpers for diagnostic binaries.
 pub mod bin_common;
-/// Backend-facing command helpers used by the Tauri application layer.
+/// Template, preview-frame and file helpers the app calls.
 pub mod commands;
 /// Progress and timing diagnostics shared by render and encode code.
 pub mod debug;

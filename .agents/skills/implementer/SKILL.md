@@ -29,7 +29,6 @@ The task file is your whole scope: build what it asks, and nothing it doesn't.
    Where the task is silent on a choice that changes behaviour, take the reading closest to the existing code and record it as an **assumption**.
 
 4. **Check the touched code.**
-   - Frontend files: `pnpm exec vp fmt <files> --write` and `pnpm exec vp lint <files>` from `app/`, plus the single test files that cover them (`pnpm exec vp test run <paths>`).
    - Rust: `cargo test` for the touched crate, narrowed to the relevant test names.
 
    Done when every check you ran is green, or its failure is recorded for the return.
