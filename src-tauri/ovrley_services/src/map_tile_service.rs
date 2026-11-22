@@ -103,18 +103,6 @@ pub enum TileCacheStatus {
     Stale,
 }
 
-impl TileCacheStatus {
-    pub fn as_header_value(self) -> &'static str {
-        match self {
-            Self::Hit => "hit",
-            Self::Miss => "miss",
-            Self::Revalidated => "revalidated",
-            Self::Refreshed => "refreshed",
-            Self::Stale => "stale",
-        }
-    }
-}
-
 struct CacheMaintenance {
     gate: RwLock<()>,
     accounting: Mutex<CacheAccounting>,
@@ -139,7 +127,7 @@ struct PersistentEntry {
 }
 
 impl MapTileService {
-    #[cfg(any(test, feature = "test-support"))]
+    #[cfg(test)]
     pub fn new(
         cache_root: PathBuf,
         source_url: String,
@@ -155,7 +143,7 @@ impl MapTileService {
         )
     }
 
-    #[cfg(any(test, feature = "test-support"))]
+    #[cfg(test)]
     pub fn new_with_timeouts(
         cache_root: PathBuf,
         source_url: String,
@@ -173,7 +161,7 @@ impl MapTileService {
         )
     }
 
-    #[cfg(any(test, feature = "test-support"))]
+    #[cfg(test)]
     pub fn new_with_cache_limit(
         cache_root: PathBuf,
         source_url: String,
@@ -1017,32 +1005,6 @@ fn remove_if_present(path: &Path) -> Result<(), String> {
             path.display()
         )),
     }
-}
-
-pub fn parse_tile_path(path: &str) -> Option<TileCoordinates> {
-    let route = path.strip_prefix("/tiles/")?;
-    let mut segments = route.split('/');
-    let zoom = parse_decimal(segments.next()?)?;
-    let x = parse_decimal(segments.next()?)?;
-    let y_segment = segments.next()?;
-    if segments.next().is_some() {
-        return None;
-    }
-    let y = parse_decimal(y_segment.strip_suffix(".pbf")?)?;
-
-    if zoom > 14 {
-        return None;
-    }
-    let coordinate_limit = 1_u32 << zoom;
-    if x >= coordinate_limit || y >= coordinate_limit {
-        return None;
-    }
-
-    Some(TileCoordinates {
-        zoom: zoom as u8,
-        x,
-        y,
-    })
 }
 
 fn parse_decimal(value: &str) -> Option<u32> {

@@ -1,15 +1,10 @@
-//! Native ownership of immutable finalized activity snapshots, map tile preparation, the native
-//! editor preview's map frames and preview font resources.
+//! Map tile preparation and the editor preview's map frames.
 use crate::map_styles::MapData;
-use ovrley_core::{
-    activity::finalize::FinalizeActivityResponse, activity::schema::ParsedActivity, paths::AppPaths, render::download_preview_tiles,
-    CoreError,
-};
+use ovrley_core::{render::download_preview_tiles, CoreError};
 use ovrley_widgets::{
     activity::ActivitySampler,
     host::WidgetHost,
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
-    preview::FontRequest,
     render::preview::PreviewRasterScale,
     widgets::{
         map::{
@@ -17,14 +12,12 @@ use ovrley_widgets::{
             preview::{MapFrameFactory, MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest},
             validation::validate_map_widget,
         },
-        splits_run::table::SplitLength,
     },
 };
 use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes};
 use ovrley_map::{MapStyleBuildings, MapStyleInfo};
-use serde::Serialize;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::HashMap,
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         mpsc, Arc, Mutex,
@@ -32,50 +25,6 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-
-/// Finalized activities retained for the preview, keyed by the id handed to the frontend.
-#[derive(Default)]
-pub struct PreviewActivities(Mutex<BTreeMap<String, Vec<u8>>>);
-
-impl PreviewActivities {
-    pub fn retain(&self, mut response: FinalizeActivityResponse) -> Result<FinalizeActivityResponse, String> {
-        let id = uuid::Uuid::new_v4().to_string();
-        let bytes = serde_json::to_vec(&response.parsed_activity).map_err(|e| e.to_string())?;
-        self.0.lock().expect("preview activities lock").insert(id.clone(), bytes);
-        response.parsed_activity.extra.insert("preview_activity_id".into(), id.into());
-        Ok(response)
-    }
-
-    /// The serialized activity retained under `activity_id`.
-    pub fn snapshot(&self, activity_id: &str) -> Result<Vec<u8>, String> {
-        self.0
-            .lock()
-            .expect("preview activities lock")
-            .get(activity_id)
-            .cloned()
-            .ok_or_else(|| format!("unknown preview activity: {activity_id}"))
-    }
-
-    pub fn release(&self, activity_id: &str) {
-        self.0.lock().expect("preview activities lock").remove(activity_id);
-    }
-
-    /// Running splits of one retained activity for a widget's split length, serialized.
-    pub fn split_table(&self, activity_id: &str, length: SplitLength) -> Result<Vec<u8>, String> {
-        if !length.distance.is_finite() || length.distance <= 0.0 {
-            return Err(format!("split length must be positive, got {}", length.distance));
-        }
-        let activity: ParsedActivity = {
-            let snapshots = self.0.lock().expect("preview activities lock");
-            let bytes = snapshots
-                .get(activity_id)
-                .ok_or_else(|| format!("unknown preview activity: {activity_id}"))?;
-            serde_json::from_slice(bytes).map_err(|e| e.to_string())?
-        };
-        let table = ovrley_core::activity::splits::derive_split_table(&activity, length);
-        serde_json::to_vec(&table).map_err(|e| e.to_string())
-    }
-}
 
 /// The tiles of a map route being downloaded. A newer request replaces it.
 #[derive(Default)]
@@ -92,17 +41,7 @@ impl MapDownload {
     }
 }
 
-/// Progress of a map tile preparation, as the preview shows it.
-#[derive(Clone, Serialize)]
-#[serde(tag = "state", rename_all = "lowercase")]
-pub enum MapPrepareEvent {
-    Needed { total: usize },
-    Downloading { done: usize, total: usize },
-    Ready,
-    Failed { error: String },
-}
-
-/// A map tile preparation request: the retained activity and the map widgets to prepare for.
+/// A map tile preparation request: the serialized activity and the map widgets to prepare for.
 pub struct MapPrepareRequest {
     pub activity: Vec<u8>,
     pub widgets: Vec<MapConfig>,
@@ -117,7 +56,6 @@ pub fn prepare_map_tiles(
     request: MapPrepareRequest,
     source: &MapData,
     cancelled: &AtomicBool,
-    on_event: &(dyn Fn(MapPrepareEvent) + Sync),
 ) -> Result<(), String> {
     let MapPrepareRequest {
         activity,
@@ -138,26 +76,11 @@ pub fn prepare_map_tiles(
             .map(|(index, widget)| validate_map_widget(widget, index))
             .collect::<Result<Vec<_>, _>>()
             .map_err(CoreError::from)?;
-        download_preview_tiles(&widgets, &scene, &host, &activity, source, cancelled, &|done, total| {
-            // Often enough for a progress bar, and quiet on a route of thousands of tiles.
-            if done == 0 {
-                on_event(MapPrepareEvent::Needed { total });
-            } else if done % (total / 50).max(1) == 0 {
-                on_event(MapPrepareEvent::Downloading { done, total });
-            }
-        })
+        download_preview_tiles(&widgets, &scene, &host, &activity, source, cancelled, &|_, _| {})
     })();
     match result {
-        Ok(()) => {
-            on_event(MapPrepareEvent::Ready);
-            Ok(())
-        }
-        Err(CoreError::Cancelled) => Ok(()),
-        Err(error) => {
-            let error = error.to_string();
-            on_event(MapPrepareEvent::Failed { error: error.clone() });
-            Err(error)
-        }
+        Ok(()) | Err(CoreError::Cancelled) => Ok(()),
+        Err(error) => Err(error.to_string()),
     }
 }
 
@@ -374,9 +297,4 @@ fn run_map_frames(receiver: &mpsc::Receiver<FrameJob>, data: &MapData, wake: &(d
             }
         }
     }
-}
-
-/// The font file a preview widget asks for.
-pub fn preview_font(paths: &AppPaths, request: &FontRequest) -> Result<Vec<u8>, String> {
-    ovrley_core::fonts::preview_font_resource(&paths.font_dirs, &request.font, request.font_weight, request.italic).map_err(|e| e.to_string())
 }

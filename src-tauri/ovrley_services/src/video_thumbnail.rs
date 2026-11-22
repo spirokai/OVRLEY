@@ -2,7 +2,6 @@
 //! cards of the video panel. Card thumbnails are made on import and project load and
 //! are never stored.
 
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -42,9 +41,4 @@ pub fn generate_thumbnail(ffmpeg: &Path, video_path: &Path) -> Option<Vec<u8>> {
         return None;
     }
     Some(output.stdout)
-}
-
-/// Encodes PNG bytes as a `data:` URL the webview can show directly.
-pub fn png_data_url(bytes: &[u8]) -> String {
-    format!("data:image/png;base64,{}", BASE64_STANDARD.encode(bytes))
 }

@@ -1,6 +1,5 @@
 //! Immutable selected raster resources shared by editor history and render jobs.
 
-use base64::Engine;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -21,13 +20,6 @@ impl RasterResources {
             .unwrap()
             .insert(id.clone(), Arc::new(image));
         id
-    }
-
-    pub fn preview_png_base64(&self, resource_id: &str) -> Result<String, String> {
-        let image = self
-            .resolve(resource_id)
-            .ok_or_else(|| "Raster image resource is unavailable".to_string())?;
-        Ok(base64::engine::general_purpose::STANDARD.encode(image.preview_png()))
     }
 
     pub fn owned_assets(
@@ -55,6 +47,7 @@ impl RasterResourceResolver for RasterResources {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
 
     #[test]
     fn replacement_keeps_both_immutable_versions_available() {

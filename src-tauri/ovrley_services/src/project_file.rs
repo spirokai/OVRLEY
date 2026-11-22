@@ -1358,11 +1358,6 @@ pub fn read_project(resources: &RasterResources, path: &str) -> Result<ReadProje
     read_project_sync(resources, path).map_err(|error| error.command_error("invalid_archive"))
 }
 
-/// The JSON entry of the Tauri command: [`read_project`].
-pub fn read_project_file(resources: &RasterResources, path: String) -> Result<ReadProjectResult, String> {
-    read_project(resources, &path)
-}
-
 fn read_project_sync(
     resources: &RasterResources,
     path: &str,
@@ -1642,20 +1637,6 @@ pub fn write_project(
     images: HashMap<String, Arc<SelectedRaster>>,
 ) -> Result<WriteProjectResult, String> {
     write_project_sync(path, document, ffmpeg, images).map_err(|error| error.command_error("save_failed"))
-}
-
-/// The JSON entry of the Tauri command: the JSON is migrated to the current format and parsed,
-/// then [`write_project`].
-pub fn write_project_file(
-    path: String,
-    project_json: String,
-    ffmpeg: Option<&Path>,
-    images: HashMap<String, Arc<SelectedRaster>>,
-) -> Result<WriteProjectResult, String> {
-    let document = migrate_project_json(&project_json)
-        .map_err(|error| ProjectFileError::from(error).command_error("save_failed"))?
-        .document;
-    write_project(&path, document, ffmpeg, images)
 }
 
 #[cfg(test)]
@@ -2053,7 +2034,7 @@ mod tests {
                 original
             );
             assert_eq!(
-                resources.preview_png_base64(resource_id).unwrap(),
+                BASE64_STANDARD.encode(resources.resolve(resource_id).unwrap().preview_png()),
                 expected_preview
             );
         }

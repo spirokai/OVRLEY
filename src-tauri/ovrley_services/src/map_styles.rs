@@ -16,16 +16,15 @@ pub use ovrley_map::{MapStyleCatalog, MapStyleInfo};
 
 use crate::map_tile_service::{MapTileService, TileCoordinates};
 use ovrley_map::{
-    read_style_file, MapDataSource, MapSource, MapStyleId, VECTOR_SOURCE,
+    read_style_file, MapDataSource, MapSource, MapStyleId,
 };
 use ovrley_widgets::model::standard_widgets::default_map_style;
-use serde_json::{json, Value as Json};
+use serde_json::Value as Json;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-const ATTRIBUTION: &str = "<a href=\"https://openfreemap.org\">OpenFreeMap</a> <a href=\"https://www.openmaptiles.org/\">&copy; OpenMapTiles</a> Data from <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a>";
 
 /// Where installed styles are read from.
 pub struct MapStyleDirs {
@@ -114,21 +113,6 @@ impl MapStyleRegistry {
 
     pub fn catalog(&self) -> &MapStyleCatalog {
         &self.catalog
-    }
-
-    /// The style as the preview's MapLibre reads it: its vector tiles from `tile_url_template`, the
-    /// local tile service, at the zooms it serves. `None` when `id` isn't installed.
-    pub fn served(&self, id: &str, tile_url_template: &str) -> Option<Vec<u8>> {
-        let mut style = self.documents.get(&MapStyleId::new(id).ok()?)?.clone();
-        let source = style["sources"][VECTOR_SOURCE]
-            .as_object_mut()
-            .expect("an installed style draws from an openmaptiles source");
-        source.remove("url");
-        source.insert("tiles".into(), json!([tile_url_template]));
-        source.insert("minzoom".into(), json!(0));
-        source.insert("maxzoom".into(), json!(14));
-        source.insert("attribution".into(), json!(ATTRIBUTION));
-        Some(serde_json::to_vec(&style).expect("a JSON document serializes"))
     }
 }
 
@@ -224,6 +208,7 @@ impl MapDataSource for MapData {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use uuid::Uuid;
 
     fn bundled_dir() -> PathBuf {
@@ -333,26 +318,5 @@ mod tests {
         assert!(user.is_dir());
         assert!(load(&root.join("missing"), &user).is_err());
         fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn a_served_style_reads_its_tiles_from_the_local_service() {
-        let user = temp_dir("served");
-        let registry = load(&bundled_dir(), &user).unwrap();
-        let served: Json = serde_json::from_slice(
-            &registry
-                .served("liberty", "http://127.0.0.1:1/tiles/{z}/{x}/{y}.pbf")
-                .unwrap(),
-        )
-        .unwrap();
-        let source = &served["sources"][VECTOR_SOURCE];
-        assert_eq!(
-            source["tiles"][0],
-            "http://127.0.0.1:1/tiles/{z}/{x}/{y}.pbf"
-        );
-        assert!(source.get("url").is_none());
-        assert!(registry.served("unknown", "x").is_none());
-        assert!(registry.served("Liberty", "x").is_none());
-        fs::remove_dir_all(user).unwrap();
     }
 }

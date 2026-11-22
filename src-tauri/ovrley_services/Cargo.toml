@@ -1,17 +1,13 @@
 [package]
-# Desktop services shared by the Tauri shell and the native app: project files, file operations,
-# map styles and tiles, runtime paths, distribution detection, raster resources, widget previews,
-# video thumbnails and timeline filmstrips.
+# The app's desktop services: project files, file operations, map styles and tiles, runtime paths,
+# distribution detection, raster resources, widget previews, video thumbnails and timeline
+# filmstrips.
 name = "ovrley_services"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.98"
 publish = false
 license = "GPL-3.0-or-later"
-
-[features]
-# Test-only constructors of the tile service, used by the Tauri crate's video-server tests.
-test-support = []
 
 [dependencies]
 serde_json = "1.0"

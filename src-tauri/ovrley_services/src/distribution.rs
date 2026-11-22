@@ -1,9 +1,7 @@
-use serde::Serialize;
 use std::path::PathBuf;
 
 /// The two supported application distribution modes.
-#[derive(Clone, Copy, Debug, Serialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DistributionKind {
     Installed,
     Portable,

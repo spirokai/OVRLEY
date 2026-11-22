@@ -259,7 +259,7 @@ impl MapServices for NativeMapServices {
     }
 
     fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String> {
-        ovrley_services::widget_preview::prepare_map_tiles(request, &self.data, cancelled, &|_| {})
+        ovrley_services::widget_preview::prepare_map_tiles(request, &self.data, cancelled)
     }
 
     fn tile_cache_usage(&self) -> Result<TileCacheUsage, String> {
