@@ -88,6 +88,28 @@ OVRLEY supports both exporting transparent overlays as well as final footage wit
 
 The prebuilt Skia WASM archive ships in [`vendor/skia-wasm`](vendor/skia-wasm). Ordinary bindings builds reuse it; GN, Ninja, and libclang are only needed to rebuild Skia from source. Native Skia uses upstream prebuilt binaries.
 
+## Nix installation
+
+The flake builds OVRLEY from source for `x86_64-linux`, `aarch64-linux`, `x86_64-darwin`, and `aarch64-darwin`. All frontend, Rust, Skia, Emscripten, and FFmpeg dependencies are pinned in the flake; the build itself does not run the interactive toolchain or FFmpeg installers.
+
+```bash
+# Run directly from a checkout
+nix run .
+
+# Build the application (result/bin/OVRLEY)
+nix build .#ovrley
+
+# Install into your user profile
+nix profile install .#ovrley
+```
+
+You can also run or install from GitHub:
+
+```bash
+nix run github:spirokai/OVRLEY
+nix profile install github:spirokai/OVRLEY#ovrley
+```
+
 ## Dev Installation
 
 After cloning, install the dependencies above and activate Emscripten 6.0.9 in your emsdk installation. Run the following from the repository root:
