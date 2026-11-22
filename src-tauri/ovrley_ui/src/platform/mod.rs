@@ -1,6 +1,8 @@
 //! The platform layer: backend selection, window chrome, and the services `ovrley_app` defines as
 //! traits (plan D3), implemented with Slint, winit, `rfd` and `arboard`.
 
+#[cfg(target_os = "linux")]
+pub mod appimage_integration;
 pub mod gpu;
 pub mod key_input;
 #[cfg(target_os = "linux")]

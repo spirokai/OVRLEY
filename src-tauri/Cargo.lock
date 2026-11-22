@@ -5983,6 +5983,7 @@ dependencies = [
  "arboard",
  "ash",
  "block2 0.6.2",
+ "dirs 6.0.0",
  "env_logger",
  "i-slint-backend-testing",
  "iconify",

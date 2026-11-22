@@ -50,6 +50,8 @@ fn start() -> Result<(), String> {
     let roots = RuntimeRoots::from_platform(installed_resource_dir)?;
     let distribution = ovrley_services::distribution::detect()?;
     log::info!("{distribution:?} distribution; settings in {}", roots.app_data_dir.display());
+    #[cfg(target_os = "linux")]
+    ovrley_ui::platform::appimage_integration::register();
 
     let preferences = open_preferences(&roots.app_data_dir)?;
     let store = Store::hydrate(&preferences).unwrap_or_else(|error| {

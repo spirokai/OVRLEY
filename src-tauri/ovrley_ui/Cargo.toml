@@ -88,6 +88,8 @@ windows = { version = "0.62", default-features = false, features = [
 
 # The Wayland drop listener (winit reports no drops on Wayland).
 [target.'cfg(target_os = "linux")'.dependencies]
+# The AppImage's menu entry goes into the user's data folder (`platform/appimage_integration.rs`).
+dirs = "6"
 # The device extension video playback's Vulkan–OpenGL bridge needs (`platform/gpu.rs`). wgpu-hal's
 # version.
 ash = "0.38"
