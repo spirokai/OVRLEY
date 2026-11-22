@@ -309,7 +309,7 @@ fn test_3_2b_composite_clamps_tiny_video_overrun_to_activity_end() {
 /// path, progress never reaching `complete`, encoded frame count mismatch.
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
 fn test_4_3_composite_branch_reaches_pipeline_shell() {
-    let ws_root = common::test_config::workspace_root();
+    let ws_root = common::test_config::repo_git_root();
     let paths = test_paths(ws_root.clone());
     let controller = RenderExecutionService::default();
     let video_path = common::test_config::sample_video_path();

@@ -251,7 +251,7 @@ async function main() {
     const fonts = [...new Map(fixtures.flatMap((fixture) => fixture.fonts).map((request) => [JSON.stringify(request), request])).values()]
     const planPath = join(directory, 'plan.json')
     await save(planPath, { root, frames: 1, warmup: 0, fps: 30, activities: {}, cases: [], fonts })
-    await execute(join(root, 'src-tauri/target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`), ['--fonts', planPath], {
+    await execute(join(root, 'target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`), ['--fonts', planPath], {
       cwd: root,
       windowsHide: true,
     })

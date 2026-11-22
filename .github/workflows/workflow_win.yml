@@ -115,14 +115,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: windows
-          workspaces: 'src-tauri -> target'
+          workspaces: '. -> target'
 
       # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
       - name: Download WASM bindings
         uses: actions/download-artifact@v7
         with:
           name: ovrley-wasm-bindings
-          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
+          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -154,7 +154,7 @@ jobs:
           Remove-Item -LiteralPath $outputDirectory, $portableDirectory -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $outputDirectory | Out-Null
 
-          $setupCandidates = @(Get-ChildItem 'src-tauri\target' -Filter '*-setup.exe' -File -Recurse | Where-Object { $_.FullName -match '\\bundle\\nsis\\' })
+          $setupCandidates = @(Get-ChildItem 'target' -Filter '*-setup.exe' -File -Recurse | Where-Object { $_.FullName -match '\\bundle\\nsis\\' })
           if ($setupCandidates.Count -ne 1) { throw "Expected exactly one NSIS setup executable, found $($setupCandidates.Count)." }
           $setupSource = $setupCandidates[0]
           $signatureSource = Get-Item -LiteralPath "$($setupSource.FullName).sig"
@@ -167,7 +167,7 @@ jobs:
           Copy-Item -LiteralPath $setupSource.FullName -Destination $setupPath
           Copy-Item -LiteralPath $signatureSource.FullName -Destination $signaturePath
 
-          $nativeBinary = Get-Item -LiteralPath 'src-tauri\target\release\app.exe'
+          $nativeBinary = Get-Item -LiteralPath 'target\release\app.exe'
           if ($nativeBinary.Length -le 0) { throw 'The compiled application executable is missing or empty.' }
           $nativeVersion = $nativeBinary.VersionInfo.ProductVersion
           if ($nativeVersion -notmatch "^$([regex]::Escape($version))(\.0)?$") { throw "Native Windows version $nativeVersion does not match $version." }
@@ -188,7 +188,7 @@ jobs:
             if (-not (Test-Path -LiteralPath (Join-Path $portableRoot $requiredPath))) { throw "Portable ZIP is missing $requiredPath." }
           }
 
-          $markersInInstallerInputs = @(Get-ChildItem 'src-tauri\target\release' -Filter '.ovrley-portable' -File -Recurse -Force -ErrorAction SilentlyContinue)
+          $markersInInstallerInputs = @(Get-ChildItem 'target\release' -Filter '.ovrley-portable' -File -Recurse -Force -ErrorAction SilentlyContinue)
           if ($markersInInstallerInputs.Count -ne 0) { throw 'Portable marker leaked into NSIS build inputs.' }
 
           $expected = @($setupName, "$setupName.sig", $portableName)

@@ -16,7 +16,7 @@ WASM `wasm.render` includes sampling, frame preparation, clearing, painting, pix
 
 The scene uses scale 2, a 232-unit circle (464 output pixels), 35-unit label font (70 output pixels), shadow strength/distance 2 (4 output pixels), 50% circle fill, and zero circle border thickness. With zero circle border, the circle's border-shadow branch is inactive; text shadows remain active.
 
-Relevant code: [native buffer wrapping](../../src-tauri/ovrley_core/src/render/surface.rs), [native frame rendering](../../src-tauri/ovrley_core/src/render/frame.rs), [WASM g-force preview](../../src-tauri/ovrley_widgets/src/widgets/g_force/preview.rs).
+Relevant code: [native buffer wrapping](../../crates/ovrley_core/src/render/surface.rs), [native frame rendering](../../crates/ovrley_core/src/render/frame.rs), [WASM g-force preview](../../crates/ovrley_widgets/src/widgets/g_force/preview.rs).
 
 ## Profile of the existing WASM artifact
 
@@ -55,13 +55,13 @@ Raw evidence: [baseline CPU profile](../../debug/g-force-analysis/baseline.cpupr
 
 ## Why conversion is expensive
 
-[The preview surface](../../src-tauri/ovrley_widgets/src/widgets/value/preview.rs) stores premultiplied RGBA: RGB already includes transparency. At the time of profiling, g-force readback requested unpremultiplied RGBA directly from Skia because browser ImageData expects RGB and transparency separately.
+[The preview surface](../../crates/ovrley_widgets/src/widgets/value/preview.rs) stores premultiplied RGBA: RGB already includes transparency. At the time of profiling, g-force readback requested unpremultiplied RGBA directly from Skia because browser ImageData expects RGB and transparency separately.
 
 In the checked-out Skia `src/core/SkConvertPixels.cpp`, a conversion involving unpremultiplication cannot use the simple copy path. On this non-NEON target, it also cannot use the specialized swizzle/premultiply path. It falls through to `convert_with_pipeline`. That pipeline processes the whole rectangle, including transparent space and pixels whose alpha is already fully opaque.
 
 Consequently, the baseline converted about 335,500 pixels through that generic float pipeline for every changing marker, even when the displayed label was unchanged. This work was additional to drawing the widget.
 
-The alternative in [read_surface_rgba](../../src-tauri/ovrley_widgets/src/render/pixels.rs) was already used by route and elevation. It asks Skia for premultiplied pixels, permitting a direct copy, then converts with a small integer loop and skips transparent/opaque pixels. All widget surface readbacks now use this helper, including [g-force](../../src-tauri/ovrley_widgets/src/widgets/g_force/preview.rs).
+The alternative in [read_surface_rgba](../../crates/ovrley_widgets/src/render/pixels.rs) was already used by route and elevation. It asks Skia for premultiplied pixels, permitting a direct copy, then converts with a small integer loop and skips transparent/opaque pixels. All widget surface readbacks now use this helper, including [g-force](../../crates/ovrley_widgets/src/widgets/g_force/preview.rs).
 
 Its post-change WASM speed has not been measured. Integer conversion can differ in channel rounding from the generic float path. The adoption adds independent conversion tests and retains exact drawing comparisons using the canonical transport on both sides; details are recorded below.
 
@@ -84,7 +84,7 @@ Disabling shadows changes both drawing work and bitmap padding. The sampled text
 
 ## What is and is not cached
 
-[GForceCache](../../src-tauri/ovrley_widgets/src/widgets/g_force/layout.rs) prepares a single image containing the circle fill, border, guides, and any circle border shadow. The even-odd ring path, clearing the ring interior, circular clip, and guide-opacity save layer are preparation operations. They are not repeated during playback.
+[GForceCache](../../crates/ovrley_widgets/src/widgets/g_force/layout.rs) prepares a single image containing the circle fill, border, guides, and any circle border shadow. The even-odd ring path, clearing the ring interior, circular clip, and guide-opacity save layer are preparation operations. They are not repeated during playback.
 
 The preview retains its destination surface and pixel vector while dimensions remain equal. In the 600-frame baseline, 595 frames used 671 x 500, two used 671 x 501, and three used 671 x 502. Occasional bounds changes can cause reallocation, but allocation was not a significant sampled cost.
 
@@ -92,7 +92,7 @@ The exact-sample early return works: repeatedly rendering the same second produc
 
 Whole-activity magnitudes are sorted once when the activity sampler is constructed. Per frame, WASM performs two indexed interpolation lookups and a constant-time percentile lookup. Native uses precomputed samples. Magnitude, clipping, formatting, and layout are small compared with the measured pixel work; there is no per-frame scan/sort of the activity.
 
-[Frame preparation](../../src-tauri/ovrley_widgets/src/widgets/g_force/frame.rs) resolves the font and lays out both the value and unit every changing sample. [draw_text_blob](../../src-tauri/ovrley_widgets/src/render/text.rs) also constructs TextPaints, including a drop-shadow filter, for each run on every draw. A persistent label repeats this work when only the marker moved; a rapidly changing label still repeats style setup and shadow filtering.
+[Frame preparation](../../crates/ovrley_widgets/src/widgets/g_force/frame.rs) resolves the font and lays out both the value and unit every changing sample. [draw_text_blob](../../crates/ovrley_widgets/src/render/text.rs) also constructs TextPaints, including a drop-shadow filter, for each run on every draw. A persistent label repeats this work when only the marker moved; a rapidly changing label still repeats style setup and shadow filtering.
 
 An independent reproduction of preserve interpolation and one-decimal magnitude formatting found only 43 label transitions across these 600 measured frames, with 13 distinct formatted values. A last-label cache could therefore reuse the prepared/rasterized label for most frames in this fixture. This is configuration- and data-dependent: labels that change every frame receive little benefit. This count is a reproduction from activity data, not an instrumented WASM counter; see [label reuse data](../../debug/g-force-analysis/label-reuse.json).
 
@@ -127,7 +127,7 @@ Text drawing and possible shadow replacements are considered separately in the f
 
 Without shadows, the sampled g-force text-drawing subtree took approximately 0.05 ms/frame. Reusing resolved fonts, Paints, the unit's TextBlob/layout, and glyph measurements can avoid repeated setup and allocations while a number changes. Skia already caches ordinary glyph images. Large savings from changing the basic unshadowed drawing calls are not supported by this profile; measurements after readback adoption should guide further work.
 
-The current text-shadow implementation is native Skia `image_filters::drop_shadow_only` in [TextPaints](../../src-tauri/ovrley_widgets/src/render/text.rs), on both native and WASM. In this Skia revision, it builds an image-filter graph: blur the input image, apply the shadow color using the blurred alpha, then translate it. Our renderer draws that shadow, then any text border, then the text fill. The number and unit are separate runs, each with its own filter; `draw_text_blob` recreates TextPaints/filter objects on every call.
+The current text-shadow implementation is native Skia `image_filters::drop_shadow_only` in [TextPaints](../../crates/ovrley_widgets/src/render/text.rs), on both native and WASM. In this Skia revision, it builds an image-filter graph: blur the input image, apply the shadow color using the blurred alpha, then translate it. Our renderer draws that shadow, then any text border, then the text fill. The number and unit are separate runs, each with its own filter; `draw_text_blob` recreates TextPaints/filter objects on every call.
 
 A cheaper candidate is native Skia `MaskFilter::blur(BlurStyle::Normal, sigma, ...)`, drawing shadow-colored text at the shadow offset. It operates on coverage masks and can use Skia's glyph-strike cache for blurred glyph images. Repeated digits can then reuse work even as the overall number changes every frame. Route and elevation already use mask blur for path shadows. Local Skia sources confirm that the scaler applies mask filters when generating glyph images and that the strike caches those images.
 
@@ -149,7 +149,7 @@ To rerun the diagnostic measurements from the repository root using existing bin
 
 ```powershell
 node debug/g-force-analysis/probe.mjs
-& 'src-tauri/target/release/benchmark_widgets.exe' --run 'debug/g-force-analysis/native-plan.json'
+& 'target/release/benchmark_widgets.exe' --run 'debug/g-force-analysis/native-plan.json'
 ```
 
 Neither command builds the application or WASM module.

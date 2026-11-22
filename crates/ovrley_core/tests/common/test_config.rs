@@ -73,11 +73,6 @@ pub fn test_template_4k_path() -> PathBuf {
 }
 
 #[allow(dead_code)]
-pub fn workspace_root() -> PathBuf {
-    repo_root().parent().unwrap().to_path_buf()
-}
-
-#[allow(dead_code)]
 pub fn repo_git_root() -> PathBuf {
     repo_root()
         .parent()

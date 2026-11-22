@@ -16,7 +16,7 @@ pub const APP_IDENTIFIER: &str = "com.ovrley.desktop";
 
 /// Returns the repository root.
 ///
-/// `CARGO_MANIFEST_DIR` points at `src-tauri/ovrley_services`, so this walks two directories up to
+/// `CARGO_MANIFEST_DIR` points at `crates/ovrley_services`, so this walks two directories up to
 /// the project root used by bundled tooling and development assets.
 pub fn source_repo_root() -> PathBuf {
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn source_repo_root_is_the_checkout() {
-        assert!(source_repo_root().join("src-tauri").join("ovrley_services").is_dir());
+        assert!(source_repo_root().join("crates").join("ovrley_services").is_dir());
     }
 
     #[test]

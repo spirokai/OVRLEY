@@ -10,7 +10,7 @@ import { cpus, platform } from 'node:os'
 import { formatSummary } from './summarize.mjs'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
-const binary = join(root, 'src-tauri/target/release/benchmark_map_labels')
+const binary = join(root, 'target/release/benchmark_map_labels')
 const tilesDir = join(root, 'debug/benchmarks/map-labels/tiles')
 const tileUrl = 'https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf'
 const { values } = parseArgs({
@@ -40,7 +40,7 @@ async function build() {
   await child(
     'cargo',
     ['build', '-p', 'ovrley_map', '--release', '--features', 'gpu,validate', '--bin', 'benchmark_map_labels', '--locked'],
-    join(root, 'src-tauri'),
+    root,
   )
   const { buildMapBindings } = await import('../../scripts/wasm/build.mjs')
   buildMapBindings()

@@ -22,7 +22,7 @@ Desktop app that turns `.fit`/`.gpx` activity data into customizable video overl
 ```
 app/              React 19 + Vite frontend (JSX, NOT TypeScript)
 src-tauri/        Tauri v2 desktop shell
-src-tauri/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encoding, activity parsing
+crates/ovrley_core/   Standalone Rust crate — Skia rendering, ffmpeg encoding, activity parsing
 ```
 
 - **No Python backend.** The old `backend/` directory & Python sidecar are gone. All rendering is Rust (Skia) + ffmpeg subprocess.
@@ -109,9 +109,9 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 ## Testing
 
 - **Frontend**: Vitest + Testing Library. Run with `pnpm test` from the repository root. Test files live in `app/src/tests/`.
-- **Rust backend**: `cargo test` from inside `src-tauri/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
-- Run both from the repository root with `pnpm test` and `cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml`.
-- **Slint UI (migration)**: `pnpm test:native-ui` runs the `ovrley_app`, `ovrley_services` and `ovrley_mcp` unit tests and `ovrley_ui`'s component tests (`src-tauri/ovrley_ui/tests/`; their Slint harness windows are in `tests/harness/` and compile into the crate only with the `dev-windows` feature). Slint's testing platform is process-wide and bound to one thread, so each test file has a single `#[test]` that runs its cases through `common::run_cases`.
+- **Rust backend**: `cargo test` from inside `crates/ovrley_core/`. Integration tests in `tests/`, unit tests are `#[cfg(test)] mod tests` blocks inline or in `src/*/tests/`.
+- Run both from the repository root with `pnpm test` and `cargo test --manifest-path crates/ovrley_core/Cargo.toml`.
+- **Slint UI (migration)**: `pnpm test:native-ui` runs the `ovrley_app`, `ovrley_services` and `ovrley_mcp` unit tests and `ovrley_ui`'s component tests (`crates/ovrley_ui/tests/`; their Slint harness windows are in `tests/harness/` and compile into the crate only with the `dev-windows` feature). Slint's testing platform is process-wide and bound to one thread, so each test file has a single `#[test]` that runs its cases through `common::run_cases`.
 
 ## Agent skills
 

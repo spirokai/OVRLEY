@@ -168,7 +168,7 @@ Run from repo root:
 ```sh
 pnpm check
 pnpm test
-cargo test --manifest-path src-tauri/ovrley_core/Cargo.toml
+cargo test --manifest-path crates/ovrley_core/Cargo.toml
 ```
 
 Follow repository build authorization rules for `pnpm wasm:build` and `pnpm dev`; bindings

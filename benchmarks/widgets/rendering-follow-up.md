@@ -60,7 +60,7 @@ These are full preview renders, including readback, rather than isolated shadow 
 
 Previously, each changing `current_lap` rendered both its static heading and its changing timer through separate `drop_shadow_only` image filters. In a control run, disabling shadows reduced WASM from 4.67 to 0.31 ms/frame. Hiding the static heading alone left 3.76 ms/frame, so the changing timer's own shadow was also expensive.
 
-For lap-log, [the old layout cache](../../src-tauri/ovrley_widgets/src/widgets/lap_timer/layout.rs) retained header/completed-lap glyphs, but did not retain their finished pixels. Every new current time assembled all rows again, regenerated completed-row delta runs, and repainted every cell and its shadow. Disabling shadows reduced this diagnostic from 11.19 to 0.71 ms/frame. These controls also shrink shadow padding, so they measure more than a pure blur function.
+For lap-log, [the old layout cache](../../crates/ovrley_widgets/src/widgets/lap_timer/layout.rs) retained header/completed-lap glyphs, but did not retain their finished pixels. Every new current time assembled all rows again, regenerated completed-row delta runs, and repainted every cell and its shadow. Disabling shadows reduced this diagnostic from 11.19 to 0.71 ms/frame. These controls also shrink shadow padding, so they measure more than a pure blur function.
 
 The shared lap renderer now rasterizes the static heading or the log's headers, completed rows/deltas, and current lap number into a bounded cached image. Only the changing time and current delta remain dynamic in the table. Completed rows/deltas rebuild when the completed-lap count or active lap number changes. Showing/hiding the current row is part of that state because it shifts the history rows. Activity replacement and configuration replacement discard the owning layout/cache. Backward seeking rebuilds the appropriate history rather than retaining future completed laps.
 
@@ -68,7 +68,7 @@ The cached image stays inside its widget's existing draw position and is painted
 
 ## Shared mask shadows
 
-All former `drop_shadow_only` drawing in production widget code now uses [`MaskFilter::blur(BlurStyle::Normal, sigma, true)`](../../src-tauri/ovrley_widgets/src/render/shadow.rs). This covers shared text, metric icons, heading ticks/labels/indicator, g-force borders, lean-angle borders, and linear/arc/corner gauge shadows. Route/elevation path shadows already used mask blur and retain their implementation. Widgets without an existing shadow do not gain a new effect.
+All former `drop_shadow_only` drawing in production widget code now uses [`MaskFilter::blur(BlurStyle::Normal, sigma, true)`](../../crates/ovrley_widgets/src/render/shadow.rs). This covers shared text, metric icons, heading ticks/labels/indicator, g-force borders, lean-angle borders, and linear/arc/corner gauge shadows. Route/elevation path shadows already used mask blur and retain their implementation. Widgets without an existing shadow do not gain a new effect.
 
 The shadow pass retains source geometry/stroke styling, uses the configured shadow color, multiplies shadow alpha by the original source alpha, and draws at the configured offset. Fills/borders keep their existing drawing and order. Icons convert sigma/offset through their local scale to retain output-pixel sizing. Strength zero creates no blur and executes no shadow drawing. Mask-blurred glyphs can be reused by Skia's glyph cache even when the overall number changes; this does not depend on finished labels remaining constant.
 

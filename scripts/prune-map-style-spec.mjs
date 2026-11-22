@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const referenceDir = join(rootDir, 'src-tauri', 'ovrley_map', 'style-spec')
+const referenceDir = join(rootDir, 'crates', 'ovrley_map', 'style-spec')
 // Documentation only: validation never reads these.
 const DOCUMENTATION_KEYS = new Set(['doc', 'example', 'sdk-support', 'units', 'requires'])
 

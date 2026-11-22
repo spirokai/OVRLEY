@@ -135,9 +135,9 @@ The Rust backend includes several extra test suites covering rendering correctne
 
 | Suite                | Purpose                                                                                        | Docs                                                         |
 | -------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| **Render Baselines** | Pixel-level regression tests — rendered frames and videos compared against committed baselines | [`BASELINES.md`](src-tauri/ovrley_core/BASELINES.md)         |
-| **Canvas Parity**    | Rust Skia vs browser SVG pixel comparison with SSIM scoring and diff images                    | [`CANVAS_PARITY.md`](src-tauri/ovrley_core/CANVAS_PARITY.md) |
-| **Benchmarks**       | Real-render encoding benchmarks measuring job time and file size per codec/hardware profile    | [`BENCHMARKS.md`](src-tauri/ovrley_core/BENCHMARKS.md)       |
+| **Render Baselines** | Pixel-level regression tests — rendered frames and videos compared against committed baselines | [`BASELINES.md`](crates/ovrley_core/BASELINES.md)         |
+| **Canvas Parity**    | Rust Skia vs browser SVG pixel comparison with SSIM scoring and diff images                    | [`CANVAS_PARITY.md`](crates/ovrley_core/CANVAS_PARITY.md) |
+| **Benchmarks**       | Real-render encoding benchmarks measuring job time and file size per codec/hardware profile    | [`BENCHMARKS.md`](crates/ovrley_core/BENCHMARKS.md)       |
 
 ## Building & Compatibility
 

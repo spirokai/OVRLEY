@@ -37,7 +37,7 @@ fn fixtures() -> PathBuf {
 
 fn test_paths() -> AppPaths {
     let git_root = manifest_dir().join("..").join("..");
-    let test_root = manifest_dir().join("..").join("target").join("atlas_export_tests");
+    let test_root = git_root.join("target").join("atlas_export_tests");
     let paths = AppPaths {
         repo_root: git_root.clone(),
         font_dirs: vec![git_root.join("fonts")],

@@ -89,14 +89,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: deb
-          workspaces: 'src-tauri -> target'
+          workspaces: '. -> target'
 
       # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
       - name: Download WASM bindings
         uses: actions/download-artifact@v7
         with:
           name: ovrley-wasm-bindings
-          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
+          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -134,7 +134,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          deb="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          deb="$(find target/release/bundle/deb -name '*.deb' -print -quit)"
           [[ -n "$deb" ]] || { echo 'No .deb package was produced.' >&2; exit 1; }
 
           package_root="$RUNNER_TEMP/ovrley-deb-root"
@@ -149,7 +149,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEB="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          DEB="$(find target/release/bundle/deb -name '*.deb' -print -quit)"
           if [ -z "$DEB" ]; then
             echo "No .deb package was produced." >&2
             exit 1
@@ -166,7 +166,7 @@ jobs:
           set -euo pipefail
           version="$RELEASE_VERSION"
           mkdir -p dist-release
-          deb="$(find src-tauri/target/release/bundle/deb -name '*.deb' -print -quit)"
+          deb="$(find target/release/bundle/deb -name '*.deb' -print -quit)"
           if [ -z "$deb" ]; then
             echo "No .deb package was produced." >&2
             exit 1
@@ -177,7 +177,7 @@ jobs:
           rm -rf "$archive_root"
           mkdir -p "$archive_root"
           install -m 0644 "$deb" "$archive_root/$deb_name"
-          install -m 0644 src-tauri/target/packaging/THIRD_PARTY_NOTICES.txt "$archive_root/THIRD_PARTY_NOTICES.txt"
+          install -m 0644 target/packaging/THIRD_PARTY_NOTICES.txt "$archive_root/THIRD_PARTY_NOTICES.txt"
           install -m 0644 packaging/install/INSTALL-debian.txt "$archive_root/INSTALL.txt"
           (cd "$archive_root" && zip -q "$GITHUB_WORKSPACE/dist-release/$archive_name" "$deb_name" THIRD_PARTY_NOTICES.txt INSTALL.txt)
 

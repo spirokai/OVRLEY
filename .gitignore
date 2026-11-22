@@ -36,15 +36,13 @@ app/dist/
 app/dist-ssr/
 /debug/
 # Parser diagnostics that tests write under a crate root.
-/src-tauri/ovrley_core/debug/
+/crates/ovrley_core/debug/
 app/*.local
 app/public/preview*.png
 next/
 
-# src-tauri specific
-src-tauri/target/
+# Left on disk by the removed Tauri build
 src-tauri/gen/schemas/
-src-tauri/binaries/
 
 # External / Vendor
 /ffmpeg/
@@ -58,7 +56,7 @@ vendor/telemetry-parser/
 vendor/wasm-bindgen/
 
 # Test fixtures (large video files)
-src-tauri/ovrley_core/tests/fixtures/video/
+crates/ovrley_core/tests/fixtures/video/
 tmp/
 /tmp/ovrley.sock
 *.mov

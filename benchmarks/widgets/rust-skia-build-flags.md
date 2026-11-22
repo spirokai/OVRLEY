@@ -74,7 +74,7 @@ Rust-only SIMD and Rust-only LTO are separate experiments from C++ Skia LTO.
 - [Windows platform configuration](https://github.com/rust-skia/rust-skia/blob/b7f043e0b1e2a850e702245de811f01df1f6b0ff/skia-bindings/build_support/platform/windows.rs)
 
 The Skia sources were inspected in the pinned checkout at
-`src-tauri/target/wasm-toolchain/rust-skia/skia-bindings/skia/`: optimization,
+`target/wasm-toolchain/rust-skia/skia-bindings/skia/`: optimization,
 floating-point and WASM settings in `gn/skia/BUILD.gn`; defaults in
 `gn/skia.gni`; specialized CPU objects in `BUILD.gn`; runtime raster selection
 in `src/core/SkOpts.cpp`.

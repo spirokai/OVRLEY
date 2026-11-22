@@ -44,7 +44,7 @@ async function updateJsonVersion(relativePath, nextVersion) {
 }
 
 async function updateCargoManifestVersion(nextVersion) {
-  const path = resolve(rootDir, 'src-tauri', 'Cargo.toml')
+  const path = resolve(rootDir, 'Cargo.toml')
   const source = await readFile(path, 'utf8')
   const matches = [...source.matchAll(/(\[package\][\s\S]*?\nversion\s*=\s*)"([^"]+)"/g)]
 
@@ -60,7 +60,7 @@ async function updateCargoManifestVersion(nextVersion) {
 }
 
 async function updateCargoLockVersion(nextVersion) {
-  const path = resolve(rootDir, 'src-tauri', 'Cargo.lock')
+  const path = resolve(rootDir, 'Cargo.lock')
   const source = await readFile(path, 'utf8')
   const pattern = /(\[\[package\]\]\r?\nname = "app"\r?\nversion = )"([^"]+)"/g
   const matches = [...source.matchAll(pattern)]
@@ -77,8 +77,8 @@ async function readVersionSources() {
   const packageJson = JSON.parse(await readFile(resolve(rootDir, 'package.json'), 'utf8'))
   const appPackageJson = JSON.parse(await readFile(resolve(rootDir, 'app/package.json'), 'utf8'))
   const tauriConfig = JSON.parse(await readFile(resolve(rootDir, 'src-tauri/tauri.conf.json'), 'utf8'))
-  const cargoManifest = await readFile(resolve(rootDir, 'src-tauri/Cargo.toml'), 'utf8')
-  const cargoLock = await readFile(resolve(rootDir, 'src-tauri/Cargo.lock'), 'utf8')
+  const cargoManifest = await readFile(resolve(rootDir, 'Cargo.toml'), 'utf8')
+  const cargoLock = await readFile(resolve(rootDir, 'Cargo.lock'), 'utf8')
   const cargoManifestMatch = cargoManifest.match(/\[package\][\s\S]*?\nversion\s*=\s*"([^"]+)"/)
   const cargoLockMatch = cargoLock.match(/\[\[package\]\]\r?\nname = "app"\r?\nversion = "([^"]+)"/)
 
@@ -90,8 +90,8 @@ async function readVersionSources() {
     'package.json': packageJson.version,
     'app/package.json': appPackageJson.version,
     'src-tauri/tauri.conf.json': tauriConfig.version,
-    'src-tauri/Cargo.toml': cargoManifestMatch[1],
-    'src-tauri/Cargo.lock': cargoLockMatch[1],
+    'Cargo.toml': cargoManifestMatch[1],
+    'Cargo.lock': cargoLockMatch[1],
   }
 }
 

@@ -1,5 +1,5 @@
 This directory stores rendered frame baselines for the integration suite in
-`src-tauri/ovrley_core/tests/render_baseline_suite.rs`.
+`crates/ovrley_core/tests/render_baseline_suite.rs`.
 
 Subdirectories:
 

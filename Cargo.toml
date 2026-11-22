@@ -1,5 +1,5 @@
 [workspace]
-members = ["ovrley_core", "ovrley_map", "ovrley_widgets", "ovrley_services", "ovrley_ui", "ovrley_app", "ovrley_mcp", "ovrley_playback"]
+members = ["crates/*"]
 resolver = "2"
 
 # Full DWARF for opt-level-3 workspace crates is ~140 MB of every ~170 MB test

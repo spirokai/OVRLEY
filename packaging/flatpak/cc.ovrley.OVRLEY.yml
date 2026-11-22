@@ -46,14 +46,14 @@ modules:
       # Frontend. pnpm runs itself by name when it prepares git dependencies, so it needs a PATH entry.
       - mkdir -p tools/bin && ln -s "$PWD/pnpm/bin/pnpm.cjs" tools/bin/pnpm
       - timeout 900 pnpm install --frozen-lockfile
-      - mkdir -p src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
-      - cp wasm_bindings.js wasm_bindings.wasm wasm_map_bindings.js wasm_map_bindings_bg.wasm src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm/
+      - mkdir -p target/wasm-bindings/wasm32-unknown-emscripten/wasm
+      - cp wasm_bindings.js wasm_bindings.wasm wasm_map_bindings.js wasm_map_bindings_bg.wasm target/wasm-bindings/wasm32-unknown-emscripten/wasm/
       # Same version stamping as the other release builds
       - node scripts/release/set-version.mjs "$OVRLEY_VERSION" && VITE_OVRLEY_VERSION="$OVRLEY_VERSION" pnpm --dir app build
       # Backend; the Tauri CLI is not used, so enable the embedded frontend explicitly
       - cd src-tauri && TAURI_CONFIG="$(cat ../packaging/flatpak/tauri.flatpak.conf.json)" cargo build --release --locked --features tauri/custom-protocol
       # Install
-      - install -Dm755 src-tauri/target/release/app /app/bin/OVRLEY
+      - install -Dm755 target/release/app /app/bin/OVRLEY
       - touch /app/bin/.ovrley-portable # in-app updates are not available in the sandbox
       - mkdir -p /app/lib/OVRLEY
       - cp -r fonts templates assets/map-styles /app/lib/OVRLEY/
@@ -76,7 +76,7 @@ modules:
           - node_modules
           - app/node_modules
           - app/dist
-          - src-tauri/target
+          - target
           - vendor/ffmpeg
           - debug
           - benchmarks

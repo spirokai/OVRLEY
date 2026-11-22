@@ -53,7 +53,7 @@ const child = (binary, args, cwd = root) =>
 
 async function main() {
   if (values.build) {
-    await child('cargo', ['build', '-p', 'ovrley_core', '--release', '--bin', 'benchmark_widgets', '--locked'], join(root, 'src-tauri'))
+    await child('cargo', ['build', '-p', 'ovrley_core', '--release', '--bin', 'benchmark_widgets', '--locked'], root)
     await child(process.execPath, [join(root, 'scripts/wasm/build.mjs')])
     return
   }
@@ -145,7 +145,7 @@ async function main() {
     await save(planPath, plan)
     console.info(`Plan: ${planPath}`)
     if (!values.run) return
-    const binary = join(root, 'src-tauri/target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`)
+    const binary = join(root, 'target/release', `benchmark_widgets${process.platform === 'win32' ? '.exe' : ''}`)
     await child(binary, ['--fonts', planPath])
     const resources = await json(join(directory, 'fonts.json'))
     for (const font of resources) files.set(`/data/${font.path}`, join(directory, font.path))

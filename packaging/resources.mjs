@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 
 export const rootDir = resolve(import.meta.dirname, '..')
 /** Where the generated notices land; tauri.conf.json and the release workflows read it here. */
-export const noticePath = join(rootDir, 'src-tauri', 'target', 'packaging', 'THIRD_PARTY_NOTICES.txt')
+export const noticePath = join(rootDir, 'target', 'packaging', 'THIRD_PARTY_NOTICES.txt')
 /** Static per-platform install guides, shipped as INSTALL.txt. */
 export const installGuide = {
   macos: join(import.meta.dirname, 'install', 'INSTALL-macos.txt'),

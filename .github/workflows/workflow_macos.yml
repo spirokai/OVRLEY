@@ -115,14 +115,14 @@ jobs:
         uses: Swatinem/rust-cache@v2
         with:
           key: macos
-          workspaces: 'src-tauri -> target'
+          workspaces: '. -> target'
 
       # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
       - name: Download WASM bindings
         uses: actions/download-artifact@v7
         with:
           name: ovrley-wasm-bindings
-          path: src-tauri/target/wasm-bindings/wasm32-unknown-emscripten/wasm
+          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -152,7 +152,7 @@ jobs:
           rm -rf dist-release
           mkdir -p dist-release
 
-          app_bundle="$(find src-tauri/target -type d -path '*/bundle/macos/OVRLEY.app' -print -quit)"
+          app_bundle="$(find target -type d -path '*/bundle/macos/OVRLEY.app' -print -quit)"
           [[ -n "$app_bundle" && -d "$app_bundle" ]] || { echo 'macOS app bundle was not produced.' >&2; exit 1; }
           app_binary="$(find "$app_bundle/Contents/MacOS" -type f -perm -111 -print -quit)"
           [[ -n "$app_binary" ]] || { echo 'macOS app executable was not found.' >&2; exit 1; }
@@ -259,7 +259,7 @@ jobs:
           fi
           hdiutil detach "$dmg_mount" >/dev/null
 
-          updater_source="$(find src-tauri/target -type f -path '*/bundle/macos/*.app.tar.gz' -print -quit)"
+          updater_source="$(find target -type f -path '*/bundle/macos/*.app.tar.gz' -print -quit)"
           [[ -n "$dmg_source" && -s "$dmg_source" ]] || { echo 'macOS DMG is missing or empty.' >&2; exit 1; }
           [[ -n "$updater_source" && -s "$updater_source" ]] || { echo 'macOS updater archive is missing or empty.' >&2; exit 1; }
           [[ -s "$updater_source.sig" ]] || { echo 'macOS updater signature is missing or empty.' >&2; exit 1; }

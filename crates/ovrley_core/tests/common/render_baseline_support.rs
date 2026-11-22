@@ -424,7 +424,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
 /// output is removed before creating fresh directories so that re-runs
 /// are isolated.
 fn prepare_case_runtime(kind: &str, case_name: &str) -> Result<CaseRuntime> {
-    let case_root = test_config::workspace_root()
+    let case_root = test_config::repo_git_root()
         .join("target")
         .join("render-baseline-suite")
         .join(kind)
@@ -933,7 +933,7 @@ fn ensure_source_video_exists(path: &Path) -> Result<()> {
     }
 
     bail!(
-        "missing composite source fixture {}. Place `test-1080p.mp4` under `src-tauri/ovrley_core/tests/fixtures/video/` and rerun `cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`.",
+        "missing composite source fixture {}. Place `test-1080p.mp4` under `crates/ovrley_core/tests/fixtures/video/` and rerun `cargo test -p ovrley_core --test it render_baseline_suite:: -- --nocapture`.",
         path.display()
     );
 }

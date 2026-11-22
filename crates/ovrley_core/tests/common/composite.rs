@@ -449,7 +449,7 @@ pub fn test_paths() -> AppPaths {
 /// tests can inspect side effects without clobbering one another.
 pub fn test_paths_named(name: &str) -> AppPaths {
     let git_root = crate::common::test_config::repo_git_root();
-    let ws_root = crate::common::test_config::workspace_root();
+    let ws_root = crate::common::test_config::repo_git_root();
     let test_root = ws_root.join("target").join(name);
     let downloads_dir = test_root.join("downloads");
     let temp_dir = test_root.join("tmp");

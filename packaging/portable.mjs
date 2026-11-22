@@ -7,7 +7,7 @@ import { ensureDirectory, ensureFile, installGuide, noticePath, preparePackaging
 
 const args = process.argv.slice(2)
 const profile = readArg('--profile') ?? 'release'
-const targetDir = join(rootDir, 'src-tauri', 'target', profile)
+const targetDir = join(rootDir, 'target', profile)
 const bundleDir = join(targetDir, 'bundle')
 const distDir = join(rootDir, 'dist-portable')
 const appName = 'OVRLEY'

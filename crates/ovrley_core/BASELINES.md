@@ -18,7 +18,7 @@ Three test functions live in `render_baseline_suite.rs`:
 
 ## Running
 
-In powershell from src-tauri/ovrley_core:
+In powershell from crates/ovrley_core:
 
 ```bash
 # Record/update baselines (after intentional output changes)

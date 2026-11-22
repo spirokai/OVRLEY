@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 
 /// Resolves the repository root from `CARGO_MANIFEST_DIR`.
 ///
-/// Walks one directory up from the Tauri crate directory to reach the
-/// workspace root where fixtures, fonts, and templates live.
+/// Walks two directories up from the crate to reach the workspace root,
+/// where fonts and templates live.
 pub fn repo_root() -> Result<PathBuf, String> {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     manifest_dir

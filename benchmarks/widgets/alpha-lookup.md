@@ -7,7 +7,7 @@ Elevation, lap-log, lean angle and several gauges also improve.
 
 ## Implementation and correctness
 
-The shared [pixel readback helper](../../src-tauri/ovrley_widgets/src/render/pixels.rs)
+The shared [pixel readback helper](../../crates/ovrley_widgets/src/render/pixels.rs)
 now uses a compile-time `[[u8; 256]; 256]` table indexed by alpha and channel.
 Each entry retains the previous formula, `((channel * 255 + alpha / 2) / alpha)
 as u8`. Transparent and opaque pixels retain their existing skip behavior.
@@ -17,7 +17,7 @@ occupies 65,536 bytes of static data.
 All three focused Rust tests passed with:
 
 ```text
-cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_widgets render::pixels::tests --locked
+cargo test -p ovrley_widgets render::pixels::tests --locked
 ```
 
 The new test exhaustively compares all 65,280 nonzero-alpha/channel byte pairs
@@ -97,7 +97,7 @@ The native division baseline used the existing release benchmark executable:
 The native benchmark was then rebuilt with the lookup table using:
 
 ```text
-cargo build --manifest-path src-tauri/Cargo.toml -p ovrley_core --release --bin benchmark_widgets --locked
+cargo build -p ovrley_core --release --bin benchmark_widgets --locked
 node benchmarks/widgets/run.mjs --run --backend both
 ```
 
