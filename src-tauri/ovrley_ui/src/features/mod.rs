@@ -11,7 +11,6 @@ pub mod template_manager;
 pub mod toolbar;
 pub mod transitions;
 pub mod undo_redo;
-#[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
 pub mod video_playback;
 pub mod video_preview;
 pub mod video_sync;

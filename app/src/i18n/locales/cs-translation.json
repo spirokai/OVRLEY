@@ -524,6 +524,7 @@
       "fileUnavailable": "Místní server náhledu nemohl načíst soubor videa. Soubor mohl být přesunut, smazán nebo je momentálně nedostupný.",
       "unsupportedFormat": "Tento formát videa systémový přehrávač nepodporuje."
     },
+    "gpuRequired": "Přehrávání videa vyžaduje alespoň integrovanou grafickou kartu.",
     "theVideoPreviewCouldNotBeLoaded": "Náhled videa se nepodařilo načíst.",
     "videoOrImage": "Video nebo obrázek",
     "videoPreviewLoadingWasAborted": "Načítání náhledu videa bylo přerušeno."

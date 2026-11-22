@@ -51,6 +51,8 @@ src-tauri/binaries/
 .ffmpeg/
 vendor/ffmpeg/*
 vendor/wasm-bindgen/
+vendor/mdk-sdk/
+vendor/.mdk-sdk-install-*/
 !vendor/ffmpeg/.gitkeep
 vendor/telemetry-parser/
 vendor/wasm-bindgen/

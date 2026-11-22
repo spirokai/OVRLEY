@@ -53,8 +53,7 @@ impl Projections {
         self.widget_drawer.project(&window, store);
         self.maps.project(store);
         self.scene_settings.project(&window, store);
-        #[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
-        features::video_playback::project(store);
+        features::video_playback::project(&window, store);
     }
 }
 
@@ -100,8 +99,8 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     dispatcher
 }
 
-/// Opens the window over `store` and runs until it closes. `gpu` is the shared device, kept for
-/// the compositor (Phase 6). Agents reach the window through `agent_socket`.
+/// Opens the window over `store` and runs until it closes. `gpu` is the shared device, which the
+/// video players draw on. Agents reach the window through `agent_socket`.
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     store: Store,
@@ -117,6 +116,9 @@ pub fn run(
     #[cfg(windows)]
     window.global::<crate::AppShell>().set_windows_10(platform::is_windows_10());
     let paths = Arc::new(paths);
+    // The blends of earlier sessions, as the Tauri shell clears them.
+    ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(&paths)
+        .map_err(|error| format!("Could not clear the transition previews: {error}"))?;
     let video_tools = Arc::new(ovrley_app::store::services::NativeVideoTools::open(Arc::clone(&paths), app_cache_dir, &preferences)?);
     let ui_post: Arc<dyn ovrley_app::store::services::UiPost> = Arc::new(SlintUiPost);
     let dispatcher = compose(
@@ -236,11 +238,9 @@ pub fn run(
         timer
     });
 
-    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
-    features::video_playback::start_if_requested(&window, gpu.as_ref(), &dispatcher.handle());
+    features::video_playback::start(&window, gpu.as_ref(), &dispatcher.handle());
     let _gpu = gpu;
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
-    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
     features::video_playback::shutdown();
     dispatcher.flush_preferences();
     result

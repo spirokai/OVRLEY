@@ -219,7 +219,7 @@ fn snapshot_videos(store: &mut Store, videos: &[(u32, u32, f64)]) {
             resolution: Some(ovrley_core::media::Resolution { width: (*width).into(), height: (*height).into() }),
             ..Default::default()
         };
-        let video = ovrley_app::lib::video_program::create_imported_video(&metadata, format!("clip-{index}"), index as u32, Vec::new()).expect("snapshot videos are valid");
+        let video = ovrley_app::lib::video_program::create_imported_video(&metadata, format!("clip-{index}"), index as u32).expect("snapshot videos are valid");
         edits.insert(video.id.clone(), VideoEdits { offset_seconds: *offset, ..VideoEdits::default() });
         imported.push(video);
     }

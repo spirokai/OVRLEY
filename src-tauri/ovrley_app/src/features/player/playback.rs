@@ -7,13 +7,14 @@
 //! when the frame changes. At the end of the timeline it pauses. Scrubs are dispatched as they come;
 //! the preview frame coalesces them (Phase 3 D9).
 //!
-//! The video clock arrives in Phase 6. Until then video playback is never possible (the video
-//! background mode does not exist yet), so the timeline clock always plays; the video guard and
-//! the handoff are ported and tested with `should_use_video_playback` forced on.
+//! Inside the pieces MDK's frames are the clock (Phase 6B): `ovrley_ui` dispatches each as
+//! [`video_clock_frame`] and the end of each shot as [`video_clock_cut`]. The timeline clock plays
+//! the rest.
 
+use crate::features::app_shell::EditorBackgroundMode;
 use crate::lib::update_rate::container_fps;
 use crate::lib::utils::clamp;
-use crate::lib::video_program::program::{resolve_playback_start, PlaybackSource, PlaybackStart, Program};
+use crate::lib::video_program::program::{resolve_playback_start, resolve_preview_target, PlaybackSource, PlaybackStart, Program};
 use crate::lib::video_program::SecondsRange;
 use crate::lib::video_program::TelemetryStatus;
 use crate::store::slices::editor::PreviewPlaybackState;
@@ -120,8 +121,8 @@ pub fn player_timing(store: &Store) -> PlayerTiming {
         timeline_minimum,
         has_activity: has_activity_data && total_duration > 0.0,
         clamped_playhead: clamp(store.editor.selected_second, timeline_minimum, total_duration),
-        // Phase 6B spike: the video clock plays inside clips once a decoder is attached.
-        should_use_video_playback: store.player.video_clock_available && store.video_import.has_videos(),
+        // React's `backgroundMode === 'video' && videoBounds !== null`, and players to play with.
+        should_use_video_playback: store.player.video_clock_available && store.editor_shell.editor_background_mode == EditorBackgroundMode::Video && bounds.is_some(),
         effective_fps: container_fps(store.render_settings.fps, f64::from(store.render_settings.widget_update_rate)),
     }
 }
@@ -133,8 +134,23 @@ fn pause_at_second(store: &mut Store, second: f64) {
     store.editor.pause_preview_playback(second);
 }
 
+/// [`resolve_playback_source`], with the timeline clock for the pieces of a file MDK cannot play.
+fn playback_start(store: &Store, timing: PlayerTiming, playhead: f64) -> PlaybackStart {
+    let program = &store.player.timeline.timeline().committed.program;
+    let start = resolve_playback_source(timing.should_use_video_playback, playhead, program);
+    let unplayable = start.source == PlaybackSource::Video
+        && resolve_preview_target(program, start.second)
+            .and_then(|target| store.video_import.imported_videos.iter().find(|video| video.id == target.video_id))
+            .is_some_and(|video| store.player.unplayable_paths.contains(&video.path));
+    if unplayable {
+        PlaybackStart { source: PlaybackSource::Timeline, ..start }
+    } else {
+        start
+    }
+}
+
 fn start_playback(store: &mut Store, timing: PlayerTiming, playhead: f64, now: Instant) {
-    let start = resolve_playback_source(timing.should_use_video_playback, playhead, &store.player.timeline.timeline().committed.program);
+    let start = playback_start(store, timing, playhead);
     let engine = &mut store.player.playback;
     engine.anchor = PlaybackAnchor::new(start.source, start.second, now);
     engine.frame_index = None;
@@ -236,28 +252,69 @@ pub fn playback_tick(store: &mut Store, now: Instant) -> bool {
     true
 }
 
-/// Phase 6B spike: the video clock presented `piece_id`'s frame at `source_second`. Inside the
-/// piece the playhead follows it; once the piece's last frame is presented, playback continues
-/// where `play` would start at the piece's end: the next piece's video, or the timeline clock.
-/// `ended` is the decoder's end of file, which can come without the last frame (React's `ended`).
-pub fn video_clock_frame(store: &mut Store, piece_id: &str, source_second: f64, ended: bool, now: Instant) {
-    if store.editor.preview_playback_state != PreviewPlaybackState::Playing || store.editor.preview_playback_source != PlaybackSource::Video {
+fn video_clock_active(store: &Store) -> bool {
+    store.editor.preview_playback_state == PreviewPlaybackState::Playing && store.editor.preview_playback_source == PlaybackSource::Video
+}
+
+/// `useVideoPlaybackClock`'s `publishPreviewSecond`: MDK presented `piece_id`'s frame at
+/// `source_second`. The playhead follows it once per preview frame, so that the widgets update at
+/// their own rate and not at the video's.
+pub fn video_clock_frame(store: &mut Store, piece_id: &str, source_second: f64) {
+    if !video_clock_active(store) {
+        return;
+    }
+    let committed = &store.player.timeline.timeline().committed;
+    let Some(piece) = committed.program.pieces.iter().find(|piece| piece.id == piece_id) else { return };
+    // A frame at or past half a frame before the end lies outside the piece.
+    if source_second >= piece.source_end_second - piece.fps.frames_to_seconds(1) / 2.0 {
+        return;
+    }
+    let second = piece.timeline_start_second + (source_second - piece.source_start_second).max(0.0);
+    let frame = (second * player_timing(store).effective_fps).floor() as i64;
+    if store.player.playback.frame_index != Some(frame) {
+        store.player.playback.frame_index = Some(frame);
+        store.editor.set_selected_second(second);
+    }
+}
+
+/// The playing shot ends at `source_second` of its piece. At the piece's end playback continues
+/// where `play` would start there, or, after a shown transition, as many seconds into the next
+/// piece as the blend showed (`resolveContinuation`). Before it, a transition's window begins.
+pub fn video_clock_cut(store: &mut Store, piece_id: &str, source_second: f64, now: Instant) {
+    if !video_clock_active(store) {
         return;
     }
     let timeline = std::rc::Rc::clone(&store.player.timeline.timeline().committed);
-    let Some(piece) = timeline.program.pieces.iter().find(|piece| piece.id == piece_id) else { return };
-    let last_frame_second = piece.fps.frames_to_seconds(piece.source_end_frame - 1);
-    if !ended && source_second + 1e-6 < last_frame_second {
-        let second = piece.timeline_start_second + (source_second - piece.source_start_second).max(0.0);
-        store.editor.set_selected_second(second.min(piece.timeline_end_second));
+    let program = &timeline.program;
+    let Some(index) = program.pieces.iter().position(|piece| piece.id == piece_id) else { return resume_from_playhead(store, now) };
+    let piece = &program.pieces[index];
+    if source_second < piece.source_end_second - piece.fps.frames_to_seconds(1) / 2.0 {
+        // A hair inside, so that the window's `second >= start` holds whatever the rounding.
+        store.editor.set_selected_second(piece.timeline_start_second + (source_second - piece.source_start_second) + 1e-6);
+        return;
+    }
+    let continuation = program
+        .joins
+        .get(index)
+        .filter(|join| store.transition_proxies.ready_path(join).is_some())
+        .map(|join| program.pieces[index + 1].timeline_start_second + join.transition.duration_seconds());
+    let timing = player_timing(store);
+    let second = continuation.unwrap_or(piece.timeline_end_second);
+    if second >= timing.total_duration {
+        pause_at_second(store, timing.total_duration);
+    } else {
+        start_playback(store, timing, second, now);
+    }
+}
+
+/// Playback goes on from the playhead with whichever clock can play there: after an edit moved the
+/// playing piece away, or its file failed.
+pub fn resume_from_playhead(store: &mut Store, now: Instant) {
+    if store.editor.preview_playback_state != PreviewPlaybackState::Playing {
         return;
     }
     let timing = player_timing(store);
-    if piece.timeline_end_second >= timing.total_duration {
-        pause_at_second(store, timing.total_duration);
-        return;
-    }
-    start_playback(store, timing, piece.timeline_end_second, now);
+    start_playback(store, timing, timing.clamped_playhead, now);
 }
 
 /// When the timeline clock reaches its next preview frame, while it plays; the timer skips the
@@ -303,7 +360,7 @@ fn reconcile_playback_with(store: &mut Store, timing: PlayerTiming, now: Instant
     }
     // 4. Timeline playback entering the program hands over to the video clock.
     if store.editor.preview_playback_state == PreviewPlaybackState::Playing && timing.should_use_video_playback && store.editor.preview_playback_source == PlaybackSource::Timeline {
-        let start = resolve_playback_source(true, timing.clamped_playhead, &store.player.timeline.timeline().committed.program);
+        let start = playback_start(store, timing, timing.clamped_playhead);
         if start.source == PlaybackSource::Video {
             let engine = &mut store.player.playback;
             engine.anchor = PlaybackAnchor::new(start.source, start.second, now);
@@ -479,6 +536,72 @@ mod tests {
         let mut store = player(8.0, Vec::new(), &[], 12.0);
         reconcile_playback(&mut store);
         assert_eq!(store.editor.selected_second, 8.0);
+    }
+
+    #[test]
+    fn video_playback_needs_players_videos_and_the_video_background() {
+        let mut store = player(8.0, vec![simple("video-1", 4.0, 0)], &[], 0.0);
+        store.editor_shell.set_editor_background_mode(EditorBackgroundMode::Video);
+        assert!(!player_timing(&store).should_use_video_playback, "no players");
+        store.player.video_clock_available = true;
+        assert!(player_timing(&store).should_use_video_playback);
+        store.editor_shell.set_editor_background_mode(EditorBackgroundMode::Checker);
+        assert!(!player_timing(&store).should_use_video_playback, "a hidden video is no clock");
+    }
+
+    fn on_video(mut store: Store) -> Store {
+        store.player.video_clock_available = true;
+        store.editor_shell.set_editor_background_mode(EditorBackgroundMode::Video);
+        play(&mut store, Instant::now());
+        store
+    }
+
+    #[test]
+    fn the_video_clock_publishes_once_per_preview_frame() {
+        let mut store = player(8.0, vec![simple("video-1", 4.0, 0)], &[], 0.0);
+        store.render_settings.widget_update_rate = 3;
+        let mut store = on_video(store);
+        video_clock_frame(&mut store, "video-1:0", 0.11);
+        assert_eq!(store.editor.selected_second, 0.11);
+        video_clock_frame(&mut store, "video-1:0", 0.16);
+        assert_eq!(store.editor.selected_second, 0.11, "the same frame at 10 fps");
+        video_clock_frame(&mut store, "video-1:0", 0.21);
+        assert_eq!(store.editor.selected_second, 0.21);
+    }
+
+    #[test]
+    fn a_cut_continues_with_the_next_piece_and_then_the_timeline() {
+        let mut store = on_video(player(20.0, vec![simple("first", 4.0, 0), simple("second", 4.0, 1)], &[("second", 10.0)], 0.0));
+        video_clock_frame(&mut store, "first:0", 4.0);
+        assert_eq!(store.editor.selected_second, 0.0, "a frame at the end is outside the piece");
+        video_clock_cut(&mut store, "first:0", 4.0, Instant::now());
+        assert_eq!(state(&store), (PreviewPlaybackState::Playing, PlaybackSource::Video, 10.0));
+        video_clock_cut(&mut store, "second:0", 4.0, Instant::now());
+        assert_eq!(state(&store), (PreviewPlaybackState::Playing, PlaybackSource::Timeline, 14.0));
+    }
+
+    #[test]
+    fn a_cut_enters_a_rendered_transition_and_leaves_it_into_the_next_piece() {
+        use crate::features::video_preview::transition_proxies::tests::{fade, render_all};
+        let mut store = player(200.0, vec![simple("ride", 60.0, 0), simple("climb", 30.0, 1)], &[("climb", 100.0)], 50.0);
+        store.video_import.transition_defaults = fade();
+        reconcile_timeline(&mut store);
+        render_all(&mut store);
+        let mut store = on_video(store);
+        video_clock_cut(&mut store, "ride:0", 58.0, Instant::now());
+        assert!((store.editor.selected_second - 58.0).abs() < 1e-5, "the window begins");
+        video_clock_cut(&mut store, "ride:0", 60.0, Instant::now());
+        assert_eq!(state(&store), (PreviewPlaybackState::Playing, PlaybackSource::Video, 102.0), "the blend showed the first 2 s");
+    }
+
+    #[test]
+    fn a_file_mdk_cannot_play_plays_on_the_timeline_clock() {
+        let video = simple("video-1", 4.0, 0);
+        let path = video.path.clone();
+        let mut store = on_video(player(8.0, vec![video], &[], 1.0));
+        assert_eq!(store.editor.preview_playback_source, PlaybackSource::Video);
+        crate::features::video_preview::preview::playback_failed(&mut store, path, Instant::now());
+        assert_eq!(state(&store), (PreviewPlaybackState::Playing, PlaybackSource::Timeline, 1.0));
     }
 
     #[test]

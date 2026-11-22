@@ -524,6 +524,7 @@
       "fileUnavailable": "Der lokale Vorschau-Server konnte die Videodatei nicht lesen. Die Datei wurde möglicherweise verschoben, gelöscht oder ist nicht mehr verfügbar.",
       "unsupportedFormat": "Dieses Videoformat wird vom Systemvideoplayer nicht unterstützt."
     },
+    "gpuRequired": "Die Videowiedergabe erfordert mindestens eine integrierte GPU.",
     "theVideoPreviewCouldNotBeLoaded": "Die Videovorschau konnte nicht geladen werden.",
     "videoOrImage": "Video oder Bild",
     "videoPreviewLoadingWasAborted": "Das Laden der Videovorschau wurde abgebrochen."

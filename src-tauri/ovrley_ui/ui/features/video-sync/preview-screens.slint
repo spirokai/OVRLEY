@@ -7,6 +7,7 @@ import { Shadow, ShadowSize } from "../../components/shadow.slint";
 import { Landmarks } from "video-sync-drawer.slint";
 import { VideoSync, LandmarkKind } from "index.slint";
 import { NavigationMapView, SelectionMapView } from "map-screens.slint";
+import { VideoPreviewSurface, VideoPreviewNotices } from "../video-preview/video-preview-surface.slint";
 
 // One mark button: `rounded-sm bg-surface shadow-md` around a ghost button (`min-h-7`, `px-2
 // py-1`, 0.75rem semibold uppercase) with a 70% border and text in its type's colour, hover at
@@ -143,7 +144,7 @@ component Screen inherits Rectangle {
     @children
 }
 
-// `VideoSyncPreviewScreens`: the video screen (black until Phase 6B, with the mark controls) and
+// `VideoSyncPreviewScreens`: the video screen (the video, with the mark controls) and
 // the map screen, side by side with the gap between them.
 export component VideoSyncScreens inherits Rectangle {
     video-screen := Screen {
@@ -152,6 +153,10 @@ export component VideoSyncScreens inherits Rectangle {
         width: VideoSync.screen-width;
         height: VideoSync.screen-height;
         fill: #000000;
+        VideoPreviewSurface {
+            width: parent.width;
+            height: parent.height;
+        }
         // The speed readout at `top 6%`, `left 4%`, under the inset and the mark controls, letting
         // the pointer through.
         Rectangle {
@@ -189,6 +194,10 @@ export component VideoSyncScreens inherits Rectangle {
             height: self.preferred-height;
             x: (parent.width - self.width) / 2;
             y: parent.height - 1rem - self.height;
+        }
+        VideoPreviewNotices {
+            width: parent.width;
+            height: parent.height;
         }
     }
     map-screen := Screen {

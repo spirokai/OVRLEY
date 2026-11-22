@@ -100,7 +100,6 @@ pub struct ImportedVideo {
     pub time_source: Option<String>,
     pub detected_creation_time: Option<String>,
     pub detected_time_source: Option<String>,
-    pub preview_warnings: Vec<String>,
     /// A project video whose file cannot be found.
     pub missing: bool,
     pub sync_warning: Option<SyncWarning>,
@@ -157,7 +156,7 @@ impl Clip {
 
 /// `createImportedVideo`: validates probed metadata once at import ingress. Malformed metadata
 /// fails, as the probe is the app's own boundary.
-pub fn create_imported_video(metadata: &SourceVideoMetadata, id: String, import_order: u32, preview_warnings: Vec<String>) -> Result<ImportedVideo, String> {
+pub fn create_imported_video(metadata: &SourceVideoMetadata, id: String, import_order: u32) -> Result<ImportedVideo, String> {
     if metadata.path.is_empty() {
         return Err("Imported video metadata must include a path".into());
     }
@@ -201,7 +200,6 @@ pub fn create_imported_video(metadata: &SourceVideoMetadata, id: String, import_
         time_source: metadata.time_source.clone(),
         detected_creation_time: metadata.creation_time.clone(),
         detected_time_source: metadata.time_source.clone(),
-        preview_warnings,
         missing: false,
         sync_warning: None,
         telemetry: VideoTelemetry::pending(),
@@ -232,7 +230,6 @@ pub fn create_missing_video(metadata: &VideoMetadataSnapshot, id: String, path: 
         time_source: metadata.time_source.clone(),
         detected_creation_time: metadata.creation_time.clone(),
         detected_time_source: metadata.time_source.clone(),
-        preview_warnings: Vec::new(),
         missing: true,
         sync_warning: None,
         telemetry: VideoTelemetry::without_activity(TelemetryStatus::Failed).expect("failed telemetry has no activity"),
@@ -307,7 +304,7 @@ pub(crate) mod fixtures {
 
     /// `createTestVideo`, through the production ingress.
     pub fn video(test: TestVideo) -> ImportedVideo {
-        create_imported_video(&metadata(test.path, test.duration_seconds, test.fps, test.width, test.height), test.id.into(), test.import_order, Vec::new()).unwrap()
+        create_imported_video(&metadata(test.path, test.duration_seconds, test.fps, test.width, test.height), test.id.into(), test.import_order).unwrap()
     }
 
     /// A video of `duration_seconds` at 30 fps with an id and import order.
@@ -360,13 +357,13 @@ mod tests {
     fn ingress_stores_a_reduced_fps_a_frame_exact_duration_and_a_display_resolution() {
         let mut probed = metadata("/videos/ride.mp4", 10.0103, (60000, 2002), 1920, 1080);
         probed.rotation_degrees = Some(90);
-        let video = create_imported_video(&probed, "v".into(), 3, vec!["slow seeking".into()]).unwrap();
+        let video = create_imported_video(&probed, "v".into(), 3).unwrap();
         assert_eq!(video.fps, Fps::new(30000, 1001).unwrap());
         // 300.09 frames: the partial last frame counts, as in the native renderer.
         assert_eq!(video.frame_count, 301);
         assert!((video.duration_seconds - 301.0 * 1001.0 / 30000.0).abs() < 1e-12);
         assert_eq!(video.resolution, VideoResolution { width: 1080, height: 1920 });
-        assert_eq!((video.import_order, video.preview_warnings.clone(), video.sync_warning), (3, vec!["slow seeking".to_string()], None));
+        assert_eq!((video.import_order, video.sync_warning), (3, None));
         assert_eq!(video.telemetry.status(), TelemetryStatus::Pending);
     }
 
@@ -384,14 +381,14 @@ mod tests {
         for (message, change) in cases {
             let mut probed = base();
             change(&mut probed);
-            let error = create_imported_video(&probed, "v".into(), 0, Vec::new()).unwrap_err();
+            let error = create_imported_video(&probed, "v".into(), 0).unwrap_err();
             assert!(error.contains(message), "{error}");
         }
     }
 
     #[test]
     fn frames_are_counted_like_the_native_renderer() {
-        let frames = |duration, fps| create_imported_video(&metadata("/v.mp4", duration, fps, 1920, 1080), "v".into(), 0, Vec::new()).unwrap().frame_count;
+        let frames = |duration, fps| create_imported_video(&metadata("/v.mp4", duration, fps, 1920, 1080), "v".into(), 0).unwrap().frame_count;
         assert_eq!(frames(10.0, (30, 1)), 300);
         assert_eq!(frames(10.000001, (30, 1)), 300);
         assert_eq!(frames(10.01, (30, 1)), 301);
@@ -410,7 +407,7 @@ mod tests {
         let mut probed = metadata("/videos/ride.mp4", 10.0, (30000, 1001), 1920, 1080);
         probed.creation_time = Some("2024-01-01T10:00:00".into());
         probed.time_source = Some("ffprobe".into());
-        let mut video = create_imported_video(&probed, "v".into(), 2, Vec::new()).unwrap();
+        let mut video = create_imported_video(&probed, "v".into(), 2).unwrap();
         video.creation_time = Some("2024-01-01T11:00:00".into());
         video.time_source = Some("filename".into());
         let snapshot = video_metadata_snapshot(&video);

@@ -951,7 +951,7 @@ pub fn probe_video(
     }
     let metadata = tools.probe(path)?;
     let thumbnail = THUMBNAILS.run(|| tools.thumbnail(path));
-    let mut video = create_imported_video(&metadata, id, import_order, Vec::new())?;
+    let mut video = create_imported_video(&metadata, id, import_order)?;
     video.thumbnail = thumbnail.map(Arc::from);
     Ok(video)
 }

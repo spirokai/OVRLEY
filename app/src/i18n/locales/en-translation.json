@@ -617,6 +617,7 @@
     "excludedIndicator": "Excluded from export",
     "renderingTransition": "Rendering transition preview…",
     "overlapPlaybackWarning": "Videos overlap here. The preview plays the earlier video first; one combined export is not possible.",
+    "gpuRequired": "Video playback requires at least an integrated GPU.",
     "theVideoPreviewCouldNotBeLoaded": "The video preview could not be loaded.",
     "transitionDuration": "Duration",
     "transitionType": "Transition",

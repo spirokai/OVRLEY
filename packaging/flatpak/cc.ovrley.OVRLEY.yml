@@ -35,6 +35,8 @@ modules:
     build-options:
       env:
         OVRLEY_WASM_PREBUILT: '1'
+        # The Tauri app has no native playback; Phase 9 packages the MDK SDK.
+        OVRLEY_SKIP_MDK_INSTALL: '1'
         # Outside the source tree: pnpm prepares git dependencies by running `pnpm install`
         # next to the store, and inside the tree that finds our workspace and loops.
         npm_config_store_dir: /run/build/pnpm-store

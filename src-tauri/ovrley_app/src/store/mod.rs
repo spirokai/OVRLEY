@@ -63,6 +63,8 @@ pub struct Store {
     pub telemetry_queue: crate::features::video_preview::import::VideoTelemetryQueue,
     /// `useVideoFilmstripQueue`'s state.
     pub filmstrip_queue: crate::features::video_preview::filmstrips::FilmstripQueue,
+    /// `createTransitionProxySlice` and its queue (Phase 6B D8).
+    pub transition_proxies: crate::features::video_preview::transition_proxies::TransitionProxies,
     /// Sync Doctor's hook state (Phase 8).
     pub video_sync: crate::features::video_sync::VideoSyncWorkspace,
     /// The player's hook state and cached timeline (phase 4 D3, D5).

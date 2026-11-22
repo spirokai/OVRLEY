@@ -524,6 +524,7 @@
       "fileUnavailable": "De lokale voorvertoningsserver kon het videobestand niet lezen. Het bestand is mogelijk verplaatst, verwijderd of niet beschikbaar.",
       "unsupportedFormat": "Dit videoformaat wordt niet ondersteund door de systeemspeler."
     },
+    "gpuRequired": "Voor het afspelen van video is minimaal een geïntegreerde GPU vereist.",
     "theVideoPreviewCouldNotBeLoaded": "De videovoorvertoning kon niet worden geladen.",
     "videoOrImage": "Video of afbeelding",
     "videoPreviewLoadingWasAborted": "Het laden van de videovoorvertoning is afgebroken."

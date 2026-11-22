@@ -69,3 +69,19 @@ export global VideoImport {
     callback sync-filename-creation-times();
     callback sync-set-utc(utc: bool);
 }
+
+// The video preview's placeholder: none, or why there is no frame.
+export enum VideoPlaceholder { none, missing, failed, no-gpu }
+
+// The video preview's surface. Written by `src/features/video_playback.rs`.
+export global VideoPreview {
+    // The decoder's wgpu texture.
+    in property <image> frame;
+    in property <bool> frame-shown;
+    // Outside the pieces.
+    in property <bool> dimmed;
+    in property <VideoPlaceholder> placeholder;
+    in property <bool> excluded;
+    in property <bool> overlap;
+    in property <bool> rendering-transition;
+}

@@ -686,7 +686,6 @@ mod tests {
             },
             "turned".into(),
             1,
-            Vec::new(),
         )
         .unwrap();
         let clips = clips_of(

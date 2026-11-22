@@ -1,7 +1,6 @@
 [package]
-# Phase 6B spike (branch spike/mdk-macos, never merged): video playback rendered into a texture
-# of the shared wgpu device. macOS (Metal), Windows (D3D12) and Linux (OpenGL, bridged into the
-# Vulkan device by ovrley_ui), with MDK through the `cpp` crate over its C++ API.
+# Video playback rendered into textures of the host's wgpu device: macOS (Metal), Windows (D3D11)
+# and Linux (OpenGL, bridged into Vulkan), with MDK through the `cpp` crate over its C++ API.
 name = "ovrley_playback"
 version = "0.1.0"
 edition = "2021"
@@ -14,6 +13,32 @@ license = "GPL-3.0-or-later"
 [dependencies]
 cpp = "0.5"
 log = "0.4"
+# Slint's version.
+wgpu = { version = "=30.0.1", default-features = false, features = ["std"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+wgpu = { version = "=30.0.1", default-features = false, features = ["metal"] }
+
+[target.'cfg(windows)'.dependencies]
+wgpu = { version = "=30.0.1", default-features = false, features = ["dx12"] }
+# The D3D11 device, and the textures and fence it shares with DX12. wgpu-hal's version.
+windows = { version = "0.62", default-features = false, features = [
+  "std",
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Direct3D12",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan"] }
+# The Vulkan–OpenGL bridge. ash at wgpu-hal's version; EGL loaded at run time (libEGL.so.1), so any
+# vendor's driver behind glvnd serves it.
+ash = "0.38"
+khronos-egl = { version = "6", features = ["dynamic"] }
 
 [build-dependencies]
 cpp_build = "0.5"

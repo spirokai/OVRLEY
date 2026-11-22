@@ -1,0 +1,188 @@
+// `VideoPreviewSurface.jsx` (Phase 6B D9): the video under the canvas's widgets and on Sync Doctor's
+// screen. The notices are their own component, because they lie above the widgets.
+import { Theme } from "../../theme/theme.slint";
+import { AppText } from "../../components/app-text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Shadow, ShadowSize } from "../../components/shadow.slint";
+import { SpinningLoader } from "../render-video/render-progress-panel.slint";
+import { VideoPreview, VideoPlaceholder } from "index.slint";
+
+// A placeholder's centred column, shrunk less than the canvas (`0.5 + 0.5 / displayScale`).
+component Placeholder inherits Rectangle {
+    in property <float> display-scale: 1;
+    in property <length> icon-size;
+    in property <color> icon-color;
+    in property <string> message;
+    in property <color> message-color;
+    in property <length> message-size;
+    in property <int> message-weight: Theme.font-weight-normal;
+    in property <length> gap;
+
+    clip: true;
+    column := VerticalLayout {
+        property <float> factor: 0.5 + 0.5 / max(0.01, root.display-scale);
+        width: min(parent.width, 36rem);
+        height: self.preferred-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        transform-scale-x: self.factor * 100%;
+        transform-scale-y: self.factor * 100%;
+        padding: 2rem;
+        spacing: root.gap;
+        HorizontalLayout {
+            alignment: center;
+            Icon {
+                glyph: Icons.triangle-alert;
+                size: root.icon-size;
+                color: root.icon-color;
+            }
+        }
+        AppText {
+            content: root.message;
+            font-size: root.message-size;
+            font-weight: root.message-weight;
+            color: root.message-color;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+    }
+}
+
+export component VideoPreviewSurface inherits Rectangle {
+    in property <float> display-scale: 1;
+
+    background: #000000;
+    // MDK crops the video to the texture (`object-cover`), which has the surface's shape. Until a
+    // resize settled its last texture stretches.
+    if VideoPreview.frame-shown: Image {
+        width: parent.width;
+        height: parent.height;
+        source: VideoPreview.frame;
+        image-fit: fill;
+        opacity: VideoPreview.dimmed ? 0.2 : 1;
+    }
+    if VideoPreview.placeholder == VideoPlaceholder.missing: Placeholder {
+        width: parent.width;
+        height: parent.height;
+        display-scale: root.display-scale;
+        background: #000000;
+        icon-size: 2.5rem;
+        icon-color: Theme.destructive;
+        message: @tr("video-preview.videoNotFound" => "Video not found");
+        message-size: Theme.text-base * 1rem;
+        message-weight: Theme.font-weight-semibold;
+        message-color: #ffffff;
+        gap: 0.75rem;
+    }
+    if VideoPreview.placeholder == VideoPlaceholder.failed || VideoPreview.placeholder == VideoPlaceholder.no-gpu: Placeholder {
+        width: parent.width;
+        height: parent.height;
+        display-scale: root.display-scale;
+        background: #000000e6;
+        icon-size: 3rem;
+        // amber-400, and amber-200 at 80%.
+        icon-color: #fbbf24;
+        message: VideoPreview.placeholder == VideoPlaceholder.no-gpu
+            ? @tr("video-preview.gpuRequired" => "Video playback requires at least an integrated GPU.")
+            : @tr("video-preview.theVideoPreviewCouldNotBeLoaded" => "The video preview could not be loaded.");
+        message-size: Theme.text-sm * 1rem;
+        message-color: #fde68acc;
+        gap: 1rem;
+    }
+}
+
+export component VideoPreviewNotices inherits Rectangle {
+    if VideoPreview.rendering-transition: Rectangle {
+        width: rendering.preferred-width;
+        height: rendering.preferred-height;
+        x: root.width - self.width - 1rem;
+        y: 1rem;
+        border-radius: Theme.radius-sm * 1rem;
+        background: #000000b3;
+        rendering := HorizontalLayout {
+            padding-left: 0.75rem;
+            padding-right: 0.75rem;
+            padding-top: 0.375rem;
+            padding-bottom: 0.375rem;
+            spacing: 0.5rem;
+            VerticalLayout {
+                alignment: center;
+                SpinningLoader {
+                    size: 0.875rem;
+                    color: #ffffff;
+                }
+            }
+            AppText {
+                content: @tr("video-preview.renderingTransition" => "Rendering transition preview…");
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-semibold;
+                color: #ffffff;
+            }
+        }
+    }
+    if VideoPreview.excluded: Rectangle {
+        width: excluded.preferred-width;
+        height: excluded.preferred-height;
+        x: (root.width - self.width) / 2;
+        y: 1rem;
+        Shadow {
+            size: ShadowSize.lg;
+            radius: Theme.radius-sm * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.radius-sm * 1rem;
+            background: #000000cc;
+        }
+        excluded := HorizontalLayout {
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            spacing: 0.5rem;
+            Icon {
+                glyph: Icons.scissors;
+                size: 1rem;
+                color: #ffffff;
+            }
+            AppText {
+                content: @tr("video-preview.excludedIndicator" => "Excluded from export");
+                font-size: Theme.text-sm * 1rem;
+                font-weight: Theme.font-weight-semibold;
+                color: #ffffff;
+            }
+        }
+    }
+    if VideoPreview.overlap: Rectangle {
+        // `max-w-[90%]`, with the icon, the gap and the padding beside the text.
+        property <length> beside: 4.75rem;
+        width: min(root.width * 0.9, overlap-text.preferred-width + self.beside);
+        height: max(1.5rem, overlap-text.preferred-height) + 1.5rem;
+        x: (root.width - self.width) / 2;
+        y: root.height - self.height - 1rem;
+        border-radius: Theme.radius-sm * 1rem;
+        border-width: 2px;
+        border-color: Theme.destructive;
+        background: Theme.destructive.transparentize(0.1);
+        accessible-role: text;
+        accessible-label: overlap-text.content;
+        Icon {
+            x: 1.25rem;
+            y: (parent.height - self.height) / 2;
+            height: 1.5rem;
+            glyph: Icons.triangle-alert;
+            size: 1.5rem;
+            color: #ffffff;
+        }
+        overlap-text := AppText {
+            x: 3.5rem;
+            y: 0.75rem;
+            width: parent.width - parent.beside;
+            height: parent.height - 1.5rem;
+            content: @tr("video-preview.overlapPlaybackWarning" => "Videos overlap here. The preview plays the earlier video first; one combined export is not possible.");
+            font-size: Theme.text-base * 1rem;
+            font-weight: Theme.font-weight-bold;
+            color: #ffffff;
+            wrap: word-wrap;
+        }
+    }
+}

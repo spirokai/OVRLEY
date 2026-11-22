@@ -524,6 +524,7 @@
       "fileUnavailable": "ローカルプレビューサーバーで動画ファイルを読み込めませんでした。ファイルが移動、削除されたか、利用できなくなった可能性があります。",
       "unsupportedFormat": "この動画形式はシステムの動画プレーヤーでサポートされていません。"
     },
+    "gpuRequired": "動画の再生には内蔵GPU以上が必要です。",
     "theVideoPreviewCouldNotBeLoaded": "動画プレビューを読み込めませんでした。",
     "videoOrImage": "動画または画像",
     "videoPreviewLoadingWasAborted": "動画プレビューの読み込みが中止されました。"

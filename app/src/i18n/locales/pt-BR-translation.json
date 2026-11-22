@@ -524,6 +524,7 @@
       "fileUnavailable": "O servidor local de pré-visualização não pôde ler o arquivo de vídeo. O arquivo pode ter sido movido, excluído ou ter ficado indisponível.",
       "unsupportedFormat": "Este formato de vídeo não é compatível com o player de vídeo do sistema."
     },
+    "gpuRequired": "A reprodução de vídeo requer pelo menos uma GPU integrada.",
     "theVideoPreviewCouldNotBeLoaded": "Não foi possível carregar a pré-visualização do vídeo.",
     "videoOrImage": "Vídeo ou imagem",
     "videoPreviewLoadingWasAborted": "O carregamento da pré-visualização do vídeo foi interrompido."

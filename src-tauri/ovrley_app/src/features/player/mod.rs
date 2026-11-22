@@ -107,8 +107,10 @@ pub struct PlayerState {
     pub timeline: timeline::TimelineCache,
     /// `usePlaybackEngine`'s refs (D6).
     pub playback: playback::PlaybackEngine,
-    /// Phase 6B spike: a decoder is attached that can be the video clock.
+    /// The video players exist, so MDK can be the video clock (Phase 6B D11).
     pub video_clock_available: bool,
+    /// Files MDK could not play this session. Their pieces play on the timeline clock.
+    pub unplayable_paths: std::collections::BTreeSet<String>,
     /// `useTimelineViewport`'s measurements and rule inputs (D7).
     pub viewport: viewport::ViewportState,
     /// A scrub, playhead drag or pan (`useTimelineGestures`, D9).
@@ -160,8 +162,8 @@ pub fn reconcile_player(store: &mut Store) {
 }
 
 /// Removes a video clip (D17): playback pauses first, and the removal runs outside the history,
-/// which is rebased. Without videos the background returns to checker. Phase 6B adds releasing the
-/// video's decoders.
+/// which is rebased. Without videos the background returns to checker. The preview's players let go of
+/// the file at the next projection.
 pub fn remove_video(store: &mut Store, video_id: &str) -> Result<(), String> {
     playback::pause(store);
     crate::features::undo_redo::change_video_collection(store, &[], |store| crate::store::slices::video_import::remove_imported_video(store, video_id))?;

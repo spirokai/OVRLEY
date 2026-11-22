@@ -14,10 +14,6 @@ dev-windows = []
 # Dev only (`pnpm dev:native:live`, with SLINT_LIVE_PREVIEW=1): saving a .slint file reloads the
 # UI inside the running app. Never in release builds.
 live-preview = ["slint/live-preview"]
-# Phase 6B spike (branch spike/mdk-macos, never merged): video playback in the canvas, macOS,
-# Windows and Linux. Runs only with OVRLEY_PLAYBACK set; needs MDK_SDK at build time (.env.local,
-# `pnpm dev:native:playback`).
-video-playback = ["dep:ovrley_playback", "dep:ash", "dep:khronos-egl"]
 
 [[bin]]
 # Packaging renames it in Phase 9.
@@ -30,6 +26,7 @@ ovrley_services = { path = "../ovrley_services" }
 ovrley_widgets = { path = "../ovrley_widgets" }
 ovrley_core = { path = "../ovrley_core" }
 ovrley_mcp = { path = "../ovrley_mcp" }
+ovrley_playback = { path = "../ovrley_playback" }
 arboard = { version = "3.7", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "webp"] }
 env_logger = { version = "0.11", default-features = false, features = ["auto-color", "humantime"] }
@@ -53,7 +50,6 @@ slint = { version = "=1.19.0", default-features = false, features = [
 skia-safe = { version = "=0.157.0", features = ["binary-cache", "no-compile"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-ovrley_playback = { path = "../ovrley_playback", optional = true }
 objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = [
@@ -75,11 +71,8 @@ objc2-app-kit = { version = "0.3", default-features = false, features = [
 ] }
 
 [target.'cfg(windows)'.dependencies]
-ovrley_playback = { path = "../ovrley_playback", optional = true }
-# The raw D3D12 pointers wgpu's DX12 objects wrap, for video playback. wgpu-hal's version.
-windows-core = { version = "0.62", default-features = false }
-# Video playback's D3D11 target (`OVRLEY_PLAYBACK_TARGET=d3d11`): a D3D11 device and a texture and
-# fence shared with the DX12 device; the Windows build, for the window's edge. wgpu-hal's version.
+# The Windows build, for the window's edge, and the D3D12 of `examples/gpu_probe.rs`. wgpu-hal's
+# version.
 windows = { version = "0.62", default-features = false, features = [
   "std",
   "Wdk_System_SystemServices",
@@ -95,12 +88,9 @@ windows = { version = "0.62", default-features = false, features = [
 
 # The Wayland drop listener (winit reports no drops on Wayland).
 [target.'cfg(target_os = "linux")'.dependencies]
-ovrley_playback = { path = "../ovrley_playback", optional = true }
-# Video playback's Vulkan–OpenGL bridge: MDK draws with OpenGL into Vulkan memory the shared device
-# exports. ash at wgpu-hal's version; EGL loaded at run time (libEGL.so.1), so any vendor's driver
-# behind glvnd serves it.
-ash = { version = "0.38", optional = true }
-khronos-egl = { version = "6", features = ["dynamic"], optional = true }
+# The device extension video playback's Vulkan–OpenGL bridge needs (`platform/gpu.rs`). wgpu-hal's
+# version.
+ash = "0.38"
 libc = "0.2"
 wayland-client = "0.31.15"
 wayland-backend = { version = "0.3.17", features = ["client_system", "dlopen"] }

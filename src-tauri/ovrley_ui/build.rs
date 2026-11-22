@@ -8,11 +8,11 @@
 mod translations;
 
 fn main() {
-    // Video playback: on macOS and Linux MDK is found through an rpath to the SDK's library folder
-    // (ovrley_playback's `links` metadata), which only the final binary can carry. Windows has no
-    // rpath: `$MDK_SDK/bin/x64` goes on PATH at run time.
+    // On macOS and Linux MDK is found through an rpath to the SDK's library folder (ovrley_playback's
+    // `links` metadata), which only the linked executables can carry. Windows has no rpath:
+    // ovrley_playback's build script copies the DLLs beside them.
     if let Ok(lib) = std::env::var("DEP_MDK_LIB_DIR") {
-        println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{lib}");
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{lib}");
     }
     let dev = std::env::var_os("CARGO_FEATURE_DEV_WINDOWS").is_some();
     let root = if dev { "ui/dev-index.slint" } else { "ui/index.slint" };

@@ -524,6 +524,7 @@
       "fileUnavailable": "Den lokala förhandsgranskningsservern kunde inte läsa videofilen. Filen kan ha flyttats, tagits bort eller blivit otillgänglig.",
       "unsupportedFormat": "Detta videoformat stöds inte av systemets videospelare."
     },
+    "gpuRequired": "Videouppspelning kräver minst en integrerad GPU.",
     "theVideoPreviewCouldNotBeLoaded": "Videoförhandsvisningen kunde inte läsas in.",
     "videoOrImage": "Video eller bild",
     "videoPreviewLoadingWasAborted": "Inläsningen av videoförhandsvisningen avbröts."

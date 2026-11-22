@@ -331,7 +331,7 @@ mod tests {
                 resolution: Some(ovrley_core::media::Resolution { width: 1920, height: 1080 }),
                 ..Default::default()
             };
-            let clip = ovrley_app::lib::video_program::create_imported_video(&metadata, "clip".into(), 0, Vec::new()).unwrap();
+            let clip = ovrley_app::lib::video_program::create_imported_video(&metadata, "clip".into(), 0).unwrap();
             ovrley_app::store::slices::video_import::commit_video_collection(store, vec![clip], ovrley_app::lib::video_program::VideoEditsMap::from([("clip".to_string(), Default::default())]));
         });
         (dispatcher, fakes)

@@ -524,6 +524,7 @@
       "fileUnavailable": "Lokalny serwer podglądu nie może odczytać pliku wideo. Plik mógł zostać przeniesiony, usunięty lub stał się niedostępny.",
       "unsupportedFormat": "Systemowy odtwarzacz wideo nie obsługuje tego formatu wideo."
     },
+    "gpuRequired": "Odtwarzanie wideo wymaga co najmniej zintegrowanego GPU.",
     "theVideoPreviewCouldNotBeLoaded": "Nie można wczytać podglądu wideo.",
     "videoOrImage": "Wideo lub obraz",
     "videoPreviewLoadingWasAborted": "Wczytywanie podglądu wideo zostało przerwane."

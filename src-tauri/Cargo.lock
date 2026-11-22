@@ -5945,10 +5945,14 @@ dependencies = [
 name = "ovrley_playback"
 version = "0.1.0"
 dependencies = [
+ "ash",
  "cpp",
  "cpp_build",
  "env_logger",
+ "khronos-egl",
  "log",
+ "wgpu",
+ "windows 0.62.2",
 ]
 
 [[package]]
@@ -5983,7 +5987,6 @@ dependencies = [
  "i-slint-backend-testing",
  "iconify",
  "image",
- "khronos-egl",
  "libc",
  "log",
  "objc2 0.6.5",
@@ -6005,7 +6008,6 @@ dependencies = [
  "wayland-backend",
  "wayland-client",
  "windows 0.62.2",
- "windows-core 0.62.2",
 ]
 
 [[package]]

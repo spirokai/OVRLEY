@@ -1,8 +1,7 @@
-//! Step 1 smoke run: open a clip, wait for the first frame (`"size"` event), read its size and
+//! Smoke run: open a clip, wait for the first frame (`"size"` event), read its size and
 //! rotation, tear down. No render target is set; MDK decodes without drawing.
 //!
-//! `MDK_SDK=… cargo run -p ovrley_playback --example smoke -- <clip>`; on Windows
-//! `$MDK_SDK/bin/x64` must be on `PATH`.
+//! `cargo run -p ovrley_playback --example smoke -- <clip>`
 
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -17,7 +16,7 @@ fn main() {
     let (sender, receiver) = mpsc::channel();
     let decoders = ovrley_playback::player::decoders_from_env();
     log::info!("decoders {decoders:?}");
-    let player = ovrley_playback::player::Player::new(
+    let mut player = ovrley_playback::player::Player::new(
         &decoders,
         ovrley_playback::player::Callbacks {
             render: Box::new(|| {}),
@@ -28,7 +27,7 @@ fn main() {
         },
     );
     let started = Instant::now();
-    player.open(&path, 0);
+    player.open(&path, 0.0);
     // Without a render target nothing pulls frames; playing paused-at-start still decodes one.
     player.set_state(ovrley_playback::player::State::Paused);
 

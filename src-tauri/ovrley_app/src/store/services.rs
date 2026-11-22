@@ -116,8 +116,12 @@ pub trait VideoTools: Send + Sync {
     fn thumbnail(&self, path: &str) -> Option<Vec<u8>>;
     /// `extractVideoTelemetry`: the video's embedded activity, `None` without one. Blocking.
     fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String>;
+    /// Renders a join's blend and returns the file's path (Phase 6B D8). Blocking.
+    fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String>;
+    fn remove_transition_proxy(&self, path: &str) -> Result<(), String>;
 }
 
+pub use ovrley_core::encode::ffmpeg::transition_proxy::{TransitionProxyRequest, TransitionProxySource};
 pub use ovrley_services::video_filmstrip::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
 
 /// The native video tools: the filmstrip cache in the application cache directory, with the limit
@@ -173,6 +177,16 @@ impl VideoTools for NativeVideoTools {
 
     fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
         ovrley_core::commands::backend_extract_video_telemetry(&self.paths, path).map_err(|error| error.to_string())
+    }
+
+    fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String> {
+        ovrley_core::encode::ffmpeg::transition_proxy::render_transition_proxy(&self.paths, request)
+            .map(|path| path.to_string_lossy().into_owned())
+            .map_err(|error| error.to_string())
+    }
+
+    fn remove_transition_proxy(&self, path: &str) -> Result<(), String> {
+        ovrley_core::encode::ffmpeg::transition_proxy::remove_transition_proxy(std::path::Path::new(path)).map_err(|error| error.to_string())
     }
 }
 
@@ -877,6 +891,14 @@ pub mod fakes {
         fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
             self.telemetry_calls.lock().unwrap().push(path.to_string());
             self.telemetry.lock().unwrap().get(path).cloned().unwrap_or(Ok(None))
+        }
+
+        fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String> {
+            Ok(format!("/proxies/{}-{}.mp4", request.transition, request.outgoing.start_second))
+        }
+
+        fn remove_transition_proxy(&self, _path: &str) -> Result<(), String> {
+            Ok(())
         }
     }
 

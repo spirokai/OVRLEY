@@ -2,7 +2,7 @@
 //!
 //! One wgpu device is opened before the backend is selected, on the backend Skia is built for:
 //! Metal on Apple, DX12 on Windows (with FXC, which ships with Windows), Vulkan elsewhere. Slint
-//! renders the window on it, and Phase 6's compositor will draw on the same device.
+//! renders the window on it, and MDK draws the video on the same device.
 //! - A software adapter (WARP, llvmpipe, lavapipe) is not shared: the window uses Skia's CPU
 //!   rasteriser, which has no device to lose.
 //! - With no adapter, the platform API is required by name, so a silent fallback to the CPU
@@ -12,14 +12,14 @@ use slint::wgpu_30::wgpu;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-/// The device Slint renders on, kept for the compositor.
+/// The device Slint renders on and MDK draws on.
 #[derive(Clone)]
 pub struct GpuDevice {
     pub instance: wgpu::Instance,
     pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    /// Set by the device-lost callback; the compositor checks it before it draws.
+    /// Set by the device-lost callback.
     pub lost: Arc<AtomicBool>,
 }
 
@@ -121,7 +121,7 @@ pub fn open() -> GpuChoice {
     })
 }
 
-#[cfg(not(all(feature = "video-playback", target_os = "linux")))]
+#[cfg(not(target_os = "linux"))]
 fn request_device(
     adapter: &wgpu::Adapter,
     descriptor: &wgpu::DeviceDescriptor,
@@ -129,11 +129,11 @@ fn request_device(
     pollster::block_on(adapter.request_device(descriptor)).map_err(|error| error.to_string())
 }
 
-/// Video playback's Vulkan–OpenGL bridge (`features/video_playback/vulkan_gl.rs`) shares
+/// Video playback's Vulkan–OpenGL bridge (`ovrley_playback::target`) shares
 /// semaphores with OpenGL through `VK_KHR_external_semaphore_fd`, which wgpu does not enable
 /// itself (it enables `VK_KHR_external_memory_fd` when the driver has it). Without the extension
 /// the device opens as usual and playback reports it at start.
-#[cfg(all(feature = "video-playback", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 fn request_device(
     adapter: &wgpu::Adapter,
     descriptor: &wgpu::DeviceDescriptor,

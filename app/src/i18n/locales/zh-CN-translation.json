@@ -524,6 +524,7 @@
       "fileUnavailable": "本地预览服务器无法读取视频文件。文件可能已被移动、删除或变得不可用。",
       "unsupportedFormat": "系统视频播放器不支持此视频格式。"
     },
+    "gpuRequired": "视频播放至少需要一个集成显卡。",
     "theVideoPreviewCouldNotBeLoaded": "无法加载视频预览。",
     "videoOrImage": "视频或图像",
     "videoPreviewLoadingWasAborted": "视频预览加载已中止。"

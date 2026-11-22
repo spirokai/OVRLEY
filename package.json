@@ -6,7 +6,7 @@
   "scripts": {
     "tauri": "node scripts/tauri.mjs",
     "preinstall": "node scripts/require-pnpm.mjs",
-    "postinstall": "node scripts/install-ffmpeg.mjs",
+    "postinstall": "node scripts/install-ffmpeg.mjs && node scripts/install-mdk.mjs",
     "dev": "pnpm tauri dev",
     "build": "pnpm tauri build",
     "dev:frontend": "cd app && pnpm dev",
@@ -23,8 +23,6 @@
     "test": "pnpm --dir app test",
     "release": "semantic-release",
     "dev:native": "cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley",
-    "dev:native:playback": "node scripts/native-playback.mjs",
-    "dev:native:playback:d3d11": "node scripts/native-playback.mjs d3d11",
     "dev:native:live": "SLINT_LIVE_PREVIEW=1 cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --bin ovrley --features live-preview",
     "showcase:native": "cargo run --manifest-path src-tauri/Cargo.toml -p ovrley_ui --features dev-windows --example showcase",
     "test:native-ui": "cargo test --manifest-path src-tauri/Cargo.toml -p ovrley_app -p ovrley_ui -p ovrley_services -p ovrley_mcp --features ovrley_ui/dev-windows",

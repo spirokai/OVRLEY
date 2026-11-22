@@ -524,6 +524,7 @@
       "fileUnavailable": "Le serveur d’aperçu local n’a pas pu lire le fichier vidéo. Le fichier a peut-être été déplacé, supprimé ou est devenu indisponible.",
       "unsupportedFormat": "Ce format vidéo n’est pas pris en charge par le lecteur vidéo du système."
     },
+    "gpuRequired": "La lecture vidéo nécessite au minimum un GPU intégré.",
     "theVideoPreviewCouldNotBeLoaded": "Impossible de charger l’aperçu vidéo.",
     "videoOrImage": "Vidéo ou image",
     "videoPreviewLoadingWasAborted": "Chargement de l’aperçu vidéo interrompu."

@@ -1,0 +1,3 @@
+[env]
+# The MDK SDK that scripts/install-mdk.mjs installs. An MDK_SDK in the environment wins.
+MDK_SDK = { value = "vendor/mdk-sdk", relative = true }

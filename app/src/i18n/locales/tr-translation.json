@@ -524,6 +524,7 @@
       "fileUnavailable": "Yerel önizleme sunucusu video dosyasını okuyamadı. Dosya taşınmış, silinmiş veya kullanılamıyor olabilir.",
       "unsupportedFormat": "Bu video biçimi sistem video oynatıcısı tarafından desteklenmiyor."
     },
+    "gpuRequired": "Video oynatma için en azından tümleşik bir GPU gerekir.",
     "theVideoPreviewCouldNotBeLoaded": "Video önizlemesi yüklenemedi.",
     "videoOrImage": "Video veya resim",
     "videoPreviewLoadingWasAborted": "Video önizlemesi yükleme işlemi iptal edildi."

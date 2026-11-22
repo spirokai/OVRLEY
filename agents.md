@@ -86,6 +86,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 ## Dependencies
 
 - **FFmpeg 8.1+** (full build) auto-downloaded by `postinstall` script to `vendor/ffmpeg/`. Required for video encoding. Tauri bundle resources include this path.
+- **MDK SDK** (nightly; video playback in the native app) auto-downloaded by `postinstall` to `vendor/mdk-sdk/` (`scripts/install-mdk.mjs`; skip with `OVRLEY_SKIP_MDK_INSTALL=1`, another archive with `OVRLEY_MDK_ARCHIVE_URL`). The root `.cargo/config.toml` points `MDK_SDK` there; an `MDK_SDK` in the environment wins. Only `ovrley_playback` and `ovrley_ui` need it.
 - **pnpm 10.25.0** (enforced via `package.json` `packageManager` field).
 - **One pnpm workspace**: install from the repository root with `pnpm install --frozen-lockfile`. `app/` shares the root `pnpm-lock.yaml`; install hooks reject other package managers. Use pnpm's default external store; no project `.pnpm-store/` directory or `.npmrc` override is needed.
 - **Node 24** used in CI; any modern LTS should work.
@@ -102,6 +103,7 @@ When asked to refactor React code, follow the detailed process in `.agents/refac
 - `ovrley --mcp` is an MCP server on stdio that drives the open window (enable "Allow agent edits" in Settings). Register it with an agent, e.g. `claude mcp add ovrley -- <path>/ovrley --mcp`.
 - Debug builds: `OVRLEY_SNAPSHOT=<dir>` renders a tour of shell states to PNGs through Slint's own `take_snapshot()` (no screen-recording permission needed) and quits; it reads but never writes the shared `ovrley-settings.json`.
 - Debug builds: `OVRLEY_DEV_VIDEOS=<path>[;<path>…]` loads those videos onto the player's video lane at startup, end to end, outside the history (phase 4 D18; there is no import dialog until Phase 6, which deletes it). With two or more clips, the `OVRLEY_SNAPSHOT` tour also captures a join's transition panel.
+- Video playback is always built. MDK decodes; `ovrley_playback` owns it and the GPU interop. Windows renders and decodes through D3D11; the D3D12 path is in the code but not wired in (`WindowsTarget::ACTIVE`). Debug builds: `MDK_DECODERS=<name>[,<name>…]` overrides the decoders.
 - Translations: `.slint` files use `@tr("<json key>" => "<English text>")`; `build.rs` converts `app/src/i18n/locales/*.json` to bundled gettext catalogs. `tests/translations.rs` checks every `@tr` against `en-translation.json`.
 
 ## Testing

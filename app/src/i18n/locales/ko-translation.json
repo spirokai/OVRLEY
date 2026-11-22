@@ -524,6 +524,7 @@
       "fileUnavailable": "로컬 미리보기 서버에서 동영상 파일을 읽을 수 없습니다. 파일이 이동되었거나, 삭제되었거나, 사용할 수 없게 되었을 수 있습니다.",
       "unsupportedFormat": "이 동영상 형식은 시스템 동영상 플레이어에서 지원되지 않습니다."
     },
+    "gpuRequired": "동영상을 재생하려면 내장 GPU 이상이 필요합니다.",
     "theVideoPreviewCouldNotBeLoaded": "동영상 미리보기를 로드할 수 없습니다.",
     "videoOrImage": "동영상 또는 이미지",
     "videoPreviewLoadingWasAborted": "동영상 미리보기 로드가 중단되었습니다."

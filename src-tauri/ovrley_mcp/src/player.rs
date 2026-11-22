@@ -4,6 +4,7 @@
 
 use crate::catalog::{input_schema, Answer, NoArguments, Reply, ToolDefinition, ToolOutcome};
 use ovrley_app::features::player::playback::{self, player_timing};
+use ovrley_app::lib::video_program::program::PlaybackSource;
 use ovrley_app::store::services::Services;
 use ovrley_app::store::slices::editor::PreviewPlaybackState;
 use ovrley_app::store::Store;
@@ -31,6 +32,14 @@ pub struct ActivityTrimSetArguments {
     /// The last activity second to keep. It stays inside the activity and at least 1 s after the start.
     #[serde(default)]
     pub end_second: Option<f64>,
+}
+
+/// Whether the preview's sound is off.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct VideoMuteSetArguments {
+    /// `true` silences the video preview, `false` plays its sound.
+    pub muted: bool,
 }
 
 /// A video clip.
@@ -183,6 +192,14 @@ pub fn tools() -> Vec<ToolDefinition> {
             description: "Moves the playhead to a timeline second and pauses there, as a click on the timeline's axis does. The second \
                           is clamped to the timeline (ovrley_summary's playback.timelineMinimum to playback.totalDurationSeconds).",
             input_schema: input_schema::<PlayheadSeekArguments>(),
+            read_only: false,
+        },
+        ToolDefinition {
+            name: "video_mute_set",
+            title: "Mute the video preview",
+            description: "Turns the sound of the video preview off or on, as the player's mute button does. Fails without videos, \
+                          where the player has no mute button. Not an undo step, and the export is not affected.",
+            input_schema: input_schema::<VideoMuteSetArguments>(),
             read_only: false,
         },
         ToolDefinition {
@@ -441,8 +458,14 @@ pub fn describe_playback(store: &Store) -> Value {
         PreviewPlaybackState::Playing => "playing",
         PreviewPlaybackState::Scrubbing => "scrubbing",
     };
+    let clock = match store.editor.preview_playback_source {
+        PlaybackSource::Video => "video",
+        PlaybackSource::Timeline => "timeline",
+    };
     json!({
         "state": state,
+        "clock": clock,
+        "muted": store.editor.is_video_muted,
         "playheadSecond": timing.clamped_playhead,
         "timelineMinimum": timing.timeline_minimum,
         "totalDurationSeconds": timing.total_duration,
@@ -477,6 +500,13 @@ pub fn call(name: &str, arguments_value: Value, store: &mut Store, _services: &m
                 return Err(ToolOutcome::InvalidParams("second must be a finite number".into()));
             }
             playback::commit_scrub(store, arguments.second);
+            now(json!({ "playback": describe_playback(store) }))
+        }),
+        "video_mute_set" => arguments::<VideoMuteSetArguments>(arguments_value).and_then(|arguments| {
+            if !store.video_import.has_videos() {
+                return Err(ToolOutcome::Failed("No videos are on the timeline.".into()));
+            }
+            store.editor.is_video_muted = arguments.muted;
             now(json!({ "playback": describe_playback(store) }))
         }),
         "activity_trim_set" => arguments::<ActivityTrimSetArguments>(arguments_value).and_then(|arguments| {
@@ -656,7 +686,7 @@ pub(crate) mod tests {
                     has_audio: true,
                     ..Default::default()
                 };
-                create_imported_video(&metadata, id.to_string(), order as u32, Vec::new()).unwrap()
+                create_imported_video(&metadata, id.to_string(), order as u32).unwrap()
             })
             .collect();
         store.video_import.video_edits = Rc::new(offsets.iter().map(|(id, offset, _)| (id.to_string(), VideoEdits { offset_seconds: *offset, ..Default::default() })).collect());
@@ -681,6 +711,16 @@ pub(crate) mod tests {
         assert_eq!(removed["videos"].as_array().unwrap().len(), 1);
         assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 2, "removal is no undo step");
         assert!(matches!(run(&dispatcher, "video_get", json!({ "videoId": "a" })), ToolOutcome::Failed(_)));
+    }
+
+    #[test]
+    fn mute_needs_videos_and_is_no_undo_step() {
+        let empty = dispatcher_with(with_activity(60.0));
+        assert!(matches!(run(&empty, "video_mute_set", json!({ "muted": true })), ToolOutcome::Failed(_)));
+        let dispatcher = dispatcher_with(with_videos(&[("a", 0.0, 10.0)]));
+        assert_eq!(ok(run(&dispatcher, "video_mute_set", json!({ "muted": true })))["playback"]["muted"], true);
+        assert_eq!(ok(run(&dispatcher, "ovrley_summary", json!({})))["playback"]["muted"], true);
+        assert_eq!(dispatcher.with_store(|store| store.history.past.len()), 0);
     }
 
     #[test]

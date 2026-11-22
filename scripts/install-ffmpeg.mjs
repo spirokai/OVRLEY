@@ -1,10 +1,9 @@
-import { createWriteStream } from 'node:fs'
 import { chmod, cp, mkdir, rm, stat } from 'node:fs/promises'
-import { get } from 'node:https'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { spawn, spawnSync } from 'node:child_process'
+import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { download, run } from './install-support.mjs'
 
 // Pinned BtbN master snapshot: carries the Vulkan performance fixes the 9.0 branch lacks and
 // predates the master CUDA writable-copy regression that breaks chained overlay_cuda.
@@ -84,7 +83,7 @@ async function main() {
   await mkdir(binDir, { recursive: true })
 
   console.log(`[ffmpeg] Downloading ${archiveUrl}`)
-  await download(archiveUrl, archivePath)
+  await download(archiveUrl, archivePath, 'ffmpeg')
   await extractArchive(archivePath, extractDir)
 
   const ffprobeArchiveUrl = process.env.OVRLEY_FFPROBE_ARCHIVE_URL ?? defaultFfprobeArchives[platformKey]
@@ -93,7 +92,7 @@ async function main() {
     const ffprobeExtractDir = join(workDir, 'extract-ffprobe')
     await mkdir(ffprobeExtractDir, { recursive: true })
     console.log(`[ffmpeg] Downloading ${ffprobeArchiveUrl}`)
-    await download(ffprobeArchiveUrl, ffprobeArchivePath)
+    await download(ffprobeArchiveUrl, ffprobeArchivePath, 'ffmpeg')
     await extractArchive(ffprobeArchivePath, ffprobeExtractDir)
   }
 
@@ -286,68 +285,6 @@ function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-function download(url, destination) {
-  return new Promise((resolvePromise, reject) => {
-    const request = get(url, (response) => {
-      if ([301, 302, 303, 307, 308].includes(response.statusCode ?? 0)) {
-        const location = response.headers.location
-        response.resume()
-        if (!location) {
-          reject(new Error(`Redirect from ${url} did not include a location`))
-          return
-        }
-        download(new URL(location, url).toString(), destination).then(resolvePromise, reject)
-        return
-      }
-
-      if (response.statusCode !== 200) {
-        reject(new Error(`Failed to download ${url}: HTTP ${response.statusCode}`))
-        return
-      }
-
-      const file = createWriteStream(destination)
-      const totalBytes = Number(response.headers['content-length'] ?? 0)
-      let downloadedBytes = 0
-      let lastProgressAt = 0
-
-      response.on('data', (chunk) => {
-        downloadedBytes += chunk.length
-        const now = Date.now()
-        if (now - lastProgressAt < 500) {
-          return
-        }
-        lastProgressAt = now
-        writeDownloadProgress(downloadedBytes, totalBytes)
-      })
-
-      response.pipe(file)
-      file.on('finish', () => {
-        writeDownloadProgress(downloadedBytes, totalBytes)
-        process.stdout.write('\n')
-        file.close(resolvePromise)
-      })
-      file.on('error', reject)
-    })
-    request.on('error', reject)
-  })
-}
-
-function writeDownloadProgress(downloadedBytes, totalBytes) {
-  const downloadedMb = bytesToMiB(downloadedBytes)
-  if (totalBytes > 0) {
-    const totalMb = bytesToMiB(totalBytes)
-    const percent = Math.min(100, (downloadedBytes / totalBytes) * 100)
-    process.stdout.write(`\r[ffmpeg] Downloaded ${downloadedMb} / ${totalMb} MiB (${percent.toFixed(1)}%)`)
-    return
-  }
-
-  process.stdout.write(`\r[ffmpeg] Downloaded ${downloadedMb} MiB`)
-}
-
-function bytesToMiB(bytes) {
-  return (bytes / 1024 / 1024).toFixed(1)
-}
-
 function extractArchive(archivePath, destination) {
   if (process.platform === 'win32') {
     return run('powershell', [
@@ -360,17 +297,6 @@ function extractArchive(archivePath, destination) {
     return run('tar', ['-xf', archivePath, '-C', destination])
   }
   return run('unzip', ['-q', archivePath, '-d', destination])
-}
-
-function run(command, args) {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { stdio: 'inherit' })
-    child.on('error', reject)
-    child.on('close', (code) => {
-      if (code === 0) resolvePromise()
-      else reject(new Error(`${command} exited with ${code}`))
-    })
-  })
 }
 
 async function findFile(dir, targetName) {

@@ -188,6 +188,7 @@ component SelectionLayer inherits Rectangle {
 import { EditorToolbar } from "editor-toolbar.slint";
 import { VideoSync } from "../video-sync/index.slint";
 import { VideoSyncScreens } from "../video-sync/preview-screens.slint";
+import { VideoPreviewSurface, VideoPreviewNotices } from "../video-preview/video-preview-surface.slint";
 
 // `OverlayCanvas`: the scene rectangle in the background colour, `rounded-sm`, a `border` at
 // 50%; the checker pattern while the background is checker and the grid is hidden; grid lines in
@@ -197,7 +198,6 @@ component OverlayCanvas inherits Rectangle {
     in property <BackgroundMode> background-mode;
     in property <color> background-color;
     in property <image> background-image;
-    in property <image> video-frame;
     in property <bool> grid-visible;
     in property <string> grid-commands;
     in property <float> display-scale;
@@ -220,12 +220,10 @@ component OverlayCanvas inherits Rectangle {
             source: root.background-image;
             image-fit: cover;
         }
-        // Video playback: the decoder letterboxes inside the texture, so it fills the scene.
-        if root.background-mode == BackgroundMode.video: Image {
+        if root.background-mode == BackgroundMode.video: VideoPreviewSurface {
             width: parent.width;
             height: parent.height;
-            source: root.video-frame;
-            image-fit: fill;
+            display-scale: root.display-scale;
         }
     }
     if root.grid-visible: Path {
@@ -245,6 +243,10 @@ component OverlayCanvas inherits Rectangle {
         height: widget.height;
         source: widget.image;
         image-fit: fill;
+    }
+    if root.background-mode == BackgroundMode.video: VideoPreviewNotices {
+        width: root.width;
+        height: root.height;
     }
     if root.error != "": Rectangle {
         x: 0px;
@@ -350,7 +352,6 @@ export component OverlayEditorView inherits Rectangle {
                 background-mode: OverlayEditor.background-mode;
                 background-color: OverlayEditor.background-color;
                 background-image: OverlayEditor.background-image;
-                video-frame: OverlayEditor.video-frame;
                 grid-visible: OverlayEditor.grid-visible;
                 grid-commands: OverlayEditor.grid-commands;
                 display-scale: OverlayEditor.display-scale;

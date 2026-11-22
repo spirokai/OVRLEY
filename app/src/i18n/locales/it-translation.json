@@ -524,6 +524,7 @@
       "fileUnavailable": "Il server locale di anteprima non ha potuto leggere il file video. Il file potrebbe essere stato spostato, eliminato o essere diventato non disponibile.",
       "unsupportedFormat": "Questo formato video non è supportato dal lettore video di sistema."
     },
+    "gpuRequired": "La riproduzione video richiede almeno una GPU integrata.",
     "theVideoPreviewCouldNotBeLoaded": "Impossibile caricare l'anteprima video.",
     "videoOrImage": "Video o immagine",
     "videoPreviewLoadingWasAborted": "Il caricamento dell'anteprima video è stato interrotto."
