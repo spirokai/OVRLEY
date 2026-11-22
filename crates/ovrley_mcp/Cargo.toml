@@ -2,7 +2,7 @@
 # OVRLEY's MCP server (D13): the stdio protocol of the `ovrley --mcp` process, the local socket to
 # the running window, the bridge that runs tool calls on the window's UI thread, and the tools.
 name = "ovrley_mcp"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 rust-version = "1.98"
 publish = false

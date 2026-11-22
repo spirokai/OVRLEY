@@ -6,10 +6,12 @@
 //! (`app::run`). A failure before the window exists is shown in a native message dialog. A failure
 //! once it exists (a malformed `lng`) is shown in the window, as `main.jsx` does.
 
+// A release build is a GUI app without a console. `--mcp` uses the pipes its client passes.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use ovrley_app::lib::preferences_store::PreferencesStore;
 use ovrley_app::store::Store;
 use ovrley_services::runtime_paths::RuntimeRoots;
-use std::path::PathBuf;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -29,7 +31,7 @@ fn main() -> ExitCode {
 }
 
 fn serve_mcp() -> ExitCode {
-    let roots = match RuntimeRoots::from_platform(installed_resource_dir) {
+    let roots = match RuntimeRoots::from_platform() {
         Ok(roots) => roots,
         Err(error) => {
             log::error!("{error}");
@@ -47,7 +49,7 @@ fn serve_mcp() -> ExitCode {
 }
 
 fn start() -> Result<(), String> {
-    let roots = RuntimeRoots::from_platform(installed_resource_dir)?;
+    let roots = RuntimeRoots::from_platform()?;
     let distribution = ovrley_services::distribution::detect()?;
     log::info!("{distribution:?} distribution; settings in {}", roots.app_data_dir.display());
     #[cfg(target_os = "linux")]
@@ -78,16 +80,4 @@ fn open_preferences(app_data_dir: &std::path::Path) -> Result<PreferencesStore, 
         return Ok(PreferencesStore::with_sink(values, Box::new(ovrley_app::lib::preferences_store::MemorySink::default())));
     }
     PreferencesStore::open(app_data_dir)
-}
-
-/// The installed build's resources: `Contents/Resources` in a macOS bundle, the executable's
-/// folder elsewhere. Phase 9 settles packaging.
-fn installed_resource_dir() -> Result<PathBuf, String> {
-    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
-    let directory = executable.parent().ok_or("the executable has no folder")?;
-    Ok(if cfg!(target_os = "macos") {
-        directory.join("../Resources")
-    } else {
-        directory.to_path_buf()
-    })
 }

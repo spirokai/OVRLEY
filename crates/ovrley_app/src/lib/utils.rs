@@ -7,15 +7,9 @@ pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
     value.max(min).min(max)
 }
 
-/// The version label `AppHeader` shows: `VITE_OVRLEY_VERSION`, which CI sets, read at compile time,
-/// with React's fallback, `0.00.0`, and a `v` prefix.
+/// The version label `AppHeader` shows: the workspace's version with a `v` prefix.
 pub fn app_version() -> String {
-    let raw = option_env!("VITE_OVRLEY_VERSION").map(str::trim).filter(|version| !version.is_empty()).unwrap_or("0.00.0");
-    if raw.starts_with('v') {
-        raw.to_string()
-    } else {
-        format!("v{raw}")
-    }
+    format!("v{}", env!("CARGO_PKG_VERSION"))
 }
 
 /// `isMacOS()`, decided at compile time.

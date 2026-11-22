@@ -2,7 +2,7 @@
 # Video playback rendered into textures of the host's wgpu device: macOS (Metal), Windows (D3D11)
 # and Linux (OpenGL, bridged into Vulkan), with MDK through the `cpp` crate over its C++ API.
 name = "ovrley_playback"
-version = "0.1.0"
+version.workspace = true
 edition = "2021"
 rust-version = "1.98"
 publish = false

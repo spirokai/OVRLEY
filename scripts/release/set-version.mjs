@@ -1,4 +1,4 @@
-import { appendFile, readFile, writeFile } from 'node:fs/promises'
+import { appendFile, readFile, readdir, writeFile } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -12,8 +12,6 @@ if (version.length !== 1) {
 assertStableVersion(version[0])
 
 await updateJsonVersion('package.json', version[0])
-await updateJsonVersion('app/package.json', version[0])
-await updateJsonVersion('src-tauri/tauri.conf.json', version[0])
 await updateCargoManifestVersion(version[0])
 await updateCargoLockVersion(version[0])
 
@@ -46,10 +44,10 @@ async function updateJsonVersion(relativePath, nextVersion) {
 async function updateCargoManifestVersion(nextVersion) {
   const path = resolve(rootDir, 'Cargo.toml')
   const source = await readFile(path, 'utf8')
-  const matches = [...source.matchAll(/(\[package\][\s\S]*?\nversion\s*=\s*)"([^"]+)"/g)]
+  const matches = [...source.matchAll(/(\[workspace\.package\][^[]*?\nversion\s*=\s*)"([^"]+)"/g)]
 
   if (matches.length !== 1) {
-    fail(`Expected exactly one application package version in ${path}`)
+    fail(`Expected exactly one workspace version in ${path}`)
   }
 
   const match = matches[0]
@@ -61,38 +59,44 @@ async function updateCargoManifestVersion(nextVersion) {
 
 async function updateCargoLockVersion(nextVersion) {
   const path = resolve(rootDir, 'Cargo.lock')
-  const source = await readFile(path, 'utf8')
-  const pattern = /(\[\[package\]\]\r?\nname = "app"\r?\nversion = )"([^"]+)"/g
-  const matches = [...source.matchAll(pattern)]
+  let updated = await readFile(path, 'utf8')
 
-  if (matches.length !== 1) {
-    fail(`Expected exactly one application package in ${path}`)
+  for (const name of await workspaceCrates()) {
+    const pattern = lockEntryPattern(name)
+    if (!pattern.test(updated)) {
+      fail(`Expected ${name} in ${path}`)
+    }
+    updated = updated.replace(pattern, `$1"${nextVersion}"`)
   }
 
-  const updated = source.replace(pattern, `$1"${nextVersion}"`)
   await writeFile(path, updated)
+}
+
+// The members are crates/*, and every one inherits the workspace's version.
+async function workspaceCrates() {
+  const entries = await readdir(resolve(rootDir, 'crates'), { withFileTypes: true })
+  return entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name)
+}
+
+function lockEntryPattern(name) {
+  return new RegExp(`(\\[\\[package\\]\\]\\r?\\nname = "${name}"\\r?\\nversion = )"([^"]+)"`)
 }
 
 async function readVersionSources() {
   const packageJson = JSON.parse(await readFile(resolve(rootDir, 'package.json'), 'utf8'))
-  const appPackageJson = JSON.parse(await readFile(resolve(rootDir, 'app/package.json'), 'utf8'))
-  const tauriConfig = JSON.parse(await readFile(resolve(rootDir, 'src-tauri/tauri.conf.json'), 'utf8'))
   const cargoManifest = await readFile(resolve(rootDir, 'Cargo.toml'), 'utf8')
   const cargoLock = await readFile(resolve(rootDir, 'Cargo.lock'), 'utf8')
-  const cargoManifestMatch = cargoManifest.match(/\[package\][\s\S]*?\nversion\s*=\s*"([^"]+)"/)
-  const cargoLockMatch = cargoLock.match(/\[\[package\]\]\r?\nname = "app"\r?\nversion = "([^"]+)"/)
+  const cargoManifestMatch = cargoManifest.match(/\[workspace\.package\][^[]*?\nversion\s*=\s*"([^"]+)"/)
 
-  if (!cargoManifestMatch || !cargoLockMatch) {
-    fail('Could not re-read the application Cargo versions')
+  if (!cargoManifestMatch) {
+    fail('Could not re-read the workspace version')
   }
 
-  return {
-    'package.json': packageJson.version,
-    'app/package.json': appPackageJson.version,
-    'src-tauri/tauri.conf.json': tauriConfig.version,
-    'Cargo.toml': cargoManifestMatch[1],
-    'Cargo.lock': cargoLockMatch[1],
+  const sources = { 'package.json': packageJson.version, 'Cargo.toml': cargoManifestMatch[1] }
+  for (const name of await workspaceCrates()) {
+    sources[`Cargo.lock (${name})`] = cargoLock.match(lockEntryPattern(name))?.[2]
   }
+  return sources
 }
 
 function assertStableVersion(value) {

@@ -2,6 +2,10 @@
 members = ["crates/*"]
 resolver = "2"
 
+[workspace.package]
+# The app's version. scripts/release/set-version.mjs stamps it here and in Cargo.lock.
+version = "0.1.0"
+
 # Full DWARF for opt-level-3 workspace crates is ~140 MB of every ~170 MB test
 # binary, and ovrley_core links ~60 of them. Line tables keep backtrace line numbers.
 [profile.dev]

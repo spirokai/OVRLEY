@@ -19,8 +19,12 @@ use slint::winit_030::winit;
 use slint::ComponentHandle;
 use std::cell::RefCell;
 
-/// The Linux app id: the desktop entry's name, so the running window groups with its launcher.
-pub const LINUX_APP_ID: &str = "com.ovrley.desktop";
+/// The Linux app id, which is the desktop entry's name, so the window finds its launcher and icon.
+/// The Flatpak's entry has the sandbox's id (`FLATPAK_ID`, the runtime's documented variable).
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+fn linux_app_id(flatpak_id: Option<String>) -> String {
+    flatpak_id.unwrap_or_else(|| ovrley_services::runtime_paths::APP_IDENTIFIER.to_string())
+}
 
 /// Selects Slint's backend, in the plan's order: the GPU device, the window-attribute hooks, the
 /// renderer, `select()`. Returns the shared device, if any, for the compositor.
@@ -83,8 +87,9 @@ fn window_attributes(attributes: winit::window::WindowAttributes) -> winit::wind
     let attributes = {
         use winit::platform::wayland::WindowAttributesExtWayland;
         use winit::platform::x11::WindowAttributesExtX11;
-        let attributes = WindowAttributesExtWayland::with_name(attributes, LINUX_APP_ID, LINUX_APP_ID);
-        WindowAttributesExtX11::with_name(attributes, LINUX_APP_ID, LINUX_APP_ID)
+        static APP_ID: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| linux_app_id(std::env::var("FLATPAK_ID").ok()));
+        let attributes = WindowAttributesExtWayland::with_name(attributes, APP_ID.as_str(), APP_ID.as_str());
+        WindowAttributesExtX11::with_name(attributes, APP_ID.as_str(), APP_ID.as_str())
             .with_decorations(false)
             .with_window_icon(window_icon())
     };
@@ -369,4 +374,13 @@ pub fn show_startup_failure(message: &str) {
         .set_description(message)
         .set_buttons(rfd::MessageButtons::Ok)
         .show();
+}
+
+#[cfg(test)]
+mod app_id_tests {
+    #[test]
+    fn the_app_id_is_the_desktop_entrys() {
+        assert_eq!(super::linux_app_id(None), "com.ovrley.desktop");
+        assert_eq!(super::linux_app_id(Some("cc.ovrley.OVRLEY".into())), "cc.ovrley.OVRLEY");
+    }
 }
