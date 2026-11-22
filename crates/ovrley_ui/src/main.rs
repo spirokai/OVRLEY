@@ -12,7 +12,7 @@
 
 use ovrley_app::lib::preferences_store::PreferencesStore;
 use ovrley_app::store::Store;
-use ovrley_services::runtime_paths::RuntimeRoots;
+use ovrley_services::runtime::RuntimeRoots;
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -58,7 +58,7 @@ fn serve_mcp() -> ExitCode {
 
 fn start() -> Result<(), String> {
     let roots = RuntimeRoots::from_platform()?;
-    let distribution = ovrley_services::distribution::detect()?;
+    let distribution = ovrley_services::runtime::Distribution::detect()?;
     log::info!("{distribution:?} distribution; settings in {}", roots.app_data_dir.display());
     #[cfg(target_os = "linux")]
     ovrley_ui::platform::appimage_integration::register();

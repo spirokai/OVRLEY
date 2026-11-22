@@ -310,7 +310,7 @@ fn new_project_save_answer_saves_first() {
         true
     );
     // The save wrote the moved playhead before the new project replaced it.
-    let read = read_project(&Default::default(), &project).unwrap();
+    let read = read_project(&Default::default(), std::path::Path::new(&project)).unwrap();
     assert_eq!(read.project.timeline.playhead_second, 9.0);
 }
 

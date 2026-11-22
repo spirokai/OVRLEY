@@ -1,21 +1,20 @@
-//! The app's desktop services.
+//! The desktop app's services: everything that touches files, the network or FFmpeg on the app's
+//! behalf, without any state or UI of its own. `ovrley_app` calls them.
 //!
-//! Owns: `.oly` project archives, template and raster file operations, installed map styles and
-//!       the tile cache, runtime paths, distribution detection, the updater, raster resources,
-//!       widget preview snapshots, video thumbnails and timeline filmstrips.
-//! Does not own: the store, actions or any UI. `ovrley_app` calls these services.
+//! - [`project`]: `.oly` project archives, read, migrated, validated and written.
+//! - [`rasters`]: the selected images raster widgets show, shared by history and render jobs.
+//! - [`maps`]: the installed map styles, the map data renders draw from, and the editor preview's
+//!   map frames; [`tiles`] fetches and caches the vector tiles they need.
+//! - [`video`]: still frames of source videos, as thumbnails and timeline filmstrips.
+//! - [`cache`]: the size-limited disk caches' shared limit policy, and the filmstrip cache.
+//! - [`runtime`]: where the app runs from: its runtime roots and its distribution.
+//! - [`updater`]: checking for, downloading and installing a newer release.
 
-pub mod distribution;
-pub mod file_ops;
-pub mod filmstrip_cache;
-pub mod map_styles;
-pub mod map_tile_service;
-#[cfg(test)]
-mod map_tile_service_tests;
-pub mod project_file;
-pub mod raster_resources;
-pub mod runtime_paths;
+pub mod cache;
+pub mod maps;
+pub mod project;
+pub mod rasters;
+pub mod runtime;
+pub mod tiles;
 pub mod updater;
-pub mod video_filmstrip;
-pub mod video_thumbnail;
-pub mod widget_preview;
+pub mod video;

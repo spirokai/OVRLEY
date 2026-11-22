@@ -18,7 +18,7 @@ A crate may also use any crate further right. `ovrley_playback` depends on no ot
 | `ovrley_ui`       | The Slint markup, one projection and binding module per feature, the platform glue, the GPU device, the binary          | App logic                           |
 | `ovrley_app`      | The store, the actions, the reconcile steps, undo, the service traits, translations of runtime strings                  | UI                                  |
 | `ovrley_mcp`      | The tool catalog and its schemas, MCP over stdio, the socket between `--mcp` and the window                             | Logic the UI lacks                  |
-| `ovrley_services` | `.oly` archives, file operations, map styles and tiles, filmstrips, runtime paths, distribution, the updater            | The store                           |
+| `ovrley_services` | `.oly` archives, raster images, map styles and tiles, thumbnails and filmstrips, disk caches, runtime roots, the updater | The store                           |
 | `ovrley_playback` | MDK, its FFI, and the interop that puts frames into the host's wgpu textures                                            | Slint, the store                    |
 | `ovrley_core`     | Activity parsing and finalization, template and render-config validation, export rendering, FFmpeg, render jobs         | Windows and preferences             |
 | `ovrley_widgets`  | The widget catalog and document model, sampling, layout and Skia drawing, the preview session                           | Files and encoding                  |
@@ -101,7 +101,7 @@ Translations are gettext catalogs in `locales/`, read by Slint's `@tr` and by `o
 
 ## Packaging and updates
 
-`scripts/package.mjs` (`pnpm build`) builds the binary, stages it with the notices and the player's libraries in `target/packaging/`, and runs cargo-packager. `ovrley_services::runtime_paths` holds the one rule for where a package's resources are:
+`scripts/package.mjs` (`pnpm build`) builds the binary, stages it with the notices and the player's libraries in `target/packaging/`, and runs cargo-packager. `ovrley_services::runtime` holds the one rule for where a package's resources are:
 
 | Package                             | Resources                 | Player's libraries        | Updater                          |
 | ----------------------------------- | ------------------------- | ------------------------- | -------------------------------- |

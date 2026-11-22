@@ -100,7 +100,7 @@ impl Workers {
 }
 
 /// The video tools the player uses off the UI thread (phase 4 D12): filmstrips through
-/// `ovrley_services::video_filmstrip`, and codec detection.
+/// `ovrley_services::video`, and codec detection.
 pub trait VideoTools: Send + Sync {
     /// The strip from the disk cache, or `None` on a miss. Cheap: no decode.
     fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String>;
@@ -122,13 +122,13 @@ pub trait VideoTools: Send + Sync {
 }
 
 pub use ovrley_core::encode::ffmpeg::transition_proxy::{TransitionProxyRequest, TransitionProxySource};
-pub use ovrley_services::video_filmstrip::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
+pub use ovrley_services::video::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
 
 /// The native video tools: the filmstrip cache in the application cache directory, with the limit
 /// is kept in the settings file, and the bundled FFmpeg.
 pub struct NativeVideoTools {
     paths: Arc<ovrley_core::paths::AppPaths>,
-    cache: ovrley_services::filmstrip_cache::FilmstripCache,
+    cache: ovrley_services::cache::FilmstripCache,
 }
 
 /// The settings key of the filmstrip cache limit, as the Tauri releases wrote it.
@@ -138,24 +138,24 @@ impl NativeVideoTools {
     /// Opens the cache. The saved limit restores state at startup: a malformed one falls back to
     /// the default, so a bad value never keeps OVRLEY from starting.
     pub fn open(paths: Arc<ovrley_core::paths::AppPaths>, app_cache_dir: &std::path::Path, preferences: &PreferencesStore) -> Result<Self, String> {
-        use ovrley_services::filmstrip_cache::{validate_filmstrip_cache_limit, FilmstripCache, DEFAULT_FILMSTRIP_CACHE_LIMIT};
+        use ovrley_services::cache::{CacheLimit, FilmstripCache, DEFAULT_FILMSTRIP_CACHE_LIMIT};
         let limit = preferences
             .get(FILMSTRIP_CACHE_LIMIT_KEY)
             .and_then(Value::as_u64)
-            .and_then(|limit| validate_filmstrip_cache_limit(limit).ok())
+            .and_then(|limit| CacheLimit::new(limit).ok())
             .unwrap_or(DEFAULT_FILMSTRIP_CACHE_LIMIT);
-        Ok(Self { cache: FilmstripCache::for_application_cache(app_cache_dir, limit)?, paths })
+        Ok(Self { cache: FilmstripCache::open(app_cache_dir, limit)?, paths })
     }
 }
 
 impl VideoTools for NativeVideoTools {
     fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String> {
-        ovrley_services::video_filmstrip::cached_filmstrip(&self.cache, request)
+        ovrley_services::video::cached_filmstrip(&self.cache, request)
     }
 
     fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String> {
         let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&self.paths.repo_root).map_err(|error| error.to_string())?;
-        ovrley_services::video_filmstrip::filmstrip(&self.cache, &ffmpeg, request, hwaccel)
+        ovrley_services::video::filmstrip(&self.cache, &ffmpeg, request, hwaccel)
     }
 
     fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String> {
@@ -172,7 +172,7 @@ impl VideoTools for NativeVideoTools {
 
     fn thumbnail(&self, path: &str) -> Option<Vec<u8>> {
         let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&self.paths.repo_root).ok()?;
-        ovrley_services::video_thumbnail::generate_thumbnail(&ffmpeg, std::path::Path::new(path))
+        ovrley_services::video::thumbnail(&ffmpeg, std::path::Path::new(path))
     }
 
     fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
@@ -190,9 +190,9 @@ impl VideoTools for NativeVideoTools {
     }
 }
 
-pub use ovrley_services::map_styles::{MapAdapterSupport, MapStyleCatalog};
-pub use ovrley_services::map_tile_service::TileCacheUsage;
-pub use ovrley_services::widget_preview::{MapFrameWake, MapPrepareRequest};
+pub use ovrley_services::maps::{MapAdapterSupport, MapStyleCatalog};
+pub use ovrley_services::cache::CacheUsage;
+pub use ovrley_services::maps::{MapFrameWake, MapPrepareRequest};
 pub use ovrley_widgets::widgets::map::preview::MapFrameFactory;
 
 /// The maps' data and renderer (phase 5 D9, D11): the installed styles, the preview's frame
@@ -207,10 +207,10 @@ pub trait MapServices: Send + Sync {
     /// `prepare_map_tiles`: downloads the tiles the maps will show into the disk cache. Blocking;
     /// a cancelled download ends with `Ok`.
     fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String>;
-    fn tile_cache_usage(&self) -> Result<TileCacheUsage, String>;
+    fn tile_cache_usage(&self) -> Result<CacheUsage, String>;
     /// Applies and saves a new limit, evicting down to it.
-    fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String>;
-    fn clear_tile_cache(&self) -> Result<TileCacheUsage, String>;
+    fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String>;
+    fn clear_tile_cache(&self) -> Result<CacheUsage, String>;
     /// The map data renders draw route maps with; `None` in tests.
     fn map_source(&self) -> Option<ovrley_core::MapSource>;
 }
@@ -220,26 +220,27 @@ pub const MAP_TILE_CACHE_LIMIT_KEY: &str = "mapTileCacheLimitBytes";
 
 /// The native maps over `MapData`, which export uses too.
 pub struct NativeMapServices {
-    data: ovrley_services::map_styles::MapData,
+    data: ovrley_services::maps::MapData,
 }
 
 impl NativeMapServices {
     /// Reads the installed styles and opens the tile cache. The saved
     /// limit is a behaviour preference, so it stays strict: absent means the default, anything but
     /// a valid whole number of bytes fails (D11).
-    pub fn open(roots: &ovrley_services::runtime_paths::RuntimeRoots, preferences: &PreferencesStore) -> Result<Self, String> {
-        use ovrley_services::map_tile_service::{validate_tile_cache_limit, MapTileService, DEFAULT_TILE_CACHE_LIMIT};
+    pub fn open(roots: &ovrley_services::runtime::RuntimeRoots, preferences: &PreferencesStore) -> Result<Self, String> {
+        use ovrley_services::cache::CacheLimit;
+        use ovrley_services::tiles::{TileCache, DEFAULT_TILE_CACHE_LIMIT};
         let limit = match preferences.get(MAP_TILE_CACHE_LIMIT_KEY) {
             None => DEFAULT_TILE_CACHE_LIMIT,
-            Some(value) => validate_tile_cache_limit(
+            Some(value) => CacheLimit::new(
                 value.as_u64().ok_or_else(|| format!("Setting {MAP_TILE_CACHE_LIMIT_KEY} must be a whole number of bytes: {value}"))?,
             )?,
         };
         Ok(Self {
-            data: ovrley_services::map_styles::MapData::new(
-                ovrley_services::map_styles::MapStyleRegistry::load(&roots.map_style_dirs())?,
-                MapTileService::for_application_cache(roots.app_cache_dir.clone(), limit)?,
-                Arc::new(ovrley_services::map_styles::GlyphService::open(&roots.map_font_dir())?),
+            data: ovrley_services::maps::MapData::new(
+                ovrley_services::maps::MapStyleRegistry::load(&roots.map_style_dirs())?,
+                TileCache::open(&roots.app_cache_dir, limit)?,
+                Arc::new(ovrley_services::maps::GlyphService::open(&roots.map_font_dir())?),
             ),
         })
     }
@@ -251,28 +252,27 @@ impl MapServices for NativeMapServices {
     }
 
     fn frames(&self, wake: MapFrameWake) -> Result<Arc<dyn MapFrameFactory>, String> {
-        Ok(Arc::new(ovrley_services::widget_preview::PreviewMapFrames::start(self.data.clone(), wake)?))
+        Ok(Arc::new(ovrley_services::maps::PreviewMapFrames::start(self.data.clone(), wake)?))
     }
 
     fn probe_adapter(&self) -> MapAdapterSupport {
-        ovrley_services::map_styles::probe_adapter()
+        ovrley_services::maps::probe_adapter()
     }
 
     fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String> {
-        ovrley_services::widget_preview::prepare_map_tiles(request, &self.data, cancelled)
+        ovrley_services::maps::prepare_map_tiles(request, &self.data, cancelled)
     }
 
-    fn tile_cache_usage(&self) -> Result<TileCacheUsage, String> {
-        self.data.tiles().usage()
+    fn tile_cache_usage(&self) -> Result<CacheUsage, String> {
+        Ok(self.data.tiles().usage())
     }
 
-    fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String> {
-        self.data.tiles().set_limit(limit)
+    fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String> {
+        self.data.tiles().set_limit(ovrley_services::cache::CacheLimit::new(limit)?)
     }
 
-    fn clear_tile_cache(&self) -> Result<TileCacheUsage, String> {
-        self.data.tiles().clear()?;
-        self.data.tiles().usage()
+    fn clear_tile_cache(&self) -> Result<CacheUsage, String> {
+        self.data.tiles().clear()
     }
 
     fn map_source(&self) -> Option<ovrley_core::MapSource> {
@@ -290,13 +290,13 @@ pub use ovrley_core::render_jobs::execution::RenderAccepted;
 pub trait RenderService: Send + Sync {
     fn submit_single(
         &self,
-        resources: &ovrley_services::raster_resources::RasterResources,
+        resources: &ovrley_services::rasters::RasterResources,
         config: ovrley_core::normalize::RenderConfig,
         activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
         output_path: &str,
         overwrite: bool,
     ) -> ovrley_core::error::CoreResult<RenderAccepted>;
-    fn submit_batch(&self, resources: &ovrley_services::raster_resources::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError>;
+    fn submit_batch(&self, resources: &ovrley_services::rasters::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError>;
     /// Cancels the single render; whether one was active.
     fn cancel(&self) -> bool;
     fn cancel_batch(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError>;
@@ -315,7 +315,7 @@ pub trait RenderService: Send + Sync {
     /// The debug PNG frame at `second`, in Downloads. Blocking.
     fn render_preview_frame(
         &self,
-        resources: &ovrley_services::raster_resources::RasterResources,
+        resources: &ovrley_services::rasters::RasterResources,
         config: ovrley_core::normalize::RenderConfig,
         activity: &ovrley_core::activity::schema::ParsedActivity,
         second: f64,
@@ -352,7 +352,7 @@ impl NativeRenderService {
 impl RenderService for NativeRenderService {
     fn submit_single(
         &self,
-        resources: &ovrley_services::raster_resources::RasterResources,
+        resources: &ovrley_services::rasters::RasterResources,
         config: ovrley_core::normalize::RenderConfig,
         activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
         output_path: &str,
@@ -361,7 +361,7 @@ impl RenderService for NativeRenderService {
         self.execution.submit_single_config(&self.paths, config, activity, output_path, overwrite, Some(resources), self.map_source.clone())
     }
 
-    fn submit_batch(&self, resources: &ovrley_services::raster_resources::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError> {
+    fn submit_batch(&self, resources: &ovrley_services::rasters::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError> {
         self.execution.submit_batch(&self.paths, &self.inspection, request, Some(resources), self.map_source.clone())
     }
 
@@ -399,7 +399,7 @@ impl RenderService for NativeRenderService {
 
     fn render_preview_frame(
         &self,
-        resources: &ovrley_services::raster_resources::RasterResources,
+        resources: &ovrley_services::rasters::RasterResources,
         config: ovrley_core::normalize::RenderConfig,
         activity: &ovrley_core::activity::schema::ParsedActivity,
         second: f64,
@@ -470,7 +470,7 @@ pub struct Services {
     /// The runtime paths `ovrley_core` reads templates, fonts and tools from.
     pub paths: Arc<ovrley_core::paths::AppPaths>,
     /// The session's selected raster images, shared with render jobs.
-    pub rasters: ovrley_services::raster_resources::RasterResources,
+    pub rasters: ovrley_services::rasters::RasterResources,
     pub preferences: PreferencesStore,
     pub dialogs: Box<dyn Dialogs>,
     pub workers: Workers,
@@ -503,7 +503,7 @@ impl ServiceParts {
     pub(super) fn into_services(self, dispatch: DispatchHandle) -> Services {
         Services {
             paths: self.paths,
-            rasters: ovrley_services::raster_resources::RasterResources::default(),
+            rasters: ovrley_services::rasters::RasterResources::default(),
             preferences: self.preferences,
             dialogs: self.dialogs,
             workers: Workers::new(self.ui_post.clone()),
@@ -636,25 +636,25 @@ pub mod fakes {
         pub frames: Mutex<Arc<dyn MapFrameFactory>>,
         pub wake: Mutex<Option<MapFrameWake>>,
         pub prepared: Mutex<Vec<usize>>,
-        pub usage: Mutex<TileCacheUsage>,
+        pub usage: Mutex<CacheUsage>,
         pub calls: Mutex<Vec<String>>,
     }
 
     impl Default for FakeMapServices {
         fn default() -> Self {
             let paths = repository_paths();
-            let dirs = ovrley_services::map_styles::MapStyleDirs {
+            let dirs = ovrley_services::maps::MapStyleDirs {
                 bundled: paths.repo_root.join("assets").join("map-styles"),
                 user: std::env::temp_dir().join(format!("ovrley-test-map-styles-{}", std::process::id())),
             };
-            let registry = ovrley_services::map_styles::MapStyleRegistry::load(&dirs).expect("the bundled map styles install");
+            let registry = ovrley_services::maps::MapStyleRegistry::load(&dirs).expect("the bundled map styles install");
             Self {
                 styles: registry.catalog().clone(),
                 adapter: Mutex::new(MapAdapterSupport::Hardware),
                 frames: Mutex::new(Arc::new(NoFrames)),
                 wake: Mutex::new(None),
                 prepared: Mutex::new(Vec::new()),
-                usage: Mutex::new(TileCacheUsage { used_bytes: 0, limit_bytes: 512 << 20, min_limit_bytes: 128 << 20, max_limit_bytes: 40 * (128 << 20), limit_step_bytes: 128 << 20 }),
+                usage: Mutex::new(CacheUsage { used_bytes: 0, limit_bytes: 512 << 20, min_limit_bytes: 128 << 20, max_limit_bytes: 40 * (128 << 20), limit_step_bytes: 128 << 20 }),
                 calls: Mutex::new(Vec::new()),
             }
         }
@@ -664,7 +664,7 @@ pub mod fakes {
     pub struct NoFrames;
 
     impl MapFrameFactory for NoFrames {
-        fn provider(&self, _style: &ovrley_services::map_styles::MapStyleInfo, _sample_count: u32) -> Arc<dyn ovrley_widgets::widgets::map::preview::MapFrameProvider> {
+        fn provider(&self, _style: &ovrley_services::maps::MapStyleInfo, _sample_count: u32) -> Arc<dyn ovrley_widgets::widgets::map::preview::MapFrameProvider> {
             Arc::new(NoFrames)
         }
     }
@@ -700,19 +700,19 @@ pub mod fakes {
             Ok(())
         }
 
-        fn tile_cache_usage(&self) -> Result<TileCacheUsage, String> {
+        fn tile_cache_usage(&self) -> Result<CacheUsage, String> {
             self.calls.lock().unwrap().push("usage".into());
             Ok(*self.usage.lock().unwrap())
         }
 
-        fn set_tile_cache_limit(&self, limit: u64) -> Result<TileCacheUsage, String> {
+        fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String> {
             self.calls.lock().unwrap().push(format!("limit {limit}"));
             let mut usage = self.usage.lock().unwrap();
-            usage.limit_bytes = ovrley_services::map_tile_service::validate_tile_cache_limit(limit)?;
+            usage.limit_bytes = ovrley_services::cache::CacheLimit::new(limit)?.bytes();
             Ok(*usage)
         }
 
-        fn clear_tile_cache(&self) -> Result<TileCacheUsage, String> {
+        fn clear_tile_cache(&self) -> Result<CacheUsage, String> {
             self.calls.lock().unwrap().push("clear".into());
             let mut usage = self.usage.lock().unwrap();
             usage.used_bytes = 0;
@@ -790,7 +790,7 @@ pub mod fakes {
     impl RenderService for FakeRenderService {
         fn submit_single(
             &self,
-            _resources: &ovrley_services::raster_resources::RasterResources,
+            _resources: &ovrley_services::rasters::RasterResources,
             config: ovrley_core::normalize::RenderConfig,
             _activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
             output_path: &str,
@@ -804,7 +804,7 @@ pub mod fakes {
             })
         }
 
-        fn submit_batch(&self, _resources: &ovrley_services::raster_resources::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError> {
+        fn submit_batch(&self, _resources: &ovrley_services::rasters::RasterResources, request: BatchRenderRequest) -> Result<BatchAcceptance, BatchServiceError> {
             self.record(FakeRenderCall::SubmitBatch { inspection_id: request.inspection_id.clone(), outputs: request.outputs.len() });
             self.batches.lock().unwrap().push(request);
             self.batch_results.lock().unwrap().pop_front().unwrap_or_else(|| Err(BatchServiceError::DispatchFailed { message: "no batch answer queued".into() }))
@@ -850,7 +850,7 @@ pub mod fakes {
 
         fn render_preview_frame(
             &self,
-            _resources: &ovrley_services::raster_resources::RasterResources,
+            _resources: &ovrley_services::rasters::RasterResources,
             _config: ovrley_core::normalize::RenderConfig,
             _activity: &ovrley_core::activity::schema::ParsedActivity,
             second: f64,

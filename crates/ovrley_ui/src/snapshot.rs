@@ -42,7 +42,7 @@ fn tour() -> Vec<Step> {
         ("projects-drawer", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Projects)),
         ("projects-drawer-back", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Activity)),
         ("activity-imported", |store, services| {
-            let ride = ovrley_services::runtime_paths::source_repo_root().join("crates/ovrley_core/tests/fixtures/activity/test-ride.fit");
+            let ride = ovrley_services::runtime::source_repo_root().join("crates/ovrley_core/tests/fixtures/activity/test-ride.fit");
             ovrley_app::features::app_shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);
         }),
         ("activity-trimmed", |store, _| {

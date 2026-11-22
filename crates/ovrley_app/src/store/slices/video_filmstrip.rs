@@ -2,7 +2,7 @@
 //! videos. Session state: not undoable, not saved (strips live in the disk cache).
 
 use crate::lib::video_program::SecondsRange;
-use ovrley_services::video_filmstrip::FilmstripWindow;
+use ovrley_services::video::FilmstripWindow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 

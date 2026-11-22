@@ -116,7 +116,7 @@ pub enum Exit {
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     store: Store,
-    distribution: ovrley_services::distribution::DistributionKind,
+    distribution: ovrley_services::runtime::Distribution,
     paths: ovrley_core::paths::AppPaths,
     app_cache_dir: &std::path::Path,
     preferences: PreferencesStore,

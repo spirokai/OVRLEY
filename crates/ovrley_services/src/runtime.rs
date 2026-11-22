@@ -1,20 +1,19 @@
-//! Runtime path resolution.
-//!
-//! Owns: repository-root detection, the four runtime roots (resources, user data, app data,
-//!       app cache), `AppPaths` construction from them, and the one rule for where each package
-//!       keeps its resources.
+//! Where the app runs from: the bundle identifier, the four runtime roots every path derives from,
+//! where each package keeps its resources, and whether this is an installed or a portable copy.
 
-use crate::map_styles::MapStyleDirs;
+use crate::maps::MapStyleDirs;
 use ovrley_core::paths::AppPaths;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 /// The bundle identifier, under which app data and caches are kept.
 pub const APP_IDENTIFIER: &str = "com.ovrley.desktop";
 
-/// Returns the repository root.
-///
-/// `CARGO_MANIFEST_DIR` points at `crates/ovrley_services`, so this walks two directories up to
-/// the project root used by bundled tooling and development assets.
+/// The marker file beside the executable of a portable copy.
+const PORTABLE_MARKER: &str = ".ovrley-portable";
+
+/// The repository root: `CARGO_MANIFEST_DIR` is `crates/ovrley_services`, two levels below it.
+#[must_use]
 pub fn source_repo_root() -> PathBuf {
     let mut root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     root.pop();
@@ -22,16 +21,46 @@ pub fn source_repo_root() -> PathBuf {
     root
 }
 
+/// How this copy of the app was distributed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Distribution {
+    Installed,
+    /// Unpacked from an archive, with the portable marker beside the executable. It never updates
+    /// itself.
+    Portable,
+}
+
+impl Distribution {
+    /// Detects this copy's distribution from the marker beside the executable.
+    ///
+    /// # Errors
+    ///
+    /// When the executable's place is unknown, or the marker exists but is not a readable file.
+    pub fn detect() -> Result<Self, String> {
+        let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+        let directory = executable
+            .parent()
+            .ok_or_else(|| format!("Executable has no parent directory: {}", executable.display()))?;
+        let marker = directory.join(PORTABLE_MARKER);
+        match std::fs::metadata(&marker) {
+            Ok(metadata) if metadata.is_file() => Ok(Self::Portable),
+            Ok(_) => Err(format!("Portable marker is not a file: {}", marker.display())),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(Self::Installed),
+            Err(error) => Err(format!("Could not inspect portable marker {}: {error}", marker.display())),
+        }
+    }
+}
+
 /// The platform directories. Absent entries are the platform's documented gaps.
-pub struct PlatformDirs {
+struct PlatformDirs {
     /// The user's documents folder. Optional on Linux (`~/.config/user-dirs.dirs` may not define it).
-    pub document_dir: Option<PathBuf>,
-    pub home_dir: Option<PathBuf>,
+    document_dir: Option<PathBuf>,
+    home_dir: Option<PathBuf>,
     /// The per-user application data root (macOS `Application Support`, Windows Roaming
     /// `AppData`, Linux `$XDG_DATA_HOME`).
-    pub data_dir: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
     /// The per-user cache root (macOS `Caches`, Windows Local `AppData`, Linux `$XDG_CACHE_HOME`).
-    pub cache_dir: Option<PathBuf>,
+    cache_dir: Option<PathBuf>,
 }
 
 /// The four roots every runtime path derives from.
@@ -43,74 +72,65 @@ pub struct RuntimeRoots {
     pub user_data_root: PathBuf,
     /// `<data dir>/com.ovrley.desktop`, where the settings file lives.
     pub app_data_dir: PathBuf,
-    /// `<cache dir>/com.ovrley.desktop`, where the map tile cache lives.
+    /// `<cache dir>/com.ovrley.desktop`, where the map tile and filmstrip caches live.
     pub app_cache_dir: PathBuf,
 }
 
 impl RuntimeRoots {
     /// Resolves the roots from the platform's directories and the executable's place.
-    pub fn resolve(dirs: PlatformDirs) -> Result<Self, String> {
+    ///
+    /// # Errors
+    ///
+    /// When the platform has no home, data or cache directory, or the executable's place is unknown.
+    pub fn from_platform() -> Result<Self, String> {
+        Self::resolve(PlatformDirs {
+            document_dir: dirs::document_dir(),
+            home_dir: dirs::home_dir(),
+            data_dir: dirs::data_dir(),
+            cache_dir: dirs::cache_dir(),
+        })
+    }
+
+    fn resolve(dirs: PlatformDirs) -> Result<Self, String> {
         let documents_dir = match dirs.document_dir {
             Some(dir) => dir,
-            None => dirs
-                .home_dir
-                .ok_or_else(|| "Could not resolve the home directory".to_string())?
-                .join("Documents"),
+            None => dirs.home_dir.ok_or("Could not resolve the home directory")?.join("Documents"),
         };
         Ok(Self {
             resource_root: resource_root()?,
             user_data_root: documents_dir.join("OVRLEY"),
-            app_data_dir: dirs
-                .data_dir
-                .ok_or_else(|| "Could not resolve the application data directory".to_string())?
-                .join(APP_IDENTIFIER),
-            app_cache_dir: dirs
-                .cache_dir
-                .ok_or_else(|| "Could not resolve the application cache directory".to_string())?
-                .join(APP_IDENTIFIER),
+            app_data_dir: dirs.data_dir.ok_or("Could not resolve the application data directory")?.join(APP_IDENTIFIER),
+            app_cache_dir: dirs.cache_dir.ok_or("Could not resolve the application cache directory")?.join(APP_IDENTIFIER),
         })
     }
 
-    /// Resolves the roots from the `dirs` crate, as the app does.
-    pub fn from_platform() -> Result<Self, String> {
-        Self::resolve(
-            PlatformDirs {
-                document_dir: dirs::document_dir(),
-                home_dir: dirs::home_dir(),
-                data_dir: dirs::data_dir(),
-                cache_dir: dirs::cache_dir(),
-            },
-        )
-    }
-
-    /// Builds the backend path configuration and creates its directories.
+    /// The core's path configuration, with its directories created: resources from the checkout in
+    /// development and from the resource root otherwise; templates in `templates/`, render outputs
+    /// at the root and runtime scratch data in `.runtime/` of the user data root.
     ///
-    /// Development builds read resources from the source checkout. Packaged builds read resources
-    /// from the resource root. User data lives under the user's documents directory in `OVRLEY`,
-    /// with templates in `templates/`, render outputs at the root, and runtime scratch data in
-    /// `.runtime/`.
+    /// # Errors
+    ///
+    /// When a directory cannot be created.
     pub fn app_paths(&self) -> Result<AppPaths, String> {
         let paths = AppPaths::from_runtime_roots(source_repo_root(), self.resource_root.clone(), self.user_data_root.clone());
-        paths.ensure_dirs().map_err(|e| e.to_string())?;
+        paths.ensure_dirs().map_err(|error| error.to_string())?;
         Ok(paths)
     }
 
     /// The installed map styles' folders: `map-styles` in the build, which a development build
     /// reads from `assets/`, and `map-styles` in the user's OVRLEY folder.
+    #[must_use]
     pub fn map_style_dirs(&self) -> MapStyleDirs {
         let bundled = if cfg!(debug_assertions) {
             source_repo_root().join("assets").join("map-styles")
         } else {
             self.resource_root.join("map-styles")
         };
-        MapStyleDirs {
-            bundled,
-            user: self.user_data_root.join("map-styles"),
-        }
+        MapStyleDirs { bundled, user: self.user_data_root.join("map-styles") }
     }
 
-    /// The bundled map fonts' folder: `fonts/map` in the checkout in development, in the build's
-    /// resources otherwise.
+    /// The bundled map fonts' folder.
+    #[must_use]
     pub fn map_font_dir(&self) -> PathBuf {
         self.resource_root.join("fonts").join("map")
     }
@@ -192,9 +212,7 @@ mod tests {
 
     #[test]
     fn user_data_root_fails_without_home_dir() {
-        let result = RuntimeRoots::resolve(platform_dirs(None, None));
-
-        assert!(result.is_err());
+        assert!(RuntimeRoots::resolve(platform_dirs(None, None)).is_err());
     }
 
     #[test]

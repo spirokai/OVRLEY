@@ -302,6 +302,16 @@ pub fn validate_template_contents(input: &str) -> CoreResult<()> {
     Ok(())
 }
 
+/// Writes a user template file after validating `contents`, creating its folder as needed.
+pub fn write_template(path: &Path, contents: &str) -> CoreResult<()> {
+    validate_template_contents(contents)?;
+    let io = |source| CoreError::Io { path: path.to_path_buf(), source };
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(io)?;
+    }
+    fs::write(path, contents).map_err(io)
+}
+
 /// Parses a config JSON string and runs the full normalization seam.
 ///
 /// Returns the validated config ready for rendering. This is the primary

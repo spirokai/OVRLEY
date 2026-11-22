@@ -22,7 +22,7 @@ use ovrley_core::encode::ffmpeg::transitions::transition_defaults;
 use ovrley_core::encode::render_settings::RenderSettings;
 use ovrley_core::media::manual_video_sync::ManualVideoSync;
 use crate::lib::video_program::program::PlaybackSource;
-use ovrley_services::project_file::{ProjectDocument, ProjectVideo};
+use ovrley_services::project::{ProjectDocument, ProjectVideo};
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};
 use std::rc::Rc;
@@ -252,7 +252,7 @@ mod tests {
     use super::*;
     use crate::lib::video_program::fixtures::{cut, cut_edits, simple};
     use ovrley_core::media::video_edits::{AnchorSide, PlacementAnchor, SegmentEdits, VideoEdits};
-    use ovrley_services::project_file::PathLocator;
+    use ovrley_services::project::PathLocator;
 
     fn project_video(id: &str, edits: VideoEdits) -> ProjectVideo {
         ProjectVideo {

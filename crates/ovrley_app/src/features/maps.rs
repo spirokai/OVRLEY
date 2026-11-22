@@ -50,7 +50,7 @@ pub struct MapsState {
 #[derive(Debug, Default)]
 pub struct MapTileCacheState {
     /// The cache's usage, once loaded.
-    pub usage: Option<crate::store::services::TileCacheUsage>,
+    pub usage: Option<crate::store::services::CacheUsage>,
     /// The slider's value while it drags, and until the command it committed answers.
     pub draft_limit: Option<u64>,
     /// Whether a cache command is running; it disables Clear.
@@ -72,7 +72,7 @@ impl MapTileCacheState {
 struct MapDownloadState {
     requested: String,
     waiting: Option<(Instant, crate::store::services::MapPrepareRequest)>,
-    running: ovrley_services::widget_preview::MapDownload,
+    running: ovrley_services::maps::MapDownload,
 }
 
 impl std::fmt::Debug for MapDownloadState {

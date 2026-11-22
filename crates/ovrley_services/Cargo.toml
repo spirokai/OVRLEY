@@ -1,7 +1,6 @@
 [package]
-# The app's desktop services: project files, file operations, map styles and tiles, runtime paths,
-# distribution detection, the updater, raster resources, widget previews, video thumbnails and
-# timeline filmstrips.
+# The desktop app's services: project archives, raster images, map styles, tiles and preview
+# frames, video thumbnails and filmstrips, the disk caches, runtime roots and the updater.
 name = "ovrley_services"
 version.workspace = true
 edition = "2021"
@@ -13,7 +12,6 @@ license = "GPL-3.0-or-later"
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-base64 = "0.22"
 # The same revision as the cargo-packager that the workflows install; 0.3.0 from crates.io once
 # it is released.
 cargo-packager-updater = { git = "https://github.com/crabnebula-dev/cargo-packager", rev = "d27f3df01749d64d258e0d356cb6e1bb8223c652" }

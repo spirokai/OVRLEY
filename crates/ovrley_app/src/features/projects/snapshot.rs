@@ -1,7 +1,7 @@
 //! `projectSnapshot.js`: the project document the session saves, and the content the project
 //! status compares with the saved baseline.
 //!
-//! The document is `ovrley_services::project_file`'s own type (D1, D2), so what is saved is what
+//! The document is `ovrley_services::project`'s own type (D1, D2), so what is saved is what
 //! the store holds. Sources are located relative to the project when they sit in its folder.
 
 use crate::features::template_manager::durable_template_state;
@@ -11,7 +11,7 @@ use crate::store::Store;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
 use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
-use ovrley_services::project_file::{
+use ovrley_services::project::{
     create_path_locator, PathLocator, ProjectDocument, ProjectEditor, ProjectLaps, ProjectRender,
     ProjectSource, ProjectSources, ProjectSync, ProjectTimeline, ProjectVideo, PROJECT_FORMAT,
     PROJECT_VERSION,

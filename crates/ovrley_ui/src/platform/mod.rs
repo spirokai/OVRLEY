@@ -49,7 +49,7 @@ pub fn take_standard_output() -> std::io::Result<std::fs::File> {
 /// The Flatpak's entry has the sandbox's id (`FLATPAK_ID`, the runtime's documented variable).
 #[cfg(any(test, all(unix, not(target_os = "macos"))))]
 fn linux_app_id(flatpak_id: Option<String>) -> String {
-    flatpak_id.unwrap_or_else(|| ovrley_services::runtime_paths::APP_IDENTIFIER.to_string())
+    flatpak_id.unwrap_or_else(|| ovrley_services::runtime::APP_IDENTIFIER.to_string())
 }
 
 /// Selects Slint's backend, in the plan's order: the GPU device, the window-attribute hooks, the

@@ -139,8 +139,7 @@ pub fn load_raster_image(
     let resources = services.rasters.clone();
     let widget_id = widget_id.to_string();
     services.workers.spawn("raster-load", move || {
-        let loaded =
-            ovrley_services::file_ops::load_selected_raster(&resources, &PathBuf::from(&path));
+        let loaded = resources.load_selected(&PathBuf::from(&path));
         Box::new(move |store: &mut Store, _: &mut Services| match loaded {
             Ok(image) => {
                 finish(store, &widget_id, None);
@@ -161,9 +160,9 @@ pub fn load_raster_image(
                 }
             }
             Err(error) => {
-                finish(store, &widget_id, Some(error.code));
+                finish(store, &widget_id, Some(error.code()));
                 if let Some(then) = then {
-                    let message = translations().t(crate::i18n::Locale::En, &format!("raster.errors.{}", error_key(error.code))).to_string();
+                    let message = translations().t(crate::i18n::Locale::En, &format!("raster.errors.{}", error_key(error.code()))).to_string();
                     then(store, Err(message));
                 }
             }

@@ -1,7 +1,7 @@
 //! The projects feature (D11): `useProjectLifecycle`, `projectOperations`,
 //! `useProjectDocumentState` and `useProjectSourceRecovery`.
 //!
-//! `.oly` files are read, migrated, validated and written only by `ovrley_services::project_file`
+//! `.oly` files are read, migrated, validated and written only by `ovrley_services::project`
 //! (D1); the editor part goes through the template ingress. Disk work runs on workers; each result
 //! comes back as an action. Opening, starting new and closing the window ask about unsaved changes
 //! first (Q4: opening asks too, unlike React).
@@ -23,9 +23,10 @@ use crate::store::slices::media::{ActivitySource, ImportedActivity};
 use crate::store::Store;
 use apply::{apply_new_project, apply_project, create_project_manual_video_sync, create_project_video_edits, resolve_disabled_laps, PreparedProject};
 use ovrley_core::normalize::template::create_durable_template_state;
-use ovrley_services::project_file::{
-    default_project_directory, list_project_files, read_project, write_project, ProjectEditor, ProjectFileSummary, RasterLoadResult, ReadProjectResult,
+use ovrley_services::project::{
+    default_project_directory, list_project_files, read_project, write_project, OpenedProject, ProjectEditor, ProjectError, ProjectFileSummary,
 };
+use ovrley_widgets::widgets::raster::error::RasterError;
 use ovrley_widgets::model::document::{canonical_numbers, OverlayConfig};
 use serde_json::{json, Map, Value};
 use snapshot::{create_project_snapshot, project_content, project_timeline, ProjectBaseline, LAST_PROJECT_DIRECTORY_KEY};
@@ -96,7 +97,7 @@ pub struct ProjectOpenRequest {
 
 /// A project read from disk with its editor normalized, waiting for its sources.
 struct ReadProject {
-    read: ReadProjectResult,
+    read: OpenedProject,
     config: OverlayConfig,
     global_defaults: Map<String, Value>,
     activity_exists: bool,
@@ -224,6 +225,17 @@ fn report(store: &mut Store, key: &str, error: &str) {
     let operation = operation_name(store, key);
     log::error!("Failed to {operation}: {error}");
     store.media.set_error_message(format!("{operation}: {error}"));
+}
+
+/// A project error tagged for translation; `invalid` names what a malformed project or a failed
+/// file operation means to this operation.
+fn tagged_project_error(error: &ProjectError, invalid: &str) -> String {
+    let code = match error {
+        ProjectError::ArchiveSize => "archive_size",
+        ProjectError::RasterUnavailable(_) => "raster_unavailable",
+        ProjectError::Invalid(_) => invalid,
+    };
+    format!("[project_error:{code}] {error}")
 }
 
 /// Busy: a project operation, an activity import, a quiet video import or the renderer runs. Project commands are ignored and their buttons disabled meanwhile.
@@ -461,7 +473,7 @@ pub fn save_project(store: &mut Store, services: &mut Services, save_as: bool, p
     let default_path = match &store.projects.loaded_project_path {
         Some(path) => path.clone(),
         None => match default_project_directory(&user_data_root(services)) {
-            Ok(directory) => path_in_directory(&directory, "project.oly"),
+            Ok(directory) => path_in_directory(&directory.to_string_lossy(), "project.oly"),
             Err(error) => {
                 report(store, "projects.saveProject", &error);
                 return then(store, services, Err(error));
@@ -525,15 +537,16 @@ fn write_session(store: &mut Store, services: &mut Services, path: String, then:
     let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&services.paths.repo_root).ok();
     let job = store.projects.park(then);
     services.workers.spawn("project-save", move || {
-        let written = write_project(&path, document.clone(), ffmpeg.as_deref(), images);
+        let written = write_project(std::path::Path::new(&path), document.clone(), ffmpeg.as_deref(), images)
+            .map_err(|error| tagged_project_error(&error, "save_failed"));
         Box::new(move |store: &mut Store, services: &mut Services| {
             store.projects.running = false;
             let then = store.projects.resume(job);
             match written {
-                Ok(written) => {
+                Ok(backup) => {
                     mark_saved(store, path, ProjectBaseline::of(document));
-                    if let Some(backup_path) = written.backup_path {
-                        store.projects.notice = Some(ProjectNotice::FormatUpgraded { backup_path });
+                    if let Some(backup) = backup {
+                        store.projects.notice = Some(ProjectNotice::FormatUpgraded { backup_path: backup.to_string_lossy().into_owned() });
                     }
                     then(store, services, Ok(true));
                 }
@@ -596,7 +609,7 @@ pub fn open_project_dialog(store: &mut Store, services: &mut Services) {
         return;
     }
     let default_path = match default_project_directory(&user_data_root(services)) {
-        Ok(directory) => directory,
+        Ok(directory) => directory.to_string_lossy().into_owned(),
         Err(error) => return report(store, "projects.openProject", &error),
     };
     store.projects.running = true;
@@ -663,8 +676,8 @@ fn load_project(store: &mut Store, services: &mut Services, path: String, reques
 
 /// The read, the editor through the template ingress with its raster results attached, the fonts
 /// checked, and which source files exist.
-fn read_and_normalize(rasters: &ovrley_services::raster_resources::RasterResources, paths: &ovrley_core::paths::AppPaths, path: &str) -> Result<ReadProject, String> {
-    let mut read = read_project(rasters, path)?;
+fn read_and_normalize(rasters: &ovrley_services::rasters::RasterResources, paths: &ovrley_core::paths::AppPaths, path: &str) -> Result<ReadProject, String> {
+    let mut read = read_project(rasters, std::path::Path::new(path)).map_err(|error| tagged_project_error(&error, "invalid_archive"))?;
     let editor = &read.project.editor;
     let config = OverlayConfig::from_value(&editor.config)?;
     let durable = create_durable_template_state(&config, Some(&editor.global_defaults)).map_err(|error| error.to_string())?;
@@ -678,10 +691,10 @@ fn read_and_normalize(rasters: &ovrley_services::raster_resources::RasterResourc
         global_defaults: durable.global_defaults.clone(),
     };
     let mut config = durable.config;
-    attach_raster_load_results(&mut config, &read.raster_load_results)?;
+    attach_raster_load_results(&mut config, &read.rasters)?;
     let sources = &read.resolved_sources;
-    let activity_exists = sources.activity_path.as_deref().is_some_and(|path| std::path::Path::new(path).is_file());
-    let videos_exist = sources.video_paths.iter().map(|path| std::path::Path::new(path).is_file()).collect();
+    let activity_exists = sources.activity_path.as_deref().is_some_and(std::path::Path::is_file);
+    let videos_exist = sources.video_paths.iter().map(|path| path.is_file()).collect();
     Ok(ReadProject {
         read,
         config,
@@ -692,15 +705,15 @@ fn read_and_normalize(rasters: &ovrley_services::raster_resources::RasterResourc
 }
 
 /// `attachRasterLoadResults`: each raster with an image gets its resource or its error.
-fn attach_raster_load_results(config: &mut OverlayConfig, results: &HashMap<String, RasterLoadResult>) -> Result<(), String> {
+fn attach_raster_load_results(config: &mut OverlayConfig, results: &HashMap<String, Result<String, RasterError>>) -> Result<(), String> {
     for raster in &mut config.rasters {
         if raster.get("path").is_none_or(Value::is_null) {
             continue;
         }
         let id = raster.get("id").and_then(Value::as_str).unwrap_or_default().to_string();
         match results.get(&id).ok_or_else(|| format!("Raster {id} has no resource result"))? {
-            RasterLoadResult::Ready { resource_id } => raster.insert("resourceId".into(), Value::String(resource_id.clone())),
-            RasterLoadResult::Error { error_code } => raster.insert("resourceErrorCode".into(), serde_json::to_value(error_code).map_err(|error| error.to_string())?),
+            Ok(resource_id) => raster.insert("resourceId".into(), Value::String(resource_id.clone())),
+            Err(error) => raster.insert("resourceErrorCode".into(), Value::String(error.code().into())),
         };
     }
     Ok(())
@@ -712,14 +725,14 @@ fn attach_raster_load_results(config: &mut OverlayConfig, results: &HashMap<Stri
 fn resolve_sources(store: &mut Store, services: &mut Services, mut pending: PendingLoad) {
     let sources = &pending.project.read.resolved_sources;
     if pending.activity.is_none() {
-        match sources.activity_path.clone() {
+        match sources.activity_path.as_deref().map(|path| path.to_string_lossy().into_owned()) {
             None => pending.activity = Some(None),
             Some(path) if pending.project.activity_exists => pending.activity = Some(Some(path)),
             Some(path) => return ask_missing_source(store, services, pending, SourceRole::Activity, &path),
         }
     }
     let sources = &pending.project.read.resolved_sources;
-    let video_paths = sources.video_paths.clone();
+    let video_paths: Vec<String> = sources.video_paths.iter().map(|path| path.to_string_lossy().into_owned()).collect();
     if video_paths.len() > 1 {
         pending.videos = video_paths.iter().cloned().zip(&pending.project.videos_exist).map(|(path, exists)| exists.then_some(path)).collect();
     }
@@ -815,7 +828,7 @@ fn prepare_project(store: &mut Store, services: &mut Services, pending: PendingL
             let ReadProject { read, config, global_defaults, .. } = project;
             let mut document = read.project;
             let legacy_batch_video_folder = read.legacy_batch_video_folder;
-            let saved_paths = read.resolved_sources.video_paths;
+            let saved_paths: Vec<String> = read.resolved_sources.video_paths.iter().map(|path| path.to_string_lossy().into_owned()).collect();
             let activity = match activity_path {
                 Some(path) => Some((path.clone(), ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string()).and_then(ImportedActivity::from_response)?)),
                 None => None,
@@ -925,7 +938,9 @@ pub fn list_projects(
     };
     let root = user_data_root(services);
     services.workers.spawn("project-list", move || {
-        let listed = remembered.and_then(|directory| directory.map_or_else(|| default_project_directory(&root), Ok)).and_then(list_project_files);
+        let listed = remembered
+            .and_then(|directory| directory.map_or_else(|| default_project_directory(&root), |directory| Ok(directory.into())))
+            .and_then(|directory| list_project_files(&directory));
         Box::new(move |store: &mut Store, _: &mut Services| then(store, listed))
     });
 }

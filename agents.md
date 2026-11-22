@@ -24,7 +24,7 @@ crates/
   ovrley_ui/        Slint markup (ui/), projections and bindings (src/features/), platform glue, the binary
   ovrley_app/       store, actions, reconcile steps, services traits; no Slint
   ovrley_mcp/       MCP server: tool catalog, protocol, the socket to the window
-  ovrley_services/  projects, files, map tiles and styles, paths, distribution, updater
+  ovrley_services/  projects, rasters, map tiles and styles, video frames, caches, runtime, updater
   ovrley_playback/  MDK player and its GPU interop
   ovrley_core/      activity parsing, normalization, export renderer, FFmpeg
   ovrley_widgets/   widgets (Skia): model, catalog, preview session, drawing

@@ -8,7 +8,7 @@ use crate::i18n::{catalog, Locale};
 use crate::lib::format::format_update_progress;
 use crate::store::services::{AppUpdate, Services, UiPost};
 use crate::store::Store;
-use ovrley_services::distribution::DistributionKind;
+use ovrley_services::runtime::Distribution;
 use ovrley_services::updater::DownloadProgress;
 use std::sync::{Arc, Mutex};
 
@@ -43,8 +43,8 @@ impl AppUpdateState {
 
 /// `getStartupUpdate`: one check per run, never in a development build or in a distribution that
 /// is updated from elsewhere. A failed check is only logged.
-pub fn check_at_startup(store: &mut Store, services: &mut Services, distribution: DistributionKind, development: bool) {
-    if store.app_update.checked || development || distribution == DistributionKind::Portable {
+pub fn check_at_startup(store: &mut Store, services: &mut Services, distribution: Distribution, development: bool) {
+    if store.app_update.checked || development || distribution == Distribution::Portable {
         return;
     }
     store.app_update.checked = true;
@@ -164,7 +164,7 @@ mod tests {
         let (parts, fakes) = fake_services(serde_json::json!({}));
         fakes.updates.offer(update);
         let dispatcher = Dispatcher::new(Store::default(), parts);
-        dispatcher.dispatch(|store, services| check_at_startup(store, services, DistributionKind::Installed, false));
+        dispatcher.dispatch(|store, services| check_at_startup(store, services, Distribution::Installed, false));
         settle(&dispatcher, &fakes, |store| store.app_update.is_open());
         (dispatcher, fakes)
     }
@@ -189,8 +189,8 @@ mod tests {
         let (parts, fakes) = fake_services(serde_json::json!({}));
         let dispatcher = Dispatcher::new(Store::default(), parts);
         dispatcher.dispatch(|store, services| {
-            check_at_startup(store, services, DistributionKind::Installed, true);
-            check_at_startup(store, services, DistributionKind::Portable, false);
+            check_at_startup(store, services, Distribution::Installed, true);
+            check_at_startup(store, services, Distribution::Portable, false);
             assert!(!store.app_update.checked);
         });
         assert_eq!(fakes.updates.checks.load(Ordering::SeqCst), 0);
@@ -205,7 +205,7 @@ mod tests {
         );
         dispatcher.dispatch(|store, services| {
             dismiss(store);
-            check_at_startup(store, services, DistributionKind::Installed, false);
+            check_at_startup(store, services, Distribution::Installed, false);
         });
         assert!(!dispatcher.with_store(|store| store.app_update.is_open()));
         assert_eq!(fakes.updates.checks.load(Ordering::SeqCst), 1);

@@ -1,6 +1,6 @@
 //! Runs the editor's preview session, including sampling and RGBA readback.
 use super::Plan;
-use ovrley_services::map_styles::{MapStyleDirs, MapStyleRegistry};
+use ovrley_services::maps::{MapStyleDirs, MapStyleRegistry};
 use ovrley_widgets::error::WidgetResult;
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
 use ovrley_widgets::widgets::map::preview::{
@@ -21,7 +21,7 @@ struct BlankFrames;
 impl MapFrameFactory for BlankFrames {
     fn provider(
         &self,
-        _style: &ovrley_services::map_styles::MapStyleInfo,
+        _style: &ovrley_services::maps::MapStyleInfo,
         _sample_count: u32,
     ) -> Arc<dyn MapFrameProvider> {
         Arc::new(BlankFrames)

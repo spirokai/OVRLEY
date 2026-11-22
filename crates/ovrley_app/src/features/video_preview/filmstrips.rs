@@ -7,7 +7,7 @@
 //! dropped, and a removed video's strips go with it. A failed strip is not retried while its video
 //! stays; its tiles fall back to a coarser strip, or the clip shows plain.
 //!
-//! The grid itself (spacings, windows, sampling) is `ovrley_services::video_filmstrip`'s.
+//! The grid itself (spacings, windows, sampling) is `ovrley_services::video`'s.
 
 use crate::lib::video_program::Clip;
 use ovrley_core::media::video_edits::VideoResolution;
@@ -15,7 +15,7 @@ use crate::store::services::{FilmstripHwaccel, FilmstripRequest, FilmstripWindow
 use crate::store::slices::video_filmstrip::{ReadyStrip, StripState};
 use crate::store::Store;
 use ovrley_core::encode::ffmpeg::detect::AvailableCodecs;
-use ovrley_services::video_filmstrip::{base_spacing_seconds, zoom_spacing_seconds, Filmstrip, FINEST_SPACING_SECONDS, FRAMES_PER_STRIP};
+use ovrley_services::video::{base_spacing_seconds, zoom_spacing_seconds, Filmstrip, FINEST_SPACING_SECONDS, FRAMES_PER_STRIP};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -208,11 +208,9 @@ fn is_current_job(store: &Store, path: &str, key: &str, job: u64) -> bool {
     store.video_filmstrip.get(path, key) == Some(&StripState::Generating { job })
 }
 
-/// Decodes a strip's base64 JPEG to RGBA, off the UI thread.
+/// Decodes a strip's JPEG to RGBA, off the UI thread.
 fn decode_sprite(strip: Filmstrip) -> Result<ReadyStrip, String> {
-    use base64::Engine as _;
-    let jpeg = base64::engine::general_purpose::STANDARD.decode(strip.sprite_jpeg_base64).map_err(|error| error.to_string())?;
-    let image = image::load_from_memory_with_format(&jpeg, image::ImageFormat::Jpeg).map_err(|error| error.to_string())?.to_rgba8();
+    let image = image::load_from_memory_with_format(&strip.sprite_jpeg, image::ImageFormat::Jpeg).map_err(|error| error.to_string())?.to_rgba8();
     Ok(ReadyStrip {
         width: image.width(),
         height: image.height(),
@@ -530,10 +528,9 @@ mod tests {
         use crate::store::Dispatcher;
 
         fn jpeg_strip(spacing_seconds: f64, sample_count: u32) -> Filmstrip {
-            use base64::Engine as _;
             let mut jpeg = Vec::new();
             image::codecs::jpeg::JpegEncoder::new(&mut jpeg).encode(&[255, 0, 0, 0, 255, 0], 2, 1, image::ExtendedColorType::Rgb8).unwrap();
-            Filmstrip { sprite_jpeg_base64: base64::engine::general_purpose::STANDARD.encode(jpeg), start_seconds: 0.0, spacing_seconds, sample_count }
+            Filmstrip { sprite_jpeg: jpeg, start_seconds: 0.0, spacing_seconds, sample_count }
         }
 
         fn dispatcher(videos: Vec<crate::lib::video_program::ImportedVideo>) -> (Dispatcher, Fakes) {

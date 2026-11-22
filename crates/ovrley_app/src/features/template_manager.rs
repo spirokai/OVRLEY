@@ -22,7 +22,7 @@ use ovrley_core::normalize::template::{
     DurableTemplateState,
 };
 use ovrley_core::paths::AppPaths;
-use ovrley_services::raster_resources::RasterResources;
+use ovrley_services::rasters::RasterResources;
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
@@ -359,14 +359,13 @@ fn prepare_template(
         else {
             continue;
         };
-        match ovrley_services::file_ops::load_selected_raster(rasters, std::path::Path::new(&path))
-        {
+        match rasters.load_selected(std::path::Path::new(&path)) {
             Ok(selection) => {
                 raster.insert("resourceId".into(), Value::String(selection.resource_id))
             }
             Err(error) => raster.insert(
                 "resourceErrorCode".into(),
-                Value::String(error.code.to_string()),
+                Value::String(error.code().to_string()),
             ),
         };
     }
@@ -645,17 +644,12 @@ pub const AGENT_SAVE_NEEDS_PATH: &str =
 /// with an error the caller ignores (`saved === undefined`).
 pub fn open_save_template_dialog(store: &mut Store, services: &mut Services, then: OnDone) {
     let filename = suggested_template_filename(store.template.loaded_template_source.as_ref());
-    let user_data_root = services
+    let default_path = services
         .paths
         .user_templates_dir
-        .parent()
-        .map(std::path::Path::to_path_buf)
-        .unwrap_or_default();
-    let default_path =
-        match ovrley_services::file_ops::default_template_save_path(&user_data_root, &filename) {
-            Ok(path) => path.to_string_lossy().into_owned(),
-            Err(error) => return fail_save(store, services, error, then),
-        };
+        .join(&filename)
+        .to_string_lossy()
+        .into_owned();
     let shared = std::rc::Rc::new(std::cell::RefCell::new(Some(then)));
     let fallback = std::rc::Rc::clone(&shared);
     let opened = save_single_path(
@@ -716,10 +710,9 @@ pub fn save_template(store: &mut Store, services: &mut Services, path: String, t
     services.workers.spawn("template-save", move || {
         let contents =
             serde_json::to_string_pretty(&payload).expect("a template payload serializes");
-        let written = ovrley_services::file_ops::write_template_file(
-            std::path::Path::new(&write_path),
-            &contents,
-        );
+        let written =
+            ovrley_core::commands::write_template(std::path::Path::new(&write_path), &contents)
+                .map_err(|error| error.to_string());
         Box::new(move |store: &mut Store, services: &mut Services| {
             let then = store.template_manager.resume(job);
             match written {

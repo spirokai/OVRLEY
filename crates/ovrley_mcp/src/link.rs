@@ -65,7 +65,7 @@ impl SocketLocation {
             .filter(|_| cfg!(target_os = "linux"))
             .map(PathBuf::from)
             .filter(|directory| directory.is_absolute())
-            .map(|directory| directory.join(ovrley_services::runtime_paths::APP_IDENTIFIER));
+            .map(|directory| directory.join(ovrley_services::runtime::APP_IDENTIFIER));
         let directory = runtime_dir.unwrap_or_else(|| app_data_dir.join("mcp"));
         Self::File(directory.join("ovrley.sock"))
     }

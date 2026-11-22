@@ -1,7 +1,7 @@
 //! The user's edits of an imported video, and what a project saves about the video itself.
 //!
 //! These are the one model of this state: the editor's store holds them, and projects read and
-//! write them (`ovrley_services::project_file`). Their serde shape is the project file's: camelCase
+//! write them (`ovrley_services::project`). Their serde shape is the project file's: camelCase
 //! names, `null` where the file has `null`. Types with invariants deserialize through their
 //! validating constructors, so reading a project is the one validation.
 //!

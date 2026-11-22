@@ -116,13 +116,14 @@ pub fn project(window: &AppWindow, store: &Store) {
         .projects
         .iter()
         .map(|summary| {
+            let path = summary.path.to_string_lossy();
             let image = summary
                 .thumbnail
                 .as_deref()
-                .and_then(|bytes| thumbnail_image(&summary.path, bytes));
+                .and_then(|bytes| thumbnail_image(&path, bytes));
             ProjectCardView {
                 name: summary.name.as_str().into(),
-                path: summary.path.as_str().into(),
+                path: path.as_ref().into(),
                 has_thumbnail: image.is_some(),
                 thumbnail: image.unwrap_or_default(),
             }

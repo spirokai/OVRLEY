@@ -1,6 +1,8 @@
-//! Filmstrips of source videos for the timeline: up to 24 keyframes of one
-//! stretch of a video, decoded in a single FFmpeg process and kept as a JPEG
-//! sprite (frames side by side) in the disk cache (`filmstrip_cache`).
+//! Still frames of source videos: the thumbnail of a project and of each video card, and the
+//! timeline's filmstrips.
+//!
+//! A filmstrip holds up to 24 keyframes of one stretch of a video, decoded in a single FFmpeg
+//! process and kept as a JPEG sprite (frames side by side) in the [`FilmstripCache`].
 //!
 //! Every video has a base strip of at most 24 frames across its whole length.
 //! Zoomed in, the timeline asks for zoom windows: on level `k` frames are
@@ -13,15 +15,38 @@
 //! device once. Each segment tags its packets with its sample index, which the
 //! decoded frames carry to the `metadata` filter's log.
 
-use crate::filmstrip_cache::FilmstripCache;
-use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-use image::{codecs::jpeg::JpegEncoder, ExtendedColorType, RgbImage};
-use serde::{Deserialize, Serialize};
+use crate::cache::FilmstripCache;
+use image::codecs::jpeg::JpegEncoder;
+use image::{ExtendedColorType, RgbImage};
+use ovrley_core::encode::ffmpeg::binary::configure_ffmpeg_command;
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::UNIX_EPOCH;
+
+/// Largest thumbnail accepted, generated or read from a project archive.
+pub const MAX_THUMBNAIL_SIZE: u64 = 2 * 1024 * 1024;
+const THUMBNAIL_FILTER: &str =
+    "scale=320:180:force_original_aspect_ratio=decrease,pad=320:180:(ow-iw)/2:(oh-ih)/2:color=black@0";
+
+/// The first frame of a video as a 320×180 PNG, letterboxed with transparency; `None` when FFmpeg
+/// cannot produce it.
+#[must_use]
+pub fn thumbnail(ffmpeg: &Path, video_path: &Path) -> Option<Vec<u8>> {
+    let mut command = Command::new(ffmpeg);
+    configure_ffmpeg_command(&mut command);
+    let output = command
+        .args(["-hide_banner", "-loglevel", "error", "-i"])
+        .arg(video_path)
+        .args(["-frames:v", "1", "-vf", THUMBNAIL_FILTER, "-f", "image2pipe", "-vcodec", "png", "pipe:1"])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+    let valid = output.status.success() && !output.stdout.is_empty() && output.stdout.len() as u64 <= MAX_THUMBNAIL_SIZE;
+    valid.then_some(output.stdout)
+}
 
 /// Most frames in one strip.
 pub const FRAMES_PER_STRIP: u32 = 24;
@@ -48,8 +73,7 @@ const BYTES_PER_PIXEL: usize = 3;
 
 /// Hardware decoder chosen from the startup codec detection. Each one is a hardware
 /// acceleration of FFmpeg's own decoders, which honour `-skip_frame nokey`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilmstripHwaccel {
     Cuda,
     Vaapi,
@@ -69,8 +93,7 @@ impl FilmstripHwaccel {
 }
 
 /// Which stretch of a video a strip covers: the whole video, or one window of a zoom level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(tag = "kind", rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FilmstripWindow {
     Base,
     Zoom { level: u32, window: u32 },
@@ -86,11 +109,13 @@ struct SamplePlan {
 }
 
 /// Spacing of the base strip: at most 24 frames, never closer than 10 s.
+#[must_use]
 pub fn base_spacing_seconds(duration_seconds: f64) -> f64 {
     FINEST_SPACING_SECONDS.max(duration_seconds / f64::from(FRAMES_PER_STRIP))
 }
 
 /// Frame spacing on a zoom level.
+#[must_use]
 pub fn zoom_spacing_seconds(level: u32) -> f64 {
     FINEST_SPACING_SECONDS * f64::from(1u32 << level)
 }
@@ -167,6 +192,11 @@ pub struct FilmstripRequest {
 }
 
 impl FilmstripRequest {
+    /// # Errors
+    ///
+    /// When the path is relative, a frame edge is outside 1 to 512 pixels, the duration is not a
+    /// plausible video length, or a zoom window is no finer than the base strip or starts past the
+    /// end.
     pub fn new(
         video_path: PathBuf,
         duration_seconds: f64,
@@ -195,6 +225,7 @@ impl FilmstripRequest {
     }
 
     /// The stretch of the video the strip covers.
+    #[must_use]
     pub fn window(&self) -> FilmstripWindow {
         self.window
     }
@@ -204,21 +235,20 @@ impl FilmstripRequest {
     }
 }
 
-/// A filmstrip: a base64 JPEG with its frames side by side, sample `i` standing
-/// for the stretch from `start + i × spacing` to `start + (i + 1) × spacing`.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
+/// A filmstrip: a JPEG with its frames side by side, sample `i` standing for the stretch from
+/// `start + i × spacing` to `start + (i + 1) × spacing`.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Filmstrip {
-    pub sprite_jpeg_base64: String,
+    pub sprite_jpeg: Vec<u8>,
     pub start_seconds: f64,
     pub spacing_seconds: f64,
     pub sample_count: u32,
 }
 
 impl Filmstrip {
-    fn of(request: &FilmstripRequest, jpeg: &[u8]) -> Self {
+    fn of(request: &FilmstripRequest, sprite_jpeg: Vec<u8>) -> Self {
         Self {
-            sprite_jpeg_base64: BASE64_STANDARD.encode(jpeg),
+            sprite_jpeg,
             start_seconds: request.plan.start_seconds,
             spacing_seconds: request.plan.spacing_seconds,
             sample_count: request.plan.sample_count,
@@ -391,7 +421,7 @@ fn decode_frames(
     hwaccel: Option<FilmstripHwaccel>,
 ) -> Option<DecodedFrames> {
     let mut command = Command::new(ffmpeg);
-    ovrley_core::encode::ffmpeg::binary::configure_ffmpeg_command(&mut command);
+    configure_ffmpeg_command(&mut command);
     let decoder = hwaccel.map_or("software", FilmstripHwaccel::ffmpeg_name);
     let output = match command
         .args(filmstrip_args(list_path, request, hwaccel))
@@ -528,6 +558,10 @@ fn generate_sprite(
 }
 
 /// The strip from the disk cache, or `None` on a miss.
+///
+/// # Errors
+///
+/// When the cached strip exists but cannot be read.
 pub fn cached_filmstrip(
     cache: &FilmstripCache,
     request: &FilmstripRequest,
@@ -535,11 +569,16 @@ pub fn cached_filmstrip(
     let Some(name) = cache_name(request) else {
         return Ok(None);
     };
-    Ok(cache.read(&name)?.map(|jpeg| Filmstrip::of(request, &jpeg)))
+    Ok(cache.read(&name)?.map(|jpeg| Filmstrip::of(request, jpeg)))
 }
 
 /// The strip from the disk cache, or decoded and stored in it. `None` when FFmpeg
 /// decodes no frame. A strip that cannot be stored is still returned.
+///
+/// # Errors
+///
+/// When the cache cannot be read, the concat list cannot be written, or the sprite cannot be
+/// encoded.
 pub fn filmstrip(
     cache: &FilmstripCache,
     ffmpeg: &Path,
@@ -566,7 +605,7 @@ pub fn filmstrip(
             request.video_path.display()
         ),
     }
-    Ok(Some(Filmstrip::of(request, &jpeg)))
+    Ok(Some(Filmstrip::of(request, jpeg)))
 }
 
 #[cfg(test)]
@@ -656,21 +695,6 @@ mod tests {
     }
 
     #[test]
-    fn windows_deserialize_from_the_frontend() {
-        let base: FilmstripWindow = serde_json::from_str(r#"{"kind":"base"}"#).unwrap();
-        let zoom: FilmstripWindow =
-            serde_json::from_str(r#"{"kind":"zoom","level":2,"window":5}"#).unwrap();
-        assert_eq!(base, FilmstripWindow::Base);
-        assert_eq!(
-            zoom,
-            FilmstripWindow::Zoom {
-                level: 2,
-                window: 5
-            }
-        );
-    }
-
-    #[test]
     fn each_sample_seeks_to_the_middle_of_its_stretch() {
         // The first waits out a hidden pre-roll only when its middle is earlier.
         assert_eq!(
@@ -748,23 +772,6 @@ mod tests {
     }
 
     #[test]
-    fn hwaccel_names_deserialize_from_the_frontend() {
-        let names = ["cuda", "vaapi", "d3d11va", "videotoolbox"];
-        let parsed: Vec<FilmstripHwaccel> = names
-            .iter()
-            .map(|name| serde_json::from_str(&format!("\"{name}\"")).unwrap())
-            .collect();
-        assert_eq!(
-            parsed
-                .iter()
-                .map(|hwaccel| hwaccel.ffmpeg_name())
-                .collect::<Vec<_>>(),
-            names
-        );
-        assert!(serde_json::from_str::<FilmstripHwaccel>("\"qsv\"").is_err());
-    }
-
-    #[test]
     fn sample_tags_are_read_from_metadata_log_lines() {
         let stderr = "\
 [in#0/concat @ 0x1] Unused options for '/v/ride.mkv'.
@@ -836,7 +843,7 @@ mod tests {
     }
 
     fn repo_ffmpeg() -> PathBuf {
-        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&crate::runtime_paths::source_repo_root())
+        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&crate::runtime::source_repo_root())
             .unwrap()
     }
 
@@ -869,11 +876,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let video = dir.join("it's a clip.mp4");
         write_test_video(&ffmpeg, &video);
-        let cache = FilmstripCache::open(
-            dir.join("cache"),
-            crate::filmstrip_cache::DEFAULT_FILMSTRIP_CACHE_LIMIT,
-        )
-        .unwrap();
+        let cache = FilmstripCache::open(&dir, crate::cache::DEFAULT_FILMSTRIP_CACHE_LIMIT).unwrap();
         let request = FilmstripRequest::new(video, 6.0, FilmstripWindow::Base, 32, 18).unwrap();
         // A decoder this platform lacks fails, and the software run takes over.
         let unavailable = if cfg!(target_os = "macos") {
@@ -899,8 +902,7 @@ mod tests {
             ),
             (0.0, 10.0, 1)
         );
-        let jpeg = BASE64_STANDARD.decode(decoded.sprite_jpeg_base64).unwrap();
-        let sprite = image::load_from_memory(&jpeg).unwrap();
+        let sprite = image::load_from_memory(&decoded.sprite_jpeg).unwrap();
         assert_eq!((sprite.width(), sprite.height()), (32, 18));
     }
 

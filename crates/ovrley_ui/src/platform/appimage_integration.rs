@@ -2,7 +2,7 @@
 //! entry and icons inside the image, where launchers cannot see them, so on every start this
 //! copies them into the user's XDG data directory. The entry is named after the app identifier
 //! because Wayland compositors match a window's app id to `<app id>.desktop` to find its icon.
-use ovrley_services::runtime_paths::APP_IDENTIFIER;
+use ovrley_services::runtime::APP_IDENTIFIER;
 use std::path::{Path, PathBuf};
 
 /// Registers the AppImage when the app runs from one. Failure only costs the menu entry, so it is

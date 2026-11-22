@@ -4523,7 +4523,6 @@ dependencies = [
 name = "ovrley_app"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "chrono",
  "chrono-tz",
  "icu",
@@ -4626,7 +4625,6 @@ dependencies = [
 name = "ovrley_services"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
  "cargo-packager-updater",
  "chrono",
  "dirs 6.0.0",

@@ -1,11 +1,13 @@
-//! Strict `.oly` project archive boundary.
+//! `.oly` project archives: a ZIP of `project.json`, an optional thumbnail and the embedded raster
+//! images.
 //!
-//! The project envelope is validated here before the app sees it.
-//! Widget config normalization belongs to the app's project-load seam, while
-//! archive and platform-path details do not leak into application state.
+//! A read migrates any supported version to the current [`ProjectDocument`] and validates it
+//! strictly, so the app only ever sees a valid current project; a write validates the same way and
+//! replaces the file atomically. The widget config inside is normalized by the template ingress
+//! when the project is applied, and archive details and source paths stay here.
 
-use crate::raster_resources::RasterResources;
-use crate::video_thumbnail::{generate_thumbnail, MAX_THUMBNAIL_SIZE};
+use crate::rasters::RasterResources;
+use crate::video::{thumbnail, MAX_THUMBNAIL_SIZE};
 use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
 use ovrley_core::activity::trim::ActivityTrim;
@@ -51,17 +53,21 @@ const MAX_PROJECT_JSON_SIZE: u64 = 4 * 1024 * 1024;
 const MAX_ARCHIVE_SIZE: u64 = 40 * 1024 * 1024;
 
 /// The `projects` folder in the user data root, created when absent.
-pub fn default_project_directory(user_data_root: &Path) -> Result<String, String> {
+///
+/// # Errors
+///
+/// When the folder cannot be created.
+pub fn default_project_directory(user_data_root: &Path) -> Result<PathBuf, String> {
     let directory = user_data_root.join("projects");
     fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
-    Ok(path_string(directory))
+    Ok(directory)
 }
 
 /// A project of a folder: its name (the file stem), its path, and its archived thumbnail (PNG).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProjectFileSummary {
     pub name: String,
-    pub path: String,
+    pub path: PathBuf,
     pub thumbnail: Option<Vec<u8>>,
 }
 
@@ -77,14 +83,18 @@ fn read_thumbnail(path: &Path) -> Option<Vec<u8>> {
     Some(bytes)
 }
 
-pub fn list_project_files(directory: String) -> Result<Vec<ProjectFileSummary>, String> {
-    let directory = PathBuf::from(directory);
+/// The `.oly` projects in `directory`, by name.
+///
+/// # Errors
+///
+/// When `directory` is relative or cannot be read, or a project's file name is not UTF-8.
+pub fn list_project_files(directory: &Path) -> Result<Vec<ProjectFileSummary>, String> {
     if !directory.is_absolute() {
         return Err("Project directory must be an absolute path".into());
     }
 
     let mut projects = Vec::new();
-    for entry in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+    for entry in fs::read_dir(directory).map_err(|error| error.to_string())? {
         let entry = entry.map_err(|error| error.to_string())?;
         let path = entry.path();
         let is_project = entry
@@ -106,7 +116,7 @@ pub fn list_project_files(directory: String) -> Result<Vec<ProjectFileSummary>, 
         projects.push(ProjectFileSummary {
             name: name.to_string(),
             thumbnail: read_thumbnail(&path),
-            path: path_string(path),
+            path,
         });
     }
 
@@ -217,7 +227,7 @@ struct GlobalDefaults {
     font_size: f64,
     opacity: f64,
     scale: f64,
-    #[allow(dead_code)]
+    #[expect(dead_code, reason = "only its presence and type are checked")]
     fixed_width_digits: bool,
 }
 
@@ -256,7 +266,8 @@ pub struct ProjectSource {
 }
 
 /// One imported video: its identity, where its file is, the user's edits, and the video as last
-/// loaded. In the file the edits sit beside the identity, flat.
+/// loaded. In the file the edits sit beside the identity, flat; serde cannot flatten under
+/// `deny_unknown_fields`, so [`ProjectVideoFields`] spells the file's shape out.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProjectVideo {
     pub id: String,
@@ -379,7 +390,8 @@ where
 
 /// The render settings and the batch output folder. `outputMode: combined` renders the whole
 /// program to one file; `separate` renders every project video to its own file in
-/// `batchOutputFolder`.
+/// `batchOutputFolder`. The file keeps the settings flat beside the folder, with the rate control
+/// as `qualityType` and `qualityValue`: [`ProjectRenderFields`] is that shape.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProjectRender {
     pub settings: RenderSettings,
@@ -509,38 +521,24 @@ pub struct ProjectTimeline {
 }
 
 /// The project's source files, resolved to absolute paths.
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolvedSources {
-    pub activity_path: Option<String>,
-    /// Absolute paths in `sources.videos` order.
-    pub video_paths: Vec<String>,
+    pub activity_path: Option<PathBuf>,
+    /// In `sources.videos` order.
+    pub video_paths: Vec<PathBuf>,
 }
 
-/// A read project, typed: the validated document, its resolved sources, each populated raster's
-/// load result, and the video folder of a version 3 to 5 batch project.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReadProjectResult {
+/// An opened project: the validated document, its resolved sources, each populated raster's image,
+/// and the video folder of a version 3 to 5 batch project.
+#[derive(Debug)]
+pub struct OpenedProject {
     pub project: ProjectDocument,
     pub resolved_sources: ResolvedSources,
-    pub raster_load_results: HashMap<String, RasterLoadResult>,
+    /// Each populated raster widget's embedded image, registered under its resource id, or why it
+    /// failed to load.
+    pub rasters: HashMap<String, Result<String, RasterError>>,
     /// Video folder of a version 3 to 5 batch project; the editor tells the user it is no longer imported.
     pub legacy_batch_video_folder: Option<String>,
-}
-
-/// A populated raster widget's embedded image: registered as a resource, or why it failed.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(tag = "status", rename_all = "lowercase")]
-pub enum RasterLoadResult {
-    Ready {
-        #[serde(rename = "resourceId")]
-        resource_id: String,
-    },
-    Error {
-        #[serde(rename = "errorCode")]
-        error_code: RasterError,
-    },
 }
 
 struct ValidatedProject {
@@ -574,40 +572,31 @@ struct RasterAsset {
     image: Arc<SelectedRaster>,
 }
 
-#[derive(Debug)]
-enum ProjectFileError {
+/// Why a project could not be read or written.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectError {
+    /// The archive or its project is malformed, or the file could not be read or written.
     Invalid(String),
+    /// The archive, read or about to be written, exceeds 40 MiB.
     ArchiveSize,
+    /// A populated raster widget has no image to embed.
     RasterUnavailable(String),
 }
 
-impl std::fmt::Display for ProjectFileError {
+impl std::fmt::Display for ProjectError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Invalid(message) | Self::RasterUnavailable(message) => {
-                formatter.write_str(message)
-            }
-            Self::ArchiveSize => {
-                formatter.write_str("Project archive exceeds the 40 MiB size limit")
-            }
+            Self::Invalid(message) | Self::RasterUnavailable(message) => formatter.write_str(message),
+            Self::ArchiveSize => formatter.write_str("Project archive exceeds the 40 MiB size limit"),
         }
     }
 }
 
-impl From<String> for ProjectFileError {
+impl std::error::Error for ProjectError {}
+
+impl From<String> for ProjectError {
     fn from(message: String) -> Self {
         Self::Invalid(message)
-    }
-}
-
-impl ProjectFileError {
-    fn command_error(self, default_code: &str) -> String {
-        let code = match &self {
-            Self::ArchiveSize => "archive_size",
-            Self::RasterUnavailable(_) => "raster_unavailable",
-            Self::Invalid(_) => default_code,
-        };
-        format!("[project_error:{code}] {self}")
     }
 }
 
@@ -659,8 +648,8 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         validate_folder(folder)?;
     }
     let render = &project.render.settings;
+    render.validate()?;
     for (label, value) in [
-        ("render.fps", render.fps),
         ("timeline.playheadSecond", project.timeline.playhead_second),
         ("timeline.viewStart", project.timeline.view_start),
         ("timeline.viewEnd", project.timeline.view_end),
@@ -668,12 +657,6 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         if !value.is_finite() {
             return Err(format!("{label} must be finite"));
         }
-    }
-    if render.fps <= 0.0 || render.widget_update_rate == 0 {
-        return Err("Render fps and widgetUpdateRate must be positive".into());
-    }
-    if render.codec.trim().is_empty() {
-        return Err("render.codec must not be empty".into());
     }
     if matches!(render.export_mode, ExportMode::Composite)
         && matches!(render.output_mode, OutputMode::Combined)
@@ -843,12 +826,6 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
             return Err(format!("editor.globalDefaults.{label} must not be empty"));
         }
     }
-
-    editor
-        .config
-        .get("scene")
-        .and_then(Value::as_object)
-        .ok_or_else(|| "editor.config.scene must be an object".to_string())?;
     Ok(())
 }
 
@@ -960,9 +937,10 @@ fn insert_lap_selection(value: &mut Value) -> Result<(), String> {
 /// saved offset that owns the manual sync landmarks, with no cuts,
 /// transitions following the defaults, and the hard transition defaults. Its
 /// metadata is unknown until the file is probed.
+///
 /// A project without a video that rendered a video folder keeps rendering
 /// separate files to the same output folder; the folder itself is handed to the
-/// frontend to import. Older versions saved the render dialog's target tab, so a
+/// editor to import. Older versions saved the render dialog's target tab, so a
 /// batch target next to the project's own video is a leftover: that project
 /// renders its video as before.
 fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, String> {
@@ -1136,20 +1114,22 @@ fn parse_project(input: &str) -> Result<ValidatedProject, String> {
     })
 }
 
+/// The absolute path of a validated locator.
 fn resolve_locator(project_path: &Path, locator: &PathLocator) -> Result<PathBuf, String> {
-    validate_locator(locator)?;
-    let path = match locator {
+    Ok(match locator {
         PathLocator::Absolute(value) => PathBuf::from(value),
-        PathLocator::ProjectRelative(value) => project_path
-            .parent()
-            .ok_or_else(|| "Project path has no parent directory".to_string())?
-            .join(value),
-    };
-    Ok(path)
+        PathLocator::ProjectRelative(value) => {
+            project_path.parent().ok_or("Project path has no parent directory")?.join(value)
+        }
+    })
 }
 
-/// `createPathLocator`: a source inside the project's folder is stored relative to it, with `/`
-/// separators; any other source is absolute. On Windows paths the comparison ignores case.
+/// The locator a source is stored under: relative to the project's folder, with `/` separators,
+/// when it is inside it; absolute otherwise. On Windows paths the comparison ignores case.
+///
+/// # Errors
+///
+/// When either path is empty.
 pub fn create_path_locator(source_path: &str, project_path: &str) -> Result<PathLocator, String> {
     if source_path.is_empty() || project_path.is_empty() {
         return Err("Source and project paths are required".into());
@@ -1180,10 +1160,6 @@ pub fn create_path_locator(source_path: &str, project_path: &str) -> Result<Path
     Ok(PathLocator::Absolute(source_path.to_string()))
 }
 
-fn path_string(path: PathBuf) -> String {
-    path.to_string_lossy().into_owned()
-}
-
 fn resolved_sources(
     project_path: &Path,
     project: &ProjectDocument,
@@ -1192,13 +1168,13 @@ fn resolved_sources(
         .sources
         .activity
         .as_ref()
-        .map(|source| resolve_locator(project_path, &source.path).map(path_string))
+        .map(|source| resolve_locator(project_path, &source.path))
         .transpose()?;
     let video_paths = project
         .sources
         .videos
         .iter()
-        .map(|video| resolve_locator(project_path, &video.path).map(path_string))
+        .map(|video| resolve_locator(project_path, &video.path))
         .collect::<Result<_, _>>()?;
     Ok(ResolvedSources {
         activity_path,
@@ -1211,7 +1187,7 @@ struct ArchiveEntries {
     rasters: HashMap<String, usize>,
 }
 
-fn inspect_archive(archive: &mut ZipArchive<File>) -> Result<ArchiveEntries, ProjectFileError> {
+fn inspect_archive(archive: &mut ZipArchive<File>) -> Result<ArchiveEntries, ProjectError> {
     let mut project = None;
     let mut names = HashSet::new();
     let mut rasters = HashMap::new();
@@ -1233,7 +1209,7 @@ fn inspect_archive(archive: &mut ZipArchive<File>) -> Result<ArchiveEntries, Pro
         }
         total_uncompressed = total_uncompressed.saturating_add(entry.size());
         if total_uncompressed > MAX_ARCHIVE_SIZE {
-            return Err(ProjectFileError::ArchiveSize);
+            return Err(ProjectError::ArchiveSize);
         }
         match name {
             PROJECT_JSON_ENTRY => {
@@ -1266,10 +1242,10 @@ fn inspect_archive(archive: &mut ZipArchive<File>) -> Result<ArchiveEntries, Pro
     Ok(ArchiveEntries { project, rasters })
 }
 
-fn read_archive(path: &Path) -> Result<LoadedArchive, ProjectFileError> {
+fn read_archive(path: &Path) -> Result<LoadedArchive, ProjectError> {
     let file = File::open(path).map_err(|error| error.to_string())?;
     if file.metadata().map_err(|error| error.to_string())?.len() > MAX_ARCHIVE_SIZE {
-        return Err(ProjectFileError::ArchiveSize);
+        return Err(ProjectError::ArchiveSize);
     }
     let mut archive =
         ZipArchive::new(file).map_err(|error| format!("Invalid project archive: {error}"))?;
@@ -1353,36 +1329,26 @@ fn load_raster_asset(
     })
 }
 
-/// Reads, migrates and validates a `.oly` archive, registering its embedded rasters.
-pub fn read_project(resources: &RasterResources, path: &str) -> Result<ReadProjectResult, String> {
-    read_project_sync(resources, path).map_err(|error| error.command_error("invalid_archive"))
-}
-
-fn read_project_sync(
-    resources: &RasterResources,
-    path: &str,
-) -> Result<ReadProjectResult, ProjectFileError> {
-    let project_path = PathBuf::from(path);
+/// Reads, migrates and validates the `.oly` archive at `path`, registering its embedded rasters.
+///
+/// # Errors
+///
+/// When the archive is too large, malformed, or holds a project that doesn't validate.
+pub fn read_project(resources: &RasterResources, path: &Path) -> Result<OpenedProject, ProjectError> {
     let LoadedArchive {
         project,
         rasters,
         legacy_batch_video_folder,
-    } = read_archive(&project_path)?;
-    let resolved_sources = resolved_sources(&project_path, &project)?;
-    let mut raster_load_results = HashMap::with_capacity(rasters.len());
-    for (id, image) in rasters {
-        let result = match image {
-            Ok(image) => RasterLoadResult::Ready {
-                resource_id: resources.insert(image),
-            },
-            Err(error_code) => RasterLoadResult::Error { error_code },
-        };
-        raster_load_results.insert(id, result);
-    }
-    Ok(ReadProjectResult {
+    } = read_archive(path)?;
+    let resolved_sources = resolved_sources(path, &project)?;
+    let rasters = rasters
+        .into_iter()
+        .map(|(id, image)| (id, image.map(|image| resources.insert(image))))
+        .collect();
+    Ok(OpenedProject {
         project,
         resolved_sources,
-        raster_load_results,
+        rasters,
         legacy_batch_video_folder,
     })
 }
@@ -1392,7 +1358,7 @@ fn write_archive(
     project_json: &str,
     thumbnail: Option<&[u8]>,
     assets: &BTreeMap<String, RasterAsset>,
-) -> Result<(), ProjectFileError> {
+) -> Result<(), ProjectError> {
     let uncompressed_size = project_json.len() as u64
         + thumbnail.map_or(0, |bytes| bytes.len() as u64)
         + assets
@@ -1400,7 +1366,7 @@ fn write_archive(
             .map(|asset| asset.image.encoded_bytes().len() as u64)
             .sum::<u64>();
     if uncompressed_size > MAX_ARCHIVE_SIZE {
-        return Err(ProjectFileError::ArchiveSize);
+        return Err(ProjectError::ArchiveSize);
     }
     let file = File::create(path).map_err(|error| error.to_string())?;
     let mut writer = ZipWriter::new(file);
@@ -1414,7 +1380,7 @@ fn write_archive(
     let file = writer.finish().map_err(|error| error.to_string())?;
     file.sync_all().map_err(|error| error.to_string())?;
     if file.metadata().map_err(|error| error.to_string())?.len() > MAX_ARCHIVE_SIZE {
-        return Err(ProjectFileError::ArchiveSize);
+        return Err(ProjectError::ArchiveSize);
     }
     Ok(())
 }
@@ -1423,7 +1389,7 @@ fn write_archive_entry(
     writer: &mut ZipWriter<File>,
     name: &str,
     contents: &[u8],
-) -> Result<(), ProjectFileError> {
+) -> Result<(), ProjectError> {
     writer
         .start_file(
             name,
@@ -1512,12 +1478,12 @@ impl Drop for PendingArchive {
 
 /// The save operation owns the reachable images and their archive names.
 /// Both the persisted mapping and ZIP entries consume these same names.
-fn prepare_raster_assets(
+fn prepare_raster_assets<S: std::hash::BuildHasher>(
     populated: &HashSet<String>,
-    images: HashMap<String, Arc<SelectedRaster>>,
-) -> Result<BTreeMap<String, RasterAsset>, ProjectFileError> {
+    images: HashMap<String, Arc<SelectedRaster>, S>,
+) -> Result<BTreeMap<String, RasterAsset>, ProjectError> {
     if populated.len() != images.len() || images.keys().any(|id| !populated.contains(id)) {
-        return Err(ProjectFileError::RasterUnavailable(
+        return Err(ProjectError::RasterUnavailable(
             "Every populated raster requires its owned image resource before saving".into(),
         ));
     }
@@ -1566,20 +1532,21 @@ fn backup_legacy_project(target: &Path) -> Result<Option<PathBuf>, String> {
     Ok(Some(backup))
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WriteProjectResult {
-    pub path: String,
-    /// Set when this save replaced an older-format project and kept its backup.
-    pub backup_path: Option<String>,
-}
-
-fn write_project_sync(
-    path: &str,
+/// Validates `document` and writes it to `path` as a `.oly` archive atomically, with the populated
+/// rasters' `images` and, when `ffmpeg` is available, a thumbnail of the first video that gives a
+/// frame. Blocking. A replaced older-format project is kept as a backup first, whose path this
+/// returns.
+///
+/// # Errors
+///
+/// When the document doesn't validate, a populated raster has no image, the archive would exceed
+/// its size limit, or the file cannot be written.
+pub fn write_project<S: std::hash::BuildHasher>(
+    path: &Path,
     document: ProjectDocument,
     ffmpeg: Option<&Path>,
-    images: HashMap<String, Arc<SelectedRaster>>,
-) -> Result<WriteProjectResult, ProjectFileError> {
+    images: HashMap<String, Arc<SelectedRaster>, S>,
+) -> Result<Option<PathBuf>, ProjectError> {
     let (mut project, populated_rasters) = validate_document(document)?;
     let assets = prepare_raster_assets(&populated_rasters, images)?;
     project.raster_assets = assets
@@ -1593,8 +1560,7 @@ fn write_project_sync(
             .to_string()
             .into());
     }
-    let target = PathBuf::from(path);
-    let parent = target
+    let parent = path
         .parent()
         .ok_or_else(|| "Project target has no parent directory".to_string())?;
     fs::create_dir_all(parent).map_err(|error| error.to_string())?;
@@ -1608,8 +1574,8 @@ fn write_project_sync(
     });
     let thumbnail = ffmpeg.and_then(|ffmpeg| {
         videos.into_iter().find_map(|video| {
-            let video_path = resolve_locator(&target, &video.path).ok()?;
-            generate_thumbnail(ffmpeg, &video_path)
+            let video_path = resolve_locator(path, &video.path).ok()?;
+            thumbnail(ffmpeg, &video_path)
         })
     });
     let temporary = PendingArchive::new(parent);
@@ -1619,24 +1585,9 @@ fn write_project_sync(
         thumbnail.as_deref(),
         &assets,
     )?;
-    let backup = backup_legacy_project(&target)?;
-    temporary.commit(&target)?;
-    Ok(WriteProjectResult {
-        path: path.to_string(),
-        backup_path: backup.map(path_string),
-    })
-}
-
-/// Validates `document` and writes it as a `.oly` archive atomically, with the populated rasters'
-/// `images` and, when `ffmpeg` is available, a thumbnail of the first video that gives a frame.
-/// Blocking. A replaced older-format project is kept as a backup first.
-pub fn write_project(
-    path: &str,
-    document: ProjectDocument,
-    ffmpeg: Option<&Path>,
-    images: HashMap<String, Arc<SelectedRaster>>,
-) -> Result<WriteProjectResult, String> {
-    write_project_sync(path, document, ffmpeg, images).map_err(|error| error.command_error("save_failed"))
+    let backup = backup_legacy_project(path)?;
+    temporary.commit(path)?;
+    Ok(backup)
 }
 
 #[cfg(test)]
@@ -1644,25 +1595,22 @@ mod tests {
     use super::*;
     use ovrley_core::media::video_edits::FIRST_SEGMENT_KEY;
 
-    fn read_project_file_sync(
-        resources: &RasterResources,
-        path: String,
-    ) -> Result<ReadProjectResult, ProjectFileError> {
-        read_project_sync(resources, &path)
-    }
+    use crate::rasters::TEST_BMP;
+    use ovrley_core::raster::RasterResourceResolver;
 
-    /// The JSON entry, keeping the coded error.
-    fn write_project_file_sync(
-        path: String,
-        project_json: String,
+    /// Saves a project JSON of any version, as the editor would after opening it.
+    fn write_json(
+        path: &Path,
+        project_json: &str,
         ffmpeg: Option<&Path>,
         images: HashMap<String, Arc<SelectedRaster>>,
-    ) -> Result<WriteProjectResult, ProjectFileError> {
-        let document = migrate_project_json(&project_json)?.document;
-        write_project_sync(&path, document, ffmpeg, images)
+    ) -> Result<Option<PathBuf>, ProjectError> {
+        write_project(path, migrate_project_json(project_json)?.document, ffmpeg, images)
     }
-    use base64::{engine::general_purpose::STANDARD as BASE64_STANDARD, Engine as _};
-    use ovrley_core::raster::RasterResourceResolver;
+
+    fn path_string(path: impl AsRef<Path>) -> String {
+        path.as_ref().to_string_lossy().into_owned()
+    }
 
     fn valid_project_json() -> String {
         let config = include_str!("../../../templates/acid-titanium.json");
@@ -1796,7 +1744,7 @@ mod tests {
                         Value::from("Inter ExtraBold.ttf");
                     write_archive(&path, &project.to_string(), None, &BTreeMap::new()).unwrap();
                     let original = fs::read(&path).unwrap();
-                    let loaded = read_project_file_sync(&resources, path_string(path.clone()))
+                    let loaded = read_project(&resources, &path)
                         .unwrap()
                         .project;
                     assert_eq!(loaded.version, PROJECT_VERSION);
@@ -1816,14 +1764,12 @@ mod tests {
                     assert_eq!(loaded.editor.global_defaults["font_text"], "Inter.ttf");
                     assert_eq!(fs::read(&path).unwrap(), original);
                     let saved = serde_json::to_string(&loaded).unwrap();
-                    write_project_file_sync(
-                        path_string(path.clone()),
-                        saved.clone(),
+                    write_json(&path, &saved,
                         None,
                         HashMap::new(),
                     )
                     .unwrap();
-                    let reloaded = read_project_file_sync(&resources, path_string(path.clone()))
+                    let reloaded = read_project(&resources, &path)
                         .unwrap()
                         .project;
                     assert_eq!(serde_json::to_string(&reloaded).unwrap(), saved);
@@ -1879,13 +1825,9 @@ mod tests {
         }
     }
 
+    /// A 1×1 BMP of one BGR `pixel`.
     fn bmp(pixel: [u8; 3]) -> Vec<u8> {
-        // A 1x1, 24-bit BMP with a padded BGR pixel at byte 54.
-        let mut bytes = BASE64_STANDARD
-            .decode(
-                "Qk06AAAAAAAAADYAAAAoAAAAAQAAAAEAAAABABgAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAD/AA==",
-            )
-            .unwrap();
+        let mut bytes = TEST_BMP.to_vec();
         bytes[54..57].copy_from_slice(&pixel);
         bytes
     }
@@ -1899,7 +1841,7 @@ mod tests {
     fn raster(id: &str, path: &Path) -> Value {
         serde_json::json!({
             "id": id, "x": 0, "y": 0, "width": 1, "height": 1,
-            "rotation": 0, "opacity": 1, "path": path_string(path.to_path_buf())
+            "rotation": 0, "opacity": 1, "path": path_string(path)
         })
     }
 
@@ -2014,36 +1956,33 @@ mod tests {
         let original = bmp([0, 0, 255]);
         fs::write(&source, &original).unwrap();
         let first = Arc::new(ovrley_core::raster::load_selected_raster(&source).unwrap());
-        let expected_preview = BASE64_STANDARD.encode(first.preview_png());
+        let expected_preview = first.preview_png().to_vec();
         let images = HashMap::from([("one".into(), Arc::clone(&first)), ("two".into(), first)]);
         let project_json = raster_project(serde_json::json!([
             raster("one", &source),
             raster("two", &source)
         ]));
-        write_project_file_sync(path_string(path.clone()), project_json, None, images).unwrap();
+        write_json(&path, &project_json, None, images).unwrap();
         fs::remove_file(&source).unwrap();
 
         let resources = RasterResources::default();
-        let loaded = read_project_file_sync(&resources, path_string(path.clone())).unwrap();
+        let loaded = read_project(&resources, &path).unwrap();
         for id in ["one", "two"] {
-            let RasterLoadResult::Ready { resource_id } = &loaded.raster_load_results[id] else {
+            let Ok(resource_id) = &loaded.rasters[id] else {
                 panic!("expected ready image for {id}");
             };
             assert_eq!(
                 resources.resolve(resource_id).unwrap().encoded_bytes(),
                 original
             );
-            assert_eq!(
-                BASE64_STANDARD.encode(resources.resolve(resource_id).unwrap().preview_png()),
-                expected_preview
-            );
+            assert_eq!(resources.resolve(resource_id).unwrap().preview_png(), expected_preview);
         }
 
         let replacement_bytes = bmp([0, 255, 0]);
         let replacement = Arc::new(load_embedded_raster("bmp", replacement_bytes.clone()).unwrap());
         let images = HashMap::from([("one".into(), replacement)]);
         let project_json = raster_project(serde_json::json!([raster("one", &source)]));
-        write_project_file_sync(path_string(path.clone()), project_json, None, images).unwrap();
+        write_json(&path, &project_json, None, images).unwrap();
         let LoadedArchive {
             project,
             rasters: images,
@@ -2059,13 +1998,8 @@ mod tests {
         drop(archive);
         let project_json = serde_json::to_string(&project).unwrap();
         write_archive(&path, &project_json, None, &BTreeMap::new()).unwrap();
-        let loaded = read_project_file_sync(&resources, path_string(path)).unwrap();
-        assert!(matches!(
-            loaded.raster_load_results["one"],
-            RasterLoadResult::Error {
-                error_code: RasterError::MissingAsset
-            }
-        ));
+        let loaded = read_project(&resources, &path).unwrap();
+        assert_eq!(loaded.rasters["one"], Err(RasterError::MissingAsset));
         fs::remove_dir_all(directory).unwrap();
     }
 
@@ -2093,15 +2027,13 @@ mod tests {
             project["render"]["codec"] = Value::from("libx265");
             project["render"]["qualityType"] = serde_json::to_value(quality_type).unwrap();
             project["render"]["qualityValue"] = Value::from(quality_value);
-            write_project_file_sync(
-                path_string(path.clone()),
-                project.to_string(),
+            write_json(&path, &project.to_string(),
                 None,
                 HashMap::from([("image".into(), Arc::clone(&image))]),
             )
             .unwrap();
 
-            let loaded = read_project_file_sync(&resources, path_string(path.clone())).unwrap();
+            let loaded = read_project(&resources, &path).unwrap();
             assert_eq!(loaded.project.version, PROJECT_VERSION);
             assert_eq!(
                 loaded.project.render.settings.quality,
@@ -2112,8 +2044,7 @@ mod tests {
                 project["editor"]["config"]["rasters"]
             );
             assert_eq!(loaded.project.raster_assets["image"], "rasters/image.bmp");
-            let RasterLoadResult::Ready { resource_id } = &loaded.raster_load_results["image"]
-            else {
+            let Ok(resource_id) = &loaded.rasters["image"] else {
                 panic!("expected embedded raster to load without its original source");
             };
             assert_eq!(
@@ -2154,9 +2085,9 @@ mod tests {
             images.insert(id, Arc::clone(&image));
         }
         let project_json = raster_project(Value::Array(rasters));
-        let error = write_project_file_sync(path_string(path.clone()), project_json, None, images)
+        let error = write_json(&path, &project_json, None, images)
             .unwrap_err();
-        assert!(matches!(error, ProjectFileError::ArchiveSize));
+        assert!(matches!(error, ProjectError::ArchiveSize));
         assert_eq!(fs::read(&path).unwrap(), previous);
         fs::remove_dir_all(directory).unwrap();
     }
@@ -2173,15 +2104,13 @@ mod tests {
         project["render"]["codec"] = Value::from("libx264");
         project["render"]["batchOutputFolder"] =
             Value::from(path_string(directory.join("renders")));
-        write_project_file_sync(
-            path_string(path.clone()),
-            project.to_string(),
+        write_json(&path, &project.to_string(),
             None,
             HashMap::new(),
         )
         .unwrap();
         let result =
-            read_project_file_sync(&RasterResources::default(), path_string(path)).unwrap();
+            read_project(&RasterResources::default(), &path).unwrap();
         assert_eq!(result.project.version, PROJECT_VERSION);
         assert!(matches!(
             result.project.render.settings.output_mode,
@@ -2194,7 +2123,7 @@ mod tests {
         );
         assert_eq!(
             result.resolved_sources.activity_path,
-            Some(path_string(directory.join("media/session.fit")))
+            Some(directory.join("media/session.fit"))
         );
         fs::remove_dir_all(directory).unwrap();
     }
@@ -2272,7 +2201,7 @@ mod tests {
         )
         .unwrap();
 
-        let projects = list_project_files(path_string(directory.clone())).unwrap();
+        let projects = list_project_files(&directory).unwrap();
 
         assert_eq!(projects.len(), 1);
         assert_eq!(
@@ -2292,16 +2221,14 @@ mod tests {
         project["sources"]["videos"] = serde_json::json!([video("clip", "missing.mp4", 0.0)]);
         let missing_ffmpeg = directory.join("missing-ffmpeg-binary");
 
-        write_project_file_sync(
-            path_string(path.clone()),
-            project.to_string(),
+        write_json(&path, &project.to_string(),
             Some(&missing_ffmpeg),
             HashMap::new(),
         )
         .unwrap();
 
         assert!(
-            read_project_file_sync(&RasterResources::default(), path_string(path.clone())).is_ok()
+            read_project(&RasterResources::default(), &path).is_ok()
         );
         assert!(read_thumbnail(&path).is_none());
         fs::remove_dir_all(directory).unwrap();
@@ -2445,7 +2372,7 @@ mod tests {
     }
 
     #[test]
-    fn single_video_batch_folder_projects_hand_their_video_folder_to_the_frontend() {
+    fn single_video_batch_folder_projects_hand_their_video_folder_to_the_editor() {
         let videos = path_string(std::env::temp_dir().join("ovrley-batch-videos"));
         let renders = path_string(std::env::temp_dir().join("ovrley-batch-renders"));
         let mut project: Value = serde_json::from_str(&valid_v5_project_json()).unwrap();
@@ -2530,31 +2457,29 @@ mod tests {
             write_archive(&path, &legacy_json, None, &BTreeMap::new()).unwrap();
             let previous = fs::read(&path).unwrap();
             let loaded =
-                read_project_file_sync(&RasterResources::default(), path_string(path.clone()))
+                read_project(&RasterResources::default(), &path)
                     .unwrap();
             assert_eq!(loaded.project.version, PROJECT_VERSION);
-            assert!(loaded.raster_load_results.is_empty());
+            assert!(loaded.rasters.is_empty());
             assert_eq!(fs::read(&path).unwrap(), previous);
 
             let saved = serde_json::to_string(&loaded.project).unwrap();
-            let result = write_project_file_sync(
-                path_string(path.clone()),
-                saved.clone(),
+            let result = write_json(&path, &saved,
                 None,
                 HashMap::new(),
             )
             .unwrap();
             let backup = directory.join(format!("Legacy.oly.v{legacy_version}.bak"));
-            assert_eq!(result.backup_path, Some(path_string(backup.clone())));
+            assert_eq!(result, Some(backup.clone()));
             assert_eq!(fs::read(&backup).unwrap(), previous);
-            assert!(list_project_files(path_string(directory.clone()))
+            assert!(list_project_files(&directory)
                 .unwrap()
                 .iter()
                 .all(|project| project.name == "Legacy"));
             let resaved =
-                write_project_file_sync(path_string(path.clone()), saved, None, HashMap::new())
+                write_json(&path, &saved, None, HashMap::new())
                     .unwrap();
-            assert_eq!(resaved.backup_path, None);
+            assert_eq!(resaved, None);
             assert_eq!(fs::read(&backup).unwrap(), previous);
 
             let mut archive = ZipArchive::new(File::open(&path).unwrap()).unwrap();
@@ -2678,7 +2603,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_widget_config_reaches_frontend_normalization() {
+    fn legacy_widget_config_reaches_the_template_ingress() {
         let mut project: Value = serde_json::from_str(&valid_project_json()).unwrap();
         project["editor"]["config"]["values"][0]
             .as_object_mut()

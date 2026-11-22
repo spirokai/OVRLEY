@@ -65,7 +65,7 @@ OVRLEY is a native Rust application. Its crates are in `crates/`:
 | ------------------ | --------------------------------------------------------------------------------------- |
 | `ovrley_ui`        | The window: the Slint interface, the glue to the app's logic, and the `ovrley` binary   |
 | `ovrley_app`       | The app's state, actions and logic, without any UI                                      |
-| `ovrley_services`  | Desktop services: projects, files, map tiles and styles, paths, the updater             |
+| `ovrley_services`  | Desktop services: projects, rasters, map tiles and styles, video frames, the updater   |
 | `ovrley_mcp`       | The MCP server for AI agents                                                            |
 | `ovrley_playback`  | Video playback with MDK, into the window's GPU textures                                 |
 | `ovrley_core`      | Activity parsing, validation, the export renderer and FFmpeg encoding                   |

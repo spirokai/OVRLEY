@@ -1,13 +1,11 @@
-//! The app's updater, on cargo-packager-updater.
-//!
-//! Owns: the release channel's endpoint and public key, the check, the verified download, the
-//!       installation and the relaunch into the installed version.
-//! Does not own: when to check and what the user sees (`ovrley_app::features::app_update`).
+//! The app's updater, on cargo-packager-updater: the release channel's endpoint and public key, the
+//! check, the verified download, the installation and the relaunch into the installed version.
+//! When to check and what the user sees are the app's.
 
 use cargo_packager_updater::{Config, Update, WindowsConfig, WindowsUpdateInstallMode};
 use std::cell::Cell;
 
-/// The manifest of the latest release, which the Tauri releases read too.
+/// The manifest of the latest release, which every installed release reads.
 const ENDPOINT: &str = "https://github.com/spirokai/OVRLEY/releases/latest/download/latest.json";
 
 /// The minisign public key of every OVRLEY release.
@@ -26,6 +24,10 @@ pub struct DownloadProgress {
 pub struct ReleaseUpdate(Update);
 
 /// The release newer than `current_version`, if there is one. Blocking.
+///
+/// # Errors
+///
+/// When `current_version` is not a version, or the manifest cannot be fetched or verified.
 pub fn check(current_version: &str) -> Result<Option<ReleaseUpdate>, String> {
     let current_version = current_version
         .parse()
@@ -35,7 +37,7 @@ pub fn check(current_version: &str) -> Result<Option<ReleaseUpdate>, String> {
         pubkey: PUBLIC_KEY.into(),
         windows: Some(WindowsConfig {
             install_mode: Some(WindowsUpdateInstallMode::Passive),
-            // As Tauri's updater passes it: the installer then leaves the desktop shortcut as it is.
+            // The installer then leaves the desktop shortcut as it is.
             installer_args: Some(vec!["/UPDATE".into()]),
         }),
         ..Config::default()
@@ -46,11 +48,16 @@ pub fn check(current_version: &str) -> Result<Option<ReleaseUpdate>, String> {
 }
 
 impl ReleaseUpdate {
+    #[must_use]
     pub fn version(&self) -> &str {
         &self.0.version
     }
 
     /// Downloads the package and verifies its signature and signed version. Blocking.
+    ///
+    /// # Errors
+    ///
+    /// When the download fails or the package's signature does not verify.
     pub fn download(&self, on_progress: &dyn Fn(DownloadProgress)) -> Result<Vec<u8>, String> {
         let downloaded = Cell::new(0);
         self.0
@@ -66,6 +73,10 @@ impl ReleaseUpdate {
 
     /// Installs a downloaded package. Blocking. On Windows it starts the installer, which starts
     /// the app afterwards, and ends this process without running drops.
+    ///
+    /// # Errors
+    ///
+    /// When the package cannot be installed.
     pub fn install(&self, package: Vec<u8>) -> Result<(), String> {
         // The crate panics when it cannot start the Windows installer.
         std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.0.install(package)))
@@ -74,8 +85,11 @@ impl ReleaseUpdate {
     }
 }
 
-/// Starts the installed version with this process's arguments, as Tauri's restart does. The caller
-/// exits right afterwards.
+/// Starts the installed version with this process's arguments. The caller exits right afterwards.
+///
+/// # Errors
+///
+/// When the installed version cannot be started.
 pub fn relaunch() -> Result<(), String> {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
     // An AppImage starts from its own file. The running binary lies in the old file's mount.
@@ -136,7 +150,7 @@ mod tests {
         }
         std::fs::write(staging.join("notes.txt"), "notes").unwrap();
         let written = std::process::Command::new("node")
-            .arg(crate::runtime_paths::source_repo_root().join("scripts/release/create-latest-json.mjs"))
+            .arg(crate::runtime::source_repo_root().join("scripts/release/create-latest-json.mjs"))
             .args(["--owner", "spirokai", "--repo", "OVRLEY", "--tag", "9.8.7", "--version", "9.8.7"])
             .args(["--notes-file", "notes.txt", "--staging-dir", "artifacts", "--output", "latest.json"])
             .current_dir(&staging)
@@ -150,7 +164,7 @@ mod tests {
         for (target, format, file) in [
             ("windows-x86_64", "nsis", "OVRLEY-win-9.8.7.exe"),
             ("macos-aarch64", "app", "OVRLEY-macos-9.8.7.app.tar.gz"),
-            // The installed Tauri releases' key for the same file.
+            // The key older installed releases read for the same file.
             ("darwin-aarch64", "app", "OVRLEY-macos-9.8.7.app.tar.gz"),
             ("linux-x86_64", "appimage", "OVRLEY-linux-9.8.7.AppImage"),
         ] {
