@@ -142,3 +142,89 @@ required-features = ["dev-windows"]
 [[test]]
 name = "review_regressions"
 required-features = ["dev-windows"]
+
+# cargo-packager's configuration. Paths are relative to this crate. scripts/package.mjs adds what
+# differs per OS: the binary's name, the formats, the player's libraries and the install guide.
+[package.metadata.packager]
+productName = "OVRLEY"
+identifier = "com.ovrley.desktop"
+# The Tauri installs' publisher, under which a custom install folder is found again.
+publisher = "ovrley"
+authors = ["spirokai"]
+description = "Turn telemetry into customizable video overlays"
+icons = [
+  "../../assets/icons/32x32.png",
+  "../../assets/icons/64x64.png",
+  "../../assets/icons/128x128.png",
+  "../../assets/icons/128x128@2x.png",
+  "../../assets/icons/icon.icns",
+  "../../assets/icons/icon.ico",
+  "../../assets/icons/icon.png",
+]
+resources = [
+  { src = "../../fonts", target = "fonts" },
+  { src = "../../templates", target = "templates" },
+  { src = "../../assets/map-styles", target = "map-styles" },
+  { src = "../../vendor/ffmpeg", target = "vendor/ffmpeg" },
+  { src = "../../target/packaging/THIRD_PARTY_NOTICES.txt", target = "THIRD_PARTY_NOTICES.txt" },
+]
+
+[package.metadata.packager.nsis]
+installMode = "currentUser"
+# Two rules of Tauri's installer, for updating its installs: the Start menu shortcut lies directly
+# in Programs ("." is that folder), and an update (/UPDATE) leaves the desktop shortcut as it is.
+preinstallSection = '''
+!define /redef MUI_STARTMENUPAGE_Application_DEFAULTFOLDER "."
+Section PreInstall
+  StrCpy $R9 $AppStartMenuFolder 1
+  StrCmp $R9 ">" +2 0
+    StrCpy $AppStartMenuFolder "."
+  ClearErrors
+  ${GetOptions} $CMDLINE "/UPDATE" $R9
+  IfErrors +2 0
+    StrCpy $CMDLINE "$CMDLINE /NS"
+  ClearErrors
+SectionEnd
+'''
+
+[package.metadata.packager.macos]
+signingIdentity = "-"
+# The executable's, Skia's and MDK's minimum.
+minimumSystemVersion = "11.0"
+
+[package.metadata.packager.linux]
+# scripts/package.mjs installs an entry named after the window's app id, which Wayland matches.
+generateDesktopEntry = false
+
+[package.metadata.packager.deb]
+packageName = "ovrley"
+# What OVRLEY, Skia, MDK and MDK's FFmpeg link or must open at start. Codecs are bundled; drivers are
+# only recommended (release-linux.yml writes the Recommends, which cargo-packager cannot).
+depends = [
+  "libasound2 | libasound2t64",
+  "libc6",
+  "libdrm2",
+  "libegl1",
+  "libfontconfig1",
+  "libfreetype6",
+  "libfribidi0",
+  "libgbm1",
+  "libgcc-s1",
+  "libgl1",
+  "libharfbuzz0b",
+  "liblz4-1",
+  "liblzma5",
+  "libpulse0",
+  "libstdc++6",
+  "libvulkan1",
+  "libwayland-client0",
+  "libx11-6",
+  "libx11-xcb1",
+  "libxcb1",
+  "libxcursor1",
+  "libxi6",
+  "libxkbcommon0",
+  "libxkbcommon-x11-0",
+  "xdg-desktop-portal | zenity",
+  "zlib1g",
+]

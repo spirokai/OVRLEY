@@ -8,14 +8,10 @@ Install
 
 Dependencies
 ------------
-The Debian package declares these runtime dependencies; apt installs them automatically:
-- gstreamer1.0-libav
-- gstreamer1.0-plugins-bad
-- gstreamer1.0-plugins-good
-- libgtk-3-0
-- libwebkit2gtk-4.1-0
+apt installs what the package needs. On a normal desktop installation those system libraries are already present.
 
 The package also recommends GPU video drivers for hardware-accelerated export (VAAPI); apt installs them unless you pass --no-install-recommends:
+- libva-drm2, the VAAPI loader
 - intel-media-va-driver (or intel-media-va-driver-non-free) for Intel GPUs
 - mesa-va-drivers (or mesa-libgallium on newer releases) for AMD GPUs
 NVIDIA GPUs use the proprietary NVIDIA driver instead.
@@ -23,4 +19,4 @@ It also recommends mesa-vulkan-drivers, a software Vulkan driver that lets the m
 
 Notes
 -----
-The Debian package includes OVRLEY and self-contained FFmpeg and FFprobe command-line tools.
+The Debian package includes OVRLEY, the video player with its codecs, and self-contained FFmpeg and FFprobe command-line tools.

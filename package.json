@@ -6,6 +6,7 @@
   "scripts": {
     "preinstall": "node scripts/require-pnpm.mjs",
     "postinstall": "node scripts/install-ffmpeg.mjs && node scripts/install-mdk.mjs",
+    "build": "node scripts/package.mjs",
     "prepare:packaging": "node packaging/resources.mjs",
     "release": "semantic-release",
     "dev:native": "cargo run -p ovrley_ui --bin ovrley",

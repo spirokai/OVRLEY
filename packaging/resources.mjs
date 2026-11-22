@@ -1,15 +1,21 @@
-// Checks the resources every release bundles and generates the shipped THIRD_PARTY_NOTICES.txt: the
-// static notices at the repository root, then the vendored Skia notices and the bundled FFmpeg's version and
-// license, which depend on the build. Runs as `pnpm prepare:packaging`; the Flatpak passes an output path.
+// Checks the resources every release bundles and prepares the ones that are generated:
+// - THIRD_PARTY_NOTICES.txt: the static notices at the repository root, then the bundled FFmpeg's
+//   version and license, which depend on the build;
+// - player/: the MDK libraries the executable loads, from the SDK.
+// Runs as `pnpm prepare:packaging`; the Flatpak passes the notices' output path.
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { mkdir, stat, writeFile } from 'node:fs/promises'
-import { dirname, join, resolve } from 'node:path'
+import { cp, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 export const rootDir = resolve(import.meta.dirname, '..')
-/** Where the generated notices land; tauri.conf.json and the release workflows read it here. */
-export const noticePath = join(rootDir, 'target', 'packaging', 'THIRD_PARTY_NOTICES.txt')
+/** The staging folder of every package. */
+export const packagingDir = join(rootDir, 'target', 'packaging')
+/** Where the generated notices land; the packager's config and the release workflows read it here. */
+export const noticePath = join(packagingDir, 'THIRD_PARTY_NOTICES.txt')
+/** The player's libraries: mdk.framework on macOS, the .so files or DLLs elsewhere. */
+export const playerDir = join(packagingDir, 'player')
 /** Static per-platform install guides, shipped as INSTALL.txt. */
 export const installGuide = {
   macos: join(import.meta.dirname, 'install', 'INSTALL-macos.txt'),
@@ -29,13 +35,45 @@ export async function preparePackagingResources(output = noticePath) {
 
   await mkdir(dirname(output), { recursive: true })
   await writeFile(output, buildThirdPartyNotice(ffmpegBinary))
+  await preparePlayerLibraries()
+}
+
+async function preparePlayerLibraries() {
+  const sdk = resolve(rootDir, process.env.MDK_SDK || join('vendor', 'mdk-sdk'))
+  await rm(playerDir, { recursive: true, force: true })
+  await mkdir(playerDir, { recursive: true })
+
+  if (process.platform === 'darwin') {
+    const framework = join(sdk, 'lib', 'mdk.framework')
+    await ensureDirectory(framework, 'MDK framework')
+    await cp(framework, join(playerDir, 'mdk.framework'), {
+      recursive: true,
+      verbatimSymlinks: true,
+      // The SDK's development files.
+      filter: (source) => !['Headers', 'Modules'].includes(basename(source)),
+    })
+    return
+  }
+
+  const isWindows = process.platform === 'win32'
+  const libraryDir = isWindows ? join(sdk, 'bin', 'x64') : join(sdk, 'lib', process.arch === 'arm64' ? 'arm64' : 'amd64')
+  await ensureDirectory(libraryDir, 'MDK library directory')
+  // Regular files only: libmdk.so is the SDK's link for linking, libmdk.so.0 is what is loaded.
+  const libraries = (await readdir(libraryDir, { withFileTypes: true }))
+    .filter((entry) => entry.isFile() && (isWindows ? /\.dll$/i : /\.so(\.\d+)?$/).test(entry.name))
+    .map((entry) => entry.name)
+  const runtime = isWindows ? 'mdk.dll' : 'libmdk.so.0'
+  if (!libraries.includes(runtime)) {
+    throw new Error(`MDK runtime ${runtime} not found in ${libraryDir}`)
+  }
+  for (const name of libraries) {
+    await cp(join(libraryDir, name), join(playerDir, name))
+  }
 }
 
 function buildThirdPartyNotice(ffmpegBinaryPath) {
   return [
     readFileSync(join(rootDir, 'THIRD_PARTY_NOTICES.txt'), 'utf8'),
-    '',
-    readFileSync(join(rootDir, 'vendor', 'skia-wasm', 'THIRD_PARTY_NOTICES.txt'), 'utf8'),
     '',
     'ffmpeg -version',
     '---------------',

@@ -143,6 +143,9 @@ jobs:
           mapfile -t executables < <(find "$package_root/usr/bin" -maxdepth 1 -type f -perm /111 -print)
           [[ "${#executables[@]}" == 1 ]] || { echo "Expected exactly one Debian application executable, found ${#executables[@]}." >&2; exit 1; }
           touch "$(dirname "${executables[0]}")/.ovrley-portable"
+          # cargo-packager writes no Recommends.
+          recommends='intel-media-va-driver | intel-media-va-driver-non-free, libva-drm2, mesa-va-drivers | mesa-libgallium, mesa-vulkan-drivers'
+          sed -i "/^Depends: /a Recommends: $recommends" "$package_root/DEBIAN/control"
           fakeroot dpkg-deb --build "$package_root" "$deb"
 
       - name: Verify Debian package contents

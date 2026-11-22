@@ -5,11 +5,24 @@
 // The translations are bundled from the catalogs in the root locales/ folder.
 
 fn main() {
-    // On macOS and Linux MDK is found through an rpath to the SDK's library folder (ovrley_playback's
-    // `links` metadata), which only the linked executables can carry. Windows has no rpath:
-    // ovrley_playback's build script copies the DLLs beside them.
-    if let Ok(lib) = std::env::var("DEP_MDK_LIB_DIR") {
-        println!("cargo:rustc-link-arg=-Wl,-rpath,{lib}");
+    // MDK is found through rpaths, which only the linked executables can carry. A package keeps it
+    // in Contents/Frameworks (macOS) or in lib/ (beside the AppImage's binary, in /usr/lib/OVRLEY
+    // and /app/lib/OVRLEY for the deb and the Flatpak); a development build finds the SDK's library
+    // folder (ovrley_playback's `links` metadata). OVRLEY_PACKAGING leaves that folder out of a
+    // package. Windows has no rpath: the DLLs are beside the executable.
+    println!("cargo:rerun-if-env-changed=OVRLEY_PACKAGING");
+    let packaged: &[&str] = match std::env::var("CARGO_CFG_TARGET_OS").expect("cargo sets CARGO_CFG_TARGET_OS").as_str() {
+        "macos" => &["@executable_path/../Frameworks"],
+        "linux" => &["$ORIGIN/lib", "$ORIGIN/../lib/OVRLEY/lib"],
+        _ => &[],
+    };
+    for path in packaged {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{path}");
+    }
+    if std::env::var_os("OVRLEY_PACKAGING").is_none() {
+        if let Ok(lib) = std::env::var("DEP_MDK_LIB_DIR") {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{lib}");
+        }
     }
     #[cfg(windows)]
     windows_resources();
