@@ -7,9 +7,12 @@ pub fn clamp(value: f64, min: f64, max: f64) -> f64 {
     value.max(min).min(max)
 }
 
+/// The app's version: the workspace's.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 /// The version label `AppHeader` shows: the workspace's version with a `v` prefix.
 pub fn app_version() -> String {
-    format!("v{}", env!("CARGO_PKG_VERSION"))
+    format!("v{VERSION}")
 }
 
 /// `isMacOS()`, decided at compile time.

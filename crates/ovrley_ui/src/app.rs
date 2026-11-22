@@ -39,6 +39,7 @@ impl Projections {
             select_language(store.i18n.language);
         }
         features::app_shell::project(&window, store, language_changed);
+        features::app_update::project(&window, store);
         features::toolbar::project(&window, store);
         features::template_manager::project(&window, store);
         features::projects::project(&window, store);
@@ -80,8 +81,10 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     };
     features::app_shell::initialize(window);
     features::transitions::initialize(window);
+    features::app_update::initialize(window);
     features::transitions::bind(window, &dispatcher);
     features::app_shell::bind(window, &dispatcher);
+    features::app_update::bind(window, &dispatcher);
     features::toolbar::bind(window, &dispatcher);
     features::template_manager::bind(window, &dispatcher);
     features::projects::bind(window, &dispatcher);
@@ -99,18 +102,28 @@ pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> 
     dispatcher
 }
 
+/// Why the app ends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Exit {
+    Closed,
+    /// An update is installed. The caller starts it: the agents' socket is free by then and the
+    /// preferences are written, so the new instance finds both as it needs them.
+    Relaunch,
+}
+
 /// Opens the window over `store` and runs until it closes. `gpu` is the shared device, which the
 /// video players draw on. Agents reach the window through `agent_socket`.
 #[allow(clippy::too_many_arguments)]
 pub fn run(
     store: Store,
+    distribution: ovrley_services::distribution::DistributionKind,
     paths: ovrley_core::paths::AppPaths,
     app_cache_dir: &std::path::Path,
     preferences: PreferencesStore,
     maps: Arc<dyn ovrley_app::store::services::MapServices>,
     gpu: Option<GpuDevice>,
     agent_socket: ovrley_mcp::link::SocketLocation,
-) -> Result<(), String> {
+) -> Result<Exit, String> {
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
     // Window chrome, not app state: written to the global directly, like the maximised state.
     #[cfg(windows)]
@@ -134,6 +147,7 @@ pub fn run(
             video_tools,
             render: Arc::new(ovrley_app::store::services::NativeRenderService::new(Arc::clone(&paths), maps.map_source(), ui_post)),
             maps,
+            updates: Arc::new(ovrley_app::store::services::NativeUpdateService),
         },
     );
     platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());
@@ -187,7 +201,8 @@ pub fn run(
         }
         // `useAppBootstrap`: the template list and the last template, with the font catalog
         // loading in parallel (D16); the startup screen shows until the restore has finished.
-        startup.dispatch(|store, services| {
+        startup.dispatch(move |store, services| {
+            ovrley_app::features::app_update::check_at_startup(store, services, distribution, cfg!(debug_assertions));
             ovrley_app::features::template_manager::fetch_templates(store, services, None);
             ovrley_app::features::widget_editor::load_font_catalog(store, services);
             // `useAppBootstrap` detects the codecs once at startup (Phase 7 D8).
@@ -243,7 +258,8 @@ pub fn run(
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
     features::video_playback::shutdown();
     dispatcher.flush_preferences();
-    result
+    let relaunch = dispatcher.with_store(|store| store.app_update.relaunch);
+    result.map(|()| if relaunch { Exit::Relaunch } else { Exit::Closed })
 }
 
 /// The theme colours widget fallbacks use, from the `Theme` global, their one source.

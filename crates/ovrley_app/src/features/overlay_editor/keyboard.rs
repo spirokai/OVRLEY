@@ -14,7 +14,7 @@ use serde_json::{Map, Value};
 /// Overlays block the editor's, the player's and the history's keys (`hasOpenOverlay`): the
 /// settings dialog, the unpinned drawer and the app's dialogs. Popups take the keys themselves.
 pub(crate) fn overlay_open(store: &Store) -> bool {
-    store.editor_shell.settings_open || store.layout.is_unpinned_overlay() || store.unsaved_confirm.is_open() || store.video_import.cut_removal_request.is_some()
+    store.editor_shell.settings_open || store.layout.is_unpinned_overlay() || store.unsaved_confirm.is_open() || store.video_import.cut_removal_request.is_some() || store.app_update.is_open()
 }
 
 /// `useUndoRedo`'s keys: a repeated key or one with Alt is ignored, as are keys while overlays are

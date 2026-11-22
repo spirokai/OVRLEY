@@ -63,19 +63,27 @@ async function buildManifest({ owner, repo, tag, version, notes: releaseNotes, s
     signatures[platform] = signature
   }
 
-  const platformNames = ['windows-x86_64', 'darwin-aarch64', 'linux-x86_64']
+  const platformNames = ['windows-x86_64', 'darwin-aarch64', 'macos-aarch64', 'linux-x86_64']
+  const macos = {
+    url: releaseAssetUrl(owner, repo, tag, names.public.macosUpdater),
+    signature: signatures.macos,
+    format: 'app',
+  }
+  // Two updaters read this. cargo-packager's needs each `format` and looks macOS up as
+  // `macos-aarch64`. Tauri's, in the releases before the native app, looks up `darwin-aarch64`
+  // and ignores the rest.
   const platforms = {
     'windows-x86_64': {
       url: releaseAssetUrl(owner, repo, tag, names.public.windows),
       signature: signatures.windows,
+      format: 'nsis',
     },
-    'darwin-aarch64': {
-      url: releaseAssetUrl(owner, repo, tag, names.public.macosUpdater),
-      signature: signatures.macos,
-    },
+    'darwin-aarch64': macos,
+    'macos-aarch64': macos,
     'linux-x86_64': {
       url: releaseAssetUrl(owner, repo, tag, names.public.linux),
       signature: signatures.linux,
+      format: 'appimage',
     },
   }
 

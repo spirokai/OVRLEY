@@ -80,7 +80,7 @@ impl TrafficLightInsetState {
 /// - Open overlays block app shortcuts (`hasOpenOverlay`): the settings dialog, and the unpinned
 ///   drawer's backdrop, except `drawer.toggle` while the drawer is that overlay. Keys do not reach
 ///   the window while a select, popover or dialog popup has focus, so those block by themselves.
-/// - The render dialog and its questions are overlays too (a Radix dialog in React).
+/// - The render dialog, its questions and the update dialog are overlays too (Radix dialogs in React).
 pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInput) -> bool {
     if input.repeat {
         return false;
@@ -89,7 +89,7 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
         return false;
     };
     let drawer_overlay = store.layout.is_unpinned_overlay();
-    let overlay_open = store.editor_shell.settings_open || drawer_overlay || store.render_dialog.is_open();
+    let overlay_open = store.editor_shell.settings_open || drawer_overlay || store.render_dialog.is_open() || store.app_update.is_open();
     let command = found.command.id.as_str();
     if overlay_open && !(command == "drawer.toggle" && drawer_overlay && !store.editor_shell.settings_open) {
         return false;
@@ -309,6 +309,7 @@ pub fn accepts_file_drops(store: &Store) -> bool {
         && !store.unsaved_confirm.is_open()
         && !crate::features::projects::has_open_dialog(store)
         && !store.render_dialog.is_open()
+        && !store.app_update.is_open()
         && !AppBootstrapState::shows_startup_screen(store)
 }
 

@@ -7,7 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 /// Keys that Rust builds from a code: the part after the prefix is never written out.
-const BUILT_KEY_PREFIXES: &[&str] = &["app-update.", "raster.errors.", "render-video.pathErrors.", "widgets.activityAttributes."];
+const BUILT_KEY_PREFIXES: &[&str] = &["raster.errors.", "render-video.pathErrors.", "widgets.activityAttributes."];
 const PLURAL_SUFFIXES: &[&str] = &["_zero", "_one", "_two", "_few", "_many", "_other"];
 
 fn manifest_dir() -> PathBuf {

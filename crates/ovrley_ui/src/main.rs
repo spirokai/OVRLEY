@@ -3,7 +3,7 @@
 //!
 //! Startup, in order: logging; runtime paths and distribution; the preferences file; the language
 //! and drawer hydration; backend selection with the shared GPU device; then the window
-//! (`app::run`). A failure before the window exists is shown in a native message dialog. A failure
+//! (`app::run`), and after an update the relaunch. A failure before the window exists is shown in a native message dialog. A failure
 //! once it exists (a malformed `lng`) is shown in the window, as `main.jsx` does.
 
 // A release build is a GUI app without a console. `--mcp` uses the pipes its client passes.
@@ -68,7 +68,14 @@ fn start() -> Result<(), String> {
     let paths = roots.app_paths()?;
     // The installed map styles and the tile cache, as the Tauri shell opens them (phase 5 D9).
     let maps = std::sync::Arc::new(ovrley_app::store::services::NativeMapServices::open(&roots, &preferences)?);
-    ovrley_ui::app::run(store, paths, &roots.app_cache_dir, preferences, maps, gpu, agent_socket)
+    let exit = ovrley_ui::app::run(store, distribution, paths, &roots.app_cache_dir, preferences, maps, gpu, agent_socket)?;
+    if exit == ovrley_ui::app::Exit::Relaunch {
+        // The update is installed either way, so this is no startup failure.
+        if let Err(error) = ovrley_services::updater::relaunch() {
+            log::error!("the updated app did not start: {error}");
+        }
+    }
+    Ok(())
 }
 
 /// The settings file. The debug snapshot tour (`OVRLEY_SNAPSHOT`) changes the language and the

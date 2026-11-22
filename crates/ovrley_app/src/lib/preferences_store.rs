@@ -255,6 +255,7 @@ impl PreferencesSink for FileSink {
 #[derive(Clone, Default)]
 pub struct MemorySink {
     pub saves: Rc<RefCell<Vec<Preferences>>>,
+    pub flushes: std::sync::Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl PreferencesSink for MemorySink {
@@ -262,7 +263,9 @@ impl PreferencesSink for MemorySink {
         self.saves.borrow_mut().push(preferences.clone());
     }
 
-    fn flush(&mut self) {}
+    fn flush(&mut self) {
+        self.flushes.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
 }
 
 impl PreferencesStore {

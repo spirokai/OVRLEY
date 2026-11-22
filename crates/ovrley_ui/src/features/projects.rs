@@ -102,7 +102,9 @@ pub fn project(window: &AppWindow, store: &Store) {
     );
 
     let startup = &store.projects.startup;
-    set_if_changed(global.get_startup_open(), startup.open, |value| {
+    // The update dialog hides the startup dialog while it shows, as `App.jsx` does.
+    let startup_open = startup.open && !store.app_update.is_open();
+    set_if_changed(global.get_startup_open(), startup_open, |value| {
         global.set_startup_open(value)
     });
     set_if_changed(

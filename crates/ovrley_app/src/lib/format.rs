@@ -31,6 +31,11 @@ pub fn format_cache_bytes(bytes: u64) -> String {
     }
 }
 
+/// `formatUpdateProgress`: a download's percentage, whole.
+pub fn format_update_progress(percent: f64) -> String {
+    format!("{}%", crate::js::round(percent))
+}
+
 /// `formatClockDuration`: `MM:SS` below an hour, `H:MM:SS` from one, with a sign for negative
 /// durations. The time widget's `format_elapsed_time` differs (always `H:MM:SS`), so both exist.
 pub fn format_clock_duration(seconds: f64) -> String {

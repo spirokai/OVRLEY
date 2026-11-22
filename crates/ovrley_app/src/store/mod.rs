@@ -103,6 +103,8 @@ pub struct Store {
     pub traffic_light_inset: TrafficLightInsetState,
     pub file_drop: WindowFileDropState,
     pub agent_session: AgentSessionState,
+    /// `useAppUpdate`'s state (Phase 9 D7).
+    pub app_update: crate::features::app_update::AppUpdateState,
 }
 
 impl Store {

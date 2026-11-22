@@ -25,6 +25,7 @@ enum StepKind {
 
 fn tour() -> Vec<Step> {
     use ovrley_app::features::app_shell::SettingsSection;
+    use ovrley_app::features::app_update::UpdatePhase;
     use ovrley_app::i18n::{change_language_preference, Locale};
     use ovrley_app::store::slices::layout::LeftDrawerTool;
     let steps: Vec<(&'static str, StepAction)> = vec![
@@ -64,7 +65,23 @@ fn tour() -> Vec<Step> {
             store.template.set_last_saved_template_state(None);
             ovrley_app::features::template_manager::create_new_template_request(store, services, None);
         }),
+        ("update-available", |store, services| {
+            ovrley_app::features::template_manager::answer_unsaved_confirm(store, services, ovrley_app::features::app_shell::UnsavedAnswer::Cancel);
+            store.app_update.phase = UpdatePhase::Available(std::sync::Arc::new(SnapshotUpdate));
+        }),
+        ("update-available-korean", |store, _| store.i18n.language = Locale::Ko),
+        ("update-downloading", |store, _| {
+            store.i18n.language = Locale::En;
+            store.app_update.phase = UpdatePhase::Downloading { update: std::sync::Arc::new(SnapshotUpdate), progress: None };
+        }),
+        ("update-progress", |store, _| {
+            if let UpdatePhase::Downloading { progress, .. } = &mut store.app_update.phase {
+                *progress = Some(ovrley_services::updater::DownloadProgress { downloaded: 84, content_length: Some(200) });
+            }
+        }),
+        ("update-failed", |store, _| store.app_update.phase = UpdatePhase::Failed),
         ("settings-general", |store, services| {
+            ovrley_app::features::app_update::dismiss(store);
             ovrley_app::features::template_manager::answer_unsaved_confirm(store, services, ovrley_app::features::app_shell::UnsavedAnswer::Cancel);
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
@@ -202,6 +219,24 @@ fn tour() -> Vec<Step> {
     tour.push(("fullscreen", StepKind::Fullscreen));
     tour.push(("fullscreen-left", StepKind::Fullscreen));
     tour
+}
+
+/// The update the dialog's captures offer. It is never downloaded.
+#[derive(Debug)]
+struct SnapshotUpdate;
+
+impl ovrley_app::store::services::AppUpdate for SnapshotUpdate {
+    fn version(&self) -> &str {
+        "9.8.7"
+    }
+
+    fn download(&self, _on_progress: &dyn Fn(ovrley_services::updater::DownloadProgress)) -> Result<Vec<u8>, String> {
+        Err("the snapshot tour does not update".into())
+    }
+
+    fn install(&self, _package: Vec<u8>) -> Result<(), String> {
+        Err("the snapshot tour does not update".into())
+    }
 }
 
 /// Videos of the given display size and offset, on the timeline without files: the render dialog

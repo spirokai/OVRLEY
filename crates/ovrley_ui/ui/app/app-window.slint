@@ -5,6 +5,8 @@ import { AppHeader } from "../features/app-shell/app-header.slint";
 import { ControlPanel, FileDropOverlay, LoadingOverlay, StartupError } from "../features/app-shell/shell-panels.slint";
 import { FocusedField } from "../components/focused-field.slint";
 import { SettingsDialog, UnsavedChangesDialog } from "../features/app-shell/dialogs.slint";
+import { AppUpdates } from "../features/app-update/index.slint";
+import { UpdatePromptDialog } from "../features/app-update/update-prompt-dialog.slint";
 import { TemplateManager, UnsavedAnswer } from "../features/template-manager/index.slint";
 import { OverlayEditorView } from "../features/overlay-editor/overlay-editor.slint";
 import { OverlayPlayer } from "../features/player/overlay-player.slint";
@@ -224,6 +226,15 @@ export component AppWindow inherits FluidWindow {
         }
     }
     property <bool> project-dialog-open: Projects.confirm-open || Projects.startup-open || Projects.missing-open || Projects.notice != ProjectNoticeKind.none;
+
+    UpdatePromptDialog { }
+
+    changed update-open => {
+        if !self.update-open {
+            keys.focus();
+        }
+    }
+    property <bool> update-open: AppUpdates.open;
 
     CutRemovalDialog { }
 

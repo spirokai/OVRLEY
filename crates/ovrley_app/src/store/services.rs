@@ -424,6 +424,47 @@ impl RenderService for NativeRenderService {
     }
 }
 
+use ovrley_services::updater::{DownloadProgress, ReleaseUpdate};
+
+/// An update the check found (Phase 9 D7).
+pub trait AppUpdate: std::fmt::Debug + Send + Sync {
+    fn version(&self) -> &str;
+    /// The verified package. Blocking.
+    fn download(&self, on_progress: &dyn Fn(DownloadProgress)) -> Result<Vec<u8>, String>;
+    /// Installs the package. Blocking. On Windows it ends the process.
+    fn install(&self, package: Vec<u8>) -> Result<(), String>;
+}
+
+/// The release channel.
+pub trait UpdateService: Send + Sync {
+    /// The update to this version, `None` when it is the newest. Blocking.
+    fn check(&self) -> Result<Option<Arc<dyn AppUpdate>>, String>;
+}
+
+/// `ovrley_services::updater`.
+pub struct NativeUpdateService;
+
+impl UpdateService for NativeUpdateService {
+    fn check(&self) -> Result<Option<Arc<dyn AppUpdate>>, String> {
+        let update = ovrley_services::updater::check(crate::lib::utils::VERSION)?;
+        Ok(update.map(|update| Arc::new(update) as Arc<dyn AppUpdate>))
+    }
+}
+
+impl AppUpdate for ReleaseUpdate {
+    fn version(&self) -> &str {
+        self.version()
+    }
+
+    fn download(&self, on_progress: &dyn Fn(DownloadProgress)) -> Result<Vec<u8>, String> {
+        self.download(on_progress)
+    }
+
+    fn install(&self, package: Vec<u8>) -> Result<(), String> {
+        self.install(package)
+    }
+}
+
 /// Everything an action may use besides the store.
 pub struct Services {
     /// The runtime paths `ovrley_core` reads templates, fonts and tools from.
@@ -439,6 +480,7 @@ pub struct Services {
     pub video_tools: Arc<dyn VideoTools>,
     pub maps: Arc<dyn MapServices>,
     pub render: Arc<dyn RenderService>,
+    pub updates: Arc<dyn UpdateService>,
     /// Dispatches later on the UI thread, for replies that arrive there (dialogs).
     pub dispatch: DispatchHandle,
 }
@@ -454,6 +496,7 @@ pub struct ServiceParts {
     pub video_tools: Arc<dyn VideoTools>,
     pub maps: Arc<dyn MapServices>,
     pub render: Arc<dyn RenderService>,
+    pub updates: Arc<dyn UpdateService>,
 }
 
 impl ServiceParts {
@@ -469,6 +512,7 @@ impl ServiceParts {
             video_tools: self.video_tools,
             maps: self.maps,
             render: self.render,
+            updates: self.updates,
             window: self.window,
             dispatch,
         }
@@ -581,6 +625,7 @@ pub mod fakes {
         pub video_tools: Arc<FakeVideoTools>,
         pub maps: Arc<FakeMapServices>,
         pub render: Arc<FakeRenderService>,
+        pub updates: Arc<FakeUpdateService>,
     }
 
     /// Maps over the checkout's bundled styles, with frames from a test's factory, a fixed adapter
@@ -902,6 +947,72 @@ pub mod fakes {
         }
     }
 
+    /// Offers at most one update, and records the check and whether the preferences were flushed
+    /// before the install.
+    #[derive(Default)]
+    pub struct FakeUpdateService {
+        offered: Mutex<Option<FakeUpdate>>,
+        pub checks: std::sync::atomic::AtomicUsize,
+        pub flushed_before_install: Arc<AtomicBool>,
+        flushes: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl FakeUpdateService {
+        pub fn offer(&self, update: FakeUpdate) {
+            *self.offered.lock().unwrap() = Some(FakeUpdate {
+                flushes: self.flushes.clone(),
+                flushed_before_install: self.flushed_before_install.clone(),
+                ..update
+            });
+        }
+    }
+
+    impl UpdateService for FakeUpdateService {
+        fn check(&self) -> Result<Option<Arc<dyn AppUpdate>>, String> {
+            self.checks.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(self.offered.lock().unwrap().clone().map(|update| Arc::new(update) as Arc<dyn AppUpdate>))
+        }
+    }
+
+    /// An update that downloads and installs at once, or fails as told.
+    #[derive(Clone, Debug)]
+    pub struct FakeUpdate {
+        pub version: String,
+        pub download_error: Option<String>,
+        pub install_error: Option<String>,
+        pub flushes: Arc<std::sync::atomic::AtomicUsize>,
+        pub flushed_before_install: Arc<AtomicBool>,
+    }
+
+    impl FakeUpdate {
+        pub fn new(version: &str) -> Self {
+            Self {
+                version: version.into(),
+                download_error: None,
+                install_error: None,
+                flushes: Arc::default(),
+                flushed_before_install: Arc::default(),
+            }
+        }
+    }
+
+    impl AppUpdate for FakeUpdate {
+        fn version(&self) -> &str {
+            &self.version
+        }
+
+        fn download(&self, on_progress: &dyn Fn(DownloadProgress)) -> Result<Vec<u8>, String> {
+            on_progress(DownloadProgress { downloaded: 1, content_length: Some(1) });
+            self.download_error.clone().map_or(Ok(vec![0]), Err)
+        }
+
+        fn install(&self, _package: Vec<u8>) -> Result<(), String> {
+            use std::sync::atomic::Ordering;
+            self.flushed_before_install.store(self.flushes.load(Ordering::SeqCst) > 0, Ordering::SeqCst);
+            self.install_error.clone().map_or(Ok(()), Err)
+        }
+    }
+
     /// The checkout's runtime paths: its bundled templates, fonts and tools.
     pub fn repository_paths() -> ovrley_core::paths::AppPaths {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
@@ -913,6 +1024,7 @@ pub mod fakes {
         let (preferences, sink) = PreferencesStore::in_memory(preferences);
         let ui_post = FakeUiPost::default();
         let fakes = Fakes {
+            updates: Arc::new(FakeUpdateService { flushes: sink.flushes.clone(), ..FakeUpdateService::default() }),
             preferences: sink,
             dialogs: FakeDialogs::default(),
             ui_post: ui_post.clone(),
@@ -932,6 +1044,7 @@ pub mod fakes {
             video_tools: fakes.video_tools.clone(),
             maps: fakes.maps.clone(),
             render: fakes.render.clone(),
+            updates: fakes.updates.clone(),
         };
         (parts, fakes)
     }
