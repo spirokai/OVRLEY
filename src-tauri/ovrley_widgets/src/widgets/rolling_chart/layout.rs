@@ -98,9 +98,15 @@ pub fn layout_legend(
         .series
         .iter()
         .map(|series| {
-            let blob = TextBlob::from_str(&series.label, &font)
+            let label = series.label.as_deref().ok_or_else(|| {
+                WidgetError::Config(format!(
+                    "rolling chart legend: {} needs a label",
+                    series.metric.as_str()
+                ))
+            })?;
+            let blob = TextBlob::from_str(label, &font)
                 .ok_or_else(|| WidgetError::Render("unable to lay out chart legend".into()))?;
-            let (advance, ink) = font.measure_str(&series.label, None);
+            let (advance, ink) = font.measure_str(label, None);
             Ok((blob, advance, ink))
         })
         .collect::<WidgetResult<Vec<_>>>()?;

@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
-/// One plotted metric. `label` is the legend text the editor localized when the metric was picked.
+/// One plotted metric. `label` is legend text the host localizes at render time; templates omit it.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ChartSeriesConfig {
     pub metric: MetricKind,
-    pub label: String,
+    pub label: Option<String>,
     pub color: String,
 }
 
