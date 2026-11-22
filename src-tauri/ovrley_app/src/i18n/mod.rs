@@ -1,14 +1,15 @@
 //! Port of `app/src/i18n`: the translation catalog, `translateOptions`, `translateBackendError`
 //! and the language preference (plan D6).
 //!
-//! The 15 locale files are embedded from `app/src/i18n/locales/`, where the React app keeps them.
-//! i18next's behaviour is kept: English is the fallback language, a key missing from a locale shows
-//! the English text, a key missing from every locale shows its code default, and `{{name}}`
-//! placeholders are filled without escaping.
+//! The catalogs in the root `locales/` folder are embedded: `ovrley.pot` holds the English text
+//! (msgid) under each key (msgctxt), `<lang>.po` each translation. i18next's behaviour is kept:
+//! English is the fallback language, a key missing from a locale shows the English text, a key
+//! missing from every locale shows its code default, and `{{name}}` placeholders are filled
+//! without escaping.
 //!
 //! This catalog serves the strings Rust code chooses at runtime (errors, projected labels). The
-//! `.slint` files translate their own strings with `@tr`, from gettext catalogs that `ovrley_ui`'s
-//! build converts from the same JSON files.
+//! `.slint` files translate their own strings with `@tr`, from the same files, with Slint's
+//! placeholders (`{0}`).
 
 pub mod locales;
 
@@ -18,6 +19,7 @@ use crate::lib::preferences_store::PreferencesStore;
 use crate::store::services::Services;
 use crate::store::Store;
 use regex::Regex;
+use rspolib::TranslatedEntry;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::OnceLock;
@@ -25,26 +27,26 @@ use std::sync::OnceLock;
 /// The preference key, shared with the React app.
 pub const LANGUAGE_PREFERENCE_KEY: &str = "lng";
 
-/// Each locale's file, in [`LOCALES`] order.
+/// Each locale's catalog, in [`LOCALES`] order; English's is the template.
 const LOCALE_FILES: [&str; 15] = [
-    include_str!("../../../../app/src/i18n/locales/en-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/zh-CN-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/ja-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/de-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/fr-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/tr-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/it-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/ko-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/es-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/ru-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/pl-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/pt-BR-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/nl-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/cs-translation.json"),
-    include_str!("../../../../app/src/i18n/locales/sv-translation.json"),
+    include_str!("../../../../locales/ovrley.pot"),
+    include_str!("../../../../locales/zh-CN.po"),
+    include_str!("../../../../locales/ja.po"),
+    include_str!("../../../../locales/de.po"),
+    include_str!("../../../../locales/fr.po"),
+    include_str!("../../../../locales/tr.po"),
+    include_str!("../../../../locales/it.po"),
+    include_str!("../../../../locales/ko.po"),
+    include_str!("../../../../locales/es.po"),
+    include_str!("../../../../locales/ru.po"),
+    include_str!("../../../../locales/pl.po"),
+    include_str!("../../../../locales/pt-BR.po"),
+    include_str!("../../../../locales/nl.po"),
+    include_str!("../../../../locales/cs.po"),
+    include_str!("../../../../locales/sv.po"),
 ];
 
-/// Every locale's strings, flattened to `namespace.key.path`.
+/// Every locale's strings, by `namespace.key.path`.
 pub struct Catalog {
     tables: Vec<HashMap<String, String>>,
 }
@@ -55,10 +57,16 @@ impl Catalog {
             .iter()
             .zip(LOCALES)
             .map(|(text, (locale, _))| {
-                let value: Value = serde_json::from_str(text).unwrap_or_else(|error| panic!("{}-translation.json is malformed: {error}", locale.code()));
-                let mut table = HashMap::new();
-                flatten("", &value, &mut table, locale);
-                table
+                let catalog = rspolib::pofile(*text).unwrap_or_else(|error| panic!("the {} catalog is malformed: {error}", locale.code()));
+                catalog
+                    .entries
+                    .iter()
+                    .filter_map(|entry| {
+                        let key = entry.msgctxt.clone().unwrap_or_else(|| panic!("the {} catalog has an entry without a key: {}", locale.code(), entry.msgid));
+                        let text = if locale == DEFAULT_LOCALE { entry.msgid.clone() } else { entry.msgstr.clone().filter(|_| entry.translated())? };
+                        Some((key, text))
+                    })
+                    .collect()
             })
             .collect();
         Self { tables }
@@ -112,21 +120,6 @@ impl Catalog {
     /// `t(key, {name: value, …})`.
     pub fn t_with(&self, locale: Locale, key: &str, values: &[(&str, &str)]) -> String {
         interpolate(self.t(locale, key), values)
-    }
-}
-
-fn flatten(prefix: &str, value: &Value, table: &mut HashMap<String, String>, locale: Locale) {
-    match value {
-        Value::Object(map) => {
-            for (key, value) in map {
-                let path = if prefix.is_empty() { key.clone() } else { format!("{prefix}.{key}") };
-                flatten(&path, value, table, locale);
-            }
-        }
-        Value::String(text) => {
-            table.insert(prefix.to_string(), text.clone());
-        }
-        other => panic!("{}-translation.json: {prefix} must be a string, found {other}", locale.code()),
     }
 }
 

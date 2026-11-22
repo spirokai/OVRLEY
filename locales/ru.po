@@ -1,0 +1,3400 @@
+msgid ""
+msgstr ""
+"Language: ru\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "app-shell.agentConnected"
+msgid "Agent connected"
+msgstr "Агент подключён"
+
+msgctxt "app-shell.agentConnectedHelp"
+msgid "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it."
+msgstr "ИИ-агент подключён через MCP и может изменять это окно. Чтобы остановить его, выключите «Разрешить изменения агентам» в настройках."
+
+msgctxt "app-shell.allowAgentEdits"
+msgid "Allow agent edits"
+msgstr "Разрешить изменения агентам"
+
+msgctxt "app-shell.allowAgentEditsHelp"
+msgid "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request."
+msgstr "Позволяет ИИ-агенту, подключённому через MCP (ovrley --mcp), изменять это окно, например язык и боковые панели. Если выключить, все запросы агентов будут отклоняться."
+
+msgctxt "app-shell.blackBackground"
+msgid "Black background"
+msgstr "Чёрный фон"
+
+msgctxt "app-shell.checkeredBackground"
+msgid "Checkered background"
+msgstr "Шахматный фон"
+
+msgctxt "app-shell.clearMapTileCache"
+msgid "Clear cache"
+msgstr "Очистить кэш"
+
+msgctxt "app-shell.close"
+msgid "Close"
+msgstr "Закрыть"
+
+msgctxt "app-shell.copyError"
+msgid "Copy error"
+msgstr "Копировать ошибку"
+
+msgctxt "app-shell.dropFilesToImport"
+msgid "Drop files to import"
+msgstr "Перетащите файлы для импорта"
+
+msgctxt "app-shell.errorRenderingVideo"
+msgid "Error Rendering Video"
+msgstr "Ошибка рендеринга видео"
+
+msgctxt "app-shell.file"
+msgid "File"
+msgstr "Файл"
+
+msgctxt "app-shell.fileMenu"
+msgid "File menu"
+msgstr "Меню «Файл»"
+
+msgctxt "app-shell.grid"
+msgid "Toggle grid"
+msgstr "Переключить сетку"
+
+msgctxt "app-shell.imageBackground"
+msgid "Image background"
+msgstr "Фон из изображения"
+
+msgctxt "app-shell.importActivity"
+msgid "Import Activity"
+msgstr "Импорт активности"
+
+msgctxt "app-shell.importTemplate"
+msgid "Import Template"
+msgstr "Импортировать шаблон"
+
+msgctxt "app-shell.importVideo"
+msgid "Import Videos"
+msgstr "Импортировать видео"
+
+msgctxt "app-shell.keyboardShortcutsDescription"
+msgid "You can use the following keyboard shortcuts to improve your workflow:"
+msgstr "Используйте следующие клавиатурные сокращения для удобства работы:"
+
+msgctxt "app-shell.language"
+msgid "Language"
+msgstr "Язык"
+
+msgctxt "app-shell.loadProject"
+msgid "Load Project"
+msgstr "Открыть проект"
+
+msgctxt "app-shell.loadingEditorData"
+msgid "Loading editor data..."
+msgstr "Загрузка данных редактора..."
+
+msgctxt "app-shell.mapTileCache"
+msgid "Map tile cache"
+msgstr "Кэш тайлов карты"
+
+msgctxt "app-shell.mapTileCacheHelp"
+msgid "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first."
+msgstr "Тайлы карты, загруженные для предпросмотра и рендеринга, хранятся на диске, поэтому карты загружаются быстрее и работают без интернета. Когда кэш заполнен, первыми удаляются тайлы, которые дольше всего не использовались."
+
+msgctxt "app-shell.mapTileCacheLimit"
+msgid "Cache size"
+msgstr "Размер кэша"
+
+msgctxt "app-shell.mapTileCacheUsage"
+msgid "{0} of {1} used"
+msgstr "Использовано {0} из {1}"
+
+msgctxt "app-shell.newProject"
+msgid "New Project"
+msgstr "Новый проект"
+
+msgctxt "app-shell.newTemplate"
+msgid "New Template"
+msgstr "Новый шаблон"
+
+msgctxt "app-shell.overlays"
+msgid "Overlays"
+msgstr "Оверлеи"
+
+msgctxt "app-shell.resetZoom"
+msgid "Reset zoom"
+msgstr "Сбросить масштаб"
+
+msgctxt "app-shell.save"
+msgid "Save"
+msgstr "Сохранить"
+
+msgctxt "app-shell.saveProject"
+msgid "Save Project"
+msgstr "Сохранить проект"
+
+msgctxt "app-shell.saveProjectAs"
+msgid "Save Project As"
+msgstr "Сохранить проект как"
+
+msgctxt "app-shell.saveTemplate"
+msgid "Save Template"
+msgstr "Сохранить шаблон"
+
+msgctxt "app-shell.selectTemplate"
+msgid "Select Template..."
+msgstr "Выбрать шаблон..."
+
+msgctxt "app-shell.settings"
+msgid "Settings"
+msgstr "Настройки"
+
+msgctxt "app-shell.shortcuts"
+msgid "Shortcuts"
+msgstr "Горячие клавиши"
+
+msgctxt "app-shell.snapToGrid"
+msgid "Snap to grid"
+msgstr "Привязка к сетке"
+
+msgctxt "app-shell.unitSystem"
+msgid "Units"
+msgstr "Единицы"
+
+msgctxt "app-shell.unitSystems.imperial"
+msgid "Imperial"
+msgstr "Имперские"
+
+msgctxt "app-shell.unitSystems.metric"
+msgid "Metric"
+msgstr "Метрические"
+
+msgctxt "app-shell.unknownResolution"
+msgid "Unknown Resolution"
+msgstr "Неизвестное разрешение"
+
+msgctxt "app-shell.videoBackground"
+msgid "Video background"
+msgstr "Видео как фон"
+
+msgctxt "app-shell.whiteBackground"
+msgid "White background"
+msgstr "Белый фон"
+
+msgctxt "app-shell.widgets"
+msgid "Widgets"
+msgstr "Виджеты"
+
+msgctxt "app-shell.zoomIn"
+msgid "Zoom in"
+msgstr "Увеличить масштаб"
+
+msgctxt "app-shell.zoomOut"
+msgid "Zoom out"
+msgstr "Уменьшить масштаб"
+
+msgctxt "app-update.close"
+msgid "Close"
+msgstr "Закрыть"
+
+msgctxt "app-update.continueWithInstalledVersion"
+msgid "The installed version remains available. You can close this dialog and continue working."
+msgstr "Установленная версия по-прежнему доступна. Закройте этот диалог и продолжите работу."
+
+msgctxt "app-update.downloadingUpdate"
+msgid "Downloading update"
+msgstr "Загрузка обновления"
+
+msgctxt "app-update.later"
+msgid "Later"
+msgstr "Позже"
+
+msgctxt "app-update.updateAvailable"
+msgid "Update available"
+msgstr "Доступно обновление"
+
+msgctxt "app-update.updateDownloadProgress"
+msgid "Update download progress"
+msgstr "Ход загрузки обновления"
+
+msgctxt "app-update.updateFailed"
+msgid "Update failed"
+msgstr "Не удалось обновить"
+
+msgctxt "app-update.updateNow"
+msgid "Update now"
+msgstr "Обновить сейчас"
+
+msgctxt "app-update.versionNowAvailable"
+msgid "OVRLEY <0>{{version}}</0> is now available."
+msgstr "OVRLEY <0>{{version}}</0> уже доступна."
+
+msgctxt "app.importingYourVideo"
+msgid "Importing your video..."
+msgstr "Импорт видео..."
+
+msgctxt "app.loadingProject"
+msgid "Loading project..."
+msgstr "Загрузка проекта..."
+
+msgctxt "app.ovrleyIsStarting"
+msgid "OVRLEY is starting..."
+msgstr "OVRLEY запускается..."
+
+msgctxt "app.processingYourActivity"
+msgid "Processing your activity..."
+msgstr "Обработка активности..."
+
+msgctxt "components.blueColorComponent0255"
+msgid "Blue color component (0-255)"
+msgstr "Синяя цветовая компонента (0–255)"
+
+msgctxt "components.brightnessPercentage0100"
+msgid "Brightness percentage (0-100)"
+msgstr "Процент яркости (0–100)"
+
+msgctxt "components.currentColorVal"
+msgid "Current color: {0}"
+msgstr "Текущий цвет: {0}"
+
+msgctxt "components.decreaseValue"
+msgid "Decrease value"
+msgstr "Уменьшить значение"
+
+msgctxt "components.gradientAddStopHint"
+msgid "Click to add a color stop"
+msgstr "Нажмите, чтобы добавить цветовую точку"
+
+msgctxt "components.gradientRemoveStop"
+msgid "Remove stop"
+msgstr "Удалить точку"
+
+msgctxt "components.gradientStopLabel"
+msgid "Color stop at {0}%"
+msgstr "Цветовая точка на {0}%"
+
+msgctxt "components.gradientStops"
+msgid "Gradient stops"
+msgstr "Точки градиента"
+
+msgctxt "components.greenColorComponent0255"
+msgid "Green color component (0-255)"
+msgstr "Зелёная цветовая компонента (0–255)"
+
+msgctxt "components.hexColorValue"
+msgid "Hex color value"
+msgstr "Шестнадцатеричное значение цвета"
+
+msgctxt "components.hueDegree0360"
+msgid "Hue degree (0-360)"
+msgstr "Оттенок в градусах (0–360)"
+
+msgctxt "components.increaseValue"
+msgid "Increase value"
+msgstr "Увеличить значение"
+
+msgctxt "components.lightnessPercentage0100"
+msgid "Lightness percentage (0-100)"
+msgstr "Процент светлоты (0–100)"
+
+msgctxt "components.presets"
+msgid "Presets"
+msgstr "Предустановки"
+
+msgctxt "components.recommended"
+msgid "Recommended"
+msgstr "Рекомендуется"
+
+msgctxt "components.redColorComponent0255"
+msgid "Red color component (0-255)"
+msgstr "Красная цветовая компонента (0–255)"
+
+msgctxt "components.saturationPercentage0100"
+msgid "Saturation percentage (0-100)"
+msgstr "Процент насыщенности (0–100)"
+
+msgctxt "components.system"
+msgid "System"
+msgstr "Система"
+
+msgctxt "keyboard-shortcuts.activityImport"
+msgid "Import activity"
+msgstr "Импортировать активность"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToEnd"
+msgid "Move playhead to activity trim end"
+msgstr "Переместить указатель к концу обрезки активности"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToStart"
+msgid "Move playhead to activity trim start"
+msgstr "Переместить указатель к началу обрезки активности"
+
+msgctxt "keyboard-shortcuts.activityTrimReset"
+msgid "Reset activity trim"
+msgstr "Сбросить обрезку активности"
+
+msgctxt "keyboard-shortcuts.drawerClose"
+msgid "Close widget drawer"
+msgstr "Закрыть панель виджетов"
+
+msgctxt "keyboard-shortcuts.drawerToggle"
+msgid "Open/close widget drawer"
+msgstr "Открыть/закрыть панель виджетов"
+
+msgctxt "keyboard-shortcuts.editorClearSelection"
+msgid "Clear widget selection"
+msgstr "Снять выделение виджетов"
+
+msgctxt "keyboard-shortcuts.editorCopy"
+msgid "Copy selected widgets"
+msgstr "Копировать выбранные виджеты"
+
+msgctxt "keyboard-shortcuts.editorDelete"
+msgid "Delete selected widgets"
+msgstr "Удалить выбранные виджеты"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetOnePixel"
+msgid "Move widget by 1 pixel"
+msgstr "Переместить виджет на 1 пиксель"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetTenPixels"
+msgid "Move widget by 10 pixels"
+msgstr "Переместить виджет на 10 пикселей"
+
+msgctxt "keyboard-shortcuts.editorNudge"
+msgid "Nudge selected widgets"
+msgstr "Сдвинуть выбранные виджеты"
+
+msgctxt "keyboard-shortcuts.editorPaste"
+msgid "Paste copied widgets"
+msgstr "Вставить скопированные виджеты"
+
+msgctxt "keyboard-shortcuts.editorResetZoom"
+msgid "Reset canvas zoom"
+msgstr "Сбросить масштаб холста"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasHorizontally"
+msgid "Scroll canvas horizontally"
+msgstr "Прокручивать холст горизонтально"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasVertically"
+msgid "Scroll canvas vertically"
+msgstr "Прокручивать холст вертикально"
+
+msgctxt "keyboard-shortcuts.editorToggleGrid"
+msgid "Toggle gridlines"
+msgstr "Переключить линии сетки"
+
+msgctxt "keyboard-shortcuts.editorToggleSnap"
+msgid "Toggle snapping to grid"
+msgstr "Переключить привязку к сетке"
+
+msgctxt "keyboard-shortcuts.editorWheelScroll"
+msgid "Scroll canvas"
+msgstr "Прокручивать холст"
+
+msgctxt "keyboard-shortcuts.editorWheelZoom"
+msgid "Zoom canvas at pointer"
+msgstr "Масштабировать холст у указателя"
+
+msgctxt "keyboard-shortcuts.editorZoomIn"
+msgid "Canvas zoom in"
+msgstr "Увеличить масштаб холста"
+
+msgctxt "keyboard-shortcuts.editorZoomOut"
+msgid "Canvas zoom out"
+msgstr "Уменьшить масштаб холста"
+
+msgctxt "keyboard-shortcuts.generalCommands"
+msgid "General commands"
+msgstr "Общие команды"
+
+msgctxt "keyboard-shortcuts.historyRedo"
+msgid "Redo"
+msgstr "Повторить"
+
+msgctxt "keyboard-shortcuts.historyUndo"
+msgid "Undo"
+msgstr "Отменить"
+
+msgctxt "keyboard-shortcuts.outputOpen"
+msgid "Open export folder"
+msgstr "Открыть папку экспорта"
+
+msgctxt "keyboard-shortcuts.playerJumpToEnd"
+msgid "Rewind to end"
+msgstr "Перейти в конец"
+
+msgctxt "keyboard-shortcuts.playerResetToStart"
+msgid "Rewind to start"
+msgstr "Перейти в начало"
+
+msgctxt "keyboard-shortcuts.playerStepBackward"
+msgid "Step backward 1 second"
+msgstr "Шаг назад на 1 секунду"
+
+msgctxt "keyboard-shortcuts.playerStepForward"
+msgid "Step forward 1 second"
+msgstr "Шаг вперёд на 1 секунду"
+
+msgctxt "keyboard-shortcuts.playerToggleMute"
+msgid "Mute/unmute video"
+msgstr "Выключить/включить звук видео"
+
+msgctxt "keyboard-shortcuts.playerTogglePlayback"
+msgid "Play/pause"
+msgstr "Воспроизведение/пауза"
+
+msgctxt "keyboard-shortcuts.projectNew"
+msgid "New project"
+msgstr "Новый проект"
+
+msgctxt "keyboard-shortcuts.projectOpen"
+msgid "Open project"
+msgstr "Открыть проект"
+
+msgctxt "keyboard-shortcuts.projectSave"
+msgid "Save project"
+msgstr "Сохранить проект"
+
+msgctxt "keyboard-shortcuts.projectSaveAs"
+msgid "Save project as"
+msgstr "Сохранить проект как"
+
+msgctxt "keyboard-shortcuts.renderOpen"
+msgid "Export overlay"
+msgstr "Экспортировать оверлей"
+
+msgctxt "keyboard-shortcuts.syncAuto"
+msgid "Auto-sync video with activity"
+msgstr "Автосинхронизация видео с активностью"
+
+msgctxt "keyboard-shortcuts.syncGlobalNudge"
+msgid "Adjust sync offset by 1 second"
+msgstr "Изменить смещение синхронизации на 1 секунду"
+
+msgctxt "keyboard-shortcuts.templateImport"
+msgid "Open template"
+msgstr "Открыть шаблон"
+
+msgctxt "keyboard-shortcuts.templateNew"
+msgid "New template"
+msgstr "Новый шаблон"
+
+msgctxt "keyboard-shortcuts.templateSave"
+msgid "Save template"
+msgstr "Сохранить шаблон"
+
+msgctxt "keyboard-shortcuts.templateSelect"
+msgid "Open template list"
+msgstr "Открыть список шаблонов"
+
+msgctxt "keyboard-shortcuts.timelineAndSync"
+msgid "Timeline and sync"
+msgstr "Временная шкала и синхронизация"
+
+msgctxt "keyboard-shortcuts.timelineClipNudge"
+msgid "Nudge selected clip synchronization"
+msgstr "Сдвинуть синхронизацию выбранного клипа"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeSecond"
+msgid "Nudge selected clip sync offset by 1 second"
+msgstr "Сдвинуть синхронизацию клипа на 1 секунду"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeTenthSecond"
+msgid "Nudge selected clip sync offset by 0.1 seconds"
+msgstr "Сдвинуть синхронизацию клипа на 0,1 секунды"
+
+msgctxt "keyboard-shortcuts.timelineFitActivity"
+msgid "Switch timeline to show activity"
+msgstr "Показать активность на шкале"
+
+msgctxt "keyboard-shortcuts.timelineFitAll"
+msgid "Show entire timeline"
+msgstr "Показать всю временную шкалу"
+
+msgctxt "keyboard-shortcuts.timelineFitMedia"
+msgid "Switch timeline to all media"
+msgstr "Переключить временную шкалу на все медиа"
+
+msgctxt "keyboard-shortcuts.timelineFitVideo"
+msgid "Switch timeline to show video"
+msgstr "Показать видео на шкале"
+
+msgctxt "keyboard-shortcuts.timelineWheelPan"
+msgid "Pan timeline"
+msgstr "Панорамировать временную шкалу"
+
+msgctxt "keyboard-shortcuts.timelineWheelZoom"
+msgid "Zoom timeline at pointer"
+msgstr "Масштабировать шкалу у указателя"
+
+msgctxt "keyboard-shortcuts.trimAfterPlayhead"
+msgid "Trim after the playhead (the video, or the activity without videos)"
+msgstr "Обрезать после указателя воспроизведения (видео или, без видео, активность)"
+
+msgctxt "keyboard-shortcuts.trimBeforePlayhead"
+msgid "Trim before the playhead (the video, or the activity without videos)"
+msgstr "Обрезать до указателя воспроизведения (видео или, без видео, активность)"
+
+msgctxt "keyboard-shortcuts.videoImport"
+msgid "Import video"
+msgstr "Импортировать видео"
+
+msgctxt "keyboard-shortcuts.videoPlayer"
+msgid "Video player"
+msgstr "Видеоплеер"
+
+msgctxt "keyboard-shortcuts.widgetEditor"
+msgid "Widget editor"
+msgstr "Редактор виджетов"
+
+msgctxt "overlay-editor.mapReset"
+msgid "Reset"
+msgstr "Сбросить"
+
+msgctxt "overlay-editor.mapViewHint"
+msgid "Double-click to pan & zoom"
+msgstr "Дважды щёлкните, чтобы сдвигать и масштабировать"
+
+msgctxt "overlay-editor.mapViewZoomHint"
+msgid "Double-click to zoom"
+msgstr "Дважды щёлкните, чтобы масштабировать"
+
+msgctxt "overlay-editor.statusModified"
+msgid "Modified"
+msgstr "Изменено"
+
+msgctxt "overlay-editor.statusUnsaved"
+msgid "Unsaved"
+msgstr "Не сохранено"
+
+msgctxt "player.activity"
+msgid "Activity"
+msgstr "Активность"
+
+msgctxt "player.all"
+msgid "All"
+msgstr "Все"
+
+msgctxt "player.duration"
+msgid "Duration"
+msgstr "Длительность"
+
+msgctxt "player.resetView"
+msgid "Reset view"
+msgstr "Сбросить вид"
+
+msgctxt "player.rewindToEnd"
+msgid "Rewind to end"
+msgstr "Перейти в конец"
+
+msgctxt "player.rewindToStart"
+msgid "Rewind to start"
+msgstr "Перейти в начало"
+
+msgctxt "player.stepBack"
+msgid "Step back"
+msgstr "Шаг назад"
+
+msgctxt "player.stepForward"
+msgid "Step forward"
+msgstr "Шаг вперёд"
+
+msgctxt "player.trimActivityAfterPlayhead"
+msgid "Trim the activity after the playhead"
+msgstr "Обрезать активность после указателя воспроизведения"
+
+msgctxt "player.trimActivityBeforePlayhead"
+msgid "Trim the activity before the playhead"
+msgstr "Обрезать активность до указателя воспроизведения"
+
+msgctxt "player.trimActivityEnd"
+msgid "Drag to trim the end of the activity"
+msgstr "Перетащите, чтобы обрезать конец активности"
+
+msgctxt "player.trimActivityStart"
+msgid "Drag to trim the start of the activity"
+msgstr "Перетащите, чтобы обрезать начало активности"
+
+msgctxt "player.trimVideoAfterPlayhead"
+msgid "Trim the video after the playhead"
+msgstr "Обрезать видео после указателя воспроизведения"
+
+msgctxt "player.trimVideoBeforePlayhead"
+msgid "Trim the video before the playhead"
+msgstr "Обрезать видео до указателя воспроизведения"
+
+msgctxt "player.video"
+msgid "Video"
+msgstr "Видео"
+
+msgctxt "player.zoomIn"
+msgid "Zoom in"
+msgstr "Увеличить масштаб"
+
+msgctxt "player.zoomOut"
+msgid "Zoom out"
+msgstr "Уменьшить масштаб"
+
+msgctxt "projects.activity"
+msgid "Activity"
+msgstr "Активность"
+
+msgctxt "projects.archiveTooLarge"
+msgid "The project exceeds the 40 MiB archive limit. Remove or replace an image."
+msgstr "Проект превышает ограничение архива в 40 МиБ. Удалите или замените изображение."
+
+msgctxt "projects.cancel"
+msgid "Cancel"
+msgstr "Отмена"
+
+msgctxt "projects.closeWithoutSaving"
+msgid "Close Without Saving"
+msgstr "Закрыть без сохранения"
+
+msgctxt "projects.createNewProject"
+msgid "Create New Project"
+msgstr "Создать новый проект"
+
+msgctxt "projects.createProject"
+msgid "create project"
+msgstr "создание проекта"
+
+msgctxt "projects.invalidArchive"
+msgid "The project archive is invalid or damaged. Choose another project file."
+msgstr "Архив проекта недействителен или повреждён. Выберите другой файл проекта."
+
+msgctxt "projects.loadAnyway"
+msgid "Load Anyway"
+msgstr "Загрузить всё равно"
+
+msgctxt "projects.locate"
+msgid "Locate"
+msgstr "Найти"
+
+msgctxt "projects.missingSourceDescription"
+msgid "The {0} file does not seem to exist. Locate the moved file or cancel without changing the current session."
+msgstr "Похоже, файл для {0} не существует. Найдите перемещённый файл или отмените действие без изменения текущего сеанса."
+
+msgctxt "projects.newProject"
+msgid "New Project"
+msgstr "Новый проект"
+
+msgctxt "projects.openAProject"
+msgid "Open a project"
+msgstr "Открыть проект"
+
+msgctxt "projects.openProject"
+msgid "open project"
+msgstr "открытие проекта"
+
+msgctxt "projects.rasterUnavailable"
+msgid "An image is unavailable. Replace it before saving."
+msgstr "Изображение недоступно. Замените его перед сохранением."
+
+msgctxt "projects.saveFailed"
+msgid "The project could not be saved. Check the destination and try again."
+msgstr "Не удалось сохранить проект. Проверьте место сохранения и повторите попытку."
+
+msgctxt "projects.saveProject"
+msgid "save project"
+msgstr "сохранение проекта"
+
+msgctxt "projects.sourceNotFound"
+msgid "{0} source not found"
+msgstr "Источник для {0} не найден"
+
+msgctxt "projects.unsavedChanges"
+msgid "Your project has unsaved changes. Save them or discard them."
+msgstr "В проекте есть несохранённые изменения. Сохраните их или отмените изменения."
+
+msgctxt "projects.unsavedChangesBeforeExit"
+msgid "Your project has unsaved changes. Do you want to save the changes or close without saving?"
+msgstr "В проекте есть несохранённые изменения. Сохранить изменения или закрыть без сохранения?"
+
+msgctxt "projects.unsavedChangesTitle"
+msgid "Unsaved Changes"
+msgstr "Несохранённые изменения"
+
+msgctxt "projects.video"
+msgid "Video"
+msgstr "Видео"
+
+msgctxt "raster.errors.corruptAsset"
+msgid "The embedded image is damaged. Select a replacement."
+msgstr "Встроенное изображение повреждено. Выберите замену."
+
+msgctxt "raster.errors.decode"
+msgid "Image could not be decoded. Choose another image."
+msgstr "Не удалось декодировать изображение. Выберите другое."
+
+msgctxt "raster.errors.encodedSize"
+msgid "Image file is larger than 5 MiB. Choose a smaller file."
+msgstr "Размер файла превышает 5 МиБ. Выберите файл меньшего размера."
+
+msgctxt "raster.errors.invalidConfig"
+msgid "Image settings are invalid."
+msgstr "Конфигурация изображения недействительна."
+
+msgctxt "raster.errors.missing"
+msgid "Image file is missing. Select another image."
+msgstr "Файл изображения не найден. Выберите другой."
+
+msgctxt "raster.errors.missingAsset"
+msgid "The embedded image is missing from this project. Select a replacement."
+msgstr "В проекте отсутствует встроенное изображение. Выберите замену."
+
+msgctxt "raster.errors.noImage"
+msgid "Image {{id}} has no selected file. Select one before rendering."
+msgstr "Для изображения {{id}} не выбран файл. Выберите его перед рендерингом."
+
+msgctxt "raster.errors.relativePath"
+msgid "Select an image from an absolute file path."
+msgstr "Выберите изображение по абсолютному пути к файлу."
+
+msgctxt "raster.errors.renderUnavailable"
+msgid "Image {{id}} cannot be rendered yet."
+msgstr "Изображение {{id}} пока нельзя отрендерить."
+
+msgctxt "raster.errors.resolution"
+msgid "Image resolution exceeds 25 megapixels. Choose a smaller image."
+msgstr "Разрешение превышает 25 мегапикселей. Выберите изображение меньшего размера."
+
+msgctxt "raster.errors.unreadable"
+msgid "Image file cannot be read. Check its permissions or select another image."
+msgstr "Не удалось прочитать файл изображения. Проверьте разрешения или выберите другой."
+
+msgctxt "raster.errors.unsupportedType"
+msgid "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff)."
+msgstr "Выберите файл PNG, JPEG, BMP или TIFF (.png, .jpeg, .jpg, .bmp, .tiff)."
+
+msgctxt "raster.imageFiles"
+msgid "Image files"
+msgstr "Файлы изображений"
+
+msgctxt "raster.replaceImage"
+msgid "Replace image"
+msgstr "Заменить изображение"
+
+msgctxt "raster.selectImage"
+msgid "Select image"
+msgstr "Выбрать изображение"
+
+msgctxt "render-video.batchResult.cancelled"
+msgid "Batch cancelled"
+msgstr "Пакет отменён"
+
+msgctxt "render-video.batchResult.completedWithErrors"
+msgid "Batch finished with errors"
+msgstr "Пакет завершён с ошибками"
+
+msgctxt "render-video.batchResult.failed"
+msgid "Batch failed"
+msgstr "Ошибка пакета"
+
+msgctxt "render-video.better"
+msgid "Better"
+msgstr "Лучше"
+
+msgctxt "render-video.bitrate"
+msgid "Bitrate"
+msgstr "Битрейт"
+
+msgctxt "render-video.cancel"
+msgid "Cancel"
+msgstr "Отмена"
+
+msgctxt "render-video.cancelled"
+msgid "Cancelled"
+msgstr "Отменено"
+
+msgctxt "render-video.cancelling"
+msgid "Cancelling..."
+msgstr "Отмена..."
+
+msgctxt "render-video.chooseFolder"
+msgid "Choose folder..."
+msgstr "Выбрать папку..."
+
+msgctxt "render-video.close"
+msgid "Close"
+msgstr "Закрыть"
+
+msgctxt "render-video.codecOutputFormat"
+msgid "Codec / Output Format"
+msgstr "Кодек / формат вывода"
+
+msgctxt "render-video.custom"
+msgid "Custom"
+msgstr "Пользовательский"
+
+msgctxt "render-video.customFps"
+msgid "Custom FPS"
+msgstr "Пользовательский FPS"
+
+msgctxt "render-video.done"
+msgid "Done"
+msgstr "Готово"
+
+msgctxt "render-video.encodingOutputFile"
+msgid "Encoding output file..."
+msgstr "Кодирование выходного файла..."
+
+msgctxt "render-video.encodingValVal2Frames"
+msgid "Encoding: {{val}} / {{val2}} frames"
+msgstr "Кодирование: {{val}} / {{val2}} кадров"
+
+msgctxt "render-video.estRemaining"
+msgid "Est. Remaining"
+msgstr "Осталось (оценка)"
+
+msgctxt "render-video.exportFinished"
+msgid "Export Finished"
+msgstr "Экспорт завершён"
+
+msgctxt "render-video.exportSettings"
+msgid "Export Settings"
+msgstr "Настройки экспорта"
+
+msgctxt "render-video.exportingOverlay"
+msgid "Exporting Overlay"
+msgstr "Экспорт оверлея"
+
+msgctxt "render-video.finalizingVideo"
+msgid "Finalizing Video"
+msgstr "Завершение видео"
+
+msgctxt "render-video.frameProgress"
+msgid "{{current}} / {{total}} frames"
+msgstr "{{current}} / {{total}} кадров"
+
+msgctxt "render-video.framerate"
+msgid "Framerate"
+msgstr "Частота кадров"
+
+msgctxt "render-video.fullVideo"
+msgid "Full Video"
+msgstr "Полное видео"
+
+msgctxt "render-video.hardwareAcceleration"
+msgid "Hardware Acceleration"
+msgstr "Аппаратное ускорение"
+
+msgctxt "render-video.hardwareAccelerationVaapiHelp"
+msgid "VAAPI needs your GPU's VA-API driver. Install it with your package manager:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nRun vainfo to check that the driver loads. NVIDIA GPUs use the NVIDIA GPU option instead."
+msgstr "Для VAAPI нужен драйвер VA-API для вашей видеокарты. Установите его через пакетный менеджер:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nЗапустите vainfo, чтобы убедиться, что драйвер загружается. Для видеокарт NVIDIA используйте вариант NVIDIA GPU."
+
+msgctxt "render-video.hiddenByOverlap"
+msgid "Hidden behind an overlapping video"
+msgstr "Скрыто перекрывающим видео"
+
+msgctxt "render-video.keepAppOpen"
+msgid "Please keep the application open during rendering"
+msgstr "Не закрывайте приложение во время рендеринга"
+
+msgctxt "render-video.largerFile"
+msgid "Larger file"
+msgstr "Больший файл"
+
+msgctxt "render-video.loadAGpxfitActivityFirst"
+msgid "Load a GPX/FIT activity first"
+msgstr "Сначала загрузите активность GPX/FIT"
+
+msgctxt "render-video.lockedToEachVideoFps"
+msgid "Locked to each video's FPS"
+msgstr "Привязано к FPS каждого видео"
+
+msgctxt "render-video.lockedToVideoFps"
+msgid "Locked to video FPS ({{fps}} fps)"
+msgstr "Привязано к FPS видео ({{fps}} fps)"
+
+msgctxt "render-video.minutesMinSecondsSec"
+msgid "{{minutes}} min {{seconds}} sec"
+msgstr "{{minutes}} мин {{seconds}} с"
+
+msgctxt "render-video.mp4Codecs"
+msgid "MP4 Codecs"
+msgstr "Кодеки MP4"
+
+msgctxt "render-video.nothingToExport"
+msgid "Every video part is excluded from export."
+msgstr "Все части видео исключены из экспорта."
+
+msgctxt "render-video.outputContainerFps"
+msgid "Output container: {{fps}} fps"
+msgstr "Контейнер вывода: {{fps}} fps"
+
+msgctxt "render-video.outputFile"
+msgid "Output file"
+msgstr "Выходной файл"
+
+msgctxt "render-video.outputFolder"
+msgid "Output folder"
+msgstr "Папка вывода"
+
+msgctxt "render-video.outputPath"
+msgid "Output path"
+msgstr "Путь вывода"
+
+msgctxt "render-video.overwrite"
+msgid "Overwrite"
+msgstr "Перезаписать"
+
+msgctxt "render-video.overwriteExistingFile"
+msgid "Overwrite existing file?"
+msgstr "Перезаписать существующий файл?"
+
+msgctxt "render-video.pathErrors.outputAliasesInput"
+msgid "The output would overwrite an input video"
+msgstr "Выходной файл перезаписал бы входное видео"
+
+msgctxt "render-video.pathErrors.outputDestinationsConflict"
+msgid "Multiple batch outputs use the same destination"
+msgstr "Несколько выходных файлов пакета используют одно место назначения"
+
+msgctxt "render-video.pathErrors.outputDirectoryInvalid"
+msgid "Choose an existing output directory"
+msgstr "Выберите существующий выходной каталог"
+
+msgctxt "render-video.pathErrors.outputDirectoryMissing"
+msgid "The output directory does not exist"
+msgstr "Выходной каталог не существует"
+
+msgctxt "render-video.pathErrors.outputExtensionInvalid"
+msgid "The output file must use .{{extension}}"
+msgstr "Выходной файл должен иметь расширение .{{extension}}"
+
+msgctxt "render-video.pathErrors.outputFileRequired"
+msgid "Choose an output file"
+msgstr "Выберите выходной файл"
+
+msgctxt "render-video.pathErrors.outputFilenameRequired"
+msgid "The output path must include a file name"
+msgstr "Путь к выходному файлу должен содержать имя файла"
+
+msgctxt "render-video.pathErrors.outputNotFile"
+msgid "The selected output is not a file"
+msgstr "Выбранное место назначения не является файлом"
+
+msgctxt "render-video.pathErrors.outputPathIncomplete"
+msgid "Choose a complete output path, including its folder"
+msgstr "Укажите полный путь к выходному файлу, включая папку"
+
+msgctxt "render-video.pathErrors.outputPathInvalid"
+msgid "The output file name or path is not valid"
+msgstr "Имя или путь выходного файла недопустимы"
+
+msgctxt "render-video.pathErrors.outputPermissionDenied"
+msgid "You do not have permission to write the output file"
+msgstr "У вас нет разрешения на запись выходного файла"
+
+msgctxt "render-video.pathErrors.outputWriteFailed"
+msgid "Could not create or write the output file: {{detail}}"
+msgstr "Не удалось создать или записать выходной файл: {{detail}}"
+
+msgctxt "render-video.pathErrors.sourceFilenameInvalid"
+msgid "The source file name is invalid"
+msgstr "Имя исходного файла недопустимо"
+
+msgctxt "render-video.percentComplete"
+msgid "{{percent}}% Complete"
+msgstr "Готово: {{percent}}%"
+
+msgctxt "render-video.preparingBatch"
+msgid "Preparing video..."
+msgstr "Подготовка видео..."
+
+msgctxt "render-video.quality"
+msgid "Quality"
+msgstr "Качество"
+
+msgctxt "render-video.queued"
+msgid "Queued"
+msgstr "В очереди"
+
+msgctxt "render-video.reinspectionRequired"
+msgid "Sources changed or inspection expired. Inspect again before starting."
+msgstr "Исходные файлы изменились или срок проверки истёк. Повторите проверку перед запуском."
+
+msgctxt "render-video.renderFps"
+msgid "Render FPS"
+msgstr "FPS рендеринга"
+
+msgctxt "render-video.rendering"
+msgid "Rendering..."
+msgstr "Рендеринг..."
+
+msgctxt "render-video.renderingAlreadyInProgress"
+msgid "Rendering already in progress"
+msgstr "Рендеринг уже выполняется"
+
+msgctxt "render-video.renderingFrames"
+msgid "Rendering frames..."
+msgstr "Рендеринг кадров..."
+
+msgctxt "render-video.resolutionMismatchInstructions"
+msgid "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template."
+msgstr "Это необходимо для корректного экспорта оверлея. Измените разрешение оверлея в настройках боковой панели или выберите другой шаблон."
+
+msgctxt "render-video.secondsSec"
+msgid "{{seconds}} sec"
+msgstr "{{seconds}} с"
+
+msgctxt "render-video.smallerFile"
+msgid "Smaller file"
+msgstr "Меньший файл"
+
+msgctxt "render-video.startRender"
+msgid "Start Render"
+msgstr "Начать рендеринг"
+
+msgctxt "render-video.startingRender"
+msgid "Starting render..."
+msgstr "Запуск рендеринга..."
+
+msgctxt "render-video.transparent"
+msgid "Transparent"
+msgstr "Прозрачный"
+
+msgctxt "render-video.transparentCodecs"
+msgid "Transparent Codecs"
+msgstr "Кодеки с прозрачностью"
+
+msgctxt "render-video.unavailable"
+msgid "Unavailable"
+msgstr "Недоступно"
+
+msgctxt "render-video.unstarted"
+msgid "Not started"
+msgstr "Не запущено"
+
+msgctxt "render-video.update1val"
+msgid "Update 1/{{val}}"
+msgstr "Обновление 1/{{val}}"
+
+msgctxt "render-video.videoImported"
+msgid "Video imported"
+msgstr "Видео импортировано"
+
+msgctxt "render-video.videoRequired"
+msgid "Video required"
+msgstr "Требуется видео"
+
+msgctxt "render-video.videoResolutionMismatchMessage"
+msgid "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}})."
+msgstr "Разрешение оверлея {{overlayResolution}} должно совпадать с разрешением импортированного видео ({{videoResolution}})."
+
+msgctxt "render-video.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "Частота обновления виджетов"
+
+msgctxt "render-video.worse"
+msgid "Worse"
+msgstr "Хуже"
+
+msgctxt "scene-settings.aspectRatio"
+msgid "Aspect Ratio"
+msgstr "Соотношение сторон"
+
+msgctxt "scene-settings.borderThickness"
+msgid "Border Thickness"
+msgstr "Толщина границы"
+
+msgctxt "scene-settings.borders"
+msgid "Borders"
+msgstr "Границы"
+
+msgctxt "scene-settings.custom"
+msgid "Custom"
+msgstr "Пользовательский"
+
+msgctxt "scene-settings.customFps"
+msgid "Custom FPS"
+msgstr "Пользовательский FPS"
+
+msgctxt "scene-settings.fixedWidthDigits"
+msgid "Fixed-Width Digits"
+msgstr "Цифры фиксированной ширины"
+
+msgctxt "scene-settings.fontLabels"
+msgid "Font - Labels"
+msgstr "Шрифт — метки"
+
+msgctxt "scene-settings.fontValues"
+msgid "Font - Values"
+msgstr "Шрифт — значения"
+
+msgctxt "scene-settings.framerate"
+msgid "Framerate"
+msgstr "Частота кадров"
+
+msgctxt "scene-settings.globalSettings"
+msgid "Global Settings"
+msgstr "Общие настройки"
+
+msgctxt "scene-settings.height"
+msgid "Height"
+msgstr "Высота"
+
+msgctxt "scene-settings.icons"
+msgid "Icons"
+msgstr "Значки"
+
+msgctxt "scene-settings.labels"
+msgid "Labels"
+msgstr "Метки"
+
+msgctxt "scene-settings.lockedToFps"
+msgid "Locked to {{fps}} fps"
+msgstr "Привязано к {{fps}} fps"
+
+msgctxt "scene-settings.overlay"
+msgid "Overlay"
+msgstr "Оверлей"
+
+msgctxt "scene-settings.portrait"
+msgid "Portrait (4:3)"
+msgstr "Портрет (4:3)"
+
+msgctxt "scene-settings.resolution"
+msgid "Resolution"
+msgstr "Разрешение"
+
+msgctxt "scene-settings.resolution1080p"
+msgid "1080p (1920x1080)"
+msgstr "1080p (1920x1080)"
+
+msgctxt "scene-settings.resolution1080pSquare"
+msgid "1080p Square (1080x1080)"
+msgstr "1080p, квадрат (1080x1080)"
+
+msgctxt "scene-settings.resolution1080pVertical"
+msgid "1080p Vertical (1080x1920)"
+msgstr "1080p, вертикальный (1080x1920)"
+
+msgctxt "scene-settings.resolution4k"
+msgid "4K (3840x2160)"
+msgstr "4K (3840x2160)"
+
+msgctxt "scene-settings.resolution4kSquare"
+msgid "4K Square (2160x2160)"
+msgstr "4K, квадрат (2160x2160)"
+
+msgctxt "scene-settings.resolution4kVertical"
+msgid "4K Vertical (2160x3840)"
+msgstr "4K, вертикальный (2160x3840)"
+
+msgctxt "scene-settings.resolution720p"
+msgid "720p (1280x720)"
+msgstr "720p (1280x720)"
+
+msgctxt "scene-settings.resolutionMismatch"
+msgid "Overlay and video resolutions do not match"
+msgstr "Разрешение оверлея и видео не совпадает"
+
+msgctxt "scene-settings.resolutionQxga"
+msgid "QXGA (2048x1536)"
+msgstr "QXGA (2048x1536)"
+
+msgctxt "scene-settings.resolutionSxga"
+msgid "SXGA+ (1400x1050)"
+msgstr "SXGA+ (1400x1050)"
+
+msgctxt "scene-settings.resolutionUltrawide"
+msgid "Ultrawide (3440x1440)"
+msgstr "Сверхширокий (3440x1440)"
+
+msgctxt "scene-settings.resolutionUxga"
+msgid "UXGA (1600x1200)"
+msgstr "UXGA (1600x1200)"
+
+msgctxt "scene-settings.resolutionXga"
+msgid "XGA (1920x1440)"
+msgstr "XGA (1920x1440)"
+
+msgctxt "scene-settings.scale"
+msgid "Scale"
+msgstr "Масштаб"
+
+msgctxt "scene-settings.shadowDistance"
+msgid "Shadow Distance"
+msgstr "Расстояние до тени"
+
+msgctxt "scene-settings.shadowStrength"
+msgid "Shadow Strength"
+msgstr "Интенсивность тени"
+
+msgctxt "scene-settings.shadows"
+msgid "Shadows"
+msgstr "Тени"
+
+msgctxt "scene-settings.square"
+msgid "Square (1:1)"
+msgstr "Квадрат (1:1)"
+
+msgctxt "scene-settings.transparency"
+msgid "Transparency"
+msgstr "Прозрачность"
+
+msgctxt "scene-settings.ultrawide"
+msgid "Ultrawide (21:9)"
+msgstr "Сверхширокий (21:9)"
+
+msgctxt "scene-settings.units"
+msgid "Units"
+msgstr "Единицы"
+
+msgctxt "scene-settings.values"
+msgid "Values"
+msgstr "Значения"
+
+msgctxt "scene-settings.vertical"
+msgid "Vertical (9:16)"
+msgstr "Вертикальный (9:16)"
+
+msgctxt "scene-settings.widescreen"
+msgid "Widescreen (16:9)"
+msgstr "Широкий экран (16:9)"
+
+msgctxt "scene-settings.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "Частота обновления виджетов"
+
+msgctxt "scene-settings.width"
+msgid "Width"
+msgstr "Ширина"
+
+msgctxt "store.couldNotDetermineVideoCreationTime"
+msgid "Could not determine video creation time"
+msgstr "Не удалось определить время создания видео"
+
+msgctxt "store.invalidTimestampFormats"
+msgid "Invalid timestamp formats"
+msgstr "Недопустимые форматы временных меток"
+
+msgctxt "store.timezoneIsRequiredForVideoSync"
+msgid "timezone is required for video sync"
+msgstr "Для синхронизации видео требуется часовой пояс"
+
+msgctxt "template-manager.cancel"
+msgid "Cancel"
+msgstr "Отмена"
+
+msgctxt "template-manager.createNewTemplate"
+msgid "Create New Template"
+msgstr "Создать новый шаблон"
+
+msgctxt "template-manager.newTemplate"
+msgid "New Template"
+msgstr "Новый шаблон"
+
+msgctxt "template-manager.save"
+msgid "Save"
+msgstr "Сохранить"
+
+msgctxt "template-manager.unsavedChanges"
+msgid "Your template has unsaved changes. Save them or discard them."
+msgstr "В шаблоне есть несохранённые изменения. Сохраните их или отмените изменения."
+
+msgctxt "toolbar.activity"
+msgid "Activity"
+msgstr "Активность"
+
+msgctxt "toolbar.activityType"
+msgid "Activity type"
+msgstr "Тип активности"
+
+msgctxt "toolbar.applyTimezone"
+msgid "Apply Timezone"
+msgstr "Часовой пояс"
+
+msgctxt "toolbar.autosync"
+msgid "Auto-sync"
+msgstr "Автосинхронизация"
+
+msgctxt "toolbar.bitRate"
+msgid "Bit rate"
+msgstr "Битрейт"
+
+msgctxt "toolbar.calculated"
+msgid "Calculated"
+msgstr "Рассчитано"
+
+msgctxt "toolbar.camera"
+msgid "Camera"
+msgstr "Камера"
+
+msgctxt "toolbar.codec"
+msgid "Codec"
+msgstr "Кодек"
+
+msgctxt "toolbar.createdAt"
+msgid "Created at"
+msgstr "Создано"
+
+msgctxt "toolbar.creationTime"
+msgid "Creation Time"
+msgstr "Время создания"
+
+msgctxt "toolbar.deleteActivity"
+msgid "Delete activity"
+msgstr "Удалить активность"
+
+msgctxt "toolbar.details"
+msgid "Details"
+msgstr "Подробности"
+
+msgctxt "toolbar.detected"
+msgid "Detected"
+msgstr "Авто"
+
+msgctxt "toolbar.detectedLaps"
+msgid "Detected laps"
+msgstr "Обнаруженные круги"
+
+msgctxt "toolbar.distance"
+msgid "Distance"
+msgstr "Расстояние"
+
+msgctxt "toolbar.dropActivityFile"
+msgid "Drop activity file"
+msgstr "Перетащите файл активности"
+
+msgctxt "toolbar.dropVideoFile"
+msgid "Drop video files"
+msgstr "Перетащите видеофайл"
+
+msgctxt "toolbar.duration"
+msgid "Duration"
+msgstr "Длительность"
+
+msgctxt "toolbar.extracted"
+msgid "Extracted"
+msgstr "Извлечено"
+
+msgctxt "toolbar.filename"
+msgid "Filename"
+msgstr "Имя"
+
+msgctxt "toolbar.frameRate"
+msgid "Frame rate"
+msgstr "Частота кадров"
+
+msgctxt "toolbar.lapDuration"
+msgid "Duration"
+msgstr "Длительность"
+
+msgctxt "toolbar.lapNumber"
+msgid "Lap"
+msgstr "Круг"
+
+msgctxt "toolbar.lapStart"
+msgid "Start"
+msgstr "Начало"
+
+msgctxt "toolbar.loadActivity"
+msgid "Load activity"
+msgstr "Загрузить активность"
+
+msgctxt "toolbar.loadVideo"
+msgid "Load videos"
+msgstr "Загрузить видео"
+
+msgctxt "toolbar.newProject"
+msgid "New Project"
+msgstr "Новый проект"
+
+msgctxt "toolbar.noDataCalculated"
+msgid "No data were calculated"
+msgstr "Данные не рассчитаны"
+
+msgctxt "toolbar.noDataExtracted"
+msgid "No data were extracted"
+msgstr "Данные не извлечены"
+
+msgctxt "toolbar.openProject"
+msgid "Open Project"
+msgstr "Открыть"
+
+msgctxt "toolbar.pinDrawer"
+msgid "Pin drawer"
+msgstr "Закрепить панель"
+
+msgctxt "toolbar.projects"
+msgid "Projects"
+msgstr "Проекты"
+
+msgctxt "toolbar.resolution"
+msgid "Resolution"
+msgstr "Разрешение"
+
+msgctxt "toolbar.restoreDetectedVideoCreationTime"
+msgid "Restore detected video creation time"
+msgstr "Восстановить обнаруженное время создания видео"
+
+msgctxt "toolbar.saveProject"
+msgid "Save Project"
+msgstr "Сохранить проект"
+
+msgctxt "toolbar.saveProjectAs"
+msgid "Save Project As"
+msgstr "Сохранить проект как"
+
+msgctxt "toolbar.showLap"
+msgid "Show lap {0}"
+msgstr "Показать круг {0}"
+
+msgctxt "toolbar.startTime"
+msgid "Start time"
+msgstr "Время начала"
+
+msgctxt "toolbar.syncOffset"
+msgid "Sync Offset"
+msgstr "Смещение синхронизации"
+
+msgctxt "toolbar.timeSource"
+msgid "Time source"
+msgstr "Источник времени"
+
+msgctxt "toolbar.timeSourceFilename"
+msgid "Filename"
+msgstr "Имя файла"
+
+msgctxt "toolbar.timeSourceGps"
+msgid "GPS timestamp"
+msgstr "Временная метка GPS"
+
+msgctxt "toolbar.timeSourceMetadata"
+msgid "Metadata"
+msgstr "Метаданные"
+
+msgctxt "toolbar.timezone"
+msgid "Timezone"
+msgstr "Часовой пояс"
+
+msgctxt "toolbar.unknown"
+msgid "Unknown"
+msgstr "Неизвестно"
+
+msgctxt "toolbar.unknownTimeSource"
+msgid "Unknown ({{value}})"
+msgstr "Неизвестный источник времени ({{value}})"
+
+msgctxt "toolbar.unpinDrawer"
+msgid "Unpin drawer"
+msgstr "Открепить панель"
+
+msgctxt "toolbar.valBitRate"
+msgid "{{val}} Mbps"
+msgstr "{{val}} Mbps"
+
+msgctxt "toolbar.valFps"
+msgid "{{val}} fps"
+msgstr "{{val}} fps"
+
+msgctxt "toolbar.valPoints"
+msgid "{{val}} points"
+msgstr "{{val}} точек"
+
+msgctxt "toolbar.valResolution"
+msgid "{{width}}×{{height}}"
+msgstr "{{width}}×{{height}}"
+
+msgctxt "toolbar.video"
+msgid "Video"
+msgstr "Видео"
+
+msgctxt "toolbar.videoSync"
+msgid "Sync Doctor"
+msgstr "Синхронизация видео"
+
+msgctxt "toolbar.widgets"
+msgid "Widgets"
+msgstr "Виджеты"
+
+msgctxt "undo-redo.redoCtrlcmdshiftz"
+msgid "Redo"
+msgstr "Повторить"
+
+msgctxt "undo-redo.undoCtrlcmdz"
+msgid "Undo"
+msgstr "Отменить"
+
+msgctxt "video-preview.gpuRequired"
+msgid "Video playback requires at least an integrated GPU."
+msgstr "Для воспроизведения видео требуется как минимум встроенный графический процессор."
+
+msgctxt "video-preview.theVideoPreviewCouldNotBeLoaded"
+msgid "The video preview could not be loaded."
+msgstr "Не удалось загрузить предпросмотр видео."
+
+msgctxt "video-preview.videoOrImage"
+msgid "Video or Image"
+msgstr "Видео или изображение"
+
+msgctxt "videoSync.activityRequiredForSync"
+msgid "Activity telemetry is required for Landmark Sync"
+msgstr "Для синхронизации по ориентирам нужны данные активности"
+
+msgctxt "videoSync.applyCandidate"
+msgid "Apply offset {0} seconds"
+msgstr "Применить смещение {0} с"
+
+msgctxt "videoSync.autodetect"
+msgid "Autodetect"
+msgstr "Авто"
+
+msgctxt "videoSync.candidates"
+msgid "Sync candidates"
+msgstr "Варианты синхронизации"
+
+msgctxt "videoSync.changeLandmarkType"
+msgid "Change {0} landmark type"
+msgstr "Изменить тип ориентира: {0}"
+
+msgctxt "videoSync.clearLandmarks"
+msgid "Clear"
+msgstr "Сброс"
+
+msgctxt "videoSync.deleteLandmark"
+msgid "Delete {0} landmark"
+msgstr "Удалить ориентир: {0}"
+
+msgctxt "videoSync.detectedEvent"
+msgid "detected {{label}}"
+msgstr "Обнаружено: {{label}}"
+
+msgctxt "videoSync.detectedEventRange"
+msgid "{{label}} event from {{start}} to {{end}} seconds"
+msgstr "Событие «{{label}}»: {{start}}–{{end}} с"
+
+msgctxt "videoSync.detectedEvents"
+msgid "Detected events"
+msgstr "Обнаруженные события"
+
+msgctxt "videoSync.detection"
+msgid "Sensitivity & Detection"
+msgstr "Чувствительность и обнаружение"
+
+msgctxt "videoSync.landmarkAriaLabel"
+msgid "{0} landmark at {1} seconds"
+msgstr "Ориентир «{0}» — {1} с"
+
+msgctxt "videoSync.landmarkLimit"
+msgid "The maximum of five landmarks has been reached"
+msgstr "Достигнут максимум в пять ориентиров"
+
+msgctxt "videoSync.landmarksMatched"
+msgid "{{matched}} / {{eligible}} landmarks matched"
+msgstr "Совпадения: {{matched}} / {{eligible}}"
+
+msgctxt "videoSync.leftTurn"
+msgid "Left Turn"
+msgstr "Поворот влево"
+
+msgctxt "videoSync.leftTurns"
+msgid "Left Turns"
+msgstr "Повороты налево"
+
+msgctxt "videoSync.location"
+msgid "Location"
+msgstr "Место"
+
+msgctxt "videoSync.locationLimit"
+msgid "Only one location landmark is allowed"
+msgstr "Можно добавить только один ориентир местоположения"
+
+msgctxt "videoSync.locationOnly"
+msgid "Location only"
+msgstr "Только место"
+
+msgctxt "videoSync.locationSyncCandidates"
+msgid "Location Sync"
+msgstr "Место"
+
+msgctxt "videoSync.locations"
+msgid "Locations"
+msgstr "Места"
+
+msgctxt "videoSync.manualSync"
+msgid "Manual Sync"
+msgstr "Вручную"
+
+msgctxt "videoSync.markControls"
+msgid "Video sync landmark controls"
+msgstr "Метки видео"
+
+msgctxt "videoSync.markLeftTurn"
+msgid "Mark Left Turn"
+msgstr "Метка: влево"
+
+msgctxt "videoSync.markLocation"
+msgid "Mark Location"
+msgstr "Метка: место"
+
+msgctxt "videoSync.markRightTurn"
+msgid "Mark Right Turn"
+msgstr "Метка: вправо"
+
+msgctxt "videoSync.markStop"
+msgid "Mark Stop"
+msgstr "Метка стопа"
+
+msgctxt "videoSync.minimumLandmarksForSync"
+msgid "At least two landmarks are required"
+msgstr "Требуется как минимум два ориентира"
+
+msgctxt "videoSync.noCandidate"
+msgid "No candidate aligns at least two landmarks"
+msgstr "Нет варианта, совпадающего хотя бы с двумя ориентирами"
+
+msgctxt "videoSync.noLandmarks"
+msgid "No landmarks marked yet."
+msgstr "Ориентиры ещё не отмечены."
+
+msgctxt "videoSync.openManualSync"
+msgid "Open Manual Sync"
+msgstr "Открыть ручную синхр."
+
+msgctxt "videoSync.playheadInsideVideo"
+msgid "Move the playhead inside the video to mark a landmark"
+msgstr "Переместите указатель воспроизведения внутрь видео, чтобы отметить ориентир"
+
+msgctxt "videoSync.rightTurn"
+msgid "Right Turn"
+msgstr "Поворот вправо"
+
+msgctxt "videoSync.rightTurns"
+msgid "Right Turns"
+msgstr "Повороты направо"
+
+msgctxt "videoSync.setLocationInMap"
+msgid "Set location"
+msgstr "Задать место"
+
+msgctxt "videoSync.speed"
+msgid "Speed"
+msgstr "Скор."
+
+msgctxt "videoSync.speedSensitivity"
+msgid "Speed"
+msgstr "Скор."
+
+msgctxt "videoSync.staleCandidates"
+msgid "Landmarks changed. Rerun the Sync again"
+msgstr "Ориентиры изменились. Запустите синхронизацию ещё раз"
+
+msgctxt "videoSync.stop"
+msgid "Stop"
+msgstr "Стоп"
+
+msgctxt "videoSync.stops"
+msgid "Stops"
+msgstr "Стоянки"
+
+msgctxt "videoSync.syncCandidates"
+msgid "Sync Candidates"
+msgstr "Варианты синхронизации"
+
+msgctxt "videoSync.syncLandmarks"
+msgid "Sync All Landmarks"
+msgstr "Синхр. все метки"
+
+msgctxt "videoSync.syncLocation"
+msgid "Match Location Only"
+msgstr "Только место"
+
+msgctxt "videoSync.timelineGraph"
+msgid "Activity telemetry graph"
+msgstr "График данных активности"
+
+msgctxt "videoSync.turnSensitivity"
+msgid "Min turn"
+msgstr "Мин. угол"
+
+msgctxt "videoSync.turning"
+msgid "Turning"
+msgstr "Повороты"
+
+msgctxt "videoSync.videoLandmarks"
+msgid "Video landmarks"
+msgstr "Ориентиры на видео"
+
+msgctxt "videoSync.videoRequired"
+msgid "A video is required to mark a landmark"
+msgstr "Для отметки ориентира требуется видео"
+
+msgctxt "videoSync.videoRequiredForSync"
+msgid "A video is required for Landmark Sync"
+msgstr "Для синхронизации по ориентирам требуется видео"
+
+msgctxt "videoSync.yourLandmarks"
+msgid "Video Landmarks"
+msgstr "Метки видео"
+
+msgctxt "widget-editor.activityStart"
+msgid "Activity"
+msgstr "активности"
+
+msgctxt "widget-editor.addMetric"
+msgid "Add metric"
+msgstr "Добавить метрику"
+
+msgctxt "widget-editor.alignment"
+msgid "Alignment"
+msgstr "Выравнивание"
+
+msgctxt "widget-editor.alignmentBelow"
+msgid "Top"
+msgstr "Сверху"
+
+msgctxt "widget-editor.alignmentCentered"
+msgid "Centered"
+msgstr "По центру"
+
+msgctxt "widget-editor.altitudeAtStart"
+msgid "Altitude at start"
+msgstr "Высота в начале"
+
+msgctxt "widget-editor.angleTrack"
+msgid "Angle Track"
+msgstr "Указатель угла"
+
+msgctxt "widget-editor.arcAngle"
+msgid "Arc Angle"
+msgstr "Угол дуги"
+
+msgctxt "widget-editor.arcTrack"
+msgid "Arc Track"
+msgstr "Дуговой указатель"
+
+msgctxt "widget-editor.areaGradient"
+msgid "Gradient"
+msgstr "Градиент"
+
+msgctxt "widget-editor.areaOpacity"
+msgid "Area Opacity"
+msgstr "Непрозрачность области"
+
+msgctxt "widget-editor.areaStyling"
+msgid "Area Styling"
+msgstr "Стиль области"
+
+msgctxt "widget-editor.axisMapping"
+msgid "Axis Mapping"
+msgstr "Привязка осей"
+
+msgctxt "widget-editor.backdropStyle"
+msgid "Backdrop Style"
+msgstr "Стиль фона"
+
+msgctxt "widget-editor.backgroundColor"
+msgid "Background"
+msgstr "Фон"
+
+msgctxt "widget-editor.balanceFormat"
+msgid "Balance Format"
+msgstr "Формат баланса"
+
+msgctxt "widget-editor.bar"
+msgid "Bar"
+msgstr "Полоса"
+
+msgctxt "widget-editor.barCount"
+msgid "Bar Count"
+msgstr "Число полос"
+
+msgctxt "widget-editor.barGap"
+msgid "Bar Gap"
+msgstr "Зазор полос"
+
+msgctxt "widget-editor.barHeight"
+msgid "Bar Height"
+msgstr "Высота полосы"
+
+msgctxt "widget-editor.barWidth"
+msgid "Bar Width"
+msgstr "Ширина полосы"
+
+msgctxt "widget-editor.border"
+msgid "Border"
+msgstr "Граница"
+
+msgctxt "widget-editor.borderColor"
+msgid "Border Color"
+msgstr "Цвет границы"
+
+msgctxt "widget-editor.borderOpacity"
+msgid "Border Opacity"
+msgstr "Прозрачность края"
+
+msgctxt "widget-editor.borderThickness"
+msgid "Border Thickness"
+msgstr "Толщина границы"
+
+msgctxt "widget-editor.both"
+msgid "Both"
+msgstr "Оба"
+
+msgctxt "widget-editor.bottom"
+msgid "Bottom"
+msgstr "Снизу"
+
+msgctxt "widget-editor.bottomEdgeStrip"
+msgid "Bottom edge strip"
+msgstr "Нижняя полоса"
+
+msgctxt "widget-editor.bottomLeft"
+msgid "Bottom Left"
+msgstr "Снизу слева"
+
+msgctxt "widget-editor.bottomRight"
+msgid "Bottom Right"
+msgstr "Снизу справа"
+
+msgctxt "widget-editor.cameraMode"
+msgid "Camera Mode"
+msgstr "Режим камеры"
+
+msgctxt "widget-editor.cardinalColor"
+msgid "Cardinal Color"
+msgstr "Цвет сторон света"
+
+msgctxt "widget-editor.cardinalLabels"
+msgid "Cardinal Labels"
+msgstr "Стороны света"
+
+msgctxt "widget-editor.ceilingAreaColor"
+msgid "Area Color"
+msgstr "Цвет области"
+
+msgctxt "widget-editor.ceilingAreaOpacity"
+msgid "Area Opacity"
+msgstr "Непрозрачность области"
+
+msgctxt "widget-editor.ceilingLineColor"
+msgid "Line Color"
+msgstr "Цвет линии"
+
+msgctxt "widget-editor.ceilingLineOpacity"
+msgid "Line Opacity"
+msgstr "Непрозрачность линии"
+
+msgctxt "widget-editor.chartMetric"
+msgid "Metric"
+msgstr "Метрика"
+
+msgctxt "widget-editor.chartMetrics"
+msgid "Metrics"
+msgstr "Метрики"
+
+msgctxt "widget-editor.chaseCamera"
+msgid "Chase Camera"
+msgstr "Камера слежения"
+
+msgctxt "widget-editor.climbColor"
+msgid "Climb"
+msgstr "Подъём"
+
+msgctxt "widget-editor.color"
+msgid "Color"
+msgstr "Цвет"
+
+msgctxt "widget-editor.colorNegative"
+msgid "Color Negative"
+msgstr "Цвет для минуса"
+
+msgctxt "widget-editor.colorPositive"
+msgid "Color Positive"
+msgstr "Цвет для плюса"
+
+msgctxt "widget-editor.compass"
+msgid "Compass"
+msgstr "Компас"
+
+msgctxt "widget-editor.compassDial"
+msgid "Dial"
+msgstr "Циферблат"
+
+msgctxt "widget-editor.concentricRing"
+msgid "Concentric Ring"
+msgstr "Кольцо"
+
+msgctxt "widget-editor.continuousFill"
+msgid "Continuous Fill"
+msgstr "Сплошная заливка"
+
+msgctxt "widget-editor.coordinateFormatDdm"
+msgid "Deg / Dec Min"
+msgstr "° / ′ десятичные"
+
+msgctxt "widget-editor.coordinateFormatDms"
+msgid "Deg / Min / Sec"
+msgstr "° / ′ / ″"
+
+msgctxt "widget-editor.coordinates"
+msgid "Coordinates"
+msgstr "Координаты"
+
+msgctxt "widget-editor.cornerOrientation"
+msgid "Corner Orientation"
+msgstr "Положение угла"
+
+msgctxt "widget-editor.cornerRadius"
+msgid "Corner Radius"
+msgstr "Радиус угла"
+
+msgctxt "widget-editor.cornerTrack"
+msgid "Corner Track"
+msgstr "Угловой указатель"
+
+msgctxt "widget-editor.cornersAndEdges"
+msgid "Corners & edges"
+msgstr "Углы и края"
+
+msgctxt "widget-editor.dateFormatDdMmYyyy"
+msgid "Date only (DD-MM-YYYY)"
+msgstr "Только дата (DD-MM-ГГГГ)"
+
+msgctxt "widget-editor.dateFormatDdMmmYyyy"
+msgid "Date only (DD MMM YYYY)"
+msgstr "Только дата (DD MMM ГГГГ)"
+
+msgctxt "widget-editor.dateFormatDdMmmmYyyy"
+msgid "Date only (DD MMMM YYYY)"
+msgstr "Только дата (DD MMMM ГГГГ)"
+
+msgctxt "widget-editor.dateFormatMmDdYyyy"
+msgid "Date only (MM-DD-YYYY)"
+msgstr "Только дата (MM-DD-ГГГГ)"
+
+msgctxt "widget-editor.dateFormatMmmDdYyyy"
+msgid "Date only (MMM DD YYYY)"
+msgstr "Только дата (MMM DD ГГГГ)"
+
+msgctxt "widget-editor.dateFormatMmmmDdYyyy"
+msgid "Date only (MMMM DD YYYY)"
+msgstr "Только дата (MMMM DD ГГГГ)"
+
+msgctxt "widget-editor.dateFormatYyyyMmDd"
+msgid "Date only (YYYY-MM-DD)"
+msgstr "Только дата (ГГГГ-MM-DD)"
+
+msgctxt "widget-editor.dateTimeFormat12h"
+msgid "Date + time (12h)"
+msgstr "Дата + время (12h)"
+
+msgctxt "widget-editor.dateTimeFormat12hWithSeconds"
+msgid "Date + time (12h with seconds)"
+msgstr "Дата + время (12h с секундами)"
+
+msgctxt "widget-editor.dateTimeFormat24h"
+msgid "Date + time (24h)"
+msgstr "Дата + время (24h)"
+
+msgctxt "widget-editor.dateTimeFormat24hWithSeconds"
+msgid "Date + time (24h with seconds)"
+msgstr "Дата + время (24h с секундами)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm12h"
+msgid "Date + time (DD MMM, 12h)"
+msgstr "Дата + время (DD MMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm24h"
+msgid "Date + time (DD MMM, 24h)"
+msgstr "Дата + время (DD MMM, 24h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm12h"
+msgid "Date + time (DD MMMM, 12h)"
+msgstr "Дата + время (DD MMMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm24h"
+msgid "Date + time (DD MMMM, 24h)"
+msgstr "Дата + время (DD MMMM, 24h)"
+
+msgctxt "widget-editor.daytime"
+msgid "Time of day"
+msgstr "Время суток"
+
+msgctxt "widget-editor.decimal"
+msgid "Decimal"
+msgstr "Десятые"
+
+msgctxt "widget-editor.decimals"
+msgid "Decimals"
+msgstr "Десятичные знаки"
+
+msgctxt "widget-editor.decompressionCeiling"
+msgid "Decompression Ceiling"
+msgstr "Декомпрессионный потолок"
+
+msgctxt "widget-editor.descentColor"
+msgid "Descent"
+msgstr "Спуск"
+
+msgctxt "widget-editor.diameter"
+msgid "Diameter"
+msgstr "Диаметр"
+
+msgctxt "widget-editor.displayType"
+msgid "Display Type"
+msgstr "Тип отображения"
+
+msgctxt "widget-editor.elapsedFrom"
+msgid "Since the Start of"
+msgstr "С начала"
+
+msgctxt "widget-editor.elapsedTime"
+msgid "Elapsed Time"
+msgstr "Прошедшее время"
+
+msgctxt "widget-editor.elevationAtStart"
+msgid "Elevation at start"
+msgstr "Высота в начале"
+
+msgctxt "widget-editor.emptyColor"
+msgid "Empty Color"
+msgstr "Цвет пустой части"
+
+msgctxt "widget-editor.emptyOpacity"
+msgid "Empty Opacity"
+msgstr "Альфа пустой части"
+
+msgctxt "widget-editor.exportStart"
+msgid "Export"
+msgstr "экспорта"
+
+msgctxt "widget-editor.fill"
+msgid "Fill"
+msgstr "Заливка"
+
+msgctxt "widget-editor.fillColor"
+msgid "Fill Color"
+msgstr "Цвет заливки"
+
+msgctxt "widget-editor.fillGradient"
+msgid "Gradient"
+msgstr "Градиент"
+
+msgctxt "widget-editor.fillOpacity"
+msgid "Fill Opacity"
+msgstr "Альфа заливки"
+
+msgctxt "widget-editor.filledColor"
+msgid "Filled Color"
+msgstr "Цвет заполнения"
+
+msgctxt "widget-editor.filledOpacity"
+msgid "Filled Opacity"
+msgstr "Альфа заполнения"
+
+msgctxt "widget-editor.finishedColor"
+msgid "Finished Color"
+msgstr "Цвет завершённого"
+
+msgctxt "widget-editor.finishedOpacity"
+msgid "Finished Opacity"
+msgstr "Альфа пройденного"
+
+msgctxt "widget-editor.flatTrack"
+msgid "Flat Track"
+msgstr "Плоская заливка"
+
+msgctxt "widget-editor.font"
+msgid "Font"
+msgstr "Шрифт"
+
+msgctxt "widget-editor.fontColor"
+msgid "Font Color"
+msgstr "Цвет шрифта"
+
+msgctxt "widget-editor.fontFamily"
+msgid "Font Family"
+msgstr "Шрифт"
+
+msgctxt "widget-editor.fontSize"
+msgid "Font Size"
+msgstr "Размер шрифта"
+
+msgctxt "widget-editor.fontWeight"
+msgid "Weight"
+msgstr "Толщина"
+
+msgctxt "widget-editor.format"
+msgid "Format"
+msgstr "Формат"
+
+msgctxt "widget-editor.gaugeTrack"
+msgid "Gauge Track"
+msgstr "Линейный индикатор"
+
+msgctxt "widget-editor.general"
+msgid "General"
+msgstr "Общие"
+
+msgctxt "widget-editor.gforcePlot"
+msgid "G-Force Plot"
+msgstr "График перегрузки"
+
+msgctxt "widget-editor.glow"
+msgid "Glow"
+msgstr "Свечение"
+
+msgctxt "widget-editor.haloDiameter"
+msgid "Halo Diameter"
+msgstr "Диаметр ореола"
+
+msgctxt "widget-editor.headingValue"
+msgid "Value"
+msgstr "Значение"
+
+msgctxt "widget-editor.heartZones"
+msgid "Zones"
+msgstr "Зоны"
+
+msgctxt "widget-editor.height"
+msgid "Height"
+msgstr "Высота"
+
+msgctxt "widget-editor.horizontal"
+msgid "Horizontal"
+msgstr "Горизонтально"
+
+msgctxt "widget-editor.horizontalOffset"
+msgid "Horizontal Offset"
+msgstr "Смещение по X"
+
+msgctxt "widget-editor.horizontalPosition"
+msgid "Horizontal Position"
+msgstr "Положение по X"
+
+msgctxt "widget-editor.hundredths"
+msgid "Hundredths"
+msgstr "Сотые доли секунды"
+
+msgctxt "widget-editor.icon"
+msgid "Icon"
+msgstr "Иконка"
+
+msgctxt "widget-editor.imperialLabel"
+msgid "Imperial Label"
+msgstr "Имперская метка"
+
+msgctxt "widget-editor.imperialOffsetX"
+msgid "Imperial Offset X"
+msgstr "Смещение X"
+
+msgctxt "widget-editor.imperialOffsetY"
+msgid "Imperial Offset Y"
+msgstr "Смещение Y"
+
+msgctxt "widget-editor.indicator"
+msgid "Indicator"
+msgstr "Индикатор"
+
+msgctxt "widget-editor.indicatorArrow"
+msgid "Arrow"
+msgstr "Стрелка"
+
+msgctxt "widget-editor.indicatorColor"
+msgid "Indicator Color"
+msgstr "Цвет индикатора"
+
+msgctxt "widget-editor.indicatorLine"
+msgid "Line"
+msgstr "Линия"
+
+msgctxt "widget-editor.indicatorSize"
+msgid "Indicator Size"
+msgstr "Размер индикатора"
+
+msgctxt "widget-editor.indicatorStyleChevron"
+msgid "Chevron"
+msgstr "Шеврон"
+
+msgctxt "widget-editor.indicatorStyleHighlightBar"
+msgid "Highlight Bar"
+msgstr "Полоса подсветки"
+
+msgctxt "widget-editor.invertSign"
+msgid "Invert sign"
+msgstr "Инвертировать знак"
+
+msgctxt "widget-editor.italic"
+msgid "Italic"
+msgstr "Курсив"
+
+msgctxt "widget-editor.label"
+msgid "Label"
+msgstr "Метка"
+
+msgctxt "widget-editor.labelAxis"
+msgid "{{label}} axis"
+msgstr "{{label}} ось"
+
+msgctxt "widget-editor.labelColor"
+msgid "Label Color"
+msgstr "Цвет метки"
+
+msgctxt "widget-editor.labelFont"
+msgid "Label Font"
+msgstr "Шрифт метки"
+
+msgctxt "widget-editor.labelFontSize"
+msgid "Label Font Size"
+msgstr "Размер шрифта"
+
+msgctxt "widget-editor.labelSize"
+msgid "Label Size"
+msgstr "Размер метки"
+
+msgctxt "widget-editor.labels"
+msgid "Labels"
+msgstr "Метки"
+
+msgctxt "widget-editor.latitude"
+msgid "Latitude"
+msgstr "Широта"
+
+msgctxt "widget-editor.left"
+msgid "Left"
+msgstr "Слева"
+
+msgctxt "widget-editor.leftEdgeStrip"
+msgid "Left edge strip"
+msgstr "Левая полоса"
+
+msgctxt "widget-editor.legend"
+msgid "Legend"
+msgstr "Легенда"
+
+msgctxt "widget-editor.letterSpacing"
+msgid "Spacing"
+msgstr "Интервал"
+
+msgctxt "widget-editor.lineStyling"
+msgid "Line Styling"
+msgstr "Стиль линии"
+
+msgctxt "widget-editor.liveValue"
+msgid "Value"
+msgstr "Значение"
+
+msgctxt "widget-editor.longitude"
+msgid "Longitude"
+msgstr "Долгота"
+
+msgctxt "widget-editor.lthr"
+msgid "Lactate Threshold HR"
+msgstr "ЧСС лактатного порога"
+
+msgctxt "widget-editor.majorInterval"
+msgid "Interval"
+msgstr "Интервал"
+
+msgctxt "widget-editor.majorLabels"
+msgid "Major Labels"
+msgstr "Крупные метки"
+
+msgctxt "widget-editor.majorLength"
+msgid "Major Length"
+msgstr "Длина крупных"
+
+msgctxt "widget-editor.majorSpacing"
+msgid "Spacing"
+msgstr "Шаг"
+
+msgctxt "widget-editor.majorThickness"
+msgid "Major Thickness"
+msgstr "Толщина крупных"
+
+msgctxt "widget-editor.majorTickColor"
+msgid "Major Color"
+msgstr "Цвет осн."
+
+msgctxt "widget-editor.majorTicks"
+msgid "Major Ticks"
+msgstr "Крупные деления"
+
+msgctxt "widget-editor.mapBuildings"
+msgid "Buildings"
+msgstr "Здания"
+
+msgctxt "widget-editor.mapLabels"
+msgid "Labels"
+msgstr "Подписи"
+
+msgctxt "widget-editor.mapLocalNames"
+msgid "Local Names"
+msgstr "Местные названия"
+
+msgctxt "widget-editor.mapPaths"
+msgid "Paths"
+msgstr "Дорожки"
+
+msgctxt "widget-editor.mapRotation"
+msgid "Map Rotation"
+msgstr "Поворот карты"
+
+msgctxt "widget-editor.mapStyle"
+msgid "Map Style"
+msgstr "Стиль карты"
+
+msgctxt "widget-editor.mapView"
+msgid "Map View"
+msgstr "Вид карты"
+
+msgctxt "widget-editor.mapWebgl2Software"
+msgid "No GPU found. The map draws in software, so its preview and export may be slow."
+msgstr "GPU не найден. Карта отрисовывается программно, поэтому предпросмотр и экспорт могут работать медленно."
+
+msgctxt "widget-editor.mapWebgl2Unavailable"
+msgid "WebGL2 isn't available on this system, so the map can't be previewed."
+msgstr "WebGL2 недоступен в этой системе, поэтому карту нельзя просмотреть."
+
+msgctxt "widget-editor.marker"
+msgid "Marker"
+msgstr "Маркер"
+
+msgctxt "widget-editor.markerArrow"
+msgid "Arrow"
+msgstr "Стрелка"
+
+msgctxt "widget-editor.markerColor"
+msgid "Marker Color"
+msgstr "Цвет маркера"
+
+msgctxt "widget-editor.markerOpacity"
+msgid "Marker Opacity"
+msgstr "Альфа маркера"
+
+msgctxt "widget-editor.markerSize"
+msgid "Marker Size"
+msgstr "Размер маркера"
+
+msgctxt "widget-editor.markerType"
+msgid "Marker Type"
+msgstr "Тип маркера"
+
+msgctxt "widget-editor.maxHeartrate"
+msgid "Max Heart Rate"
+msgstr "Максимальная ЧСС"
+
+msgctxt "widget-editor.maxSplits"
+msgid "Max Splits"
+msgstr "Макс. отрезков"
+
+msgctxt "widget-editor.metricLabel"
+msgid "Metric Label"
+msgstr "Метрическая метка"
+
+msgctxt "widget-editor.metricOffsetX"
+msgid "Metric Offset X"
+msgstr "Смещение X"
+
+msgctxt "widget-editor.metricOffsetY"
+msgid "Metric Offset Y"
+msgstr "Смещение Y"
+
+msgctxt "widget-editor.minmaxLabels"
+msgid "Min/Max Labels"
+msgstr "Метки мин./макс."
+
+msgctxt "widget-editor.minorLabels"
+msgid "Minor Labels"
+msgstr "Мелкие метки"
+
+msgctxt "widget-editor.minorLength"
+msgid "Minor Length"
+msgstr "Длина мелких"
+
+msgctxt "widget-editor.minorThickness"
+msgid "Minor Thickness"
+msgstr "Толщина мелких"
+
+msgctxt "widget-editor.minorTickColor"
+msgid "Minor Color"
+msgstr "Цвет доп."
+
+msgctxt "widget-editor.minorTicks"
+msgid "Minor Ticks"
+msgstr "Мелкие деления"
+
+msgctxt "widget-editor.moveDown"
+msgid "Move down"
+msgstr "Переместить вниз"
+
+msgctxt "widget-editor.moveUp"
+msgid "Move up"
+msgstr "Переместить вверх"
+
+msgctxt "widget-editor.msaa"
+msgid "Anti-aliasing (MSAA)"
+msgstr "Сглаживание (MSAA)"
+
+msgctxt "widget-editor.msaaOff"
+msgid "Off"
+msgstr "Выкл."
+
+msgctxt "widget-editor.negativeDeltaColor"
+msgid "Negative Delta Color"
+msgstr "Цвет минуса"
+
+msgctxt "widget-editor.noActiveWidgets"
+msgid "No active widgets"
+msgstr "Виджеты неактивны"
+
+msgctxt "widget-editor.northUp"
+msgid "North Up"
+msgstr "Север сверху"
+
+msgctxt "widget-editor.offset"
+msgid "Offset"
+msgstr "Смещение"
+
+msgctxt "widget-editor.opacity"
+msgid "Opacity"
+msgstr "Прозрачность"
+
+msgctxt "widget-editor.orientation"
+msgid "Orientation"
+msgstr "Ориентация"
+
+msgctxt "widget-editor.percentColor"
+msgid "Percent Color"
+msgstr "Цвет процентов"
+
+msgctxt "widget-editor.pitch"
+msgid "Pitch"
+msgstr "Наклон"
+
+msgctxt "widget-editor.pixelsPerDegree"
+msgid "Pixels per Degree"
+msgstr "Пикселей/градус"
+
+msgctxt "widget-editor.placement"
+msgid "Placement"
+msgstr "Размещение"
+
+msgctxt "widget-editor.position"
+msgid "Position"
+msgstr "Положение"
+
+msgctxt "widget-editor.positiveDeltaColor"
+msgid "Positive Delta Color"
+msgstr "Цвет плюса"
+
+msgctxt "widget-editor.profileDetail"
+msgid "Profile Detail"
+msgstr "Детали профиля"
+
+msgctxt "widget-editor.readout"
+msgid "Readout"
+msgstr "Показания"
+
+msgctxt "widget-editor.remainingColor"
+msgid "Remaining Color"
+msgstr "Цвет остатка"
+
+msgctxt "widget-editor.remainingOpacity"
+msgid "Remaining Opacity"
+msgstr "Альфа остатка"
+
+msgctxt "widget-editor.removeMetric"
+msgid "Remove metric"
+msgstr "Удалить метрику"
+
+msgctxt "widget-editor.renumberLaps"
+msgid "Renumber laps"
+msgstr "Перенумеровать круги"
+
+msgctxt "widget-editor.resetField"
+msgid "Reset field"
+msgstr "Сбросить поле"
+
+msgctxt "widget-editor.resetLabel"
+msgid "Reset {0}"
+msgstr "Сбросить {0}"
+
+msgctxt "widget-editor.riderUp"
+msgid "Rider Up"
+msgstr "Направление движения сверху"
+
+msgctxt "widget-editor.right"
+msgid "Right"
+msgstr "Справа"
+
+msgctxt "widget-editor.rightEdgeStrip"
+msgid "Right edge strip"
+msgstr "Правая полоса"
+
+msgctxt "widget-editor.ringDiameter"
+msgid "Ring Diameter"
+msgstr "Диаметр кольца"
+
+msgctxt "widget-editor.rotation"
+msgid "Rotation"
+msgstr "Поворот"
+
+msgctxt "widget-editor.rotationMode"
+msgid "Rotation Mode"
+msgstr "Режим вращения"
+
+msgctxt "widget-editor.roundBottomLeftCorner"
+msgid "Round bottom left corner"
+msgstr "Угол снизу слева"
+
+msgctxt "widget-editor.roundBottomRightCorner"
+msgid "Round bottom right corner"
+msgstr "Угол снизу справа"
+
+msgctxt "widget-editor.roundTopLeftCorner"
+msgid "Round top left corner"
+msgstr "Угол сверху слева"
+
+msgctxt "widget-editor.roundTopRightCorner"
+msgid "Round top right corner"
+msgstr "Угол сверху справа"
+
+msgctxt "widget-editor.routeDetail"
+msgid "Route Detail"
+msgstr "Детали маршрута"
+
+msgctxt "widget-editor.rowGap"
+msgid "Row Gap"
+msgstr "Интервал строк"
+
+msgctxt "widget-editor.segmentedBars"
+msgid "Segmented Bars"
+msgstr "Сегментные полосы"
+
+msgctxt "widget-editor.shape"
+msgid "Shape"
+msgstr "Форма"
+
+msgctxt "widget-editor.showFullActivity"
+msgid "Show Full Activity"
+msgstr "Вся активность"
+
+msgctxt "widget-editor.showFullAscent"
+msgid "Show Full Ascent"
+msgstr "Весь набор высоты"
+
+msgctxt "widget-editor.showFullDistance"
+msgid "Show Full Distance"
+msgstr "Вся дистанция"
+
+msgctxt "widget-editor.showIndicator"
+msgid "Show Indicator"
+msgstr "Показать индикатор"
+
+msgctxt "widget-editor.showLabels"
+msgid "Show Labels"
+msgstr "Показывать подписи"
+
+msgctxt "widget-editor.showSign"
+msgid "Show sign"
+msgstr "Показывать знак"
+
+msgctxt "widget-editor.showValue"
+msgid "Show Value"
+msgstr "Показывать значение"
+
+msgctxt "widget-editor.singleCircle"
+msgid "Single Circle"
+msgstr "Одиночный круг"
+
+msgctxt "widget-editor.size"
+msgid "Size"
+msgstr "Размер"
+
+msgctxt "widget-editor.smoothing"
+msgid "Smoothing"
+msgstr "Сглаживание"
+
+msgctxt "widget-editor.solidHalo"
+msgid "Solid Halo"
+msgstr "Сплошной ореол"
+
+msgctxt "widget-editor.splitColumnBar"
+msgid "Bar"
+msgstr "Полоса"
+
+msgctxt "widget-editor.splitColumnPace"
+msgid "Pace"
+msgstr "Темп"
+
+msgctxt "widget-editor.splitColumnSplit"
+msgid "Split"
+msgstr "Отрезок"
+
+msgctxt "widget-editor.splitColumns"
+msgid "Columns"
+msgstr "Столбцы"
+
+msgctxt "widget-editor.splitLength"
+msgid "Split Length"
+msgstr "Длина отрезка"
+
+msgctxt "widget-editor.splits"
+msgid "Splits"
+msgstr "Отрезки"
+
+msgctxt "widget-editor.stripColor"
+msgid "Strip Color"
+msgstr "Цвет полосы"
+
+msgctxt "widget-editor.stripThickness"
+msgid "Strip Thickness"
+msgstr "Толщина полосы"
+
+msgctxt "widget-editor.style"
+msgid "Style"
+msgstr "Стиль"
+
+msgctxt "widget-editor.tapeScale"
+msgid "Tape Scale"
+msgstr "Масштаб ленты"
+
+msgctxt "widget-editor.text"
+msgid "Text"
+msgstr "Текст"
+
+msgctxt "widget-editor.thickness"
+msgid "Thickness"
+msgstr "Толщина"
+
+msgctxt "widget-editor.tickColor"
+msgid "Tick Color"
+msgstr "Цвет делений"
+
+msgctxt "widget-editor.tickLength"
+msgid "Tick Length"
+msgstr "Длина делений"
+
+msgctxt "widget-editor.ticks"
+msgid "Ticks"
+msgstr "Деления"
+
+msgctxt "widget-editor.timeFormat12h"
+msgid "Time only (12h)"
+msgstr "Только время (12h)"
+
+msgctxt "widget-editor.timeFormat12hWithSeconds"
+msgid "Time only (12h with seconds)"
+msgstr "Только время (12h с секундами)"
+
+msgctxt "widget-editor.timeFormat24h"
+msgid "Time only (24h)"
+msgstr "Только время (24h)"
+
+msgctxt "widget-editor.timeFormat24hWithSeconds"
+msgid "Time only (24h with seconds)"
+msgstr "Только время (24h с секундами)"
+
+msgctxt "widget-editor.timeMode"
+msgid "Time Mode"
+msgstr "Режим времени"
+
+msgctxt "widget-editor.timeWindow"
+msgid "Time Window"
+msgstr "Временное окно"
+
+msgctxt "widget-editor.top"
+msgid "Top"
+msgstr "Сверху"
+
+msgctxt "widget-editor.topDown"
+msgid "Top Down"
+msgstr "Вид сверху"
+
+msgctxt "widget-editor.topEdgeStrip"
+msgid "Top edge strip"
+msgstr "Верхняя полоса"
+
+msgctxt "widget-editor.trackFill"
+msgid "Track Fill"
+msgstr "Заливка дорожки"
+
+msgctxt "widget-editor.trackStyle"
+msgid "Track Style"
+msgstr "Стиль заливки"
+
+msgctxt "widget-editor.transparency"
+msgid "Transparency"
+msgstr "Прозрачность"
+
+msgctxt "widget-editor.trendSeconds"
+msgid "Trend"
+msgstr "Тренд"
+
+msgctxt "widget-editor.typography"
+msgid "Typography"
+msgstr "Типографика"
+
+msgctxt "widget-editor.unit"
+msgid "Unit"
+msgstr "Единица"
+
+msgctxt "widget-editor.unitColor"
+msgid "Unit Color"
+msgstr "Цвет единиц"
+
+msgctxt "widget-editor.units"
+msgid "Units"
+msgstr "Единицы"
+
+msgctxt "widget-editor.valueColor"
+msgid "Value Color"
+msgstr "Цвет значения"
+
+msgctxt "widget-editor.valueOffset"
+msgid "Value Offset"
+msgstr "Смещение значения"
+
+msgctxt "widget-editor.vertical"
+msgid "Vertical"
+msgstr "Вертикально"
+
+msgctxt "widget-editor.verticalOffset"
+msgid "Vertical Offset"
+msgstr "Смещение по Y"
+
+msgctxt "widget-editor.verticalPosition"
+msgid "Vertical Position"
+msgstr "Положение по Y"
+
+msgctxt "widget-editor.verticalScale"
+msgid "Vertical Scale"
+msgstr "Масштаб по Y"
+
+msgctxt "widget-editor.verticalSpeed"
+msgid "Vert. Speed"
+msgstr "Верт. скорость"
+
+msgctxt "widget-editor.width"
+msgid "Width"
+msgstr "Ширина"
+
+msgctxt "widget-editor.zoneCalculation"
+msgid "Zone Calculation"
+msgstr "Расчёт зон"
+
+msgctxt "widget-editor.zoneCalculationLthr"
+msgid "Lactate Threshold HR"
+msgstr "ЧСС лактатного порога"
+
+msgctxt "widget-editor.zoneCalculationManual"
+msgid "Manual"
+msgstr "Вручную"
+
+msgctxt "widget-editor.zoneCalculationMaxHeartrate"
+msgid "Max Heart Rate"
+msgstr "Максимальная ЧСС"
+
+msgctxt "widget-editor.zoneFrom"
+msgid "From"
+msgstr "От"
+
+msgctxt "widget-editor.zoneLabel"
+msgid "Zone Label"
+msgstr "Метка зоны"
+
+msgctxt "widget-editor.zoneTo"
+msgid "To"
+msgstr "До"
+
+msgctxt "widget-editor.zoom"
+msgid "Zoom"
+msgstr "Масштаб"
+
+msgctxt "widgets.activityAttributes.barometric_altitude"
+msgid "Barometric Altitude"
+msgstr "Барометрическая высота"
+
+msgctxt "widgets.backdropTypes.circle"
+msgid "Circle"
+msgstr "Круг"
+
+msgctxt "widgets.backdropTypes.rectangle"
+msgid "Rectangle"
+msgstr "Прямоугольник"
+
+msgctxt "widgets.categories.camera"
+msgid "Camera"
+msgstr "Камера"
+
+msgctxt "widgets.categories.cycling"
+msgid "Cycling"
+msgstr "Велоспорт"
+
+msgctxt "widgets.categories.general"
+msgid "General"
+msgstr "Общие"
+
+msgctxt "widgets.categories.motosports"
+msgid "Motorsports"
+msgstr "Мотоспорт"
+
+msgctxt "widgets.categories.other"
+msgid "Other"
+msgstr "Другое"
+
+msgctxt "widgets.categories.running"
+msgid "Running"
+msgstr "Бег"
+
+msgctxt "widgets.categories.scuba_diving"
+msgid "Scuba Diving"
+msgstr "Дайвинг"
+
+msgctxt "widgets.displayTypes.altitudeTape"
+msgid "Altitude Tape"
+msgstr "Лента высоты"
+
+msgctxt "widgets.displayTypes.arc"
+msgid "Arc Gauge"
+msgstr "Дуговой индикатор"
+
+msgctxt "widgets.displayTypes.corner"
+msgid "Corner Gauge"
+msgstr "Угловой индикатор"
+
+msgctxt "widgets.displayTypes.depthTape"
+msgid "Depth Tape"
+msgstr "Лента глубины"
+
+msgctxt "widgets.displayTypes.gForce"
+msgid "G-Force"
+msgstr "Перегрузка"
+
+msgctxt "widgets.displayTypes.gtGauge"
+msgid "GT Gauge"
+msgstr "GT-индикатор"
+
+msgctxt "widgets.displayTypes.headingCompass"
+msgid "Heading Compass"
+msgstr "Компас курса"
+
+msgctxt "widgets.displayTypes.headingTape"
+msgid "Heading Tape"
+msgstr "Лента курса"
+
+msgctxt "widgets.displayTypes.heartZones"
+msgid "Heart Zones"
+msgstr "Пульсовые зоны"
+
+msgctxt "widgets.displayTypes.lapTimer"
+msgid "Lap Times"
+msgstr "Круги"
+
+msgctxt "widgets.displayTypes.leanAngle"
+msgid "Lean Angle"
+msgstr "Угол наклона"
+
+msgctxt "widgets.displayTypes.linear"
+msgid "Linear Bar"
+msgstr "Линейный индикатор"
+
+msgctxt "widgets.displayTypes.splitsRun"
+msgid "Splits"
+msgstr "Отрезки"
+
+msgctxt "widgets.displayTypes.text"
+msgid "Text"
+msgstr "Текст"
+
+msgctxt "widgets.drawerGroups.map.mapTiles"
+msgid "Map Tiles"
+msgstr "Тайлы карты"
+
+msgctxt "widgets.drawerGroups.map.route"
+msgid "Route"
+msgstr "Маршрут"
+
+msgctxt "widgets.drawerGroups.map.route3d"
+msgid "3D Route"
+msgstr "3D-маршрут"
+
+msgctxt "widgets.drawerGroups.map.shortName"
+msgid "Map"
+msgstr "Карта"
+
+msgctxt "widgets.lapTimerModes.bestLap"
+msgid "Best Lap"
+msgstr "Лучший круг"
+
+msgctxt "widgets.lapTimerModes.currentLap"
+msgid "Current Lap"
+msgstr "Текущий круг"
+
+msgctxt "widgets.lapTimerModes.delta"
+msgid "Delta"
+msgstr "Дельта"
+
+msgctxt "widgets.lapTimerModes.lapLog"
+msgid "Lap Log"
+msgstr "Журнал кругов"
+
+msgctxt "widgets.types.air_pressure.name"
+msgid "Air Pressure"
+msgstr "Атмосферное давление"
+
+msgctxt "widgets.types.air_pressure.shortName"
+msgid "Air Press."
+msgstr "Давление"
+
+msgctxt "widgets.types.altitude.name"
+msgid "Altitude"
+msgstr "Высота над уровнем моря"
+
+msgctxt "widgets.types.altitude.shortName"
+msgid "Altitude"
+msgstr "Высота"
+
+msgctxt "widgets.types.aperture.name"
+msgid "Aperture"
+msgstr "Диафрагма"
+
+msgctxt "widgets.types.aperture.shortName"
+msgid "Aperture"
+msgstr "Диафрагма"
+
+msgctxt "widgets.types.average_ppo2.name"
+msgid "Average ppO₂"
+msgstr "Среднее ppO₂"
+
+msgctxt "widgets.types.average_ppo2.shortName"
+msgid "ppO₂"
+msgstr "ppO₂"
+
+msgctxt "widgets.types.backdrop.name"
+msgid "Backdrop"
+msgstr "Фон"
+
+msgctxt "widgets.types.backdrop.shortName"
+msgid "Backdrop"
+msgstr "Фон"
+
+msgctxt "widgets.types.boost_pressure.name"
+msgid "Boost Pressure"
+msgstr "Давление наддува"
+
+msgctxt "widgets.types.boost_pressure.shortName"
+msgid "Boost"
+msgstr "Наддув"
+
+msgctxt "widgets.types.brake_position.name"
+msgid "Brake Position"
+msgstr "Положение тормоза"
+
+msgctxt "widgets.types.brake_position.shortName"
+msgid "Brake"
+msgstr "Тормоз"
+
+msgctxt "widgets.types.cadence.name"
+msgid "Cadence"
+msgstr "Каденс"
+
+msgctxt "widgets.types.cadence.shortName"
+msgid "Cadence"
+msgstr "Каденс"
+
+msgctxt "widgets.types.calories.name"
+msgid "Calories"
+msgstr "Калории"
+
+msgctxt "widgets.types.calories.shortName"
+msgid "Calories"
+msgstr "Калории"
+
+msgctxt "widgets.types.color_temperature.name"
+msgid "Color Temperature"
+msgstr "Цветовая температура"
+
+msgctxt "widgets.types.color_temperature.shortName"
+msgid "WB"
+msgstr "WB"
+
+msgctxt "widgets.types.coolant_temperature.name"
+msgid "Coolant Temperature"
+msgstr "Температура охлаждающей жидкости"
+
+msgctxt "widgets.types.coolant_temperature.shortName"
+msgid "Coolant"
+msgstr "Темп. ОЖ"
+
+msgctxt "widgets.types.core_temperature.name"
+msgid "Core Temperature"
+msgstr "Температура тела"
+
+msgctxt "widgets.types.core_temperature.shortName"
+msgid "Core T."
+msgstr "Темп. тела"
+
+msgctxt "widgets.types.course.name"
+msgid "Route Map"
+msgstr "Карта маршрута"
+
+msgctxt "widgets.types.course.shortName"
+msgid "Map"
+msgstr "Карта"
+
+msgctxt "widgets.types.depth.name"
+msgid "Depth"
+msgstr "Глубина"
+
+msgctxt "widgets.types.depth.shortName"
+msgid "Depth"
+msgstr "Глубина"
+
+msgctxt "widgets.types.distance.name"
+msgid "Distance"
+msgstr "Расстояние"
+
+msgctxt "widgets.types.distance.shortName"
+msgid "Dist."
+msgstr "Расст."
+
+msgctxt "widgets.types.distance_to_home.name"
+msgid "Distance to Home"
+msgstr "Расстояние до дома"
+
+msgctxt "widgets.types.distance_to_home.shortName"
+msgid "Home"
+msgstr "Дом"
+
+msgctxt "widgets.types.diving_profile.name"
+msgid "Diving Profile"
+msgstr "Профиль погружения"
+
+msgctxt "widgets.types.diving_profile.shortName"
+msgid "Dive Profile"
+msgstr "Профиль погружения"
+
+msgctxt "widgets.types.elevation.name"
+msgid "Elevation"
+msgstr "Профиль высот"
+
+msgctxt "widgets.types.elevation.shortName"
+msgid "Elev."
+msgstr "Профиль"
+
+msgctxt "widgets.types.engine_load.name"
+msgid "Engine Load"
+msgstr "Нагрузка двигателя"
+
+msgctxt "widgets.types.engine_load.shortName"
+msgid "Eng. Load"
+msgstr "Нагрузка"
+
+msgctxt "widgets.types.engine_power.name"
+msgid "Engine Power"
+msgstr "Мощность двигателя"
+
+msgctxt "widgets.types.engine_power.shortName"
+msgid "Eng. Power"
+msgstr "Мощн. двиг."
+
+msgctxt "widgets.types.ev.name"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.ev.shortName"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.first_stop_depth.name"
+msgid "First Stop Depth"
+msgstr "Глубина первой остановки"
+
+msgctxt "widgets.types.first_stop_depth.shortName"
+msgid "Stop Depth"
+msgstr "Глубина ост."
+
+msgctxt "widgets.types.first_stop_time.name"
+msgid "First Stop Time"
+msgstr "Время первой остановки"
+
+msgctxt "widgets.types.first_stop_time.shortName"
+msgid "Stop Time"
+msgstr "Время ост."
+
+msgctxt "widgets.types.focal_length.name"
+msgid "Focal Length"
+msgstr "Фокусное расстояние"
+
+msgctxt "widgets.types.focal_length.shortName"
+msgid "Focal L."
+msgstr "Фокус"
+
+msgctxt "widgets.types.g_force.name"
+msgid "G-Force"
+msgstr "Перегрузка"
+
+msgctxt "widgets.types.g_force.shortName"
+msgid "G-Force"
+msgstr "Перегрузка"
+
+msgctxt "widgets.types.gas_mix.name"
+msgid "Gas Mix (O₂/He)"
+msgstr "Газовая смесь (O₂/He)"
+
+msgctxt "widgets.types.gas_mix.shortName"
+msgid "O₂/He"
+msgstr "O₂/He"
+
+msgctxt "widgets.types.gear_position.name"
+msgid "Gear Position"
+msgstr "Положение передачи"
+
+msgctxt "widgets.types.gear_position.shortName"
+msgid "Gear"
+msgstr "Передача"
+
+msgctxt "widgets.types.gps_coordinates.name"
+msgid "GPS Coordinates"
+msgstr "Координаты GPS"
+
+msgctxt "widgets.types.gps_coordinates.shortName"
+msgid "Location"
+msgstr "Положение"
+
+msgctxt "widgets.types.gradient.name"
+msgid "Gradient"
+msgstr "Уклон"
+
+msgctxt "widgets.types.gradient.shortName"
+msgid "Grad."
+msgstr "Уклон"
+
+msgctxt "widgets.types.ground_contact_time.name"
+msgid "Ground Contact Time"
+msgstr "Время контакта с землёй"
+
+msgctxt "widgets.types.ground_contact_time.shortName"
+msgid "GCT"
+msgstr "Контакт"
+
+msgctxt "widgets.types.heading.name"
+msgid "Heading"
+msgstr "Курс"
+
+msgctxt "widgets.types.heading.shortName"
+msgid "Heading"
+msgstr "Курс"
+
+msgctxt "widgets.types.heartrate.name"
+msgid "Heart Rate"
+msgstr "Пульс"
+
+msgctxt "widgets.types.heartrate.shortName"
+msgid "HR"
+msgstr "Пульс"
+
+msgctxt "widgets.types.iso.name"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.iso.shortName"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.label.name"
+msgid "Text"
+msgstr "Текст"
+
+msgctxt "widgets.types.label.shortName"
+msgid "Text"
+msgstr "Текст"
+
+msgctxt "widgets.types.lap_timer.name"
+msgid "Lap Timer"
+msgstr "Таймер круга"
+
+msgctxt "widgets.types.lap_timer.shortName"
+msgid "Lap Times"
+msgstr "Круги"
+
+msgctxt "widgets.types.lean_angle.name"
+msgid "Lean Angle"
+msgstr "Угол наклона"
+
+msgctxt "widgets.types.lean_angle.shortName"
+msgid "Lean"
+msgstr "Наклон"
+
+msgctxt "widgets.types.left_right_balance.name"
+msgid "Left/Right Balance"
+msgstr "Баланс Л/П"
+
+msgctxt "widgets.types.left_right_balance.shortName"
+msgid "L/R Bal."
+msgstr "Л/П баланс"
+
+msgctxt "widgets.types.map.name"
+msgid "Street Map"
+msgstr "Карта улиц"
+
+msgctxt "widgets.types.map.shortName"
+msgid "Streets"
+msgstr "Улицы"
+
+msgctxt "widgets.types.pace.name"
+msgid "Pace"
+msgstr "Темп"
+
+msgctxt "widgets.types.pace.shortName"
+msgid "Pace"
+msgstr "Темп"
+
+msgctxt "widgets.types.power.name"
+msgid "Power"
+msgstr "Мощность"
+
+msgctxt "widgets.types.power.shortName"
+msgid "Power"
+msgstr "Мощность"
+
+msgctxt "widgets.types.raster.name"
+msgid "Image"
+msgstr "Изображение"
+
+msgctxt "widgets.types.raster.shortName"
+msgid "Image"
+msgstr "Изображение"
+
+msgctxt "widgets.types.rolling_chart.name"
+msgid "Charts"
+msgstr "Графики"
+
+msgctxt "widgets.types.rolling_chart.shortName"
+msgid "Charts"
+msgstr "Графики"
+
+msgctxt "widgets.types.rpm.name"
+msgid "RPM"
+msgstr "Обороты двигателя"
+
+msgctxt "widgets.types.rpm.shortName"
+msgid "RPM"
+msgstr "RPM"
+
+msgctxt "widgets.types.shutter_speed.name"
+msgid "Shutter Speed"
+msgstr "Выдержка"
+
+msgctxt "widgets.types.shutter_speed.shortName"
+msgid "Shutter"
+msgstr "Выдержка"
+
+msgctxt "widgets.types.speed.name"
+msgid "Speed"
+msgstr "Скорость"
+
+msgctxt "widgets.types.speed.shortName"
+msgid "Speed"
+msgstr "Скорость"
+
+msgctxt "widgets.types.splits_run.name"
+msgid "Running Splits"
+msgstr "Беговые отрезки"
+
+msgctxt "widgets.types.splits_run.shortName"
+msgid "Splits"
+msgstr "Отрезки"
+
+msgctxt "widgets.types.stride_length.name"
+msgid "Stride Length"
+msgstr "Длина шага"
+
+msgctxt "widgets.types.stride_length.shortName"
+msgid "Stride"
+msgstr "Шаг"
+
+msgctxt "widgets.types.stroke_rate.name"
+msgid "Stroke Rate"
+msgstr "Частота гребков"
+
+msgctxt "widgets.types.stroke_rate.shortName"
+msgid "S/R"
+msgstr "Гребки"
+
+msgctxt "widgets.types.temperature.name"
+msgid "Temperature"
+msgstr "Температура"
+
+msgctxt "widgets.types.temperature.shortName"
+msgid "Temp."
+msgstr "Темп."
+
+msgctxt "widgets.types.throttle_position.name"
+msgid "Throttle Position"
+msgstr "Положение дросселя"
+
+msgctxt "widgets.types.throttle_position.shortName"
+msgid "Throttle"
+msgstr "Дроссель"
+
+msgctxt "widgets.types.time.name"
+msgid "Time"
+msgstr "Время"
+
+msgctxt "widgets.types.time.shortName"
+msgid "Time"
+msgstr "Время"
+
+msgctxt "widgets.types.time_to_surface.name"
+msgid "Time to Surface"
+msgstr "Время до поверхности"
+
+msgctxt "widgets.types.time_to_surface.shortName"
+msgid "TTS"
+msgstr "TTS"
+
+msgctxt "widgets.types.torque.name"
+msgid "Torque"
+msgstr "Крутящий момент"
+
+msgctxt "widgets.types.torque.shortName"
+msgid "Torque"
+msgstr "Момент"
+
+msgctxt "widgets.types.total_ascent.name"
+msgid "Total Ascent"
+msgstr "Общий набор высоты"
+
+msgctxt "widgets.types.total_ascent.shortName"
+msgid "Ascent"
+msgstr "Подъём"
+
+msgctxt "widgets.types.vertical_oscillation.name"
+msgid "Vertical Oscillation"
+msgstr "Вертикальные колебания"
+
+msgctxt "widgets.types.vertical_oscillation.shortName"
+msgid "V. Osc."
+msgstr "Верт. колеб."
+
+msgctxt "widgets.types.vertical_ratio.name"
+msgid "Vertical Ratio"
+msgstr "Вертикальное соотношение"
+
+msgctxt "widgets.types.vertical_ratio.shortName"
+msgid "V. Ratio"
+msgstr "Верт. соотн."
+
+msgctxt "widgets.types.vertical_speed.name"
+msgid "Vertical Speed"
+msgstr "Вертикальная скорость"
+
+msgctxt "widgets.types.vertical_speed.shortName"
+msgid "V. Speed"
+msgstr "Верт. скор."
+
+msgctxt "widgets.types.water_temperature.name"
+msgid "Water Temperature"
+msgstr "Температура воды"
+
+msgctxt "widgets.types.water_temperature.shortName"
+msgid "Water Temp."
+msgstr "Темп. воды"

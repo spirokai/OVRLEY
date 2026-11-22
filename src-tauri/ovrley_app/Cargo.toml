@@ -12,6 +12,8 @@ license = "GPL-3.0-or-later"
 schema = ["dep:schemars"]
 
 [dependencies]
+# The .po reader; Slint's compiler uses the same one.
+rspolib = "0.1.2"
 ovrley_core = { path = "../ovrley_core" }
 ovrley_widgets = { path = "../ovrley_widgets" }
 ovrley_map = { path = "../ovrley_map" }

@@ -2,10 +2,7 @@
 // showcase (ui/showcase/) and the test harness windows (tests/harness/), so they share the app's
 // globals. It also emits the debug info the testing backend's element search needs.
 //
-// The translations are bundled from the React app's locale files, converted to gettext catalogs
-// in OUT_DIR (`build_support/translations.rs`).
-#[path = "build_support/translations.rs"]
-mod translations;
+// The translations are bundled from the catalogs in the root locales/ folder.
 
 fn main() {
     // On macOS and Linux MDK is found through an rpath to the SDK's library folder (ovrley_playback's
@@ -17,17 +14,33 @@ fn main() {
     let dev = std::env::var_os("CARGO_FEATURE_DEV_WINDOWS").is_some();
     let root = if dev { "ui/dev-index.slint" } else { "ui/index.slint" };
 
-    let manifest_dir = std::path::PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR"));
-    let locales = manifest_dir.join("../../app/src/i18n/locales");
-    let catalogs = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("cargo sets OUT_DIR")).join("translations");
-    let inputs = translations::convert(&locales, &catalogs).unwrap_or_else(|error| panic!("ovrley_ui: translations: {error}"));
-    println!("cargo:rerun-if-changed={}", locales.display());
-    for input in inputs {
-        println!("cargo:rerun-if-changed={}", input.display());
-    }
+    let catalogs = bundle_catalogs().unwrap_or_else(|error| panic!("ovrley_ui: translations: {error}"));
 
     let config = slint_build::CompilerConfiguration::new()
         .with_debug_info(dev)
         .with_bundled_translations(catalogs);
     slint_build::compile_with_config(root, config).expect("ovrley_ui: Slint compilation failed");
+}
+
+/// Copies `locales/<lang>.po` to the `<lang>/LC_MESSAGES/<domain>.po` tree Slint reads, in OUT_DIR.
+/// The domain is the crate's name.
+fn bundle_catalogs() -> Result<std::path::PathBuf, String> {
+    let locales = std::path::Path::new(&std::env::var_os("CARGO_MANIFEST_DIR").expect("cargo sets CARGO_MANIFEST_DIR")).join("../../locales");
+    let bundle = std::path::PathBuf::from(std::env::var_os("OUT_DIR").expect("cargo sets OUT_DIR")).join("translations");
+    if bundle.exists() {
+        std::fs::remove_dir_all(&bundle).map_err(|error| format!("{}: {error}", bundle.display()))?;
+    }
+    println!("cargo:rerun-if-changed={}", locales.display());
+    for entry in std::fs::read_dir(&locales).map_err(|error| format!("{}: {error}", locales.display()))? {
+        let path = entry.map_err(|error| error.to_string())?.path();
+        if path.extension().is_none_or(|extension| extension != "po") {
+            continue;
+        }
+        println!("cargo:rerun-if-changed={}", path.display());
+        let language = path.file_stem().ok_or_else(|| format!("{} has no name", path.display()))?;
+        let target = bundle.join(language).join("LC_MESSAGES");
+        std::fs::create_dir_all(&target).map_err(|error| format!("{}: {error}", target.display()))?;
+        std::fs::copy(&path, target.join("ovrley_ui.po")).map_err(|error| format!("{}: {error}", path.display()))?;
+    }
+    Ok(bundle)
 }

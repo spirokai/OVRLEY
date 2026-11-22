@@ -1,0 +1,3400 @@
+msgid ""
+msgstr ""
+"Language: ko\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "app-shell.agentConnected"
+msgid "Agent connected"
+msgstr "에이전트 연결됨"
+
+msgctxt "app-shell.agentConnectedHelp"
+msgid "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it."
+msgstr "AI 에이전트가 MCP로 연결되어 있으며 이 창을 변경할 수 있습니다. 중지하려면 설정에서 '에이전트 편집 허용'을 끄세요."
+
+msgctxt "app-shell.allowAgentEdits"
+msgid "Allow agent edits"
+msgstr "에이전트 편집 허용"
+
+msgctxt "app-shell.allowAgentEditsHelp"
+msgid "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request."
+msgstr "MCP(ovrley --mcp)로 연결된 AI 에이전트가 언어와 서랍 같은 이 창의 설정을 변경할 수 있게 합니다. 끄면 모든 에이전트 요청을 거부합니다."
+
+msgctxt "app-shell.blackBackground"
+msgid "Black background"
+msgstr "검은색 배경"
+
+msgctxt "app-shell.checkeredBackground"
+msgid "Checkered background"
+msgstr "체크무늬 배경"
+
+msgctxt "app-shell.clearMapTileCache"
+msgid "Clear cache"
+msgstr "캐시 지우기"
+
+msgctxt "app-shell.close"
+msgid "Close"
+msgstr "닫기"
+
+msgctxt "app-shell.copyError"
+msgid "Copy error"
+msgstr "오류 복사"
+
+msgctxt "app-shell.dropFilesToImport"
+msgid "Drop files to import"
+msgstr "가져올 파일을 놓으세요"
+
+msgctxt "app-shell.errorRenderingVideo"
+msgid "Error Rendering Video"
+msgstr "동영상 렌더링 오류"
+
+msgctxt "app-shell.file"
+msgid "File"
+msgstr "파일"
+
+msgctxt "app-shell.fileMenu"
+msgid "File menu"
+msgstr "파일 메뉴"
+
+msgctxt "app-shell.grid"
+msgid "Toggle grid"
+msgstr "격자 표시 전환"
+
+msgctxt "app-shell.imageBackground"
+msgid "Image background"
+msgstr "이미지 배경"
+
+msgctxt "app-shell.importActivity"
+msgid "Import Activity"
+msgstr "활동 가져오기"
+
+msgctxt "app-shell.importTemplate"
+msgid "Import Template"
+msgstr "템플릿 가져오기"
+
+msgctxt "app-shell.importVideo"
+msgid "Import Videos"
+msgstr "동영상 가져오기"
+
+msgctxt "app-shell.keyboardShortcutsDescription"
+msgid "You can use the following keyboard shortcuts to improve your workflow:"
+msgstr "다음 키보드 단축키를 사용하여 작업 효율을 높일 수 있습니다:"
+
+msgctxt "app-shell.language"
+msgid "Language"
+msgstr "언어"
+
+msgctxt "app-shell.loadProject"
+msgid "Load Project"
+msgstr "프로젝트 열기"
+
+msgctxt "app-shell.loadingEditorData"
+msgid "Loading editor data..."
+msgstr "편집기 데이터 로드 중..."
+
+msgctxt "app-shell.mapTileCache"
+msgid "Map tile cache"
+msgstr "지도 타일 캐시"
+
+msgctxt "app-shell.mapTileCacheHelp"
+msgid "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first."
+msgstr "미리보기와 렌더링을 위해 다운로드한 지도 타일은 디스크에 저장되어 지도가 더 빨리 로드되고 오프라인에서도 작동합니다. 캐시가 가득 차면 가장 오랫동안 사용하지 않은 타일부터 삭제됩니다."
+
+msgctxt "app-shell.mapTileCacheLimit"
+msgid "Cache size"
+msgstr "캐시 크기"
+
+msgctxt "app-shell.mapTileCacheUsage"
+msgid "{0} of {1} used"
+msgstr "{1} 중 {0} 사용"
+
+msgctxt "app-shell.newProject"
+msgid "New Project"
+msgstr "새 프로젝트"
+
+msgctxt "app-shell.newTemplate"
+msgid "New Template"
+msgstr "새 템플릿"
+
+msgctxt "app-shell.overlays"
+msgid "Overlays"
+msgstr "오버레이"
+
+msgctxt "app-shell.resetZoom"
+msgid "Reset zoom"
+msgstr "확대/축소 초기화"
+
+msgctxt "app-shell.save"
+msgid "Save"
+msgstr "저장"
+
+msgctxt "app-shell.saveProject"
+msgid "Save Project"
+msgstr "프로젝트 저장"
+
+msgctxt "app-shell.saveProjectAs"
+msgid "Save Project As"
+msgstr "다른 이름으로 저장"
+
+msgctxt "app-shell.saveTemplate"
+msgid "Save Template"
+msgstr "템플릿 저장"
+
+msgctxt "app-shell.selectTemplate"
+msgid "Select Template..."
+msgstr "템플릿 선택..."
+
+msgctxt "app-shell.settings"
+msgid "Settings"
+msgstr "설정"
+
+msgctxt "app-shell.shortcuts"
+msgid "Shortcuts"
+msgstr "단축키"
+
+msgctxt "app-shell.snapToGrid"
+msgid "Snap to grid"
+msgstr "격자에 스냅"
+
+msgctxt "app-shell.unitSystem"
+msgid "Units"
+msgstr "단위"
+
+msgctxt "app-shell.unitSystems.imperial"
+msgid "Imperial"
+msgstr "야드파운드법"
+
+msgctxt "app-shell.unitSystems.metric"
+msgid "Metric"
+msgstr "미터법"
+
+msgctxt "app-shell.unknownResolution"
+msgid "Unknown Resolution"
+msgstr "알 수 없는 해상도"
+
+msgctxt "app-shell.videoBackground"
+msgid "Video background"
+msgstr "동영상 배경"
+
+msgctxt "app-shell.whiteBackground"
+msgid "White background"
+msgstr "흰색 배경"
+
+msgctxt "app-shell.widgets"
+msgid "Widgets"
+msgstr "위젯"
+
+msgctxt "app-shell.zoomIn"
+msgid "Zoom in"
+msgstr "확대"
+
+msgctxt "app-shell.zoomOut"
+msgid "Zoom out"
+msgstr "축소"
+
+msgctxt "app-update.close"
+msgid "Close"
+msgstr "닫기"
+
+msgctxt "app-update.continueWithInstalledVersion"
+msgid "The installed version remains available. You can close this dialog and continue working."
+msgstr "설치된 버전을 계속 사용할 수 있습니다. 이 대화 상자를 닫고 작업을 계속할 수 있습니다."
+
+msgctxt "app-update.downloadingUpdate"
+msgid "Downloading update"
+msgstr "업데이트 다운로드 중"
+
+msgctxt "app-update.later"
+msgid "Later"
+msgstr "나중에"
+
+msgctxt "app-update.updateAvailable"
+msgid "Update available"
+msgstr "업데이트 가능"
+
+msgctxt "app-update.updateDownloadProgress"
+msgid "Update download progress"
+msgstr "업데이트 다운로드 진행률"
+
+msgctxt "app-update.updateFailed"
+msgid "Update failed"
+msgstr "업데이트 실패"
+
+msgctxt "app-update.updateNow"
+msgid "Update now"
+msgstr "지금 업데이트"
+
+msgctxt "app-update.versionNowAvailable"
+msgid "OVRLEY <0>{{version}}</0> is now available."
+msgstr "OVRLEY <0>{{version}}</0> 버전을 지금 사용할 수 있습니다."
+
+msgctxt "app.importingYourVideo"
+msgid "Importing your video..."
+msgstr "동영상 가져오는 중..."
+
+msgctxt "app.loadingProject"
+msgid "Loading project..."
+msgstr "프로젝트 로드 중..."
+
+msgctxt "app.ovrleyIsStarting"
+msgid "OVRLEY is starting..."
+msgstr "OVRLEY 시작 중..."
+
+msgctxt "app.processingYourActivity"
+msgid "Processing your activity..."
+msgstr "활동 처리 중..."
+
+msgctxt "components.blueColorComponent0255"
+msgid "Blue color component (0-255)"
+msgstr "파란색 색상 구성 요소 (0-255)"
+
+msgctxt "components.brightnessPercentage0100"
+msgid "Brightness percentage (0-100)"
+msgstr "밝기 백분율 (0-100)"
+
+msgctxt "components.currentColorVal"
+msgid "Current color: {0}"
+msgstr "현재 색상: {0}"
+
+msgctxt "components.decreaseValue"
+msgid "Decrease value"
+msgstr "값 줄이기"
+
+msgctxt "components.gradientAddStopHint"
+msgid "Click to add a color stop"
+msgstr "클릭하여 색상 정지점 추가"
+
+msgctxt "components.gradientRemoveStop"
+msgid "Remove stop"
+msgstr "정지점 제거"
+
+msgctxt "components.gradientStopLabel"
+msgid "Color stop at {0}%"
+msgstr "{0}% 위치의 색상 정지점"
+
+msgctxt "components.gradientStops"
+msgid "Gradient stops"
+msgstr "그라데이션 정지점"
+
+msgctxt "components.greenColorComponent0255"
+msgid "Green color component (0-255)"
+msgstr "녹색 색상 구성 요소 (0-255)"
+
+msgctxt "components.hexColorValue"
+msgid "Hex color value"
+msgstr "16진수 색상 값"
+
+msgctxt "components.hueDegree0360"
+msgid "Hue degree (0-360)"
+msgstr "색조 각도 (0-360)"
+
+msgctxt "components.increaseValue"
+msgid "Increase value"
+msgstr "값 늘리기"
+
+msgctxt "components.lightnessPercentage0100"
+msgid "Lightness percentage (0-100)"
+msgstr "명도 백분율 (0-100)"
+
+msgctxt "components.presets"
+msgid "Presets"
+msgstr "프리셋"
+
+msgctxt "components.recommended"
+msgid "Recommended"
+msgstr "권장"
+
+msgctxt "components.redColorComponent0255"
+msgid "Red color component (0-255)"
+msgstr "빨간색 색상 구성 요소 (0-255)"
+
+msgctxt "components.saturationPercentage0100"
+msgid "Saturation percentage (0-100)"
+msgstr "채도 백분율 (0-100)"
+
+msgctxt "components.system"
+msgid "System"
+msgstr "시스템"
+
+msgctxt "keyboard-shortcuts.activityImport"
+msgid "Import activity"
+msgstr "활동 가져오기"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToEnd"
+msgid "Move playhead to activity trim end"
+msgstr "재생 헤드를 활동 트리밍 끝으로 이동"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToStart"
+msgid "Move playhead to activity trim start"
+msgstr "재생 헤드를 활동 트리밍 시작으로 이동"
+
+msgctxt "keyboard-shortcuts.activityTrimReset"
+msgid "Reset activity trim"
+msgstr "활동 트리밍 재설정"
+
+msgctxt "keyboard-shortcuts.drawerClose"
+msgid "Close widget drawer"
+msgstr "위젯 패널 닫기"
+
+msgctxt "keyboard-shortcuts.drawerToggle"
+msgid "Open/close widget drawer"
+msgstr "위젯 패널 열기/닫기"
+
+msgctxt "keyboard-shortcuts.editorClearSelection"
+msgid "Clear widget selection"
+msgstr "위젯 선택 지우기"
+
+msgctxt "keyboard-shortcuts.editorCopy"
+msgid "Copy selected widgets"
+msgstr "선택한 위젯 복사"
+
+msgctxt "keyboard-shortcuts.editorDelete"
+msgid "Delete selected widgets"
+msgstr "선택한 위젯 삭제"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetOnePixel"
+msgid "Move widget by 1 pixel"
+msgstr "위젯을 1픽셀 이동"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetTenPixels"
+msgid "Move widget by 10 pixels"
+msgstr "위젯을 10픽셀 이동"
+
+msgctxt "keyboard-shortcuts.editorNudge"
+msgid "Nudge selected widgets"
+msgstr "선택한 위젯 조금 이동"
+
+msgctxt "keyboard-shortcuts.editorPaste"
+msgid "Paste copied widgets"
+msgstr "복사한 위젯 붙여넣기"
+
+msgctxt "keyboard-shortcuts.editorResetZoom"
+msgid "Reset canvas zoom"
+msgstr "캔버스 확대/축소 초기화"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasHorizontally"
+msgid "Scroll canvas horizontally"
+msgstr "캔버스 가로 스크롤"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasVertically"
+msgid "Scroll canvas vertically"
+msgstr "캔버스 세로 스크롤"
+
+msgctxt "keyboard-shortcuts.editorToggleGrid"
+msgid "Toggle gridlines"
+msgstr "격자선 전환"
+
+msgctxt "keyboard-shortcuts.editorToggleSnap"
+msgid "Toggle snapping to grid"
+msgstr "격자 스냅 전환"
+
+msgctxt "keyboard-shortcuts.editorWheelScroll"
+msgid "Scroll canvas"
+msgstr "캔버스 스크롤"
+
+msgctxt "keyboard-shortcuts.editorWheelZoom"
+msgid "Zoom canvas at pointer"
+msgstr "포인터 위치에서 캔버스 확대/축소"
+
+msgctxt "keyboard-shortcuts.editorZoomIn"
+msgid "Canvas zoom in"
+msgstr "캔버스 확대"
+
+msgctxt "keyboard-shortcuts.editorZoomOut"
+msgid "Canvas zoom out"
+msgstr "캔버스 축소"
+
+msgctxt "keyboard-shortcuts.generalCommands"
+msgid "General commands"
+msgstr "일반 명령"
+
+msgctxt "keyboard-shortcuts.historyRedo"
+msgid "Redo"
+msgstr "다시 실행"
+
+msgctxt "keyboard-shortcuts.historyUndo"
+msgid "Undo"
+msgstr "실행 취소"
+
+msgctxt "keyboard-shortcuts.outputOpen"
+msgid "Open export folder"
+msgstr "내보내기 폴더 열기"
+
+msgctxt "keyboard-shortcuts.playerJumpToEnd"
+msgid "Rewind to end"
+msgstr "끝으로 이동"
+
+msgctxt "keyboard-shortcuts.playerResetToStart"
+msgid "Rewind to start"
+msgstr "시작으로 이동"
+
+msgctxt "keyboard-shortcuts.playerStepBackward"
+msgid "Step backward 1 second"
+msgstr "1초 뒤로 이동"
+
+msgctxt "keyboard-shortcuts.playerStepForward"
+msgid "Step forward 1 second"
+msgstr "1초 앞으로 이동"
+
+msgctxt "keyboard-shortcuts.playerToggleMute"
+msgid "Mute/unmute video"
+msgstr "동영상 음소거/해제"
+
+msgctxt "keyboard-shortcuts.playerTogglePlayback"
+msgid "Play/pause"
+msgstr "재생/일시 정지"
+
+msgctxt "keyboard-shortcuts.projectNew"
+msgid "New project"
+msgstr "새 프로젝트"
+
+msgctxt "keyboard-shortcuts.projectOpen"
+msgid "Open project"
+msgstr "프로젝트 열기"
+
+msgctxt "keyboard-shortcuts.projectSave"
+msgid "Save project"
+msgstr "프로젝트 저장"
+
+msgctxt "keyboard-shortcuts.projectSaveAs"
+msgid "Save project as"
+msgstr "다른 이름으로 프로젝트 저장"
+
+msgctxt "keyboard-shortcuts.renderOpen"
+msgid "Export overlay"
+msgstr "오버레이 내보내기"
+
+msgctxt "keyboard-shortcuts.syncAuto"
+msgid "Auto-sync video with activity"
+msgstr "동영상과 활동 자동 동기화"
+
+msgctxt "keyboard-shortcuts.syncGlobalNudge"
+msgid "Adjust sync offset by 1 second"
+msgstr "동기화 오프셋을 1초 조정"
+
+msgctxt "keyboard-shortcuts.templateImport"
+msgid "Open template"
+msgstr "템플릿 열기"
+
+msgctxt "keyboard-shortcuts.templateNew"
+msgid "New template"
+msgstr "새 템플릿"
+
+msgctxt "keyboard-shortcuts.templateSave"
+msgid "Save template"
+msgstr "템플릿 저장"
+
+msgctxt "keyboard-shortcuts.templateSelect"
+msgid "Open template list"
+msgstr "템플릿 목록 열기"
+
+msgctxt "keyboard-shortcuts.timelineAndSync"
+msgid "Timeline and sync"
+msgstr "타임라인 및 동기화"
+
+msgctxt "keyboard-shortcuts.timelineClipNudge"
+msgid "Nudge selected clip synchronization"
+msgstr "선택한 클립 동기화 조금 이동"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeSecond"
+msgid "Nudge selected clip sync offset by 1 second"
+msgstr "선택한 클립 동기화 오프셋을 1초 이동"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeTenthSecond"
+msgid "Nudge selected clip sync offset by 0.1 seconds"
+msgstr "선택한 클립 동기화 오프셋을 0.1초 이동"
+
+msgctxt "keyboard-shortcuts.timelineFitActivity"
+msgid "Switch timeline to show activity"
+msgstr "타임라인을 활동 표시로 전환"
+
+msgctxt "keyboard-shortcuts.timelineFitAll"
+msgid "Show entire timeline"
+msgstr "전체 타임라인 표시"
+
+msgctxt "keyboard-shortcuts.timelineFitMedia"
+msgid "Switch timeline to all media"
+msgstr "타임라인을 모든 미디어로 전환"
+
+msgctxt "keyboard-shortcuts.timelineFitVideo"
+msgid "Switch timeline to show video"
+msgstr "타임라인을 동영상 표시로 전환"
+
+msgctxt "keyboard-shortcuts.timelineWheelPan"
+msgid "Pan timeline"
+msgstr "타임라인 이동"
+
+msgctxt "keyboard-shortcuts.timelineWheelZoom"
+msgid "Zoom timeline at pointer"
+msgstr "포인터 위치에서 타임라인 확대/축소"
+
+msgctxt "keyboard-shortcuts.trimAfterPlayhead"
+msgid "Trim after the playhead (the video, or the activity without videos)"
+msgstr "재생 헤드 뒷부분 트리밍(동영상, 동영상이 없으면 활동)"
+
+msgctxt "keyboard-shortcuts.trimBeforePlayhead"
+msgid "Trim before the playhead (the video, or the activity without videos)"
+msgstr "재생 헤드 앞부분 트리밍(동영상, 동영상이 없으면 활동)"
+
+msgctxt "keyboard-shortcuts.videoImport"
+msgid "Import video"
+msgstr "동영상 가져오기"
+
+msgctxt "keyboard-shortcuts.videoPlayer"
+msgid "Video player"
+msgstr "동영상 플레이어"
+
+msgctxt "keyboard-shortcuts.widgetEditor"
+msgid "Widget editor"
+msgstr "위젯 편집기"
+
+msgctxt "overlay-editor.mapReset"
+msgid "Reset"
+msgstr "초기화"
+
+msgctxt "overlay-editor.mapViewHint"
+msgid "Double-click to pan & zoom"
+msgstr "더블클릭하여 이동 및 확대/축소"
+
+msgctxt "overlay-editor.mapViewZoomHint"
+msgid "Double-click to zoom"
+msgstr "더블클릭하여 확대/축소"
+
+msgctxt "overlay-editor.statusModified"
+msgid "Modified"
+msgstr "수정됨"
+
+msgctxt "overlay-editor.statusUnsaved"
+msgid "Unsaved"
+msgstr "저장되지 않음"
+
+msgctxt "player.activity"
+msgid "Activity"
+msgstr "활동"
+
+msgctxt "player.all"
+msgid "All"
+msgstr "모두"
+
+msgctxt "player.duration"
+msgid "Duration"
+msgstr "재생 시간"
+
+msgctxt "player.resetView"
+msgid "Reset view"
+msgstr "보기 초기화"
+
+msgctxt "player.rewindToEnd"
+msgid "Rewind to end"
+msgstr "끝으로 이동"
+
+msgctxt "player.rewindToStart"
+msgid "Rewind to start"
+msgstr "시작으로 이동"
+
+msgctxt "player.stepBack"
+msgid "Step back"
+msgstr "한 단계 뒤로"
+
+msgctxt "player.stepForward"
+msgid "Step forward"
+msgstr "한 단계 앞으로"
+
+msgctxt "player.trimActivityAfterPlayhead"
+msgid "Trim the activity after the playhead"
+msgstr "재생 헤드 뒤의 활동 트리밍"
+
+msgctxt "player.trimActivityBeforePlayhead"
+msgid "Trim the activity before the playhead"
+msgstr "재생 헤드 앞의 활동 트리밍"
+
+msgctxt "player.trimActivityEnd"
+msgid "Drag to trim the end of the activity"
+msgstr "드래그하여 활동 끝 트리밍"
+
+msgctxt "player.trimActivityStart"
+msgid "Drag to trim the start of the activity"
+msgstr "드래그하여 활동 시작 트리밍"
+
+msgctxt "player.trimVideoAfterPlayhead"
+msgid "Trim the video after the playhead"
+msgstr "재생 헤드 뒤의 동영상 트리밍"
+
+msgctxt "player.trimVideoBeforePlayhead"
+msgid "Trim the video before the playhead"
+msgstr "재생 헤드 앞의 동영상 트리밍"
+
+msgctxt "player.video"
+msgid "Video"
+msgstr "동영상"
+
+msgctxt "player.zoomIn"
+msgid "Zoom in"
+msgstr "확대"
+
+msgctxt "player.zoomOut"
+msgid "Zoom out"
+msgstr "축소"
+
+msgctxt "projects.activity"
+msgid "Activity"
+msgstr "활동"
+
+msgctxt "projects.archiveTooLarge"
+msgid "The project exceeds the 40 MiB archive limit. Remove or replace an image."
+msgstr "프로젝트가 40 MiB 압축 파일 제한을 초과합니다. 이미지를 제거하거나 교체하세요."
+
+msgctxt "projects.cancel"
+msgid "Cancel"
+msgstr "취소"
+
+msgctxt "projects.closeWithoutSaving"
+msgid "Close Without Saving"
+msgstr "저장하지 않고 닫기"
+
+msgctxt "projects.createNewProject"
+msgid "Create New Project"
+msgstr "새 프로젝트 만들기"
+
+msgctxt "projects.createProject"
+msgid "create project"
+msgstr "프로젝트 만들기"
+
+msgctxt "projects.invalidArchive"
+msgid "The project archive is invalid or damaged. Choose another project file."
+msgstr "프로젝트 압축 파일이 올바르지 않거나 손상되었습니다. 다른 프로젝트 파일을 선택하세요."
+
+msgctxt "projects.loadAnyway"
+msgid "Load Anyway"
+msgstr "무시하고 로드"
+
+msgctxt "projects.locate"
+msgid "Locate"
+msgstr "찾기"
+
+msgctxt "projects.missingSourceDescription"
+msgid "The {0} file does not seem to exist. Locate the moved file or cancel without changing the current session."
+msgstr "{0} 파일이 존재하지 않는 것 같습니다. 이동된 파일을 찾거나 취소하여 현재 세션을 변경하지 마세요."
+
+msgctxt "projects.newProject"
+msgid "New Project"
+msgstr "새 프로젝트"
+
+msgctxt "projects.openAProject"
+msgid "Open a project"
+msgstr "프로젝트 열기"
+
+msgctxt "projects.openProject"
+msgid "open project"
+msgstr "프로젝트 열기"
+
+msgctxt "projects.rasterUnavailable"
+msgid "An image is unavailable. Replace it before saving."
+msgstr "이미지를 사용할 수 없습니다. 저장하기 전에 교체하세요."
+
+msgctxt "projects.saveFailed"
+msgid "The project could not be saved. Check the destination and try again."
+msgstr "프로젝트를 저장할 수 없습니다. 저장 위치를 확인하고 다시 시도하세요."
+
+msgctxt "projects.saveProject"
+msgid "save project"
+msgstr "프로젝트 저장"
+
+msgctxt "projects.sourceNotFound"
+msgid "{0} source not found"
+msgstr "{0} 원본을 찾을 수 없음"
+
+msgctxt "projects.unsavedChanges"
+msgid "Your project has unsaved changes. Save them or discard them."
+msgstr "프로젝트에 저장되지 않은 변경 사항이 있습니다. 저장하거나 삭제하세요."
+
+msgctxt "projects.unsavedChangesBeforeExit"
+msgid "Your project has unsaved changes. Do you want to save the changes or close without saving?"
+msgstr "프로젝트에 저장되지 않은 변경 사항이 있습니다. 변경 사항을 저장하거나 저장하지 않고 닫으시겠습니까?"
+
+msgctxt "projects.unsavedChangesTitle"
+msgid "Unsaved Changes"
+msgstr "저장되지 않은 변경 사항"
+
+msgctxt "projects.video"
+msgid "Video"
+msgstr "동영상"
+
+msgctxt "raster.errors.corruptAsset"
+msgid "The embedded image is damaged. Select a replacement."
+msgstr "포함된 이미지가 손상되었습니다. 대체 이미지를 선택하세요."
+
+msgctxt "raster.errors.decode"
+msgid "Image could not be decoded. Choose another image."
+msgstr "이미지를 디코딩할 수 없습니다. 다른 이미지를 선택하세요."
+
+msgctxt "raster.errors.encodedSize"
+msgid "Image file is larger than 5 MiB. Choose a smaller file."
+msgstr "파일 크기가 5 MiB를 초과합니다. 더 작은 파일을 선택하세요."
+
+msgctxt "raster.errors.invalidConfig"
+msgid "Image settings are invalid."
+msgstr "이미지 설정이 잘못되었습니다."
+
+msgctxt "raster.errors.missing"
+msgid "Image file is missing. Select another image."
+msgstr "이미지 파일이 없습니다. 다른 이미지를 선택하세요."
+
+msgctxt "raster.errors.missingAsset"
+msgid "The embedded image is missing from this project. Select a replacement."
+msgstr "이 프로젝트에 포함된 이미지가 없습니다. 대체 이미지를 선택하세요."
+
+msgctxt "raster.errors.noImage"
+msgid "Image {{id}} has no selected file. Select one before rendering."
+msgstr "이미지 {{id}}에 선택된 파일이 없습니다. 렌더링 전에 선택하세요."
+
+msgctxt "raster.errors.relativePath"
+msgid "Select an image from an absolute file path."
+msgstr "절대 파일 경로에서 이미지를 선택하세요."
+
+msgctxt "raster.errors.renderUnavailable"
+msgid "Image {{id}} cannot be rendered yet."
+msgstr "이미지 {{id}}는 아직 렌더링할 수 없습니다."
+
+msgctxt "raster.errors.resolution"
+msgid "Image resolution exceeds 25 megapixels. Choose a smaller image."
+msgstr "해상도가 25메가픽셀을 초과합니다. 더 작은 이미지를 선택하세요."
+
+msgctxt "raster.errors.unreadable"
+msgid "Image file cannot be read. Check its permissions or select another image."
+msgstr "이미지 파일을 읽을 수 없습니다. 권한을 확인하거나 다른 이미지를 선택하세요."
+
+msgctxt "raster.errors.unsupportedType"
+msgid "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff)."
+msgstr "PNG, JPEG, BMP 또는 TIFF 파일을 선택하세요(.png, .jpeg, .jpg, .bmp, .tiff)."
+
+msgctxt "raster.imageFiles"
+msgid "Image files"
+msgstr "이미지 파일"
+
+msgctxt "raster.replaceImage"
+msgid "Replace image"
+msgstr "이미지 교체"
+
+msgctxt "raster.selectImage"
+msgid "Select image"
+msgstr "이미지 선택"
+
+msgctxt "render-video.batchResult.cancelled"
+msgid "Batch cancelled"
+msgstr "일괄 작업 취소됨"
+
+msgctxt "render-video.batchResult.completedWithErrors"
+msgid "Batch finished with errors"
+msgstr "오류와 함께 일괄 작업 완료"
+
+msgctxt "render-video.batchResult.failed"
+msgid "Batch failed"
+msgstr "일괄 작업 실패"
+
+msgctxt "render-video.better"
+msgid "Better"
+msgstr "높음"
+
+msgctxt "render-video.bitrate"
+msgid "Bitrate"
+msgstr "비트레이트"
+
+msgctxt "render-video.cancel"
+msgid "Cancel"
+msgstr "취소"
+
+msgctxt "render-video.cancelled"
+msgid "Cancelled"
+msgstr "취소됨"
+
+msgctxt "render-video.cancelling"
+msgid "Cancelling..."
+msgstr "취소 중..."
+
+msgctxt "render-video.chooseFolder"
+msgid "Choose folder..."
+msgstr "폴더 선택..."
+
+msgctxt "render-video.close"
+msgid "Close"
+msgstr "닫기"
+
+msgctxt "render-video.codecOutputFormat"
+msgid "Codec / Output Format"
+msgstr "코덱 / 출력 형식"
+
+msgctxt "render-video.custom"
+msgid "Custom"
+msgstr "사용자 지정"
+
+msgctxt "render-video.customFps"
+msgid "Custom FPS"
+msgstr "사용자 지정 FPS"
+
+msgctxt "render-video.done"
+msgid "Done"
+msgstr "완료"
+
+msgctxt "render-video.encodingOutputFile"
+msgid "Encoding output file..."
+msgstr "출력 파일 인코딩 중..."
+
+msgctxt "render-video.encodingValVal2Frames"
+msgid "Encoding: {{val}} / {{val2}} frames"
+msgstr "인코딩: {{val}} / {{val2}} 프레임"
+
+msgctxt "render-video.estRemaining"
+msgid "Est. Remaining"
+msgstr "예상 남은 시간"
+
+msgctxt "render-video.exportFinished"
+msgid "Export Finished"
+msgstr "내보내기 완료"
+
+msgctxt "render-video.exportSettings"
+msgid "Export Settings"
+msgstr "내보내기 설정"
+
+msgctxt "render-video.exportingOverlay"
+msgid "Exporting Overlay"
+msgstr "오버레이 내보내는 중"
+
+msgctxt "render-video.finalizingVideo"
+msgid "Finalizing Video"
+msgstr "동영상 마무리 중"
+
+msgctxt "render-video.frameProgress"
+msgid "{{current}} / {{total}} frames"
+msgstr "{{current}} / {{total}} 프레임"
+
+msgctxt "render-video.framerate"
+msgid "Framerate"
+msgstr "프레임 속도"
+
+msgctxt "render-video.fullVideo"
+msgid "Full Video"
+msgstr "전체 동영상"
+
+msgctxt "render-video.hardwareAcceleration"
+msgid "Hardware Acceleration"
+msgstr "하드웨어 가속"
+
+msgctxt "render-video.hardwareAccelerationVaapiHelp"
+msgid "VAAPI needs your GPU's VA-API driver. Install it with your package manager:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nRun vainfo to check that the driver loads. NVIDIA GPUs use the NVIDIA GPU option instead."
+msgstr "VAAPI를 사용하려면 GPU의 VA-API 드라이버가 필요합니다. 패키지 관리자로 설치하세요:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nvainfo를 실행해 드라이버가 로드되는지 확인하세요. NVIDIA GPU는 대신 NVIDIA GPU 옵션을 사용합니다."
+
+msgctxt "render-video.hiddenByOverlap"
+msgid "Hidden behind an overlapping video"
+msgstr "겹치는 동영상에 가려짐"
+
+msgctxt "render-video.keepAppOpen"
+msgid "Please keep the application open during rendering"
+msgstr "렌더링 중에는 애플리케이션을 열어 두세요"
+
+msgctxt "render-video.largerFile"
+msgid "Larger file"
+msgstr "큰 파일"
+
+msgctxt "render-video.loadAGpxfitActivityFirst"
+msgid "Load a GPX/FIT activity first"
+msgstr "GPX/FIT 활동을 먼저 로드하세요"
+
+msgctxt "render-video.lockedToEachVideoFps"
+msgid "Locked to each video's FPS"
+msgstr "각 동영상의 FPS로 고정됨"
+
+msgctxt "render-video.lockedToVideoFps"
+msgid "Locked to video FPS ({{fps}} fps)"
+msgstr "동영상 FPS로 고정됨 ({{fps}} fps)"
+
+msgctxt "render-video.minutesMinSecondsSec"
+msgid "{{minutes}} min {{seconds}} sec"
+msgstr "{{minutes}}분 {{seconds}}초"
+
+msgctxt "render-video.mp4Codecs"
+msgid "MP4 Codecs"
+msgstr "MP4 코덱"
+
+msgctxt "render-video.nothingToExport"
+msgid "Every video part is excluded from export."
+msgstr "모든 동영상 부분이 내보내기에서 제외되었습니다."
+
+msgctxt "render-video.outputContainerFps"
+msgid "Output container: {{fps}} fps"
+msgstr "출력 컨테이너: {{fps}} fps"
+
+msgctxt "render-video.outputFile"
+msgid "Output file"
+msgstr "출력 파일"
+
+msgctxt "render-video.outputFolder"
+msgid "Output folder"
+msgstr "출력 폴더"
+
+msgctxt "render-video.outputPath"
+msgid "Output path"
+msgstr "출력 경로"
+
+msgctxt "render-video.overwrite"
+msgid "Overwrite"
+msgstr "덮어쓰기"
+
+msgctxt "render-video.overwriteExistingFile"
+msgid "Overwrite existing file?"
+msgstr "기존 파일을 덮어쓰시겠습니까?"
+
+msgctxt "render-video.pathErrors.outputAliasesInput"
+msgid "The output would overwrite an input video"
+msgstr "출력 파일이 입력 동영상을 덮어쓰게 됩니다"
+
+msgctxt "render-video.pathErrors.outputDestinationsConflict"
+msgid "Multiple batch outputs use the same destination"
+msgstr "여러 일괄 출력이 같은 대상을 사용합니다"
+
+msgctxt "render-video.pathErrors.outputDirectoryInvalid"
+msgid "Choose an existing output directory"
+msgstr "기존 출력 디렉터리를 선택하세요"
+
+msgctxt "render-video.pathErrors.outputDirectoryMissing"
+msgid "The output directory does not exist"
+msgstr "출력 디렉터리가 존재하지 않습니다"
+
+msgctxt "render-video.pathErrors.outputExtensionInvalid"
+msgid "The output file must use .{{extension}}"
+msgstr "출력 파일은 .{{extension}} 확장자를 사용해야 합니다"
+
+msgctxt "render-video.pathErrors.outputFileRequired"
+msgid "Choose an output file"
+msgstr "출력 파일을 선택하세요"
+
+msgctxt "render-video.pathErrors.outputFilenameRequired"
+msgid "The output path must include a file name"
+msgstr "출력 경로에 파일 이름이 포함되어야 합니다"
+
+msgctxt "render-video.pathErrors.outputNotFile"
+msgid "The selected output is not a file"
+msgstr "선택한 출력 대상이 파일이 아닙니다"
+
+msgctxt "render-video.pathErrors.outputPathIncomplete"
+msgid "Choose a complete output path, including its folder"
+msgstr "폴더를 포함한 전체 출력 경로를 선택하세요"
+
+msgctxt "render-video.pathErrors.outputPathInvalid"
+msgid "The output file name or path is not valid"
+msgstr "출력 파일 이름 또는 경로가 유효하지 않습니다"
+
+msgctxt "render-video.pathErrors.outputPermissionDenied"
+msgid "You do not have permission to write the output file"
+msgstr "출력 파일에 쓸 권한이 없습니다"
+
+msgctxt "render-video.pathErrors.outputWriteFailed"
+msgid "Could not create or write the output file: {{detail}}"
+msgstr "출력 파일을 만들거나 쓸 수 없습니다: {{detail}}"
+
+msgctxt "render-video.pathErrors.sourceFilenameInvalid"
+msgid "The source file name is invalid"
+msgstr "원본 파일 이름이 유효하지 않습니다"
+
+msgctxt "render-video.percentComplete"
+msgid "{{percent}}% Complete"
+msgstr "{{percent}}% 완료"
+
+msgctxt "render-video.preparingBatch"
+msgid "Preparing video..."
+msgstr "동영상 준비 중..."
+
+msgctxt "render-video.quality"
+msgid "Quality"
+msgstr "화질"
+
+msgctxt "render-video.queued"
+msgid "Queued"
+msgstr "대기 중"
+
+msgctxt "render-video.reinspectionRequired"
+msgid "Sources changed or inspection expired. Inspect again before starting."
+msgstr "파일이 변경되었거나 검사 유효 기간이 만료되었습니다. 시작 전에 다시 검사하세요."
+
+msgctxt "render-video.renderFps"
+msgid "Render FPS"
+msgstr "렌더링 FPS"
+
+msgctxt "render-video.rendering"
+msgid "Rendering..."
+msgstr "렌더링 중..."
+
+msgctxt "render-video.renderingAlreadyInProgress"
+msgid "Rendering already in progress"
+msgstr "렌더링이 이미 진행 중입니다"
+
+msgctxt "render-video.renderingFrames"
+msgid "Rendering frames..."
+msgstr "프레임 렌더링 중..."
+
+msgctxt "render-video.resolutionMismatchInstructions"
+msgid "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template."
+msgstr "오버레이를 올바르게 내보내려면 필요합니다. 사이드바 설정에서 오버레이 해상도를 변경하거나 다른 템플릿을 선택하세요."
+
+msgctxt "render-video.secondsSec"
+msgid "{{seconds}} sec"
+msgstr "{{seconds}}초"
+
+msgctxt "render-video.smallerFile"
+msgid "Smaller file"
+msgstr "작은 파일"
+
+msgctxt "render-video.startRender"
+msgid "Start Render"
+msgstr "렌더링 시작"
+
+msgctxt "render-video.startingRender"
+msgid "Starting render..."
+msgstr "렌더링 시작 중..."
+
+msgctxt "render-video.transparent"
+msgid "Transparent"
+msgstr "투명"
+
+msgctxt "render-video.transparentCodecs"
+msgid "Transparent Codecs"
+msgstr "투명도를 지원하는 코덱"
+
+msgctxt "render-video.unavailable"
+msgid "Unavailable"
+msgstr "사용할 수 없음"
+
+msgctxt "render-video.unstarted"
+msgid "Not started"
+msgstr "시작 안 됨"
+
+msgctxt "render-video.update1val"
+msgid "Update 1/{{val}}"
+msgstr "업데이트 1/{{val}}"
+
+msgctxt "render-video.videoImported"
+msgid "Video imported"
+msgstr "동영상 가져옴"
+
+msgctxt "render-video.videoRequired"
+msgid "Video required"
+msgstr "동영상 필요"
+
+msgctxt "render-video.videoResolutionMismatchMessage"
+msgid "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}})."
+msgstr "오버레이 해상도 {{overlayResolution}}는 가져온 동영상({{videoResolution}})과 일치해야 합니다."
+
+msgctxt "render-video.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "위젯 업데이트 속도"
+
+msgctxt "render-video.worse"
+msgid "Worse"
+msgstr "낮음"
+
+msgctxt "scene-settings.aspectRatio"
+msgid "Aspect Ratio"
+msgstr "가로세로 비율"
+
+msgctxt "scene-settings.borderThickness"
+msgid "Border Thickness"
+msgstr "테두리 두께"
+
+msgctxt "scene-settings.borders"
+msgid "Borders"
+msgstr "테두리"
+
+msgctxt "scene-settings.custom"
+msgid "Custom"
+msgstr "사용자 지정"
+
+msgctxt "scene-settings.customFps"
+msgid "Custom FPS"
+msgstr "사용자 지정 FPS"
+
+msgctxt "scene-settings.fixedWidthDigits"
+msgid "Fixed-Width Digits"
+msgstr "고정 폭 숫자"
+
+msgctxt "scene-settings.fontLabels"
+msgid "Font - Labels"
+msgstr "폰트 - 레이블"
+
+msgctxt "scene-settings.fontValues"
+msgid "Font - Values"
+msgstr "폰트 - 값"
+
+msgctxt "scene-settings.framerate"
+msgid "Framerate"
+msgstr "프레임 속도"
+
+msgctxt "scene-settings.globalSettings"
+msgid "Global Settings"
+msgstr "전역 설정"
+
+msgctxt "scene-settings.height"
+msgid "Height"
+msgstr "높이"
+
+msgctxt "scene-settings.icons"
+msgid "Icons"
+msgstr "아이콘"
+
+msgctxt "scene-settings.labels"
+msgid "Labels"
+msgstr "레이블"
+
+msgctxt "scene-settings.lockedToFps"
+msgid "Locked to {{fps}} fps"
+msgstr "{{fps}} fps로 고정됨"
+
+msgctxt "scene-settings.overlay"
+msgid "Overlay"
+msgstr "오버레이"
+
+msgctxt "scene-settings.portrait"
+msgid "Portrait (4:3)"
+msgstr "세로 (4:3)"
+
+msgctxt "scene-settings.resolution"
+msgid "Resolution"
+msgstr "해상도"
+
+msgctxt "scene-settings.resolution1080p"
+msgid "1080p (1920x1080)"
+msgstr "1080p (1920x1080)"
+
+msgctxt "scene-settings.resolution1080pSquare"
+msgid "1080p Square (1080x1080)"
+msgstr "1080p 정사각형 (1080x1080)"
+
+msgctxt "scene-settings.resolution1080pVertical"
+msgid "1080p Vertical (1080x1920)"
+msgstr "1080p 세로 (1080x1920)"
+
+msgctxt "scene-settings.resolution4k"
+msgid "4K (3840x2160)"
+msgstr "4K (3840x2160)"
+
+msgctxt "scene-settings.resolution4kSquare"
+msgid "4K Square (2160x2160)"
+msgstr "4K 정사각형 (2160x2160)"
+
+msgctxt "scene-settings.resolution4kVertical"
+msgid "4K Vertical (2160x3840)"
+msgstr "4K 세로 (2160x3840)"
+
+msgctxt "scene-settings.resolution720p"
+msgid "720p (1280x720)"
+msgstr "720p (1280x720)"
+
+msgctxt "scene-settings.resolutionMismatch"
+msgid "Overlay and video resolutions do not match"
+msgstr "오버레이와 동영상 해상도가 일치하지 않음"
+
+msgctxt "scene-settings.resolutionQxga"
+msgid "QXGA (2048x1536)"
+msgstr "QXGA (2048x1536)"
+
+msgctxt "scene-settings.resolutionSxga"
+msgid "SXGA+ (1400x1050)"
+msgstr "SXGA+ (1400x1050)"
+
+msgctxt "scene-settings.resolutionUltrawide"
+msgid "Ultrawide (3440x1440)"
+msgstr "울트라와이드 (3440x1440)"
+
+msgctxt "scene-settings.resolutionUxga"
+msgid "UXGA (1600x1200)"
+msgstr "UXGA (1600x1200)"
+
+msgctxt "scene-settings.resolutionXga"
+msgid "XGA (1920x1440)"
+msgstr "XGA (1920x1440)"
+
+msgctxt "scene-settings.scale"
+msgid "Scale"
+msgstr "배율"
+
+msgctxt "scene-settings.shadowDistance"
+msgid "Shadow Distance"
+msgstr "그림자 거리"
+
+msgctxt "scene-settings.shadowStrength"
+msgid "Shadow Strength"
+msgstr "그림자 강도"
+
+msgctxt "scene-settings.shadows"
+msgid "Shadows"
+msgstr "그림자"
+
+msgctxt "scene-settings.square"
+msgid "Square (1:1)"
+msgstr "정사각형 (1:1)"
+
+msgctxt "scene-settings.transparency"
+msgid "Transparency"
+msgstr "투명도"
+
+msgctxt "scene-settings.ultrawide"
+msgid "Ultrawide (21:9)"
+msgstr "울트라와이드 (21:9)"
+
+msgctxt "scene-settings.units"
+msgid "Units"
+msgstr "단위"
+
+msgctxt "scene-settings.values"
+msgid "Values"
+msgstr "값"
+
+msgctxt "scene-settings.vertical"
+msgid "Vertical (9:16)"
+msgstr "세로 (9:16)"
+
+msgctxt "scene-settings.widescreen"
+msgid "Widescreen (16:9)"
+msgstr "와이드스크린 (16:9)"
+
+msgctxt "scene-settings.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "위젯 업데이트 속도"
+
+msgctxt "scene-settings.width"
+msgid "Width"
+msgstr "너비"
+
+msgctxt "store.couldNotDetermineVideoCreationTime"
+msgid "Could not determine video creation time"
+msgstr "동영상 생성 시간을 확인할 수 없음"
+
+msgctxt "store.invalidTimestampFormats"
+msgid "Invalid timestamp formats"
+msgstr "잘못된 타임스탬프 형식"
+
+msgctxt "store.timezoneIsRequiredForVideoSync"
+msgid "timezone is required for video sync"
+msgstr "동영상 동기화에 시간대가 필요합니다"
+
+msgctxt "template-manager.cancel"
+msgid "Cancel"
+msgstr "취소"
+
+msgctxt "template-manager.createNewTemplate"
+msgid "Create New Template"
+msgstr "새 템플릿 만들기"
+
+msgctxt "template-manager.newTemplate"
+msgid "New Template"
+msgstr "새 템플릿"
+
+msgctxt "template-manager.save"
+msgid "Save"
+msgstr "저장"
+
+msgctxt "template-manager.unsavedChanges"
+msgid "Your template has unsaved changes. Save them or discard them."
+msgstr "템플릿에 저장되지 않은 변경 사항이 있습니다. 저장하거나 삭제하세요."
+
+msgctxt "toolbar.activity"
+msgid "Activity"
+msgstr "활동"
+
+msgctxt "toolbar.activityType"
+msgid "Activity type"
+msgstr "활동 유형"
+
+msgctxt "toolbar.applyTimezone"
+msgid "Apply Timezone"
+msgstr "시간대 적용"
+
+msgctxt "toolbar.autosync"
+msgid "Auto-sync"
+msgstr "자동 동기화"
+
+msgctxt "toolbar.bitRate"
+msgid "Bit rate"
+msgstr "비트레이트"
+
+msgctxt "toolbar.calculated"
+msgid "Calculated"
+msgstr "계산됨"
+
+msgctxt "toolbar.camera"
+msgid "Camera"
+msgstr "카메라"
+
+msgctxt "toolbar.codec"
+msgid "Codec"
+msgstr "코덱"
+
+msgctxt "toolbar.createdAt"
+msgid "Created at"
+msgstr "생성 시간"
+
+msgctxt "toolbar.creationTime"
+msgid "Creation Time"
+msgstr "생성 시간"
+
+msgctxt "toolbar.deleteActivity"
+msgid "Delete activity"
+msgstr "활동 삭제"
+
+msgctxt "toolbar.details"
+msgid "Details"
+msgstr "세부 정보"
+
+msgctxt "toolbar.detected"
+msgid "Detected"
+msgstr "감지됨"
+
+msgctxt "toolbar.detectedLaps"
+msgid "Detected laps"
+msgstr "감지된 랩"
+
+msgctxt "toolbar.distance"
+msgid "Distance"
+msgstr "거리"
+
+msgctxt "toolbar.dropActivityFile"
+msgid "Drop activity file"
+msgstr "활동 파일을 끌어 놓기"
+
+msgctxt "toolbar.dropVideoFile"
+msgid "Drop video files"
+msgstr "동영상 파일을 끌어 놓기"
+
+msgctxt "toolbar.duration"
+msgid "Duration"
+msgstr "재생 시간"
+
+msgctxt "toolbar.extracted"
+msgid "Extracted"
+msgstr "추출됨"
+
+msgctxt "toolbar.filename"
+msgid "Filename"
+msgstr "파일 이름"
+
+msgctxt "toolbar.frameRate"
+msgid "Frame rate"
+msgstr "프레임 속도"
+
+msgctxt "toolbar.lapDuration"
+msgid "Duration"
+msgstr "시간"
+
+msgctxt "toolbar.lapNumber"
+msgid "Lap"
+msgstr "랩"
+
+msgctxt "toolbar.lapStart"
+msgid "Start"
+msgstr "시작"
+
+msgctxt "toolbar.loadActivity"
+msgid "Load activity"
+msgstr "활동 로드"
+
+msgctxt "toolbar.loadVideo"
+msgid "Load videos"
+msgstr "동영상 로드"
+
+msgctxt "toolbar.newProject"
+msgid "New Project"
+msgstr "새 프로젝트"
+
+msgctxt "toolbar.noDataCalculated"
+msgid "No data were calculated"
+msgstr "계산된 데이터 없음"
+
+msgctxt "toolbar.noDataExtracted"
+msgid "No data were extracted"
+msgstr "추출된 데이터 없음"
+
+msgctxt "toolbar.openProject"
+msgid "Open Project"
+msgstr "프로젝트 열기"
+
+msgctxt "toolbar.pinDrawer"
+msgid "Pin drawer"
+msgstr "패널 고정"
+
+msgctxt "toolbar.projects"
+msgid "Projects"
+msgstr "프로젝트"
+
+msgctxt "toolbar.resolution"
+msgid "Resolution"
+msgstr "해상도"
+
+msgctxt "toolbar.restoreDetectedVideoCreationTime"
+msgid "Restore detected video creation time"
+msgstr "감지된 동영상 생성 시간 복원"
+
+msgctxt "toolbar.saveProject"
+msgid "Save Project"
+msgstr "프로젝트 저장"
+
+msgctxt "toolbar.saveProjectAs"
+msgid "Save Project As"
+msgstr "다른 이름으로 저장"
+
+msgctxt "toolbar.showLap"
+msgid "Show lap {0}"
+msgstr "랩 {0} 표시"
+
+msgctxt "toolbar.startTime"
+msgid "Start time"
+msgstr "시작 시간"
+
+msgctxt "toolbar.syncOffset"
+msgid "Sync Offset"
+msgstr "동기화 오프셋"
+
+msgctxt "toolbar.timeSource"
+msgid "Time source"
+msgstr "시간 소스"
+
+msgctxt "toolbar.timeSourceFilename"
+msgid "Filename"
+msgstr "파일 이름"
+
+msgctxt "toolbar.timeSourceGps"
+msgid "GPS timestamp"
+msgstr "GPS 타임스탬프"
+
+msgctxt "toolbar.timeSourceMetadata"
+msgid "Metadata"
+msgstr "메타데이터"
+
+msgctxt "toolbar.timezone"
+msgid "Timezone"
+msgstr "시간대"
+
+msgctxt "toolbar.unknown"
+msgid "Unknown"
+msgstr "알 수 없음"
+
+msgctxt "toolbar.unknownTimeSource"
+msgid "Unknown ({{value}})"
+msgstr "알 수 없는 시간 소스 ({{value}})"
+
+msgctxt "toolbar.unpinDrawer"
+msgid "Unpin drawer"
+msgstr "패널 고정 해제"
+
+msgctxt "toolbar.valBitRate"
+msgid "{{val}} Mbps"
+msgstr "{{val}} Mbps"
+
+msgctxt "toolbar.valFps"
+msgid "{{val}} fps"
+msgstr "{{val}} fps"
+
+msgctxt "toolbar.valPoints"
+msgid "{{val}} points"
+msgstr "{{val}}개 지점"
+
+msgctxt "toolbar.valResolution"
+msgid "{{width}}×{{height}}"
+msgstr "{{width}}×{{height}}"
+
+msgctxt "toolbar.video"
+msgid "Video"
+msgstr "동영상"
+
+msgctxt "toolbar.videoSync"
+msgid "Sync Doctor"
+msgstr "동영상 동기화"
+
+msgctxt "toolbar.widgets"
+msgid "Widgets"
+msgstr "위젯"
+
+msgctxt "undo-redo.redoCtrlcmdshiftz"
+msgid "Redo"
+msgstr "다시 실행"
+
+msgctxt "undo-redo.undoCtrlcmdz"
+msgid "Undo"
+msgstr "실행 취소"
+
+msgctxt "video-preview.gpuRequired"
+msgid "Video playback requires at least an integrated GPU."
+msgstr "동영상을 재생하려면 내장 GPU 이상이 필요합니다."
+
+msgctxt "video-preview.theVideoPreviewCouldNotBeLoaded"
+msgid "The video preview could not be loaded."
+msgstr "동영상 미리보기를 로드할 수 없습니다."
+
+msgctxt "video-preview.videoOrImage"
+msgid "Video or Image"
+msgstr "동영상 또는 이미지"
+
+msgctxt "videoSync.activityRequiredForSync"
+msgid "Activity telemetry is required for Landmark Sync"
+msgstr "랜드마크 동기화에는 활동 데이터가 필요합니다"
+
+msgctxt "videoSync.applyCandidate"
+msgid "Apply offset {0} seconds"
+msgstr "오프셋 {0}초 적용"
+
+msgctxt "videoSync.autodetect"
+msgid "Autodetect"
+msgstr "자동 감지"
+
+msgctxt "videoSync.candidates"
+msgid "Sync candidates"
+msgstr "동기화 후보"
+
+msgctxt "videoSync.changeLandmarkType"
+msgid "Change {0} landmark type"
+msgstr "기준점 유형 변경: {0}"
+
+msgctxt "videoSync.clearLandmarks"
+msgid "Clear"
+msgstr "지우기"
+
+msgctxt "videoSync.deleteLandmark"
+msgid "Delete {0} landmark"
+msgstr "기준점 삭제: {0}"
+
+msgctxt "videoSync.detectedEvent"
+msgid "detected {{label}}"
+msgstr "감지: {{label}}"
+
+msgctxt "videoSync.detectedEventRange"
+msgid "{{label}} event from {{start}} to {{end}} seconds"
+msgstr "{{label}} 이벤트: {{start}}~{{end}}초"
+
+msgctxt "videoSync.detectedEvents"
+msgid "Detected events"
+msgstr "감지된 이벤트"
+
+msgctxt "videoSync.detection"
+msgid "Sensitivity & Detection"
+msgstr "민감도 및 감지"
+
+msgctxt "videoSync.landmarkAriaLabel"
+msgid "{0} landmark at {1} seconds"
+msgstr "{1}초 지점의 기준점 “{0}”"
+
+msgctxt "videoSync.landmarkLimit"
+msgid "The maximum of five landmarks has been reached"
+msgstr "기준점은 최대 5개까지 설정할 수 있습니다"
+
+msgctxt "videoSync.landmarksMatched"
+msgid "{{matched}} / {{eligible}} landmarks matched"
+msgstr "일치: {{matched}} / {{eligible}}"
+
+msgctxt "videoSync.leftTurn"
+msgid "Left Turn"
+msgstr "좌회전"
+
+msgctxt "videoSync.leftTurns"
+msgid "Left Turns"
+msgstr "좌회전"
+
+msgctxt "videoSync.location"
+msgid "Location"
+msgstr "위치"
+
+msgctxt "videoSync.locationLimit"
+msgid "Only one location landmark is allowed"
+msgstr "위치 기준점은 하나만 설정할 수 있습니다"
+
+msgctxt "videoSync.locationOnly"
+msgid "Location only"
+msgstr "위치만"
+
+msgctxt "videoSync.locationSyncCandidates"
+msgid "Location Sync"
+msgstr "위치 동기화"
+
+msgctxt "videoSync.locations"
+msgid "Locations"
+msgstr "위치"
+
+msgctxt "videoSync.manualSync"
+msgid "Manual Sync"
+msgstr "수동 동기화"
+
+msgctxt "videoSync.markControls"
+msgid "Video sync landmark controls"
+msgstr "동영상 동기화 기준점 컨트롤"
+
+msgctxt "videoSync.markLeftTurn"
+msgid "Mark Left Turn"
+msgstr "좌회전 표시"
+
+msgctxt "videoSync.markLocation"
+msgid "Mark Location"
+msgstr "위치 표시"
+
+msgctxt "videoSync.markRightTurn"
+msgid "Mark Right Turn"
+msgstr "우회전 표시"
+
+msgctxt "videoSync.markStop"
+msgid "Mark Stop"
+msgstr "정지 표시"
+
+msgctxt "videoSync.minimumLandmarksForSync"
+msgid "At least two landmarks are required"
+msgstr "기준점이 두 개 이상 필요합니다"
+
+msgctxt "videoSync.noCandidate"
+msgid "No candidate aligns at least two landmarks"
+msgstr "기준점 두 개 이상과 일치하는 후보가 없습니다"
+
+msgctxt "videoSync.noLandmarks"
+msgid "No landmarks marked yet."
+msgstr "아직 표시된 기준점이 없습니다."
+
+msgctxt "videoSync.openManualSync"
+msgid "Open Manual Sync"
+msgstr "수동 동기화 열기"
+
+msgctxt "videoSync.playheadInsideVideo"
+msgid "Move the playhead inside the video to mark a landmark"
+msgstr "기준점을 표시하려면 재생 헤드를 동영상 안으로 이동하세요"
+
+msgctxt "videoSync.rightTurn"
+msgid "Right Turn"
+msgstr "우회전"
+
+msgctxt "videoSync.rightTurns"
+msgid "Right Turns"
+msgstr "우회전"
+
+msgctxt "videoSync.setLocationInMap"
+msgid "Set location"
+msgstr "위치 설정"
+
+msgctxt "videoSync.speed"
+msgid "Speed"
+msgstr "속도"
+
+msgctxt "videoSync.speedSensitivity"
+msgid "Speed"
+msgstr "속도"
+
+msgctxt "videoSync.staleCandidates"
+msgid "Landmarks changed. Rerun the Sync again"
+msgstr "기준점이 변경되었습니다. 동기화를 다시 실행하세요"
+
+msgctxt "videoSync.stop"
+msgid "Stop"
+msgstr "정지"
+
+msgctxt "videoSync.stops"
+msgid "Stops"
+msgstr "정지"
+
+msgctxt "videoSync.syncCandidates"
+msgid "Sync Candidates"
+msgstr "동기화 후보"
+
+msgctxt "videoSync.syncLandmarks"
+msgid "Sync All Landmarks"
+msgstr "모든 기준점 동기화"
+
+msgctxt "videoSync.syncLocation"
+msgid "Match Location Only"
+msgstr "위치만 일치시키기"
+
+msgctxt "videoSync.timelineGraph"
+msgid "Activity telemetry graph"
+msgstr "활동 데이터 그래프"
+
+msgctxt "videoSync.turnSensitivity"
+msgid "Min turn"
+msgstr "최소 회전 각도"
+
+msgctxt "videoSync.turning"
+msgid "Turning"
+msgstr "회전"
+
+msgctxt "videoSync.videoLandmarks"
+msgid "Video landmarks"
+msgstr "동영상 기준점"
+
+msgctxt "videoSync.videoRequired"
+msgid "A video is required to mark a landmark"
+msgstr "기준점을 표시하려면 동영상이 필요합니다"
+
+msgctxt "videoSync.videoRequiredForSync"
+msgid "A video is required for Landmark Sync"
+msgstr "기준점 동기화에는 동영상이 필요합니다"
+
+msgctxt "videoSync.yourLandmarks"
+msgid "Video Landmarks"
+msgstr "내 동영상 기준점"
+
+msgctxt "widget-editor.activityStart"
+msgid "Activity"
+msgstr "활동 시작"
+
+msgctxt "widget-editor.addMetric"
+msgid "Add metric"
+msgstr "지표 추가"
+
+msgctxt "widget-editor.alignment"
+msgid "Alignment"
+msgstr "정렬"
+
+msgctxt "widget-editor.alignmentBelow"
+msgid "Top"
+msgstr "위쪽"
+
+msgctxt "widget-editor.alignmentCentered"
+msgid "Centered"
+msgstr "가운데"
+
+msgctxt "widget-editor.altitudeAtStart"
+msgid "Altitude at start"
+msgstr "시작 고도"
+
+msgctxt "widget-editor.angleTrack"
+msgid "Angle Track"
+msgstr "각도 트랙"
+
+msgctxt "widget-editor.arcAngle"
+msgid "Arc Angle"
+msgstr "호 각도"
+
+msgctxt "widget-editor.arcTrack"
+msgid "Arc Track"
+msgstr "호 트랙"
+
+msgctxt "widget-editor.areaGradient"
+msgid "Gradient"
+msgstr "그라데이션"
+
+msgctxt "widget-editor.areaOpacity"
+msgid "Area Opacity"
+msgstr "영역 불투명도"
+
+msgctxt "widget-editor.areaStyling"
+msgid "Area Styling"
+msgstr "영역 스타일"
+
+msgctxt "widget-editor.axisMapping"
+msgid "Axis Mapping"
+msgstr "축 매핑"
+
+msgctxt "widget-editor.backdropStyle"
+msgid "Backdrop Style"
+msgstr "배경 스타일"
+
+msgctxt "widget-editor.backgroundColor"
+msgid "Background"
+msgstr "배경"
+
+msgctxt "widget-editor.balanceFormat"
+msgid "Balance Format"
+msgstr "균형 형식"
+
+msgctxt "widget-editor.bar"
+msgid "Bar"
+msgstr "막대"
+
+msgctxt "widget-editor.barCount"
+msgid "Bar Count"
+msgstr "막대 개수"
+
+msgctxt "widget-editor.barGap"
+msgid "Bar Gap"
+msgstr "막대 간격"
+
+msgctxt "widget-editor.barHeight"
+msgid "Bar Height"
+msgstr "막대 높이"
+
+msgctxt "widget-editor.barWidth"
+msgid "Bar Width"
+msgstr "막대 너비"
+
+msgctxt "widget-editor.border"
+msgid "Border"
+msgstr "테두리"
+
+msgctxt "widget-editor.borderColor"
+msgid "Border Color"
+msgstr "테두리 색상"
+
+msgctxt "widget-editor.borderOpacity"
+msgid "Border Opacity"
+msgstr "테두리 불투명도"
+
+msgctxt "widget-editor.borderThickness"
+msgid "Border Thickness"
+msgstr "테두리 두께"
+
+msgctxt "widget-editor.both"
+msgid "Both"
+msgstr "둘 다"
+
+msgctxt "widget-editor.bottom"
+msgid "Bottom"
+msgstr "아래"
+
+msgctxt "widget-editor.bottomEdgeStrip"
+msgid "Bottom edge strip"
+msgstr "아래쪽 가장자리 띠"
+
+msgctxt "widget-editor.bottomLeft"
+msgid "Bottom Left"
+msgstr "왼쪽 아래"
+
+msgctxt "widget-editor.bottomRight"
+msgid "Bottom Right"
+msgstr "오른쪽 아래"
+
+msgctxt "widget-editor.cameraMode"
+msgid "Camera Mode"
+msgstr "카메라 모드"
+
+msgctxt "widget-editor.cardinalColor"
+msgid "Cardinal Color"
+msgstr "방위 색상"
+
+msgctxt "widget-editor.cardinalLabels"
+msgid "Cardinal Labels"
+msgstr "방위 레이블"
+
+msgctxt "widget-editor.ceilingAreaColor"
+msgid "Area Color"
+msgstr "영역 색상"
+
+msgctxt "widget-editor.ceilingAreaOpacity"
+msgid "Area Opacity"
+msgstr "영역 불투명도"
+
+msgctxt "widget-editor.ceilingLineColor"
+msgid "Line Color"
+msgstr "선 색상"
+
+msgctxt "widget-editor.ceilingLineOpacity"
+msgid "Line Opacity"
+msgstr "선 불투명도"
+
+msgctxt "widget-editor.chartMetric"
+msgid "Metric"
+msgstr "지표"
+
+msgctxt "widget-editor.chartMetrics"
+msgid "Metrics"
+msgstr "지표"
+
+msgctxt "widget-editor.chaseCamera"
+msgid "Chase Camera"
+msgstr "추적 카메라"
+
+msgctxt "widget-editor.climbColor"
+msgid "Climb"
+msgstr "상승"
+
+msgctxt "widget-editor.color"
+msgid "Color"
+msgstr "색상"
+
+msgctxt "widget-editor.colorNegative"
+msgid "Color Negative"
+msgstr "음수 색상"
+
+msgctxt "widget-editor.colorPositive"
+msgid "Color Positive"
+msgstr "양수 색상"
+
+msgctxt "widget-editor.compass"
+msgid "Compass"
+msgstr "나침반"
+
+msgctxt "widget-editor.compassDial"
+msgid "Dial"
+msgstr "다이얼"
+
+msgctxt "widget-editor.concentricRing"
+msgid "Concentric Ring"
+msgstr "동심원"
+
+msgctxt "widget-editor.continuousFill"
+msgid "Continuous Fill"
+msgstr "연속 채우기"
+
+msgctxt "widget-editor.coordinateFormatDdm"
+msgid "Deg / Dec Min"
+msgstr "도 / 소수점 분"
+
+msgctxt "widget-editor.coordinateFormatDms"
+msgid "Deg / Min / Sec"
+msgstr "도 / 분 / 초"
+
+msgctxt "widget-editor.coordinates"
+msgid "Coordinates"
+msgstr "좌표"
+
+msgctxt "widget-editor.cornerOrientation"
+msgid "Corner Orientation"
+msgstr "모서리 방향"
+
+msgctxt "widget-editor.cornerRadius"
+msgid "Corner Radius"
+msgstr "모서리 반경"
+
+msgctxt "widget-editor.cornerTrack"
+msgid "Corner Track"
+msgstr "모서리 트랙"
+
+msgctxt "widget-editor.cornersAndEdges"
+msgid "Corners & edges"
+msgstr "모서리와 가장자리"
+
+msgctxt "widget-editor.dateFormatDdMmYyyy"
+msgid "Date only (DD-MM-YYYY)"
+msgstr "날짜만 (DD-MM-YYYY)"
+
+msgctxt "widget-editor.dateFormatDdMmmYyyy"
+msgid "Date only (DD MMM YYYY)"
+msgstr "날짜만 (DD MMM YYYY)"
+
+msgctxt "widget-editor.dateFormatDdMmmmYyyy"
+msgid "Date only (DD MMMM YYYY)"
+msgstr "날짜만 (DD MMMM YYYY)"
+
+msgctxt "widget-editor.dateFormatMmDdYyyy"
+msgid "Date only (MM-DD-YYYY)"
+msgstr "날짜만 (MM-DD-YYYY)"
+
+msgctxt "widget-editor.dateFormatMmmDdYyyy"
+msgid "Date only (MMM DD YYYY)"
+msgstr "날짜만 (MMM DD YYYY)"
+
+msgctxt "widget-editor.dateFormatMmmmDdYyyy"
+msgid "Date only (MMMM DD YYYY)"
+msgstr "날짜만 (MMMM DD YYYY)"
+
+msgctxt "widget-editor.dateFormatYyyyMmDd"
+msgid "Date only (YYYY-MM-DD)"
+msgstr "날짜만 (YYYY-MM-DD)"
+
+msgctxt "widget-editor.dateTimeFormat12h"
+msgid "Date + time (12h)"
+msgstr "날짜 + 시간 (12h)"
+
+msgctxt "widget-editor.dateTimeFormat12hWithSeconds"
+msgid "Date + time (12h with seconds)"
+msgstr "날짜 + 시간 (12h 초 포함)"
+
+msgctxt "widget-editor.dateTimeFormat24h"
+msgid "Date + time (24h)"
+msgstr "날짜 + 시간 (24h)"
+
+msgctxt "widget-editor.dateTimeFormat24hWithSeconds"
+msgid "Date + time (24h with seconds)"
+msgstr "날짜 + 시간 (24h 초 포함)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm12h"
+msgid "Date + time (DD MMM, 12h)"
+msgstr "날짜 + 시간 (DD MMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm24h"
+msgid "Date + time (DD MMM, 24h)"
+msgstr "날짜 + 시간 (DD MMM, 24h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm12h"
+msgid "Date + time (DD MMMM, 12h)"
+msgstr "날짜 + 시간 (DD MMMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm24h"
+msgid "Date + time (DD MMMM, 24h)"
+msgstr "날짜 + 시간 (DD MMMM, 24h)"
+
+msgctxt "widget-editor.daytime"
+msgid "Time of day"
+msgstr "현재 시각"
+
+msgctxt "widget-editor.decimal"
+msgid "Decimal"
+msgstr "소수"
+
+msgctxt "widget-editor.decimals"
+msgid "Decimals"
+msgstr "소수 자릿수"
+
+msgctxt "widget-editor.decompressionCeiling"
+msgid "Decompression Ceiling"
+msgstr "감압 천장"
+
+msgctxt "widget-editor.descentColor"
+msgid "Descent"
+msgstr "하강"
+
+msgctxt "widget-editor.diameter"
+msgid "Diameter"
+msgstr "직경"
+
+msgctxt "widget-editor.displayType"
+msgid "Display Type"
+msgstr "표시 유형"
+
+msgctxt "widget-editor.elapsedFrom"
+msgid "Since the Start of"
+msgstr "경과 시간 기준:"
+
+msgctxt "widget-editor.elapsedTime"
+msgid "Elapsed Time"
+msgstr "경과 시간"
+
+msgctxt "widget-editor.elevationAtStart"
+msgid "Elevation at start"
+msgstr "시작 고도"
+
+msgctxt "widget-editor.emptyColor"
+msgid "Empty Color"
+msgstr "빈 부분 색상"
+
+msgctxt "widget-editor.emptyOpacity"
+msgid "Empty Opacity"
+msgstr "빈 부분 불투명도"
+
+msgctxt "widget-editor.exportStart"
+msgid "Export"
+msgstr "내보내기 시작"
+
+msgctxt "widget-editor.fill"
+msgid "Fill"
+msgstr "채우기"
+
+msgctxt "widget-editor.fillColor"
+msgid "Fill Color"
+msgstr "채우기 색상"
+
+msgctxt "widget-editor.fillGradient"
+msgid "Gradient"
+msgstr "그라데이션"
+
+msgctxt "widget-editor.fillOpacity"
+msgid "Fill Opacity"
+msgstr "채우기 불투명도"
+
+msgctxt "widget-editor.filledColor"
+msgid "Filled Color"
+msgstr "채워진 부분 색상"
+
+msgctxt "widget-editor.filledOpacity"
+msgid "Filled Opacity"
+msgstr "채워진 부분 불투명도"
+
+msgctxt "widget-editor.finishedColor"
+msgid "Finished Color"
+msgstr "완료 부분 색상"
+
+msgctxt "widget-editor.finishedOpacity"
+msgid "Finished Opacity"
+msgstr "완료 부분 불투명도"
+
+msgctxt "widget-editor.flatTrack"
+msgid "Flat Track"
+msgstr "평면 트랙"
+
+msgctxt "widget-editor.font"
+msgid "Font"
+msgstr "글꼴"
+
+msgctxt "widget-editor.fontColor"
+msgid "Font Color"
+msgstr "폰트 색상"
+
+msgctxt "widget-editor.fontFamily"
+msgid "Font Family"
+msgstr "폰트 패밀리"
+
+msgctxt "widget-editor.fontSize"
+msgid "Font Size"
+msgstr "폰트 크기"
+
+msgctxt "widget-editor.fontWeight"
+msgid "Weight"
+msgstr "굵기"
+
+msgctxt "widget-editor.format"
+msgid "Format"
+msgstr "형식"
+
+msgctxt "widget-editor.gaugeTrack"
+msgid "Gauge Track"
+msgstr "게이지 트랙"
+
+msgctxt "widget-editor.general"
+msgid "General"
+msgstr "일반"
+
+msgctxt "widget-editor.gforcePlot"
+msgid "G-Force Plot"
+msgstr "G-포스 그래프"
+
+msgctxt "widget-editor.glow"
+msgid "Glow"
+msgstr "글로우"
+
+msgctxt "widget-editor.haloDiameter"
+msgid "Halo Diameter"
+msgstr "후광 직경"
+
+msgctxt "widget-editor.headingValue"
+msgid "Value"
+msgstr "값"
+
+msgctxt "widget-editor.heartZones"
+msgid "Zones"
+msgstr "구간"
+
+msgctxt "widget-editor.height"
+msgid "Height"
+msgstr "높이"
+
+msgctxt "widget-editor.horizontal"
+msgid "Horizontal"
+msgstr "가로"
+
+msgctxt "widget-editor.horizontalOffset"
+msgid "Horizontal Offset"
+msgstr "가로 오프셋"
+
+msgctxt "widget-editor.horizontalPosition"
+msgid "Horizontal Position"
+msgstr "가로 위치"
+
+msgctxt "widget-editor.hundredths"
+msgid "Hundredths"
+msgstr "1/100초"
+
+msgctxt "widget-editor.icon"
+msgid "Icon"
+msgstr "아이콘"
+
+msgctxt "widget-editor.imperialLabel"
+msgid "Imperial Label"
+msgstr "야드파운드 레이블"
+
+msgctxt "widget-editor.imperialOffsetX"
+msgid "Imperial Offset X"
+msgstr "야드파운드 오프셋 X"
+
+msgctxt "widget-editor.imperialOffsetY"
+msgid "Imperial Offset Y"
+msgstr "야드파운드 오프셋 Y"
+
+msgctxt "widget-editor.indicator"
+msgid "Indicator"
+msgstr "표시기"
+
+msgctxt "widget-editor.indicatorArrow"
+msgid "Arrow"
+msgstr "화살표"
+
+msgctxt "widget-editor.indicatorColor"
+msgid "Indicator Color"
+msgstr "표시기 색상"
+
+msgctxt "widget-editor.indicatorLine"
+msgid "Line"
+msgstr "선"
+
+msgctxt "widget-editor.indicatorSize"
+msgid "Indicator Size"
+msgstr "표시기 크기"
+
+msgctxt "widget-editor.indicatorStyleChevron"
+msgid "Chevron"
+msgstr "갈매기표"
+
+msgctxt "widget-editor.indicatorStyleHighlightBar"
+msgid "Highlight Bar"
+msgstr "강조 막대"
+
+msgctxt "widget-editor.invertSign"
+msgid "Invert sign"
+msgstr "부호 반전"
+
+msgctxt "widget-editor.italic"
+msgid "Italic"
+msgstr "기울임"
+
+msgctxt "widget-editor.label"
+msgid "Label"
+msgstr "레이블"
+
+msgctxt "widget-editor.labelAxis"
+msgid "{{label}} axis"
+msgstr "{{label}} 축"
+
+msgctxt "widget-editor.labelColor"
+msgid "Label Color"
+msgstr "레이블 색상"
+
+msgctxt "widget-editor.labelFont"
+msgid "Label Font"
+msgstr "레이블 폰트"
+
+msgctxt "widget-editor.labelFontSize"
+msgid "Label Font Size"
+msgstr "레이블 폰트 크기"
+
+msgctxt "widget-editor.labelSize"
+msgid "Label Size"
+msgstr "레이블 크기"
+
+msgctxt "widget-editor.labels"
+msgid "Labels"
+msgstr "레이블"
+
+msgctxt "widget-editor.latitude"
+msgid "Latitude"
+msgstr "위도"
+
+msgctxt "widget-editor.left"
+msgid "Left"
+msgstr "왼쪽"
+
+msgctxt "widget-editor.leftEdgeStrip"
+msgid "Left edge strip"
+msgstr "왼쪽 가장자리 띠"
+
+msgctxt "widget-editor.legend"
+msgid "Legend"
+msgstr "범례"
+
+msgctxt "widget-editor.letterSpacing"
+msgid "Spacing"
+msgstr "간격"
+
+msgctxt "widget-editor.lineStyling"
+msgid "Line Styling"
+msgstr "선 스타일"
+
+msgctxt "widget-editor.liveValue"
+msgid "Value"
+msgstr "값"
+
+msgctxt "widget-editor.longitude"
+msgid "Longitude"
+msgstr "경도"
+
+msgctxt "widget-editor.lthr"
+msgid "Lactate Threshold HR"
+msgstr "젖산 역치 심박수"
+
+msgctxt "widget-editor.majorInterval"
+msgid "Interval"
+msgstr "간격"
+
+msgctxt "widget-editor.majorLabels"
+msgid "Major Labels"
+msgstr "주요 레이블"
+
+msgctxt "widget-editor.majorLength"
+msgid "Major Length"
+msgstr "주요 길이"
+
+msgctxt "widget-editor.majorSpacing"
+msgid "Spacing"
+msgstr "거리"
+
+msgctxt "widget-editor.majorThickness"
+msgid "Major Thickness"
+msgstr "주요 두께"
+
+msgctxt "widget-editor.majorTickColor"
+msgid "Major Color"
+msgstr "주 색상"
+
+msgctxt "widget-editor.majorTicks"
+msgid "Major Ticks"
+msgstr "주요 눈금"
+
+msgctxt "widget-editor.mapBuildings"
+msgid "Buildings"
+msgstr "건물"
+
+msgctxt "widget-editor.mapLabels"
+msgid "Labels"
+msgstr "라벨"
+
+msgctxt "widget-editor.mapLocalNames"
+msgid "Local Names"
+msgstr "현지 이름"
+
+msgctxt "widget-editor.mapPaths"
+msgid "Paths"
+msgstr "오솔길"
+
+msgctxt "widget-editor.mapRotation"
+msgid "Map Rotation"
+msgstr "지도 회전"
+
+msgctxt "widget-editor.mapStyle"
+msgid "Map Style"
+msgstr "지도 스타일"
+
+msgctxt "widget-editor.mapView"
+msgid "Map View"
+msgstr "지도 보기"
+
+msgctxt "widget-editor.mapWebgl2Software"
+msgid "No GPU found. The map draws in software, so its preview and export may be slow."
+msgstr "GPU를 찾을 수 없습니다. 지도가 소프트웨어로 렌더링되어 미리보기와 내보내기가 느릴 수 있습니다."
+
+msgctxt "widget-editor.mapWebgl2Unavailable"
+msgid "WebGL2 isn't available on this system, so the map can't be previewed."
+msgstr "이 시스템에서는 WebGL2를 사용할 수 없어 지도를 미리 볼 수 없습니다."
+
+msgctxt "widget-editor.marker"
+msgid "Marker"
+msgstr "마커"
+
+msgctxt "widget-editor.markerArrow"
+msgid "Arrow"
+msgstr "화살표"
+
+msgctxt "widget-editor.markerColor"
+msgid "Marker Color"
+msgstr "마커 색상"
+
+msgctxt "widget-editor.markerOpacity"
+msgid "Marker Opacity"
+msgstr "마커 불투명도"
+
+msgctxt "widget-editor.markerSize"
+msgid "Marker Size"
+msgstr "마커 크기"
+
+msgctxt "widget-editor.markerType"
+msgid "Marker Type"
+msgstr "마커 유형"
+
+msgctxt "widget-editor.maxHeartrate"
+msgid "Max Heart Rate"
+msgstr "최대 심박수"
+
+msgctxt "widget-editor.maxSplits"
+msgid "Max Splits"
+msgstr "최대 스플릿 수"
+
+msgctxt "widget-editor.metricLabel"
+msgid "Metric Label"
+msgstr "미터법 레이블"
+
+msgctxt "widget-editor.metricOffsetX"
+msgid "Metric Offset X"
+msgstr "미터법 오프셋 X"
+
+msgctxt "widget-editor.metricOffsetY"
+msgid "Metric Offset Y"
+msgstr "미터법 오프셋 Y"
+
+msgctxt "widget-editor.minmaxLabels"
+msgid "Min/Max Labels"
+msgstr "최소/최대 레이블"
+
+msgctxt "widget-editor.minorLabels"
+msgid "Minor Labels"
+msgstr "보조 레이블"
+
+msgctxt "widget-editor.minorLength"
+msgid "Minor Length"
+msgstr "보조 길이"
+
+msgctxt "widget-editor.minorThickness"
+msgid "Minor Thickness"
+msgstr "보조 두께"
+
+msgctxt "widget-editor.minorTickColor"
+msgid "Minor Color"
+msgstr "보조 색상"
+
+msgctxt "widget-editor.minorTicks"
+msgid "Minor Ticks"
+msgstr "보조 눈금"
+
+msgctxt "widget-editor.moveDown"
+msgid "Move down"
+msgstr "아래로 이동"
+
+msgctxt "widget-editor.moveUp"
+msgid "Move up"
+msgstr "위로 이동"
+
+msgctxt "widget-editor.msaa"
+msgid "Anti-aliasing (MSAA)"
+msgstr "안티앨리어싱 (MSAA)"
+
+msgctxt "widget-editor.msaaOff"
+msgid "Off"
+msgstr "끔"
+
+msgctxt "widget-editor.negativeDeltaColor"
+msgid "Negative Delta Color"
+msgstr "음수 델타 색상"
+
+msgctxt "widget-editor.noActiveWidgets"
+msgid "No active widgets"
+msgstr "활성 위젯 없음"
+
+msgctxt "widget-editor.northUp"
+msgid "North Up"
+msgstr "북쪽 위"
+
+msgctxt "widget-editor.offset"
+msgid "Offset"
+msgstr "오프셋"
+
+msgctxt "widget-editor.opacity"
+msgid "Opacity"
+msgstr "불투명도"
+
+msgctxt "widget-editor.orientation"
+msgid "Orientation"
+msgstr "방향"
+
+msgctxt "widget-editor.percentColor"
+msgid "Percent Color"
+msgstr "백분율 색상"
+
+msgctxt "widget-editor.pitch"
+msgid "Pitch"
+msgstr "기울기"
+
+msgctxt "widget-editor.pixelsPerDegree"
+msgid "Pixels per Degree"
+msgstr "도당 픽셀 수"
+
+msgctxt "widget-editor.placement"
+msgid "Placement"
+msgstr "배치"
+
+msgctxt "widget-editor.position"
+msgid "Position"
+msgstr "위치"
+
+msgctxt "widget-editor.positiveDeltaColor"
+msgid "Positive Delta Color"
+msgstr "양수 델타 색상"
+
+msgctxt "widget-editor.profileDetail"
+msgid "Profile Detail"
+msgstr "프로필 세부 정보"
+
+msgctxt "widget-editor.readout"
+msgid "Readout"
+msgstr "표시값"
+
+msgctxt "widget-editor.remainingColor"
+msgid "Remaining Color"
+msgstr "남은 부분 색상"
+
+msgctxt "widget-editor.remainingOpacity"
+msgid "Remaining Opacity"
+msgstr "남은 부분 불투명도"
+
+msgctxt "widget-editor.removeMetric"
+msgid "Remove metric"
+msgstr "지표 제거"
+
+msgctxt "widget-editor.renumberLaps"
+msgid "Renumber laps"
+msgstr "랩 번호 다시 매기기"
+
+msgctxt "widget-editor.resetField"
+msgid "Reset field"
+msgstr "필드 초기화"
+
+msgctxt "widget-editor.resetLabel"
+msgid "Reset {0}"
+msgstr "{0} 초기화"
+
+msgctxt "widget-editor.riderUp"
+msgid "Rider Up"
+msgstr "진행 방향 위"
+
+msgctxt "widget-editor.right"
+msgid "Right"
+msgstr "오른쪽"
+
+msgctxt "widget-editor.rightEdgeStrip"
+msgid "Right edge strip"
+msgstr "오른쪽 가장자리 띠"
+
+msgctxt "widget-editor.ringDiameter"
+msgid "Ring Diameter"
+msgstr "링 직경"
+
+msgctxt "widget-editor.rotation"
+msgid "Rotation"
+msgstr "회전"
+
+msgctxt "widget-editor.rotationMode"
+msgid "Rotation Mode"
+msgstr "회전 모드"
+
+msgctxt "widget-editor.roundBottomLeftCorner"
+msgid "Round bottom left corner"
+msgstr "왼쪽 아래 모서리 둥글게"
+
+msgctxt "widget-editor.roundBottomRightCorner"
+msgid "Round bottom right corner"
+msgstr "오른쪽 아래 모서리 둥글게"
+
+msgctxt "widget-editor.roundTopLeftCorner"
+msgid "Round top left corner"
+msgstr "왼쪽 위 모서리 둥글게"
+
+msgctxt "widget-editor.roundTopRightCorner"
+msgid "Round top right corner"
+msgstr "오른쪽 위 모서리 둥글게"
+
+msgctxt "widget-editor.routeDetail"
+msgid "Route Detail"
+msgstr "경로 세부 정보"
+
+msgctxt "widget-editor.rowGap"
+msgid "Row Gap"
+msgstr "행 간격"
+
+msgctxt "widget-editor.segmentedBars"
+msgid "Segmented Bars"
+msgstr "분할 막대"
+
+msgctxt "widget-editor.shape"
+msgid "Shape"
+msgstr "모양"
+
+msgctxt "widget-editor.showFullActivity"
+msgid "Show Full Activity"
+msgstr "전체 활동 표시"
+
+msgctxt "widget-editor.showFullAscent"
+msgid "Show Full Ascent"
+msgstr "전체 상승고도 표시"
+
+msgctxt "widget-editor.showFullDistance"
+msgid "Show Full Distance"
+msgstr "전체 거리 표시"
+
+msgctxt "widget-editor.showIndicator"
+msgid "Show Indicator"
+msgstr "표시기 표시"
+
+msgctxt "widget-editor.showLabels"
+msgid "Show Labels"
+msgstr "레이블 표시"
+
+msgctxt "widget-editor.showSign"
+msgid "Show sign"
+msgstr "부호 표시"
+
+msgctxt "widget-editor.showValue"
+msgid "Show Value"
+msgstr "값 표시"
+
+msgctxt "widget-editor.singleCircle"
+msgid "Single Circle"
+msgstr "단일 원"
+
+msgctxt "widget-editor.size"
+msgid "Size"
+msgstr "크기"
+
+msgctxt "widget-editor.smoothing"
+msgid "Smoothing"
+msgstr "스무딩"
+
+msgctxt "widget-editor.solidHalo"
+msgid "Solid Halo"
+msgstr "단색 후광"
+
+msgctxt "widget-editor.splitColumnBar"
+msgid "Bar"
+msgstr "막대"
+
+msgctxt "widget-editor.splitColumnPace"
+msgid "Pace"
+msgstr "페이스"
+
+msgctxt "widget-editor.splitColumnSplit"
+msgid "Split"
+msgstr "스플릿"
+
+msgctxt "widget-editor.splitColumns"
+msgid "Columns"
+msgstr "열"
+
+msgctxt "widget-editor.splitLength"
+msgid "Split Length"
+msgstr "스플릿 거리"
+
+msgctxt "widget-editor.splits"
+msgid "Splits"
+msgstr "스플릿"
+
+msgctxt "widget-editor.stripColor"
+msgid "Strip Color"
+msgstr "띠 색상"
+
+msgctxt "widget-editor.stripThickness"
+msgid "Strip Thickness"
+msgstr "띠 두께"
+
+msgctxt "widget-editor.style"
+msgid "Style"
+msgstr "스타일"
+
+msgctxt "widget-editor.tapeScale"
+msgid "Tape Scale"
+msgstr "테이프 배율"
+
+msgctxt "widget-editor.text"
+msgid "Text"
+msgstr "텍스트"
+
+msgctxt "widget-editor.thickness"
+msgid "Thickness"
+msgstr "두께"
+
+msgctxt "widget-editor.tickColor"
+msgid "Tick Color"
+msgstr "눈금 색상"
+
+msgctxt "widget-editor.tickLength"
+msgid "Tick Length"
+msgstr "눈금 길이"
+
+msgctxt "widget-editor.ticks"
+msgid "Ticks"
+msgstr "눈금"
+
+msgctxt "widget-editor.timeFormat12h"
+msgid "Time only (12h)"
+msgstr "시간만 (12h)"
+
+msgctxt "widget-editor.timeFormat12hWithSeconds"
+msgid "Time only (12h with seconds)"
+msgstr "시간만 (12h 초 포함)"
+
+msgctxt "widget-editor.timeFormat24h"
+msgid "Time only (24h)"
+msgstr "시간만 (24h)"
+
+msgctxt "widget-editor.timeFormat24hWithSeconds"
+msgid "Time only (24h with seconds)"
+msgstr "시간만 (24h 초 포함)"
+
+msgctxt "widget-editor.timeMode"
+msgid "Time Mode"
+msgstr "시간 모드"
+
+msgctxt "widget-editor.timeWindow"
+msgid "Time Window"
+msgstr "시간 범위"
+
+msgctxt "widget-editor.top"
+msgid "Top"
+msgstr "위쪽"
+
+msgctxt "widget-editor.topDown"
+msgid "Top Down"
+msgstr "위에서 보기"
+
+msgctxt "widget-editor.topEdgeStrip"
+msgid "Top edge strip"
+msgstr "위쪽 가장자리 띠"
+
+msgctxt "widget-editor.trackFill"
+msgid "Track Fill"
+msgstr "트랙 채우기"
+
+msgctxt "widget-editor.trackStyle"
+msgid "Track Style"
+msgstr "트랙 스타일"
+
+msgctxt "widget-editor.transparency"
+msgid "Transparency"
+msgstr "투명도"
+
+msgctxt "widget-editor.trendSeconds"
+msgid "Trend"
+msgstr "추세"
+
+msgctxt "widget-editor.typography"
+msgid "Typography"
+msgstr "타이포그래피"
+
+msgctxt "widget-editor.unit"
+msgid "Unit"
+msgstr "단위"
+
+msgctxt "widget-editor.unitColor"
+msgid "Unit Color"
+msgstr "단위 색상"
+
+msgctxt "widget-editor.units"
+msgid "Units"
+msgstr "단위"
+
+msgctxt "widget-editor.valueColor"
+msgid "Value Color"
+msgstr "값 색상"
+
+msgctxt "widget-editor.valueOffset"
+msgid "Value Offset"
+msgstr "값 오프셋"
+
+msgctxt "widget-editor.vertical"
+msgid "Vertical"
+msgstr "세로"
+
+msgctxt "widget-editor.verticalOffset"
+msgid "Vertical Offset"
+msgstr "세로 오프셋"
+
+msgctxt "widget-editor.verticalPosition"
+msgid "Vertical Position"
+msgstr "세로 위치"
+
+msgctxt "widget-editor.verticalScale"
+msgid "Vertical Scale"
+msgstr "세로 배율"
+
+msgctxt "widget-editor.verticalSpeed"
+msgid "Vert. Speed"
+msgstr "수직 속도"
+
+msgctxt "widget-editor.width"
+msgid "Width"
+msgstr "너비"
+
+msgctxt "widget-editor.zoneCalculation"
+msgid "Zone Calculation"
+msgstr "구간 계산"
+
+msgctxt "widget-editor.zoneCalculationLthr"
+msgid "Lactate Threshold HR"
+msgstr "젖산 역치 심박수"
+
+msgctxt "widget-editor.zoneCalculationManual"
+msgid "Manual"
+msgstr "수동"
+
+msgctxt "widget-editor.zoneCalculationMaxHeartrate"
+msgid "Max Heart Rate"
+msgstr "최대 심박수"
+
+msgctxt "widget-editor.zoneFrom"
+msgid "From"
+msgstr "시작"
+
+msgctxt "widget-editor.zoneLabel"
+msgid "Zone Label"
+msgstr "구간 라벨"
+
+msgctxt "widget-editor.zoneTo"
+msgid "To"
+msgstr "끝"
+
+msgctxt "widget-editor.zoom"
+msgid "Zoom"
+msgstr "확대/축소"
+
+msgctxt "widgets.activityAttributes.barometric_altitude"
+msgid "Barometric Altitude"
+msgstr "기압 고도"
+
+msgctxt "widgets.backdropTypes.circle"
+msgid "Circle"
+msgstr "원형"
+
+msgctxt "widgets.backdropTypes.rectangle"
+msgid "Rectangle"
+msgstr "직사각형"
+
+msgctxt "widgets.categories.camera"
+msgid "Camera"
+msgstr "카메라"
+
+msgctxt "widgets.categories.cycling"
+msgid "Cycling"
+msgstr "자전거"
+
+msgctxt "widgets.categories.general"
+msgid "General"
+msgstr "일반"
+
+msgctxt "widgets.categories.motosports"
+msgid "Motorsports"
+msgstr "모터스포츠"
+
+msgctxt "widgets.categories.other"
+msgid "Other"
+msgstr "기타"
+
+msgctxt "widgets.categories.running"
+msgid "Running"
+msgstr "달리기"
+
+msgctxt "widgets.categories.scuba_diving"
+msgid "Scuba Diving"
+msgstr "스쿠버 다이빙"
+
+msgctxt "widgets.displayTypes.altitudeTape"
+msgid "Altitude Tape"
+msgstr "고도 테이프"
+
+msgctxt "widgets.displayTypes.arc"
+msgid "Arc Gauge"
+msgstr "호형 게이지"
+
+msgctxt "widgets.displayTypes.corner"
+msgid "Corner Gauge"
+msgstr "모서리 게이지"
+
+msgctxt "widgets.displayTypes.depthTape"
+msgid "Depth Tape"
+msgstr "수심 테이프"
+
+msgctxt "widgets.displayTypes.gForce"
+msgid "G-Force"
+msgstr "G-포스"
+
+msgctxt "widgets.displayTypes.gtGauge"
+msgid "GT Gauge"
+msgstr "GT 게이지"
+
+msgctxt "widgets.displayTypes.headingCompass"
+msgid "Heading Compass"
+msgstr "방위 나침반"
+
+msgctxt "widgets.displayTypes.headingTape"
+msgid "Heading Tape"
+msgstr "방향 테이프"
+
+msgctxt "widgets.displayTypes.heartZones"
+msgid "Heart Zones"
+msgstr "심박 구간"
+
+msgctxt "widgets.displayTypes.lapTimer"
+msgid "Lap Times"
+msgstr "랩 타임"
+
+msgctxt "widgets.displayTypes.leanAngle"
+msgid "Lean Angle"
+msgstr "기울기 각도"
+
+msgctxt "widgets.displayTypes.linear"
+msgid "Linear Bar"
+msgstr "선형 막대"
+
+msgctxt "widgets.displayTypes.splitsRun"
+msgid "Splits"
+msgstr "스플릿"
+
+msgctxt "widgets.displayTypes.text"
+msgid "Text"
+msgstr "텍스트"
+
+msgctxt "widgets.drawerGroups.map.mapTiles"
+msgid "Map Tiles"
+msgstr "지도 타일"
+
+msgctxt "widgets.drawerGroups.map.route"
+msgid "Route"
+msgstr "경로"
+
+msgctxt "widgets.drawerGroups.map.route3d"
+msgid "3D Route"
+msgstr "3D 경로"
+
+msgctxt "widgets.drawerGroups.map.shortName"
+msgid "Map"
+msgstr "지도"
+
+msgctxt "widgets.lapTimerModes.bestLap"
+msgid "Best Lap"
+msgstr "최고 랩"
+
+msgctxt "widgets.lapTimerModes.currentLap"
+msgid "Current Lap"
+msgstr "현재 랩"
+
+msgctxt "widgets.lapTimerModes.delta"
+msgid "Delta"
+msgstr "델타"
+
+msgctxt "widgets.lapTimerModes.lapLog"
+msgid "Lap Log"
+msgstr "랩 기록"
+
+msgctxt "widgets.types.air_pressure.name"
+msgid "Air Pressure"
+msgstr "기압"
+
+msgctxt "widgets.types.air_pressure.shortName"
+msgid "Air Press."
+msgstr "기압"
+
+msgctxt "widgets.types.altitude.name"
+msgid "Altitude"
+msgstr "고도"
+
+msgctxt "widgets.types.altitude.shortName"
+msgid "Altitude"
+msgstr "고도"
+
+msgctxt "widgets.types.aperture.name"
+msgid "Aperture"
+msgstr "조리개"
+
+msgctxt "widgets.types.aperture.shortName"
+msgid "Aperture"
+msgstr "조리개"
+
+msgctxt "widgets.types.average_ppo2.name"
+msgid "Average ppO₂"
+msgstr "평균 ppO₂"
+
+msgctxt "widgets.types.average_ppo2.shortName"
+msgid "ppO₂"
+msgstr "ppO₂"
+
+msgctxt "widgets.types.backdrop.name"
+msgid "Backdrop"
+msgstr "배경"
+
+msgctxt "widgets.types.backdrop.shortName"
+msgid "Backdrop"
+msgstr "배경"
+
+msgctxt "widgets.types.boost_pressure.name"
+msgid "Boost Pressure"
+msgstr "부스트 압력"
+
+msgctxt "widgets.types.boost_pressure.shortName"
+msgid "Boost"
+msgstr "부스트"
+
+msgctxt "widgets.types.brake_position.name"
+msgid "Brake Position"
+msgstr "브레이크 위치"
+
+msgctxt "widgets.types.brake_position.shortName"
+msgid "Brake"
+msgstr "브레이크"
+
+msgctxt "widgets.types.cadence.name"
+msgid "Cadence"
+msgstr "케이던스"
+
+msgctxt "widgets.types.cadence.shortName"
+msgid "Cadence"
+msgstr "케이던스"
+
+msgctxt "widgets.types.calories.name"
+msgid "Calories"
+msgstr "칼로리"
+
+msgctxt "widgets.types.calories.shortName"
+msgid "Calories"
+msgstr "칼로리"
+
+msgctxt "widgets.types.color_temperature.name"
+msgid "Color Temperature"
+msgstr "색온도"
+
+msgctxt "widgets.types.color_temperature.shortName"
+msgid "WB"
+msgstr "WB"
+
+msgctxt "widgets.types.coolant_temperature.name"
+msgid "Coolant Temperature"
+msgstr "냉각수 온도"
+
+msgctxt "widgets.types.coolant_temperature.shortName"
+msgid "Coolant"
+msgstr "냉각수"
+
+msgctxt "widgets.types.core_temperature.name"
+msgid "Core Temperature"
+msgstr "체온"
+
+msgctxt "widgets.types.core_temperature.shortName"
+msgid "Core T."
+msgstr "체온"
+
+msgctxt "widgets.types.course.name"
+msgid "Route Map"
+msgstr "경로 지도"
+
+msgctxt "widgets.types.course.shortName"
+msgid "Map"
+msgstr "지도"
+
+msgctxt "widgets.types.depth.name"
+msgid "Depth"
+msgstr "수심"
+
+msgctxt "widgets.types.depth.shortName"
+msgid "Depth"
+msgstr "수심"
+
+msgctxt "widgets.types.distance.name"
+msgid "Distance"
+msgstr "거리"
+
+msgctxt "widgets.types.distance.shortName"
+msgid "Dist."
+msgstr "거리"
+
+msgctxt "widgets.types.distance_to_home.name"
+msgid "Distance to Home"
+msgstr "집까지 거리"
+
+msgctxt "widgets.types.distance_to_home.shortName"
+msgid "Home"
+msgstr "집"
+
+msgctxt "widgets.types.diving_profile.name"
+msgid "Diving Profile"
+msgstr "다이빙 프로필"
+
+msgctxt "widgets.types.diving_profile.shortName"
+msgid "Dive Profile"
+msgstr "잠수 프로필"
+
+msgctxt "widgets.types.elevation.name"
+msgid "Elevation"
+msgstr "고도"
+
+msgctxt "widgets.types.elevation.shortName"
+msgid "Elev."
+msgstr "고도"
+
+msgctxt "widgets.types.engine_load.name"
+msgid "Engine Load"
+msgstr "엔진 부하"
+
+msgctxt "widgets.types.engine_load.shortName"
+msgid "Eng. Load"
+msgstr "엔진 부하"
+
+msgctxt "widgets.types.engine_power.name"
+msgid "Engine Power"
+msgstr "엔진 출력"
+
+msgctxt "widgets.types.engine_power.shortName"
+msgid "Eng. Power"
+msgstr "엔진 출력"
+
+msgctxt "widgets.types.ev.name"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.ev.shortName"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.first_stop_depth.name"
+msgid "First Stop Depth"
+msgstr "첫 감압 정지 수심"
+
+msgctxt "widgets.types.first_stop_depth.shortName"
+msgid "Stop Depth"
+msgstr "정지 수심"
+
+msgctxt "widgets.types.first_stop_time.name"
+msgid "First Stop Time"
+msgstr "첫 감압 정지 시간"
+
+msgctxt "widgets.types.first_stop_time.shortName"
+msgid "Stop Time"
+msgstr "정지 시간"
+
+msgctxt "widgets.types.focal_length.name"
+msgid "Focal Length"
+msgstr "초점 거리"
+
+msgctxt "widgets.types.focal_length.shortName"
+msgid "Focal L."
+msgstr "초점 거리"
+
+msgctxt "widgets.types.g_force.name"
+msgid "G-Force"
+msgstr "G-포스"
+
+msgctxt "widgets.types.g_force.shortName"
+msgid "G-Force"
+msgstr "G-포스"
+
+msgctxt "widgets.types.gas_mix.name"
+msgid "Gas Mix (O₂/He)"
+msgstr "혼합 기체 (O₂/He)"
+
+msgctxt "widgets.types.gas_mix.shortName"
+msgid "O₂/He"
+msgstr "O₂/He"
+
+msgctxt "widgets.types.gear_position.name"
+msgid "Gear Position"
+msgstr "기어 위치"
+
+msgctxt "widgets.types.gear_position.shortName"
+msgid "Gear"
+msgstr "기어"
+
+msgctxt "widgets.types.gps_coordinates.name"
+msgid "GPS Coordinates"
+msgstr "GPS 좌표"
+
+msgctxt "widgets.types.gps_coordinates.shortName"
+msgid "Location"
+msgstr "위치"
+
+msgctxt "widgets.types.gradient.name"
+msgid "Gradient"
+msgstr "경사도"
+
+msgctxt "widgets.types.gradient.shortName"
+msgid "Grad."
+msgstr "경사"
+
+msgctxt "widgets.types.ground_contact_time.name"
+msgid "Ground Contact Time"
+msgstr "지면 접촉 시간"
+
+msgctxt "widgets.types.ground_contact_time.shortName"
+msgid "GCT"
+msgstr "접촉 시간"
+
+msgctxt "widgets.types.heading.name"
+msgid "Heading"
+msgstr "방향"
+
+msgctxt "widgets.types.heading.shortName"
+msgid "Heading"
+msgstr "방향"
+
+msgctxt "widgets.types.heartrate.name"
+msgid "Heart Rate"
+msgstr "심박수"
+
+msgctxt "widgets.types.heartrate.shortName"
+msgid "HR"
+msgstr "HR"
+
+msgctxt "widgets.types.iso.name"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.iso.shortName"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.label.name"
+msgid "Text"
+msgstr "텍스트"
+
+msgctxt "widgets.types.label.shortName"
+msgid "Text"
+msgstr "텍스트"
+
+msgctxt "widgets.types.lap_timer.name"
+msgid "Lap Timer"
+msgstr "랩 타이머"
+
+msgctxt "widgets.types.lap_timer.shortName"
+msgid "Lap Times"
+msgstr "랩 타임"
+
+msgctxt "widgets.types.lean_angle.name"
+msgid "Lean Angle"
+msgstr "기울기 각도"
+
+msgctxt "widgets.types.lean_angle.shortName"
+msgid "Lean"
+msgstr "기울기"
+
+msgctxt "widgets.types.left_right_balance.name"
+msgid "Left/Right Balance"
+msgstr "좌/우 균형"
+
+msgctxt "widgets.types.left_right_balance.shortName"
+msgid "L/R Bal."
+msgstr "좌/우 균형"
+
+msgctxt "widgets.types.map.name"
+msgid "Street Map"
+msgstr "거리 지도"
+
+msgctxt "widgets.types.map.shortName"
+msgid "Streets"
+msgstr "거리"
+
+msgctxt "widgets.types.pace.name"
+msgid "Pace"
+msgstr "페이스"
+
+msgctxt "widgets.types.pace.shortName"
+msgid "Pace"
+msgstr "페이스"
+
+msgctxt "widgets.types.power.name"
+msgid "Power"
+msgstr "파워"
+
+msgctxt "widgets.types.power.shortName"
+msgid "Power"
+msgstr "파워"
+
+msgctxt "widgets.types.raster.name"
+msgid "Image"
+msgstr "이미지"
+
+msgctxt "widgets.types.raster.shortName"
+msgid "Image"
+msgstr "이미지"
+
+msgctxt "widgets.types.rolling_chart.name"
+msgid "Charts"
+msgstr "차트"
+
+msgctxt "widgets.types.rolling_chart.shortName"
+msgid "Charts"
+msgstr "차트"
+
+msgctxt "widgets.types.rpm.name"
+msgid "RPM"
+msgstr "RPM"
+
+msgctxt "widgets.types.rpm.shortName"
+msgid "RPM"
+msgstr "RPM"
+
+msgctxt "widgets.types.shutter_speed.name"
+msgid "Shutter Speed"
+msgstr "셔터 속도"
+
+msgctxt "widgets.types.shutter_speed.shortName"
+msgid "Shutter"
+msgstr "셔터"
+
+msgctxt "widgets.types.speed.name"
+msgid "Speed"
+msgstr "속도"
+
+msgctxt "widgets.types.speed.shortName"
+msgid "Speed"
+msgstr "속도"
+
+msgctxt "widgets.types.splits_run.name"
+msgid "Running Splits"
+msgstr "러닝 스플릿"
+
+msgctxt "widgets.types.splits_run.shortName"
+msgid "Splits"
+msgstr "스플릿"
+
+msgctxt "widgets.types.stride_length.name"
+msgid "Stride Length"
+msgstr "보폭"
+
+msgctxt "widgets.types.stride_length.shortName"
+msgid "Stride"
+msgstr "보폭"
+
+msgctxt "widgets.types.stroke_rate.name"
+msgid "Stroke Rate"
+msgstr "스트로크율"
+
+msgctxt "widgets.types.stroke_rate.shortName"
+msgid "S/R"
+msgstr "스트로크율"
+
+msgctxt "widgets.types.temperature.name"
+msgid "Temperature"
+msgstr "온도"
+
+msgctxt "widgets.types.temperature.shortName"
+msgid "Temp."
+msgstr "온도"
+
+msgctxt "widgets.types.throttle_position.name"
+msgid "Throttle Position"
+msgstr "스로틀 위치"
+
+msgctxt "widgets.types.throttle_position.shortName"
+msgid "Throttle"
+msgstr "스로틀"
+
+msgctxt "widgets.types.time.name"
+msgid "Time"
+msgstr "시간"
+
+msgctxt "widgets.types.time.shortName"
+msgid "Time"
+msgstr "시간"
+
+msgctxt "widgets.types.time_to_surface.name"
+msgid "Time to Surface"
+msgstr "수면 도달 시간"
+
+msgctxt "widgets.types.time_to_surface.shortName"
+msgid "TTS"
+msgstr "TTS"
+
+msgctxt "widgets.types.torque.name"
+msgid "Torque"
+msgstr "토크"
+
+msgctxt "widgets.types.torque.shortName"
+msgid "Torque"
+msgstr "토크"
+
+msgctxt "widgets.types.total_ascent.name"
+msgid "Total Ascent"
+msgstr "총 상승고도"
+
+msgctxt "widgets.types.total_ascent.shortName"
+msgid "Ascent"
+msgstr "상승고도"
+
+msgctxt "widgets.types.vertical_oscillation.name"
+msgid "Vertical Oscillation"
+msgstr "수직 진동"
+
+msgctxt "widgets.types.vertical_oscillation.shortName"
+msgid "V. Osc."
+msgstr "수직 진동"
+
+msgctxt "widgets.types.vertical_ratio.name"
+msgid "Vertical Ratio"
+msgstr "수직 비율"
+
+msgctxt "widgets.types.vertical_ratio.shortName"
+msgid "V. Ratio"
+msgstr "수직 비율"
+
+msgctxt "widgets.types.vertical_speed.name"
+msgid "Vertical Speed"
+msgstr "수직 속도"
+
+msgctxt "widgets.types.vertical_speed.shortName"
+msgid "V. Speed"
+msgstr "수직 속도"
+
+msgctxt "widgets.types.water_temperature.name"
+msgid "Water Temperature"
+msgstr "수온"
+
+msgctxt "widgets.types.water_temperature.shortName"
+msgid "Water Temp."
+msgstr "수온"

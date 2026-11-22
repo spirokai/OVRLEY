@@ -1,0 +1,3400 @@
+msgid ""
+msgstr ""
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "app-shell.agentConnected"
+msgid "Agent connected"
+msgstr "代理已连接"
+
+msgctxt "app-shell.agentConnectedHelp"
+msgid "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it."
+msgstr "有 AI 代理通过 MCP 连接，可能会更改此窗口。在设置中关闭“允许代理编辑”即可阻止。"
+
+msgctxt "app-shell.allowAgentEdits"
+msgid "Allow agent edits"
+msgstr "允许代理编辑"
+
+msgctxt "app-shell.allowAgentEditsHelp"
+msgid "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request."
+msgstr "允许通过 MCP（ovrley --mcp）连接的 AI 代理更改此窗口，例如语言和抽屉面板。关闭后将拒绝所有代理请求。"
+
+msgctxt "app-shell.blackBackground"
+msgid "Black background"
+msgstr "黑色背景"
+
+msgctxt "app-shell.checkeredBackground"
+msgid "Checkered background"
+msgstr "棋盘格背景"
+
+msgctxt "app-shell.clearMapTileCache"
+msgid "Clear cache"
+msgstr "清除缓存"
+
+msgctxt "app-shell.close"
+msgid "Close"
+msgstr "关闭"
+
+msgctxt "app-shell.copyError"
+msgid "Copy error"
+msgstr "复制错误"
+
+msgctxt "app-shell.dropFilesToImport"
+msgid "Drop files to import"
+msgstr "拖放文件以导入"
+
+msgctxt "app-shell.errorRenderingVideo"
+msgid "Error Rendering Video"
+msgstr "视频渲染错误"
+
+msgctxt "app-shell.file"
+msgid "File"
+msgstr "文件"
+
+msgctxt "app-shell.fileMenu"
+msgid "File menu"
+msgstr "文件菜单"
+
+msgctxt "app-shell.grid"
+msgid "Toggle grid"
+msgstr "显示/隐藏网格"
+
+msgctxt "app-shell.imageBackground"
+msgid "Image background"
+msgstr "图像背景"
+
+msgctxt "app-shell.importActivity"
+msgid "Import Activity"
+msgstr "导入活动"
+
+msgctxt "app-shell.importTemplate"
+msgid "Import Template"
+msgstr "导入模板"
+
+msgctxt "app-shell.importVideo"
+msgid "Import Videos"
+msgstr "导入视频"
+
+msgctxt "app-shell.keyboardShortcutsDescription"
+msgid "You can use the following keyboard shortcuts to improve your workflow:"
+msgstr "您可以使用以下键盘快捷键来提高工作效率:"
+
+msgctxt "app-shell.language"
+msgid "Language"
+msgstr "语言"
+
+msgctxt "app-shell.loadProject"
+msgid "Load Project"
+msgstr "加载项目"
+
+msgctxt "app-shell.loadingEditorData"
+msgid "Loading editor data..."
+msgstr "正在加载编辑器数据..."
+
+msgctxt "app-shell.mapTileCache"
+msgid "Map tile cache"
+msgstr "地图瓦片缓存"
+
+msgctxt "app-shell.mapTileCacheHelp"
+msgid "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first."
+msgstr "为预览和渲染下载的地图瓦片会保存在磁盘上，使地图加载更快并可离线使用。缓存满时，会优先删除最久未使用的瓦片。"
+
+msgctxt "app-shell.mapTileCacheLimit"
+msgid "Cache size"
+msgstr "缓存大小"
+
+msgctxt "app-shell.mapTileCacheUsage"
+msgid "{0} of {1} used"
+msgstr "已使用 {0} / {1}"
+
+msgctxt "app-shell.newProject"
+msgid "New Project"
+msgstr "新建项目"
+
+msgctxt "app-shell.newTemplate"
+msgid "New Template"
+msgstr "新建模板"
+
+msgctxt "app-shell.overlays"
+msgid "Overlays"
+msgstr "叠加层"
+
+msgctxt "app-shell.resetZoom"
+msgid "Reset zoom"
+msgstr "重置缩放"
+
+msgctxt "app-shell.save"
+msgid "Save"
+msgstr "保存"
+
+msgctxt "app-shell.saveProject"
+msgid "Save Project"
+msgstr "保存项目"
+
+msgctxt "app-shell.saveProjectAs"
+msgid "Save Project As"
+msgstr "项目另存为"
+
+msgctxt "app-shell.saveTemplate"
+msgid "Save Template"
+msgstr "保存模板"
+
+msgctxt "app-shell.selectTemplate"
+msgid "Select Template..."
+msgstr "选择模板..."
+
+msgctxt "app-shell.settings"
+msgid "Settings"
+msgstr "设置"
+
+msgctxt "app-shell.shortcuts"
+msgid "Shortcuts"
+msgstr "快捷键"
+
+msgctxt "app-shell.snapToGrid"
+msgid "Snap to grid"
+msgstr "吸附到网格"
+
+msgctxt "app-shell.unitSystem"
+msgid "Units"
+msgstr "单位"
+
+msgctxt "app-shell.unitSystems.imperial"
+msgid "Imperial"
+msgstr "英制"
+
+msgctxt "app-shell.unitSystems.metric"
+msgid "Metric"
+msgstr "公制"
+
+msgctxt "app-shell.unknownResolution"
+msgid "Unknown Resolution"
+msgstr "未知分辨率"
+
+msgctxt "app-shell.videoBackground"
+msgid "Video background"
+msgstr "视频背景"
+
+msgctxt "app-shell.whiteBackground"
+msgid "White background"
+msgstr "白色背景"
+
+msgctxt "app-shell.widgets"
+msgid "Widgets"
+msgstr "小部件"
+
+msgctxt "app-shell.zoomIn"
+msgid "Zoom in"
+msgstr "放大"
+
+msgctxt "app-shell.zoomOut"
+msgid "Zoom out"
+msgstr "缩小"
+
+msgctxt "app-update.close"
+msgid "Close"
+msgstr "关闭"
+
+msgctxt "app-update.continueWithInstalledVersion"
+msgid "The installed version remains available. You can close this dialog and continue working."
+msgstr "安装的版本仍可用。您可以关闭此对话框并继续工作。"
+
+msgctxt "app-update.downloadingUpdate"
+msgid "Downloading update"
+msgstr "正在下载更新"
+
+msgctxt "app-update.later"
+msgid "Later"
+msgstr "稍后"
+
+msgctxt "app-update.updateAvailable"
+msgid "Update available"
+msgstr "有可用更新"
+
+msgctxt "app-update.updateDownloadProgress"
+msgid "Update download progress"
+msgstr "更新下载进度"
+
+msgctxt "app-update.updateFailed"
+msgid "Update failed"
+msgstr "更新失败"
+
+msgctxt "app-update.updateNow"
+msgid "Update now"
+msgstr "立即更新"
+
+msgctxt "app-update.versionNowAvailable"
+msgid "OVRLEY <0>{{version}}</0> is now available."
+msgstr "OVRLEY <0>{{version}}</0> 现已可用。"
+
+msgctxt "app.importingYourVideo"
+msgid "Importing your video..."
+msgstr "正在导入视频..."
+
+msgctxt "app.loadingProject"
+msgid "Loading project..."
+msgstr "正在加载项目..."
+
+msgctxt "app.ovrleyIsStarting"
+msgid "OVRLEY is starting..."
+msgstr "OVRLEY 正在启动..."
+
+msgctxt "app.processingYourActivity"
+msgid "Processing your activity..."
+msgstr "正在处理活动..."
+
+msgctxt "components.blueColorComponent0255"
+msgid "Blue color component (0-255)"
+msgstr "蓝色分量 (0-255)"
+
+msgctxt "components.brightnessPercentage0100"
+msgid "Brightness percentage (0-100)"
+msgstr "亮度百分比 (0-100)"
+
+msgctxt "components.currentColorVal"
+msgid "Current color: {0}"
+msgstr "当前颜色: {0}"
+
+msgctxt "components.decreaseValue"
+msgid "Decrease value"
+msgstr "减小数值"
+
+msgctxt "components.gradientAddStopHint"
+msgid "Click to add a color stop"
+msgstr "点击添加色标"
+
+msgctxt "components.gradientRemoveStop"
+msgid "Remove stop"
+msgstr "移除色标"
+
+msgctxt "components.gradientStopLabel"
+msgid "Color stop at {0}%"
+msgstr "位于 {0}% 的色标"
+
+msgctxt "components.gradientStops"
+msgid "Gradient stops"
+msgstr "渐变色标"
+
+msgctxt "components.greenColorComponent0255"
+msgid "Green color component (0-255)"
+msgstr "绿色分量 (0-255)"
+
+msgctxt "components.hexColorValue"
+msgid "Hex color value"
+msgstr "十六进制颜色值"
+
+msgctxt "components.hueDegree0360"
+msgid "Hue degree (0-360)"
+msgstr "色相角度 (0-360)"
+
+msgctxt "components.increaseValue"
+msgid "Increase value"
+msgstr "增大数值"
+
+msgctxt "components.lightnessPercentage0100"
+msgid "Lightness percentage (0-100)"
+msgstr "明度百分比 (0-100)"
+
+msgctxt "components.presets"
+msgid "Presets"
+msgstr "预设"
+
+msgctxt "components.recommended"
+msgid "Recommended"
+msgstr "推荐"
+
+msgctxt "components.redColorComponent0255"
+msgid "Red color component (0-255)"
+msgstr "红色分量 (0-255)"
+
+msgctxt "components.saturationPercentage0100"
+msgid "Saturation percentage (0-100)"
+msgstr "饱和度百分比 (0-100)"
+
+msgctxt "components.system"
+msgid "System"
+msgstr "系统"
+
+msgctxt "keyboard-shortcuts.activityImport"
+msgid "Import activity"
+msgstr "导入活动"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToEnd"
+msgid "Move playhead to activity trim end"
+msgstr "将播放头移到活动修剪终点"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToStart"
+msgid "Move playhead to activity trim start"
+msgstr "将播放头移到活动修剪起点"
+
+msgctxt "keyboard-shortcuts.activityTrimReset"
+msgid "Reset activity trim"
+msgstr "重置活动修剪"
+
+msgctxt "keyboard-shortcuts.drawerClose"
+msgid "Close widget drawer"
+msgstr "关闭小部件面板"
+
+msgctxt "keyboard-shortcuts.drawerToggle"
+msgid "Open/close widget drawer"
+msgstr "打开/关闭小部件面板"
+
+msgctxt "keyboard-shortcuts.editorClearSelection"
+msgid "Clear widget selection"
+msgstr "清除小部件选择"
+
+msgctxt "keyboard-shortcuts.editorCopy"
+msgid "Copy selected widgets"
+msgstr "复制选中的小部件"
+
+msgctxt "keyboard-shortcuts.editorDelete"
+msgid "Delete selected widgets"
+msgstr "删除选中的小部件"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetOnePixel"
+msgid "Move widget by 1 pixel"
+msgstr "将小部件移动 1 像素"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetTenPixels"
+msgid "Move widget by 10 pixels"
+msgstr "将小部件移动 10 像素"
+
+msgctxt "keyboard-shortcuts.editorNudge"
+msgid "Nudge selected widgets"
+msgstr "微调选中的小部件"
+
+msgctxt "keyboard-shortcuts.editorPaste"
+msgid "Paste copied widgets"
+msgstr "粘贴已复制的小部件"
+
+msgctxt "keyboard-shortcuts.editorResetZoom"
+msgid "Reset canvas zoom"
+msgstr "重置画布缩放"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasHorizontally"
+msgid "Scroll canvas horizontally"
+msgstr "水平滚动画布"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasVertically"
+msgid "Scroll canvas vertically"
+msgstr "垂直滚动画布"
+
+msgctxt "keyboard-shortcuts.editorToggleGrid"
+msgid "Toggle gridlines"
+msgstr "切换网格线"
+
+msgctxt "keyboard-shortcuts.editorToggleSnap"
+msgid "Toggle snapping to grid"
+msgstr "切换网格吸附"
+
+msgctxt "keyboard-shortcuts.editorWheelScroll"
+msgid "Scroll canvas"
+msgstr "滚动画布"
+
+msgctxt "keyboard-shortcuts.editorWheelZoom"
+msgid "Zoom canvas at pointer"
+msgstr "在指针处缩放画布"
+
+msgctxt "keyboard-shortcuts.editorZoomIn"
+msgid "Canvas zoom in"
+msgstr "放大画布"
+
+msgctxt "keyboard-shortcuts.editorZoomOut"
+msgid "Canvas zoom out"
+msgstr "缩小画布"
+
+msgctxt "keyboard-shortcuts.generalCommands"
+msgid "General commands"
+msgstr "常规命令"
+
+msgctxt "keyboard-shortcuts.historyRedo"
+msgid "Redo"
+msgstr "重做"
+
+msgctxt "keyboard-shortcuts.historyUndo"
+msgid "Undo"
+msgstr "撤销"
+
+msgctxt "keyboard-shortcuts.outputOpen"
+msgid "Open export folder"
+msgstr "打开导出文件夹"
+
+msgctxt "keyboard-shortcuts.playerJumpToEnd"
+msgid "Rewind to end"
+msgstr "跳到末尾"
+
+msgctxt "keyboard-shortcuts.playerResetToStart"
+msgid "Rewind to start"
+msgstr "跳到开头"
+
+msgctxt "keyboard-shortcuts.playerStepBackward"
+msgid "Step backward 1 second"
+msgstr "后退 1 秒"
+
+msgctxt "keyboard-shortcuts.playerStepForward"
+msgid "Step forward 1 second"
+msgstr "前进 1 秒"
+
+msgctxt "keyboard-shortcuts.playerToggleMute"
+msgid "Mute/unmute video"
+msgstr "静音/取消静音视频"
+
+msgctxt "keyboard-shortcuts.playerTogglePlayback"
+msgid "Play/pause"
+msgstr "播放/暂停"
+
+msgctxt "keyboard-shortcuts.projectNew"
+msgid "New project"
+msgstr "新建项目"
+
+msgctxt "keyboard-shortcuts.projectOpen"
+msgid "Open project"
+msgstr "打开项目"
+
+msgctxt "keyboard-shortcuts.projectSave"
+msgid "Save project"
+msgstr "保存项目"
+
+msgctxt "keyboard-shortcuts.projectSaveAs"
+msgid "Save project as"
+msgstr "项目另存为"
+
+msgctxt "keyboard-shortcuts.renderOpen"
+msgid "Export overlay"
+msgstr "导出叠加层"
+
+msgctxt "keyboard-shortcuts.syncAuto"
+msgid "Auto-sync video with activity"
+msgstr "自动同步视频与活动"
+
+msgctxt "keyboard-shortcuts.syncGlobalNudge"
+msgid "Adjust sync offset by 1 second"
+msgstr "将同步偏移调整 1 秒"
+
+msgctxt "keyboard-shortcuts.templateImport"
+msgid "Open template"
+msgstr "打开模板"
+
+msgctxt "keyboard-shortcuts.templateNew"
+msgid "New template"
+msgstr "新建模板"
+
+msgctxt "keyboard-shortcuts.templateSave"
+msgid "Save template"
+msgstr "保存模板"
+
+msgctxt "keyboard-shortcuts.templateSelect"
+msgid "Open template list"
+msgstr "打开模板列表"
+
+msgctxt "keyboard-shortcuts.timelineAndSync"
+msgid "Timeline and sync"
+msgstr "时间轴与同步"
+
+msgctxt "keyboard-shortcuts.timelineClipNudge"
+msgid "Nudge selected clip synchronization"
+msgstr "微调选中片段的同步"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeSecond"
+msgid "Nudge selected clip sync offset by 1 second"
+msgstr "将选中片段同步偏移微调 1 秒"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeTenthSecond"
+msgid "Nudge selected clip sync offset by 0.1 seconds"
+msgstr "将选中片段同步偏移微调 0.1 秒"
+
+msgctxt "keyboard-shortcuts.timelineFitActivity"
+msgid "Switch timeline to show activity"
+msgstr "切换时间轴以显示活动"
+
+msgctxt "keyboard-shortcuts.timelineFitAll"
+msgid "Show entire timeline"
+msgstr "显示完整时间轴"
+
+msgctxt "keyboard-shortcuts.timelineFitMedia"
+msgid "Switch timeline to all media"
+msgstr "切换时间轴以显示所有媒体"
+
+msgctxt "keyboard-shortcuts.timelineFitVideo"
+msgid "Switch timeline to show video"
+msgstr "切换时间轴以显示视频"
+
+msgctxt "keyboard-shortcuts.timelineWheelPan"
+msgid "Pan timeline"
+msgstr "平移时间轴"
+
+msgctxt "keyboard-shortcuts.timelineWheelZoom"
+msgid "Zoom timeline at pointer"
+msgstr "在指针处缩放时间轴"
+
+msgctxt "keyboard-shortcuts.trimAfterPlayhead"
+msgid "Trim after the playhead (the video, or the activity without videos)"
+msgstr "修剪播放头之后的部分（视频；没有视频时为活动）"
+
+msgctxt "keyboard-shortcuts.trimBeforePlayhead"
+msgid "Trim before the playhead (the video, or the activity without videos)"
+msgstr "修剪播放头之前的部分（视频；没有视频时为活动）"
+
+msgctxt "keyboard-shortcuts.videoImport"
+msgid "Import video"
+msgstr "导入视频"
+
+msgctxt "keyboard-shortcuts.videoPlayer"
+msgid "Video player"
+msgstr "视频播放器"
+
+msgctxt "keyboard-shortcuts.widgetEditor"
+msgid "Widget editor"
+msgstr "小部件编辑器"
+
+msgctxt "overlay-editor.mapReset"
+msgid "Reset"
+msgstr "重置"
+
+msgctxt "overlay-editor.mapViewHint"
+msgid "Double-click to pan & zoom"
+msgstr "双击以平移和缩放"
+
+msgctxt "overlay-editor.mapViewZoomHint"
+msgid "Double-click to zoom"
+msgstr "双击以缩放"
+
+msgctxt "overlay-editor.statusModified"
+msgid "Modified"
+msgstr "已修改"
+
+msgctxt "overlay-editor.statusUnsaved"
+msgid "Unsaved"
+msgstr "未保存"
+
+msgctxt "player.activity"
+msgid "Activity"
+msgstr "活动"
+
+msgctxt "player.all"
+msgid "All"
+msgstr "全部"
+
+msgctxt "player.duration"
+msgid "Duration"
+msgstr "时长"
+
+msgctxt "player.resetView"
+msgid "Reset view"
+msgstr "重置视图"
+
+msgctxt "player.rewindToEnd"
+msgid "Rewind to end"
+msgstr "跳到末尾"
+
+msgctxt "player.rewindToStart"
+msgid "Rewind to start"
+msgstr "跳到开头"
+
+msgctxt "player.stepBack"
+msgid "Step back"
+msgstr "后退一步"
+
+msgctxt "player.stepForward"
+msgid "Step forward"
+msgstr "前进一步"
+
+msgctxt "player.trimActivityAfterPlayhead"
+msgid "Trim the activity after the playhead"
+msgstr "修剪播放头之后的活动"
+
+msgctxt "player.trimActivityBeforePlayhead"
+msgid "Trim the activity before the playhead"
+msgstr "修剪播放头之前的活动"
+
+msgctxt "player.trimActivityEnd"
+msgid "Drag to trim the end of the activity"
+msgstr "拖动以修剪活动结尾"
+
+msgctxt "player.trimActivityStart"
+msgid "Drag to trim the start of the activity"
+msgstr "拖动以修剪活动开头"
+
+msgctxt "player.trimVideoAfterPlayhead"
+msgid "Trim the video after the playhead"
+msgstr "修剪播放头之后的视频"
+
+msgctxt "player.trimVideoBeforePlayhead"
+msgid "Trim the video before the playhead"
+msgstr "修剪播放头之前的视频"
+
+msgctxt "player.video"
+msgid "Video"
+msgstr "视频"
+
+msgctxt "player.zoomIn"
+msgid "Zoom in"
+msgstr "放大"
+
+msgctxt "player.zoomOut"
+msgid "Zoom out"
+msgstr "缩小"
+
+msgctxt "projects.activity"
+msgid "Activity"
+msgstr "活动"
+
+msgctxt "projects.archiveTooLarge"
+msgid "The project exceeds the 40 MiB archive limit. Remove or replace an image."
+msgstr "项目超过 40 MiB 归档大小限制。请移除或替换一张图片。"
+
+msgctxt "projects.cancel"
+msgid "Cancel"
+msgstr "取消"
+
+msgctxt "projects.closeWithoutSaving"
+msgid "Close Without Saving"
+msgstr "不保存并关闭"
+
+msgctxt "projects.createNewProject"
+msgid "Create New Project"
+msgstr "新建项目"
+
+msgctxt "projects.createProject"
+msgid "create project"
+msgstr "创建项目"
+
+msgctxt "projects.invalidArchive"
+msgid "The project archive is invalid or damaged. Choose another project file."
+msgstr "项目归档无效或已损坏。请选择其他项目文件。"
+
+msgctxt "projects.loadAnyway"
+msgid "Load Anyway"
+msgstr "仍然加载"
+
+msgctxt "projects.locate"
+msgid "Locate"
+msgstr "定位"
+
+msgctxt "projects.missingSourceDescription"
+msgid "The {0} file does not seem to exist. Locate the moved file or cancel without changing the current session."
+msgstr "{0} 文件似乎不存在。请定位已移动的文件，或取消操作而不更改当前会话。"
+
+msgctxt "projects.newProject"
+msgid "New Project"
+msgstr "新建项目"
+
+msgctxt "projects.openAProject"
+msgid "Open a project"
+msgstr "打开项目"
+
+msgctxt "projects.openProject"
+msgid "open project"
+msgstr "打开项目"
+
+msgctxt "projects.rasterUnavailable"
+msgid "An image is unavailable. Replace it before saving."
+msgstr "有一张图片不可用。请在保存前替换它。"
+
+msgctxt "projects.saveFailed"
+msgid "The project could not be saved. Check the destination and try again."
+msgstr "无法保存项目。请检查目标位置后重试。"
+
+msgctxt "projects.saveProject"
+msgid "save project"
+msgstr "保存项目"
+
+msgctxt "projects.sourceNotFound"
+msgid "{0} source not found"
+msgstr "未找到 {0} 源文件"
+
+msgctxt "projects.unsavedChanges"
+msgid "Your project has unsaved changes. Save them or discard them."
+msgstr "您的项目有未保存的更改。请保存或放弃更改。"
+
+msgctxt "projects.unsavedChangesBeforeExit"
+msgid "Your project has unsaved changes. Do you want to save the changes or close without saving?"
+msgstr "您的项目有未保存的更改。要保存更改，还是不保存直接关闭？"
+
+msgctxt "projects.unsavedChangesTitle"
+msgid "Unsaved Changes"
+msgstr "未保存的更改"
+
+msgctxt "projects.video"
+msgid "Video"
+msgstr "视频"
+
+msgctxt "raster.errors.corruptAsset"
+msgid "The embedded image is damaged. Select a replacement."
+msgstr "嵌入的图片已损坏。请选择替换图片。"
+
+msgctxt "raster.errors.decode"
+msgid "Image could not be decoded. Choose another image."
+msgstr "无法解码图片。请选择其他图片。"
+
+msgctxt "raster.errors.encodedSize"
+msgid "Image file is larger than 5 MiB. Choose a smaller file."
+msgstr "文件超过 5 MiB。请选择较小的文件。"
+
+msgctxt "raster.errors.invalidConfig"
+msgid "Image settings are invalid."
+msgstr "图片配置无效。"
+
+msgctxt "raster.errors.missing"
+msgid "Image file is missing. Select another image."
+msgstr "图片文件不存在。请选择其他图片。"
+
+msgctxt "raster.errors.missingAsset"
+msgid "The embedded image is missing from this project. Select a replacement."
+msgstr "此项目缺少嵌入的图片。请选择替换图片。"
+
+msgctxt "raster.errors.noImage"
+msgid "Image {{id}} has no selected file. Select one before rendering."
+msgstr "图片 {{id}} 尚未选择文件。请在渲染前选择。"
+
+msgctxt "raster.errors.relativePath"
+msgid "Select an image from an absolute file path."
+msgstr "请通过绝对文件路径选择图片。"
+
+msgctxt "raster.errors.renderUnavailable"
+msgid "Image {{id}} cannot be rendered yet."
+msgstr "图片 {{id}} 暂时无法渲染。"
+
+msgctxt "raster.errors.resolution"
+msgid "Image resolution exceeds 25 megapixels. Choose a smaller image."
+msgstr "分辨率超过 2500 万像素。请选择较小的图片。"
+
+msgctxt "raster.errors.unreadable"
+msgid "Image file cannot be read. Check its permissions or select another image."
+msgstr "无法读取图片文件。请检查权限或选择其他图片。"
+
+msgctxt "raster.errors.unsupportedType"
+msgid "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff)."
+msgstr "请选择 PNG、JPEG、BMP 或 TIFF 文件（.png、.jpeg、.jpg、.bmp、.tiff）。"
+
+msgctxt "raster.imageFiles"
+msgid "Image files"
+msgstr "图片文件"
+
+msgctxt "raster.replaceImage"
+msgid "Replace image"
+msgstr "替换图片"
+
+msgctxt "raster.selectImage"
+msgid "Select image"
+msgstr "选择图片"
+
+msgctxt "render-video.batchResult.cancelled"
+msgid "Batch cancelled"
+msgstr "批量任务已取消"
+
+msgctxt "render-video.batchResult.completedWithErrors"
+msgid "Batch finished with errors"
+msgstr "批量任务已完成，但存在错误"
+
+msgctxt "render-video.batchResult.failed"
+msgid "Batch failed"
+msgstr "批量任务失败"
+
+msgctxt "render-video.better"
+msgid "Better"
+msgstr "更好"
+
+msgctxt "render-video.bitrate"
+msgid "Bitrate"
+msgstr "比特率"
+
+msgctxt "render-video.cancel"
+msgid "Cancel"
+msgstr "取消"
+
+msgctxt "render-video.cancelled"
+msgid "Cancelled"
+msgstr "已取消"
+
+msgctxt "render-video.cancelling"
+msgid "Cancelling..."
+msgstr "正在取消..."
+
+msgctxt "render-video.chooseFolder"
+msgid "Choose folder..."
+msgstr "选择文件夹..."
+
+msgctxt "render-video.close"
+msgid "Close"
+msgstr "关闭"
+
+msgctxt "render-video.codecOutputFormat"
+msgid "Codec / Output Format"
+msgstr "编解码器 / 输出格式"
+
+msgctxt "render-video.custom"
+msgid "Custom"
+msgstr "自定义"
+
+msgctxt "render-video.customFps"
+msgid "Custom FPS"
+msgstr "自定义 FPS"
+
+msgctxt "render-video.done"
+msgid "Done"
+msgstr "已完成"
+
+msgctxt "render-video.encodingOutputFile"
+msgid "Encoding output file..."
+msgstr "正在编码输出文件..."
+
+msgctxt "render-video.encodingValVal2Frames"
+msgid "Encoding: {{val}} / {{val2}} frames"
+msgstr "编码: {{val}} / {{val2}} 帧"
+
+msgctxt "render-video.estRemaining"
+msgid "Est. Remaining"
+msgstr "预计剩余时间"
+
+msgctxt "render-video.exportFinished"
+msgid "Export Finished"
+msgstr "导出完成"
+
+msgctxt "render-video.exportSettings"
+msgid "Export Settings"
+msgstr "导出设置"
+
+msgctxt "render-video.exportingOverlay"
+msgid "Exporting Overlay"
+msgstr "正在导出叠加层"
+
+msgctxt "render-video.finalizingVideo"
+msgid "Finalizing Video"
+msgstr "正在完成视频处理"
+
+msgctxt "render-video.frameProgress"
+msgid "{{current}} / {{total}} frames"
+msgstr "{{current}} / {{total}} 帧"
+
+msgctxt "render-video.framerate"
+msgid "Framerate"
+msgstr "帧率"
+
+msgctxt "render-video.fullVideo"
+msgid "Full Video"
+msgstr "完整视频"
+
+msgctxt "render-video.hardwareAcceleration"
+msgid "Hardware Acceleration"
+msgstr "硬件加速"
+
+msgctxt "render-video.hardwareAccelerationVaapiHelp"
+msgid "VAAPI needs your GPU's VA-API driver. Install it with your package manager:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nRun vainfo to check that the driver loads. NVIDIA GPUs use the NVIDIA GPU option instead."
+msgstr "VAAPI 需要安装显卡的 VA-API 驱动。请使用包管理器安装:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\n运行 vainfo 检查驱动是否成功加载。NVIDIA 显卡请改用 NVIDIA GPU 选项。"
+
+msgctxt "render-video.hiddenByOverlap"
+msgid "Hidden behind an overlapping video"
+msgstr "被重叠的视频遮挡"
+
+msgctxt "render-video.keepAppOpen"
+msgid "Please keep the application open during rendering"
+msgstr "渲染期间请保持应用打开"
+
+msgctxt "render-video.largerFile"
+msgid "Larger file"
+msgstr "较大文件"
+
+msgctxt "render-video.loadAGpxfitActivityFirst"
+msgid "Load a GPX/FIT activity first"
+msgstr "请先加载 GPX/FIT 活动"
+
+msgctxt "render-video.lockedToEachVideoFps"
+msgid "Locked to each video's FPS"
+msgstr "锁定为每个视频的 FPS"
+
+msgctxt "render-video.lockedToVideoFps"
+msgid "Locked to video FPS ({{fps}} fps)"
+msgstr "锁定为视频 FPS ({{fps}} fps)"
+
+msgctxt "render-video.minutesMinSecondsSec"
+msgid "{{minutes}} min {{seconds}} sec"
+msgstr "{{minutes}} 分 {{seconds}} 秒"
+
+msgctxt "render-video.mp4Codecs"
+msgid "MP4 Codecs"
+msgstr "MP4 编解码器"
+
+msgctxt "render-video.nothingToExport"
+msgid "Every video part is excluded from export."
+msgstr "所有视频片段均已排除在导出之外。"
+
+msgctxt "render-video.outputContainerFps"
+msgid "Output container: {{fps}} fps"
+msgstr "输出容器: {{fps}} fps"
+
+msgctxt "render-video.outputFile"
+msgid "Output file"
+msgstr "输出文件"
+
+msgctxt "render-video.outputFolder"
+msgid "Output folder"
+msgstr "输出文件夹"
+
+msgctxt "render-video.outputPath"
+msgid "Output path"
+msgstr "输出路径"
+
+msgctxt "render-video.overwrite"
+msgid "Overwrite"
+msgstr "覆盖"
+
+msgctxt "render-video.overwriteExistingFile"
+msgid "Overwrite existing file?"
+msgstr "覆盖现有文件?"
+
+msgctxt "render-video.pathErrors.outputAliasesInput"
+msgid "The output would overwrite an input video"
+msgstr "输出文件会覆盖输入视频"
+
+msgctxt "render-video.pathErrors.outputDestinationsConflict"
+msgid "Multiple batch outputs use the same destination"
+msgstr "多个批量输出使用了相同的目标路径"
+
+msgctxt "render-video.pathErrors.outputDirectoryInvalid"
+msgid "Choose an existing output directory"
+msgstr "请选择现有的输出目录"
+
+msgctxt "render-video.pathErrors.outputDirectoryMissing"
+msgid "The output directory does not exist"
+msgstr "输出目录不存在"
+
+msgctxt "render-video.pathErrors.outputExtensionInvalid"
+msgid "The output file must use .{{extension}}"
+msgstr "输出文件必须使用 .{{extension}} 扩展名"
+
+msgctxt "render-video.pathErrors.outputFileRequired"
+msgid "Choose an output file"
+msgstr "请选择输出文件"
+
+msgctxt "render-video.pathErrors.outputFilenameRequired"
+msgid "The output path must include a file name"
+msgstr "输出路径必须包含文件名"
+
+msgctxt "render-video.pathErrors.outputNotFile"
+msgid "The selected output is not a file"
+msgstr "所选输出目标不是文件"
+
+msgctxt "render-video.pathErrors.outputPathIncomplete"
+msgid "Choose a complete output path, including its folder"
+msgstr "请选择包含文件夹的完整输出路径"
+
+msgctxt "render-video.pathErrors.outputPathInvalid"
+msgid "The output file name or path is not valid"
+msgstr "输出文件名或路径无效"
+
+msgctxt "render-video.pathErrors.outputPermissionDenied"
+msgid "You do not have permission to write the output file"
+msgstr "您没有写入输出文件的权限"
+
+msgctxt "render-video.pathErrors.outputWriteFailed"
+msgid "Could not create or write the output file: {{detail}}"
+msgstr "无法创建或写入输出文件：{{detail}}"
+
+msgctxt "render-video.pathErrors.sourceFilenameInvalid"
+msgid "The source file name is invalid"
+msgstr "源文件名无效"
+
+msgctxt "render-video.percentComplete"
+msgid "{{percent}}% Complete"
+msgstr "已完成 {{percent}}%"
+
+msgctxt "render-video.preparingBatch"
+msgid "Preparing video..."
+msgstr "正在准备视频..."
+
+msgctxt "render-video.quality"
+msgid "Quality"
+msgstr "画质"
+
+msgctxt "render-video.queued"
+msgid "Queued"
+msgstr "排队中"
+
+msgctxt "render-video.reinspectionRequired"
+msgid "Sources changed or inspection expired. Inspect again before starting."
+msgstr "源文件已更改或检查已过期。开始前请重新检查。"
+
+msgctxt "render-video.renderFps"
+msgid "Render FPS"
+msgstr "渲染 FPS"
+
+msgctxt "render-video.rendering"
+msgid "Rendering..."
+msgstr "正在渲染..."
+
+msgctxt "render-video.renderingAlreadyInProgress"
+msgid "Rendering already in progress"
+msgstr "渲染正在进行中"
+
+msgctxt "render-video.renderingFrames"
+msgid "Rendering frames..."
+msgstr "正在渲染帧..."
+
+msgctxt "render-video.resolutionMismatchInstructions"
+msgid "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template."
+msgstr "这是正确导出叠加层所必需的。请在侧边栏设置中更改叠加层分辨率，或选择其他模板。"
+
+msgctxt "render-video.secondsSec"
+msgid "{{seconds}} sec"
+msgstr "{{seconds}} 秒"
+
+msgctxt "render-video.smallerFile"
+msgid "Smaller file"
+msgstr "较小文件"
+
+msgctxt "render-video.startRender"
+msgid "Start Render"
+msgstr "开始渲染"
+
+msgctxt "render-video.startingRender"
+msgid "Starting render..."
+msgstr "开始渲染..."
+
+msgctxt "render-video.transparent"
+msgid "Transparent"
+msgstr "透明"
+
+msgctxt "render-video.transparentCodecs"
+msgid "Transparent Codecs"
+msgstr "支持透明度的编解码器"
+
+msgctxt "render-video.unavailable"
+msgid "Unavailable"
+msgstr "不可用"
+
+msgctxt "render-video.unstarted"
+msgid "Not started"
+msgstr "未开始"
+
+msgctxt "render-video.update1val"
+msgid "Update 1/{{val}}"
+msgstr "更新 1/{{val}}"
+
+msgctxt "render-video.videoImported"
+msgid "Video imported"
+msgstr "已导入视频"
+
+msgctxt "render-video.videoRequired"
+msgid "Video required"
+msgstr "需要视频"
+
+msgctxt "render-video.videoResolutionMismatchMessage"
+msgid "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}})."
+msgstr "叠加层分辨率 {{overlayResolution}} 必须与导入视频的分辨率 ({{videoResolution}}) 匹配。"
+
+msgctxt "render-video.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "小部件更新频率"
+
+msgctxt "render-video.worse"
+msgid "Worse"
+msgstr "更差"
+
+msgctxt "scene-settings.aspectRatio"
+msgid "Aspect Ratio"
+msgstr "宽高比"
+
+msgctxt "scene-settings.borderThickness"
+msgid "Border Thickness"
+msgstr "边框粗细"
+
+msgctxt "scene-settings.borders"
+msgid "Borders"
+msgstr "边框"
+
+msgctxt "scene-settings.custom"
+msgid "Custom"
+msgstr "自定义"
+
+msgctxt "scene-settings.customFps"
+msgid "Custom FPS"
+msgstr "自定义 FPS"
+
+msgctxt "scene-settings.fixedWidthDigits"
+msgid "Fixed-Width Digits"
+msgstr "等宽数字"
+
+msgctxt "scene-settings.fontLabels"
+msgid "Font - Labels"
+msgstr "字体 - 标签"
+
+msgctxt "scene-settings.fontValues"
+msgid "Font - Values"
+msgstr "字体 - 数值"
+
+msgctxt "scene-settings.framerate"
+msgid "Framerate"
+msgstr "帧率"
+
+msgctxt "scene-settings.globalSettings"
+msgid "Global Settings"
+msgstr "全局设置"
+
+msgctxt "scene-settings.height"
+msgid "Height"
+msgstr "高度"
+
+msgctxt "scene-settings.icons"
+msgid "Icons"
+msgstr "图标"
+
+msgctxt "scene-settings.labels"
+msgid "Labels"
+msgstr "标签"
+
+msgctxt "scene-settings.lockedToFps"
+msgid "Locked to {{fps}} fps"
+msgstr "锁定为 {{fps}} fps"
+
+msgctxt "scene-settings.overlay"
+msgid "Overlay"
+msgstr "叠加层"
+
+msgctxt "scene-settings.portrait"
+msgid "Portrait (4:3)"
+msgstr "纵向 (4:3)"
+
+msgctxt "scene-settings.resolution"
+msgid "Resolution"
+msgstr "分辨率"
+
+msgctxt "scene-settings.resolution1080p"
+msgid "1080p (1920x1080)"
+msgstr "1080p (1920x1080)"
+
+msgctxt "scene-settings.resolution1080pSquare"
+msgid "1080p Square (1080x1080)"
+msgstr "1080p 方形 (1080x1080)"
+
+msgctxt "scene-settings.resolution1080pVertical"
+msgid "1080p Vertical (1080x1920)"
+msgstr "1080p 纵向 (1080x1920)"
+
+msgctxt "scene-settings.resolution4k"
+msgid "4K (3840x2160)"
+msgstr "4K (3840x2160)"
+
+msgctxt "scene-settings.resolution4kSquare"
+msgid "4K Square (2160x2160)"
+msgstr "4K 方形 (2160x2160)"
+
+msgctxt "scene-settings.resolution4kVertical"
+msgid "4K Vertical (2160x3840)"
+msgstr "4K 纵向 (2160x3840)"
+
+msgctxt "scene-settings.resolution720p"
+msgid "720p (1280x720)"
+msgstr "720p (1280x720)"
+
+msgctxt "scene-settings.resolutionMismatch"
+msgid "Overlay and video resolutions do not match"
+msgstr "叠加层和视频的分辨率不匹配"
+
+msgctxt "scene-settings.resolutionQxga"
+msgid "QXGA (2048x1536)"
+msgstr "QXGA (2048x1536)"
+
+msgctxt "scene-settings.resolutionSxga"
+msgid "SXGA+ (1400x1050)"
+msgstr "SXGA+ (1400x1050)"
+
+msgctxt "scene-settings.resolutionUltrawide"
+msgid "Ultrawide (3440x1440)"
+msgstr "超宽屏 (3440x1440)"
+
+msgctxt "scene-settings.resolutionUxga"
+msgid "UXGA (1600x1200)"
+msgstr "UXGA (1600x1200)"
+
+msgctxt "scene-settings.resolutionXga"
+msgid "XGA (1920x1440)"
+msgstr "XGA (1920x1440)"
+
+msgctxt "scene-settings.scale"
+msgid "Scale"
+msgstr "缩放"
+
+msgctxt "scene-settings.shadowDistance"
+msgid "Shadow Distance"
+msgstr "阴影距离"
+
+msgctxt "scene-settings.shadowStrength"
+msgid "Shadow Strength"
+msgstr "阴影强度"
+
+msgctxt "scene-settings.shadows"
+msgid "Shadows"
+msgstr "阴影"
+
+msgctxt "scene-settings.square"
+msgid "Square (1:1)"
+msgstr "方形 (1:1)"
+
+msgctxt "scene-settings.transparency"
+msgid "Transparency"
+msgstr "透明度"
+
+msgctxt "scene-settings.ultrawide"
+msgid "Ultrawide (21:9)"
+msgstr "超宽屏 (21:9)"
+
+msgctxt "scene-settings.units"
+msgid "Units"
+msgstr "单位"
+
+msgctxt "scene-settings.values"
+msgid "Values"
+msgstr "数值"
+
+msgctxt "scene-settings.vertical"
+msgid "Vertical (9:16)"
+msgstr "纵向 (9:16)"
+
+msgctxt "scene-settings.widescreen"
+msgid "Widescreen (16:9)"
+msgstr "宽屏 (16:9)"
+
+msgctxt "scene-settings.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "小部件更新频率"
+
+msgctxt "scene-settings.width"
+msgid "Width"
+msgstr "宽度"
+
+msgctxt "store.couldNotDetermineVideoCreationTime"
+msgid "Could not determine video creation time"
+msgstr "无法确定视频创建时间"
+
+msgctxt "store.invalidTimestampFormats"
+msgid "Invalid timestamp formats"
+msgstr "无效的时间戳格式"
+
+msgctxt "store.timezoneIsRequiredForVideoSync"
+msgid "timezone is required for video sync"
+msgstr "同步视频需要设置时区"
+
+msgctxt "template-manager.cancel"
+msgid "Cancel"
+msgstr "取消"
+
+msgctxt "template-manager.createNewTemplate"
+msgid "Create New Template"
+msgstr "新建模板"
+
+msgctxt "template-manager.newTemplate"
+msgid "New Template"
+msgstr "新建模板"
+
+msgctxt "template-manager.save"
+msgid "Save"
+msgstr "保存"
+
+msgctxt "template-manager.unsavedChanges"
+msgid "Your template has unsaved changes. Save them or discard them."
+msgstr "您的模板有未保存的更改。请保存或放弃更改。"
+
+msgctxt "toolbar.activity"
+msgid "Activity"
+msgstr "活动"
+
+msgctxt "toolbar.activityType"
+msgid "Activity type"
+msgstr "活动类型"
+
+msgctxt "toolbar.applyTimezone"
+msgid "Apply Timezone"
+msgstr "应用时区"
+
+msgctxt "toolbar.autosync"
+msgid "Auto-sync"
+msgstr "自动同步"
+
+msgctxt "toolbar.bitRate"
+msgid "Bit rate"
+msgstr "比特率"
+
+msgctxt "toolbar.calculated"
+msgid "Calculated"
+msgstr "已计算"
+
+msgctxt "toolbar.camera"
+msgid "Camera"
+msgstr "相机"
+
+msgctxt "toolbar.codec"
+msgid "Codec"
+msgstr "编解码器"
+
+msgctxt "toolbar.createdAt"
+msgid "Created at"
+msgstr "创建时间"
+
+msgctxt "toolbar.creationTime"
+msgid "Creation Time"
+msgstr "创建时间"
+
+msgctxt "toolbar.deleteActivity"
+msgid "Delete activity"
+msgstr "删除活动"
+
+msgctxt "toolbar.details"
+msgid "Details"
+msgstr "详细信息"
+
+msgctxt "toolbar.detected"
+msgid "Detected"
+msgstr "已检测"
+
+msgctxt "toolbar.detectedLaps"
+msgid "Detected laps"
+msgstr "检测到的圈"
+
+msgctxt "toolbar.distance"
+msgid "Distance"
+msgstr "距离"
+
+msgctxt "toolbar.dropActivityFile"
+msgid "Drop activity file"
+msgstr "拖放活动文件"
+
+msgctxt "toolbar.dropVideoFile"
+msgid "Drop video files"
+msgstr "拖放视频文件"
+
+msgctxt "toolbar.duration"
+msgid "Duration"
+msgstr "时长"
+
+msgctxt "toolbar.extracted"
+msgid "Extracted"
+msgstr "已提取"
+
+msgctxt "toolbar.filename"
+msgid "Filename"
+msgstr "文件名"
+
+msgctxt "toolbar.frameRate"
+msgid "Frame rate"
+msgstr "帧率"
+
+msgctxt "toolbar.lapDuration"
+msgid "Duration"
+msgstr "时长"
+
+msgctxt "toolbar.lapNumber"
+msgid "Lap"
+msgstr "圈"
+
+msgctxt "toolbar.lapStart"
+msgid "Start"
+msgstr "开始"
+
+msgctxt "toolbar.loadActivity"
+msgid "Load activity"
+msgstr "加载活动"
+
+msgctxt "toolbar.loadVideo"
+msgid "Load videos"
+msgstr "加载视频"
+
+msgctxt "toolbar.newProject"
+msgid "New Project"
+msgstr "新建项目"
+
+msgctxt "toolbar.noDataCalculated"
+msgid "No data were calculated"
+msgstr "未计算出数据"
+
+msgctxt "toolbar.noDataExtracted"
+msgid "No data were extracted"
+msgstr "未提取出数据"
+
+msgctxt "toolbar.openProject"
+msgid "Open Project"
+msgstr "打开项目"
+
+msgctxt "toolbar.pinDrawer"
+msgid "Pin drawer"
+msgstr "固定面板"
+
+msgctxt "toolbar.projects"
+msgid "Projects"
+msgstr "项目"
+
+msgctxt "toolbar.resolution"
+msgid "Resolution"
+msgstr "分辨率"
+
+msgctxt "toolbar.restoreDetectedVideoCreationTime"
+msgid "Restore detected video creation time"
+msgstr "恢复检测到的视频创建时间"
+
+msgctxt "toolbar.saveProject"
+msgid "Save Project"
+msgstr "保存项目"
+
+msgctxt "toolbar.saveProjectAs"
+msgid "Save Project As"
+msgstr "项目另存为"
+
+msgctxt "toolbar.showLap"
+msgid "Show lap {0}"
+msgstr "显示第 {0} 圈"
+
+msgctxt "toolbar.startTime"
+msgid "Start time"
+msgstr "开始时间"
+
+msgctxt "toolbar.syncOffset"
+msgid "Sync Offset"
+msgstr "同步偏移"
+
+msgctxt "toolbar.timeSource"
+msgid "Time source"
+msgstr "时间来源"
+
+msgctxt "toolbar.timeSourceFilename"
+msgid "Filename"
+msgstr "文件名"
+
+msgctxt "toolbar.timeSourceGps"
+msgid "GPS timestamp"
+msgstr "GPS 时间戳"
+
+msgctxt "toolbar.timeSourceMetadata"
+msgid "Metadata"
+msgstr "元数据"
+
+msgctxt "toolbar.timezone"
+msgid "Timezone"
+msgstr "时区"
+
+msgctxt "toolbar.unknown"
+msgid "Unknown"
+msgstr "未知"
+
+msgctxt "toolbar.unknownTimeSource"
+msgid "Unknown ({{value}})"
+msgstr "未知时间来源 ({{value}})"
+
+msgctxt "toolbar.unpinDrawer"
+msgid "Unpin drawer"
+msgstr "取消固定面板"
+
+msgctxt "toolbar.valBitRate"
+msgid "{{val}} Mbps"
+msgstr "{{val}} Mbps"
+
+msgctxt "toolbar.valFps"
+msgid "{{val}} fps"
+msgstr "{{val}} fps"
+
+msgctxt "toolbar.valPoints"
+msgid "{{val}} points"
+msgstr "{{val}} 个点"
+
+msgctxt "toolbar.valResolution"
+msgid "{{width}}×{{height}}"
+msgstr "{{width}}×{{height}}"
+
+msgctxt "toolbar.video"
+msgid "Video"
+msgstr "视频"
+
+msgctxt "toolbar.videoSync"
+msgid "Sync Doctor"
+msgstr "视频同步"
+
+msgctxt "toolbar.widgets"
+msgid "Widgets"
+msgstr "小部件"
+
+msgctxt "undo-redo.redoCtrlcmdshiftz"
+msgid "Redo"
+msgstr "重做"
+
+msgctxt "undo-redo.undoCtrlcmdz"
+msgid "Undo"
+msgstr "撤销"
+
+msgctxt "video-preview.gpuRequired"
+msgid "Video playback requires at least an integrated GPU."
+msgstr "视频播放至少需要一个集成显卡。"
+
+msgctxt "video-preview.theVideoPreviewCouldNotBeLoaded"
+msgid "The video preview could not be loaded."
+msgstr "无法加载视频预览。"
+
+msgctxt "video-preview.videoOrImage"
+msgid "Video or Image"
+msgstr "视频或图像"
+
+msgctxt "videoSync.activityRequiredForSync"
+msgid "Activity telemetry is required for Landmark Sync"
+msgstr "通过基准点同步需要活动数据"
+
+msgctxt "videoSync.applyCandidate"
+msgid "Apply offset {0} seconds"
+msgstr "应用 {0} 秒偏移"
+
+msgctxt "videoSync.autodetect"
+msgid "Autodetect"
+msgstr "自动检测"
+
+msgctxt "videoSync.candidates"
+msgid "Sync candidates"
+msgstr "同步候选项"
+
+msgctxt "videoSync.changeLandmarkType"
+msgid "Change {0} landmark type"
+msgstr "更改基准点类型：{0}"
+
+msgctxt "videoSync.clearLandmarks"
+msgid "Clear"
+msgstr "清除"
+
+msgctxt "videoSync.deleteLandmark"
+msgid "Delete {0} landmark"
+msgstr "删除基准点：{0}"
+
+msgctxt "videoSync.detectedEvent"
+msgid "detected {{label}}"
+msgstr "检测到：{{label}}"
+
+msgctxt "videoSync.detectedEventRange"
+msgid "{{label}} event from {{start}} to {{end}} seconds"
+msgstr "「{{label}}」事件：{{start}}–{{end}} 秒"
+
+msgctxt "videoSync.detectedEvents"
+msgid "Detected events"
+msgstr "检测到的事件"
+
+msgctxt "videoSync.detection"
+msgid "Sensitivity & Detection"
+msgstr "灵敏度与检测"
+
+msgctxt "videoSync.landmarkAriaLabel"
+msgid "{0} landmark at {1} seconds"
+msgstr "基准点「{0}」：{1} 秒"
+
+msgctxt "videoSync.landmarkLimit"
+msgid "The maximum of five landmarks has been reached"
+msgstr "已达到最多五个基准点的上限"
+
+msgctxt "videoSync.landmarksMatched"
+msgid "{{matched}} / {{eligible}} landmarks matched"
+msgstr "匹配数：{{matched}} / {{eligible}}"
+
+msgctxt "videoSync.leftTurn"
+msgid "Left Turn"
+msgstr "左转"
+
+msgctxt "videoSync.leftTurns"
+msgid "Left Turns"
+msgstr "左转"
+
+msgctxt "videoSync.location"
+msgid "Location"
+msgstr "位置"
+
+msgctxt "videoSync.locationLimit"
+msgid "Only one location landmark is allowed"
+msgstr "只能设置一个位置基准点"
+
+msgctxt "videoSync.locationOnly"
+msgid "Location only"
+msgstr "仅位置"
+
+msgctxt "videoSync.locationSyncCandidates"
+msgid "Location Sync"
+msgstr "按位置同步"
+
+msgctxt "videoSync.locations"
+msgid "Locations"
+msgstr "位置"
+
+msgctxt "videoSync.manualSync"
+msgid "Manual Sync"
+msgstr "手动同步"
+
+msgctxt "videoSync.markControls"
+msgid "Video sync landmark controls"
+msgstr "视频同步基准点控件"
+
+msgctxt "videoSync.markLeftTurn"
+msgid "Mark Left Turn"
+msgstr "标记左转"
+
+msgctxt "videoSync.markLocation"
+msgid "Mark Location"
+msgstr "标记位置"
+
+msgctxt "videoSync.markRightTurn"
+msgid "Mark Right Turn"
+msgstr "标记右转"
+
+msgctxt "videoSync.markStop"
+msgid "Mark Stop"
+msgstr "标记停止"
+
+msgctxt "videoSync.minimumLandmarksForSync"
+msgid "At least two landmarks are required"
+msgstr "至少需要两个基准点"
+
+msgctxt "videoSync.noCandidate"
+msgid "No candidate aligns at least two landmarks"
+msgstr "没有候选项能匹配至少两个基准点"
+
+msgctxt "videoSync.noLandmarks"
+msgid "No landmarks marked yet."
+msgstr "尚未标记任何基准点。"
+
+msgctxt "videoSync.openManualSync"
+msgid "Open Manual Sync"
+msgstr "打开手动同步"
+
+msgctxt "videoSync.playheadInsideVideo"
+msgid "Move the playhead inside the video to mark a landmark"
+msgstr "将播放头移至视频范围内以标记基准点"
+
+msgctxt "videoSync.rightTurn"
+msgid "Right Turn"
+msgstr "右转"
+
+msgctxt "videoSync.rightTurns"
+msgid "Right Turns"
+msgstr "右转"
+
+msgctxt "videoSync.setLocationInMap"
+msgid "Set location"
+msgstr "设置位置"
+
+msgctxt "videoSync.speed"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "videoSync.speedSensitivity"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "videoSync.staleCandidates"
+msgid "Landmarks changed. Rerun the Sync again"
+msgstr "基准点已更改。请重新运行同步"
+
+msgctxt "videoSync.stop"
+msgid "Stop"
+msgstr "停止"
+
+msgctxt "videoSync.stops"
+msgid "Stops"
+msgstr "停止"
+
+msgctxt "videoSync.syncCandidates"
+msgid "Sync Candidates"
+msgstr "同步候选项"
+
+msgctxt "videoSync.syncLandmarks"
+msgid "Sync All Landmarks"
+msgstr "同步所有基准点"
+
+msgctxt "videoSync.syncLocation"
+msgid "Match Location Only"
+msgstr "仅匹配位置"
+
+msgctxt "videoSync.timelineGraph"
+msgid "Activity telemetry graph"
+msgstr "活动数据图表"
+
+msgctxt "videoSync.turnSensitivity"
+msgid "Min turn"
+msgstr "最小转弯角度"
+
+msgctxt "videoSync.turning"
+msgid "Turning"
+msgstr "转弯"
+
+msgctxt "videoSync.videoLandmarks"
+msgid "Video landmarks"
+msgstr "视频基准点"
+
+msgctxt "videoSync.videoRequired"
+msgid "A video is required to mark a landmark"
+msgstr "需要视频才能标记基准点"
+
+msgctxt "videoSync.videoRequiredForSync"
+msgid "A video is required for Landmark Sync"
+msgstr "需要视频才能同步基准点"
+
+msgctxt "videoSync.yourLandmarks"
+msgid "Video Landmarks"
+msgstr "你的视频基准点"
+
+msgctxt "widget-editor.activityStart"
+msgid "Activity"
+msgstr "活动开始"
+
+msgctxt "widget-editor.addMetric"
+msgid "Add metric"
+msgstr "添加指标"
+
+msgctxt "widget-editor.alignment"
+msgid "Alignment"
+msgstr "对齐"
+
+msgctxt "widget-editor.alignmentBelow"
+msgid "Top"
+msgstr "顶部"
+
+msgctxt "widget-editor.alignmentCentered"
+msgid "Centered"
+msgstr "居中"
+
+msgctxt "widget-editor.altitudeAtStart"
+msgid "Altitude at start"
+msgstr "起始海拔高度"
+
+msgctxt "widget-editor.angleTrack"
+msgid "Angle Track"
+msgstr "角度指示器"
+
+msgctxt "widget-editor.arcAngle"
+msgid "Arc Angle"
+msgstr "弧形角度"
+
+msgctxt "widget-editor.arcTrack"
+msgid "Arc Track"
+msgstr "弧形轨道"
+
+msgctxt "widget-editor.areaGradient"
+msgid "Gradient"
+msgstr "渐变"
+
+msgctxt "widget-editor.areaOpacity"
+msgid "Area Opacity"
+msgstr "区域不透明度"
+
+msgctxt "widget-editor.areaStyling"
+msgid "Area Styling"
+msgstr "区域样式"
+
+msgctxt "widget-editor.axisMapping"
+msgid "Axis Mapping"
+msgstr "轴映射"
+
+msgctxt "widget-editor.backdropStyle"
+msgid "Backdrop Style"
+msgstr "背景样式"
+
+msgctxt "widget-editor.backgroundColor"
+msgid "Background"
+msgstr "背景"
+
+msgctxt "widget-editor.balanceFormat"
+msgid "Balance Format"
+msgstr "平衡格式"
+
+msgctxt "widget-editor.bar"
+msgid "Bar"
+msgstr "条形"
+
+msgctxt "widget-editor.barCount"
+msgid "Bar Count"
+msgstr "条数"
+
+msgctxt "widget-editor.barGap"
+msgid "Bar Gap"
+msgstr "条间距"
+
+msgctxt "widget-editor.barHeight"
+msgid "Bar Height"
+msgstr "条形高度"
+
+msgctxt "widget-editor.barWidth"
+msgid "Bar Width"
+msgstr "条形宽度"
+
+msgctxt "widget-editor.border"
+msgid "Border"
+msgstr "边框"
+
+msgctxt "widget-editor.borderColor"
+msgid "Border Color"
+msgstr "边框颜色"
+
+msgctxt "widget-editor.borderOpacity"
+msgid "Border Opacity"
+msgstr "边框不透明度"
+
+msgctxt "widget-editor.borderThickness"
+msgid "Border Thickness"
+msgstr "边框粗细"
+
+msgctxt "widget-editor.both"
+msgid "Both"
+msgstr "两者"
+
+msgctxt "widget-editor.bottom"
+msgid "Bottom"
+msgstr "底部"
+
+msgctxt "widget-editor.bottomEdgeStrip"
+msgid "Bottom edge strip"
+msgstr "下边缘色条"
+
+msgctxt "widget-editor.bottomLeft"
+msgid "Bottom Left"
+msgstr "左下"
+
+msgctxt "widget-editor.bottomRight"
+msgid "Bottom Right"
+msgstr "右下"
+
+msgctxt "widget-editor.cameraMode"
+msgid "Camera Mode"
+msgstr "相机模式"
+
+msgctxt "widget-editor.cardinalColor"
+msgid "Cardinal Color"
+msgstr "方位颜色"
+
+msgctxt "widget-editor.cardinalLabels"
+msgid "Cardinal Labels"
+msgstr "方位标签"
+
+msgctxt "widget-editor.ceilingAreaColor"
+msgid "Area Color"
+msgstr "区域颜色"
+
+msgctxt "widget-editor.ceilingAreaOpacity"
+msgid "Area Opacity"
+msgstr "区域不透明度"
+
+msgctxt "widget-editor.ceilingLineColor"
+msgid "Line Color"
+msgstr "曲线颜色"
+
+msgctxt "widget-editor.ceilingLineOpacity"
+msgid "Line Opacity"
+msgstr "曲线不透明度"
+
+msgctxt "widget-editor.chartMetric"
+msgid "Metric"
+msgstr "指标"
+
+msgctxt "widget-editor.chartMetrics"
+msgid "Metrics"
+msgstr "指标"
+
+msgctxt "widget-editor.chaseCamera"
+msgid "Chase Camera"
+msgstr "追踪相机"
+
+msgctxt "widget-editor.climbColor"
+msgid "Climb"
+msgstr "爬升"
+
+msgctxt "widget-editor.color"
+msgid "Color"
+msgstr "颜色"
+
+msgctxt "widget-editor.colorNegative"
+msgid "Color Negative"
+msgstr "负值颜色"
+
+msgctxt "widget-editor.colorPositive"
+msgid "Color Positive"
+msgstr "正值颜色"
+
+msgctxt "widget-editor.compass"
+msgid "Compass"
+msgstr "罗盘"
+
+msgctxt "widget-editor.compassDial"
+msgid "Dial"
+msgstr "表盘"
+
+msgctxt "widget-editor.concentricRing"
+msgid "Concentric Ring"
+msgstr "同心圆"
+
+msgctxt "widget-editor.continuousFill"
+msgid "Continuous Fill"
+msgstr "连续填充"
+
+msgctxt "widget-editor.coordinateFormatDdm"
+msgid "Deg / Dec Min"
+msgstr "度 / 十进制分"
+
+msgctxt "widget-editor.coordinateFormatDms"
+msgid "Deg / Min / Sec"
+msgstr "度 / 分 / 秒"
+
+msgctxt "widget-editor.coordinates"
+msgid "Coordinates"
+msgstr "坐标"
+
+msgctxt "widget-editor.cornerOrientation"
+msgid "Corner Orientation"
+msgstr "角部方向"
+
+msgctxt "widget-editor.cornerRadius"
+msgid "Corner Radius"
+msgstr "圆角半径"
+
+msgctxt "widget-editor.cornerTrack"
+msgid "Corner Track"
+msgstr "角部轨道"
+
+msgctxt "widget-editor.cornersAndEdges"
+msgid "Corners & edges"
+msgstr "角与边"
+
+msgctxt "widget-editor.dateFormatDdMmYyyy"
+msgid "Date only (DD-MM-YYYY)"
+msgstr "仅日期 (DD-MM-YYYY)"
+
+msgctxt "widget-editor.dateFormatDdMmmYyyy"
+msgid "Date only (DD MMM YYYY)"
+msgstr "仅日期 (DD MMM YYYY)"
+
+msgctxt "widget-editor.dateFormatDdMmmmYyyy"
+msgid "Date only (DD MMMM YYYY)"
+msgstr "仅日期 (DD MMMM YYYY)"
+
+msgctxt "widget-editor.dateFormatMmDdYyyy"
+msgid "Date only (MM-DD-YYYY)"
+msgstr "仅日期 (MM-DD-YYYY)"
+
+msgctxt "widget-editor.dateFormatMmmDdYyyy"
+msgid "Date only (MMM DD YYYY)"
+msgstr "仅日期 (MMM DD YYYY)"
+
+msgctxt "widget-editor.dateFormatMmmmDdYyyy"
+msgid "Date only (MMMM DD YYYY)"
+msgstr "仅日期 (MMMM DD YYYY)"
+
+msgctxt "widget-editor.dateFormatYyyyMmDd"
+msgid "Date only (YYYY-MM-DD)"
+msgstr "仅日期 (YYYY-MM-DD)"
+
+msgctxt "widget-editor.dateTimeFormat12h"
+msgid "Date + time (12h)"
+msgstr "日期 + 时间 (12h)"
+
+msgctxt "widget-editor.dateTimeFormat12hWithSeconds"
+msgid "Date + time (12h with seconds)"
+msgstr "日期 + 时间 (12h 包含秒数)"
+
+msgctxt "widget-editor.dateTimeFormat24h"
+msgid "Date + time (24h)"
+msgstr "日期 + 时间 (24h)"
+
+msgctxt "widget-editor.dateTimeFormat24hWithSeconds"
+msgid "Date + time (24h with seconds)"
+msgstr "日期 + 时间 (24h 包含秒数)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm12h"
+msgid "Date + time (DD MMM, 12h)"
+msgstr "日期 + 时间 (DD MMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm24h"
+msgid "Date + time (DD MMM, 24h)"
+msgstr "日期 + 时间 (DD MMM, 24h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm12h"
+msgid "Date + time (DD MMMM, 12h)"
+msgstr "日期 + 时间 (DD MMMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm24h"
+msgid "Date + time (DD MMMM, 24h)"
+msgstr "日期 + 时间 (DD MMMM, 24h)"
+
+msgctxt "widget-editor.daytime"
+msgid "Time of day"
+msgstr "当前时间"
+
+msgctxt "widget-editor.decimal"
+msgid "Decimal"
+msgstr "小数"
+
+msgctxt "widget-editor.decimals"
+msgid "Decimals"
+msgstr "小数位数"
+
+msgctxt "widget-editor.decompressionCeiling"
+msgid "Decompression Ceiling"
+msgstr "减压上限"
+
+msgctxt "widget-editor.descentColor"
+msgid "Descent"
+msgstr "下降"
+
+msgctxt "widget-editor.diameter"
+msgid "Diameter"
+msgstr "直径"
+
+msgctxt "widget-editor.displayType"
+msgid "Display Type"
+msgstr "显示类型"
+
+msgctxt "widget-editor.elapsedFrom"
+msgid "Since the Start of"
+msgstr "从"
+
+msgctxt "widget-editor.elapsedTime"
+msgid "Elapsed Time"
+msgstr "经过时间"
+
+msgctxt "widget-editor.elevationAtStart"
+msgid "Elevation at start"
+msgstr "起始海拔"
+
+msgctxt "widget-editor.emptyColor"
+msgid "Empty Color"
+msgstr "空白颜色"
+
+msgctxt "widget-editor.emptyOpacity"
+msgid "Empty Opacity"
+msgstr "空白不透明度"
+
+msgctxt "widget-editor.exportStart"
+msgid "Export"
+msgstr "导出开始"
+
+msgctxt "widget-editor.fill"
+msgid "Fill"
+msgstr "填充"
+
+msgctxt "widget-editor.fillColor"
+msgid "Fill Color"
+msgstr "填充颜色"
+
+msgctxt "widget-editor.fillGradient"
+msgid "Gradient"
+msgstr "渐变"
+
+msgctxt "widget-editor.fillOpacity"
+msgid "Fill Opacity"
+msgstr "填充不透明度"
+
+msgctxt "widget-editor.filledColor"
+msgid "Filled Color"
+msgstr "已填充颜色"
+
+msgctxt "widget-editor.filledOpacity"
+msgid "Filled Opacity"
+msgstr "已填充不透明度"
+
+msgctxt "widget-editor.finishedColor"
+msgid "Finished Color"
+msgstr "已完成颜色"
+
+msgctxt "widget-editor.finishedOpacity"
+msgid "Finished Opacity"
+msgstr "已完成不透明度"
+
+msgctxt "widget-editor.flatTrack"
+msgid "Flat Track"
+msgstr "平面填充"
+
+msgctxt "widget-editor.font"
+msgid "Font"
+msgstr "字体"
+
+msgctxt "widget-editor.fontColor"
+msgid "Font Color"
+msgstr "字体颜色"
+
+msgctxt "widget-editor.fontFamily"
+msgid "Font Family"
+msgstr "字体"
+
+msgctxt "widget-editor.fontSize"
+msgid "Font Size"
+msgstr "字体大小"
+
+msgctxt "widget-editor.fontWeight"
+msgid "Weight"
+msgstr "字重"
+
+msgctxt "widget-editor.format"
+msgid "Format"
+msgstr "格式"
+
+msgctxt "widget-editor.gaugeTrack"
+msgid "Gauge Track"
+msgstr "仪表轨道"
+
+msgctxt "widget-editor.general"
+msgid "General"
+msgstr "常规"
+
+msgctxt "widget-editor.gforcePlot"
+msgid "G-Force Plot"
+msgstr "G力图"
+
+msgctxt "widget-editor.glow"
+msgid "Glow"
+msgstr "光晕"
+
+msgctxt "widget-editor.haloDiameter"
+msgid "Halo Diameter"
+msgstr "光晕直径"
+
+msgctxt "widget-editor.headingValue"
+msgid "Value"
+msgstr "数值"
+
+msgctxt "widget-editor.heartZones"
+msgid "Zones"
+msgstr "区间"
+
+msgctxt "widget-editor.height"
+msgid "Height"
+msgstr "高度"
+
+msgctxt "widget-editor.horizontal"
+msgid "Horizontal"
+msgstr "水平"
+
+msgctxt "widget-editor.horizontalOffset"
+msgid "Horizontal Offset"
+msgstr "水平偏移"
+
+msgctxt "widget-editor.horizontalPosition"
+msgid "Horizontal Position"
+msgstr "水平位置"
+
+msgctxt "widget-editor.hundredths"
+msgid "Hundredths"
+msgstr "百分之一秒"
+
+msgctxt "widget-editor.icon"
+msgid "Icon"
+msgstr "图标"
+
+msgctxt "widget-editor.imperialLabel"
+msgid "Imperial Label"
+msgstr "英制标签"
+
+msgctxt "widget-editor.imperialOffsetX"
+msgid "Imperial Offset X"
+msgstr "英制 X 偏移"
+
+msgctxt "widget-editor.imperialOffsetY"
+msgid "Imperial Offset Y"
+msgstr "英制 Y 偏移"
+
+msgctxt "widget-editor.indicator"
+msgid "Indicator"
+msgstr "指示器"
+
+msgctxt "widget-editor.indicatorArrow"
+msgid "Arrow"
+msgstr "箭头"
+
+msgctxt "widget-editor.indicatorColor"
+msgid "Indicator Color"
+msgstr "指示器颜色"
+
+msgctxt "widget-editor.indicatorLine"
+msgid "Line"
+msgstr "线条"
+
+msgctxt "widget-editor.indicatorSize"
+msgid "Indicator Size"
+msgstr "指示器大小"
+
+msgctxt "widget-editor.indicatorStyleChevron"
+msgid "Chevron"
+msgstr "人字形箭头"
+
+msgctxt "widget-editor.indicatorStyleHighlightBar"
+msgid "Highlight Bar"
+msgstr "高亮条"
+
+msgctxt "widget-editor.invertSign"
+msgid "Invert sign"
+msgstr "反转符号"
+
+msgctxt "widget-editor.italic"
+msgid "Italic"
+msgstr "斜体"
+
+msgctxt "widget-editor.label"
+msgid "Label"
+msgstr "标签"
+
+msgctxt "widget-editor.labelAxis"
+msgid "{{label}} axis"
+msgstr "{{label}} 轴"
+
+msgctxt "widget-editor.labelColor"
+msgid "Label Color"
+msgstr "标签颜色"
+
+msgctxt "widget-editor.labelFont"
+msgid "Label Font"
+msgstr "标签字体"
+
+msgctxt "widget-editor.labelFontSize"
+msgid "Label Font Size"
+msgstr "标签字号"
+
+msgctxt "widget-editor.labelSize"
+msgid "Label Size"
+msgstr "标签大小"
+
+msgctxt "widget-editor.labels"
+msgid "Labels"
+msgstr "标签"
+
+msgctxt "widget-editor.latitude"
+msgid "Latitude"
+msgstr "纬度"
+
+msgctxt "widget-editor.left"
+msgid "Left"
+msgstr "左"
+
+msgctxt "widget-editor.leftEdgeStrip"
+msgid "Left edge strip"
+msgstr "左边缘色条"
+
+msgctxt "widget-editor.legend"
+msgid "Legend"
+msgstr "图例"
+
+msgctxt "widget-editor.letterSpacing"
+msgid "Spacing"
+msgstr "字间距"
+
+msgctxt "widget-editor.lineStyling"
+msgid "Line Styling"
+msgstr "线条样式"
+
+msgctxt "widget-editor.liveValue"
+msgid "Value"
+msgstr "数值"
+
+msgctxt "widget-editor.longitude"
+msgid "Longitude"
+msgstr "经度"
+
+msgctxt "widget-editor.lthr"
+msgid "Lactate Threshold HR"
+msgstr "乳酸阈心率"
+
+msgctxt "widget-editor.majorInterval"
+msgid "Interval"
+msgstr "间隔"
+
+msgctxt "widget-editor.majorLabels"
+msgid "Major Labels"
+msgstr "主刻度标签"
+
+msgctxt "widget-editor.majorLength"
+msgid "Major Length"
+msgstr "主刻度长度"
+
+msgctxt "widget-editor.majorSpacing"
+msgid "Spacing"
+msgstr "间距"
+
+msgctxt "widget-editor.majorThickness"
+msgid "Major Thickness"
+msgstr "主刻度粗细"
+
+msgctxt "widget-editor.majorTickColor"
+msgid "Major Color"
+msgstr "主刻度色"
+
+msgctxt "widget-editor.majorTicks"
+msgid "Major Ticks"
+msgstr "主刻度"
+
+msgctxt "widget-editor.mapBuildings"
+msgid "Buildings"
+msgstr "建筑"
+
+msgctxt "widget-editor.mapLabels"
+msgid "Labels"
+msgstr "标注"
+
+msgctxt "widget-editor.mapLocalNames"
+msgid "Local Names"
+msgstr "本地名称"
+
+msgctxt "widget-editor.mapPaths"
+msgid "Paths"
+msgstr "小路"
+
+msgctxt "widget-editor.mapRotation"
+msgid "Map Rotation"
+msgstr "地图旋转"
+
+msgctxt "widget-editor.mapStyle"
+msgid "Map Style"
+msgstr "地图样式"
+
+msgctxt "widget-editor.mapView"
+msgid "Map View"
+msgstr "地图视图"
+
+msgctxt "widget-editor.mapWebgl2Software"
+msgid "No GPU found. The map draws in software, so its preview and export may be slow."
+msgstr "未找到 GPU。地图使用软件渲染，预览和导出可能较慢。"
+
+msgctxt "widget-editor.mapWebgl2Unavailable"
+msgid "WebGL2 isn't available on this system, so the map can't be previewed."
+msgstr "此系统不支持 WebGL2，因此无法预览地图。"
+
+msgctxt "widget-editor.marker"
+msgid "Marker"
+msgstr "标记"
+
+msgctxt "widget-editor.markerArrow"
+msgid "Arrow"
+msgstr "箭头"
+
+msgctxt "widget-editor.markerColor"
+msgid "Marker Color"
+msgstr "标记颜色"
+
+msgctxt "widget-editor.markerOpacity"
+msgid "Marker Opacity"
+msgstr "标记不透明度"
+
+msgctxt "widget-editor.markerSize"
+msgid "Marker Size"
+msgstr "标记大小"
+
+msgctxt "widget-editor.markerType"
+msgid "Marker Type"
+msgstr "标记类型"
+
+msgctxt "widget-editor.maxHeartrate"
+msgid "Max Heart Rate"
+msgstr "最大心率"
+
+msgctxt "widget-editor.maxSplits"
+msgid "Max Splits"
+msgstr "最大分段数"
+
+msgctxt "widget-editor.metricLabel"
+msgid "Metric Label"
+msgstr "公制标签"
+
+msgctxt "widget-editor.metricOffsetX"
+msgid "Metric Offset X"
+msgstr "公制 X 偏移"
+
+msgctxt "widget-editor.metricOffsetY"
+msgid "Metric Offset Y"
+msgstr "公制 Y 偏移"
+
+msgctxt "widget-editor.minmaxLabels"
+msgid "Min/Max Labels"
+msgstr "最小/最大值标签"
+
+msgctxt "widget-editor.minorLabels"
+msgid "Minor Labels"
+msgstr "次刻度标签"
+
+msgctxt "widget-editor.minorLength"
+msgid "Minor Length"
+msgstr "次刻度长度"
+
+msgctxt "widget-editor.minorThickness"
+msgid "Minor Thickness"
+msgstr "次刻度粗细"
+
+msgctxt "widget-editor.minorTickColor"
+msgid "Minor Color"
+msgstr "次刻度色"
+
+msgctxt "widget-editor.minorTicks"
+msgid "Minor Ticks"
+msgstr "次刻度"
+
+msgctxt "widget-editor.moveDown"
+msgid "Move down"
+msgstr "下移"
+
+msgctxt "widget-editor.moveUp"
+msgid "Move up"
+msgstr "上移"
+
+msgctxt "widget-editor.msaa"
+msgid "Anti-aliasing (MSAA)"
+msgstr "抗锯齿 (MSAA)"
+
+msgctxt "widget-editor.msaaOff"
+msgid "Off"
+msgstr "关闭"
+
+msgctxt "widget-editor.negativeDeltaColor"
+msgid "Negative Delta Color"
+msgstr "负差值颜色"
+
+msgctxt "widget-editor.noActiveWidgets"
+msgid "No active widgets"
+msgstr "无活动小部件"
+
+msgctxt "widget-editor.northUp"
+msgid "North Up"
+msgstr "北向朝上"
+
+msgctxt "widget-editor.offset"
+msgid "Offset"
+msgstr "偏移"
+
+msgctxt "widget-editor.opacity"
+msgid "Opacity"
+msgstr "不透明度"
+
+msgctxt "widget-editor.orientation"
+msgid "Orientation"
+msgstr "方向"
+
+msgctxt "widget-editor.percentColor"
+msgid "Percent Color"
+msgstr "百分比颜色"
+
+msgctxt "widget-editor.pitch"
+msgid "Pitch"
+msgstr "俯仰"
+
+msgctxt "widget-editor.pixelsPerDegree"
+msgid "Pixels per Degree"
+msgstr "每度像素数"
+
+msgctxt "widget-editor.placement"
+msgid "Placement"
+msgstr "放置位置"
+
+msgctxt "widget-editor.position"
+msgid "Position"
+msgstr "位置"
+
+msgctxt "widget-editor.positiveDeltaColor"
+msgid "Positive Delta Color"
+msgstr "正差值颜色"
+
+msgctxt "widget-editor.profileDetail"
+msgid "Profile Detail"
+msgstr "剖面细节"
+
+msgctxt "widget-editor.readout"
+msgid "Readout"
+msgstr "读数"
+
+msgctxt "widget-editor.remainingColor"
+msgid "Remaining Color"
+msgstr "剩余颜色"
+
+msgctxt "widget-editor.remainingOpacity"
+msgid "Remaining Opacity"
+msgstr "剩余不透明度"
+
+msgctxt "widget-editor.removeMetric"
+msgid "Remove metric"
+msgstr "移除指标"
+
+msgctxt "widget-editor.renumberLaps"
+msgid "Renumber laps"
+msgstr "重新编号圈数"
+
+msgctxt "widget-editor.resetField"
+msgid "Reset field"
+msgstr "重置字段"
+
+msgctxt "widget-editor.resetLabel"
+msgid "Reset {0}"
+msgstr "重置 {0}"
+
+msgctxt "widget-editor.riderUp"
+msgid "Rider Up"
+msgstr "行进方向朝上"
+
+msgctxt "widget-editor.right"
+msgid "Right"
+msgstr "右"
+
+msgctxt "widget-editor.rightEdgeStrip"
+msgid "Right edge strip"
+msgstr "右边缘色条"
+
+msgctxt "widget-editor.ringDiameter"
+msgid "Ring Diameter"
+msgstr "环形直径"
+
+msgctxt "widget-editor.rotation"
+msgid "Rotation"
+msgstr "旋转"
+
+msgctxt "widget-editor.rotationMode"
+msgid "Rotation Mode"
+msgstr "旋转模式"
+
+msgctxt "widget-editor.roundBottomLeftCorner"
+msgid "Round bottom left corner"
+msgstr "圆角化左下角"
+
+msgctxt "widget-editor.roundBottomRightCorner"
+msgid "Round bottom right corner"
+msgstr "圆角化右下角"
+
+msgctxt "widget-editor.roundTopLeftCorner"
+msgid "Round top left corner"
+msgstr "圆角化左上角"
+
+msgctxt "widget-editor.roundTopRightCorner"
+msgid "Round top right corner"
+msgstr "圆角化右上角"
+
+msgctxt "widget-editor.routeDetail"
+msgid "Route Detail"
+msgstr "路线细节"
+
+msgctxt "widget-editor.rowGap"
+msgid "Row Gap"
+msgstr "行间距"
+
+msgctxt "widget-editor.segmentedBars"
+msgid "Segmented Bars"
+msgstr "分段条"
+
+msgctxt "widget-editor.shape"
+msgid "Shape"
+msgstr "形状"
+
+msgctxt "widget-editor.showFullActivity"
+msgid "Show Full Activity"
+msgstr "显示完整活动"
+
+msgctxt "widget-editor.showFullAscent"
+msgid "Show Full Ascent"
+msgstr "显示全部爬升"
+
+msgctxt "widget-editor.showFullDistance"
+msgid "Show Full Distance"
+msgstr "显示全部距离"
+
+msgctxt "widget-editor.showIndicator"
+msgid "Show Indicator"
+msgstr "显示指示器"
+
+msgctxt "widget-editor.showLabels"
+msgid "Show Labels"
+msgstr "显示标签"
+
+msgctxt "widget-editor.showSign"
+msgid "Show sign"
+msgstr "显示符号"
+
+msgctxt "widget-editor.showValue"
+msgid "Show Value"
+msgstr "显示数值"
+
+msgctxt "widget-editor.singleCircle"
+msgid "Single Circle"
+msgstr "单圆"
+
+msgctxt "widget-editor.size"
+msgid "Size"
+msgstr "大小"
+
+msgctxt "widget-editor.smoothing"
+msgid "Smoothing"
+msgstr "平滑"
+
+msgctxt "widget-editor.solidHalo"
+msgid "Solid Halo"
+msgstr "实心光晕"
+
+msgctxt "widget-editor.splitColumnBar"
+msgid "Bar"
+msgstr "条形"
+
+msgctxt "widget-editor.splitColumnPace"
+msgid "Pace"
+msgstr "配速"
+
+msgctxt "widget-editor.splitColumnSplit"
+msgid "Split"
+msgstr "分段"
+
+msgctxt "widget-editor.splitColumns"
+msgid "Columns"
+msgstr "列"
+
+msgctxt "widget-editor.splitLength"
+msgid "Split Length"
+msgstr "分段距离"
+
+msgctxt "widget-editor.splits"
+msgid "Splits"
+msgstr "分段"
+
+msgctxt "widget-editor.stripColor"
+msgid "Strip Color"
+msgstr "色条颜色"
+
+msgctxt "widget-editor.stripThickness"
+msgid "Strip Thickness"
+msgstr "色条粗细"
+
+msgctxt "widget-editor.style"
+msgid "Style"
+msgstr "样式"
+
+msgctxt "widget-editor.tapeScale"
+msgid "Tape Scale"
+msgstr "方向带刻度"
+
+msgctxt "widget-editor.text"
+msgid "Text"
+msgstr "文本"
+
+msgctxt "widget-editor.thickness"
+msgid "Thickness"
+msgstr "粗细"
+
+msgctxt "widget-editor.tickColor"
+msgid "Tick Color"
+msgstr "刻度颜色"
+
+msgctxt "widget-editor.tickLength"
+msgid "Tick Length"
+msgstr "刻度长度"
+
+msgctxt "widget-editor.ticks"
+msgid "Ticks"
+msgstr "刻度"
+
+msgctxt "widget-editor.timeFormat12h"
+msgid "Time only (12h)"
+msgstr "仅时间 (12h)"
+
+msgctxt "widget-editor.timeFormat12hWithSeconds"
+msgid "Time only (12h with seconds)"
+msgstr "仅时间 (12h 包含秒数)"
+
+msgctxt "widget-editor.timeFormat24h"
+msgid "Time only (24h)"
+msgstr "仅时间 (24h)"
+
+msgctxt "widget-editor.timeFormat24hWithSeconds"
+msgid "Time only (24h with seconds)"
+msgstr "仅时间 (24h 包含秒数)"
+
+msgctxt "widget-editor.timeMode"
+msgid "Time Mode"
+msgstr "时间模式"
+
+msgctxt "widget-editor.timeWindow"
+msgid "Time Window"
+msgstr "时间窗口"
+
+msgctxt "widget-editor.top"
+msgid "Top"
+msgstr "顶部"
+
+msgctxt "widget-editor.topDown"
+msgid "Top Down"
+msgstr "俯视"
+
+msgctxt "widget-editor.topEdgeStrip"
+msgid "Top edge strip"
+msgstr "上边缘色条"
+
+msgctxt "widget-editor.trackFill"
+msgid "Track Fill"
+msgstr "轨道填充"
+
+msgctxt "widget-editor.trackStyle"
+msgid "Track Style"
+msgstr "轨道样式"
+
+msgctxt "widget-editor.transparency"
+msgid "Transparency"
+msgstr "透明度"
+
+msgctxt "widget-editor.trendSeconds"
+msgid "Trend"
+msgstr "趋势"
+
+msgctxt "widget-editor.typography"
+msgid "Typography"
+msgstr "排版"
+
+msgctxt "widget-editor.unit"
+msgid "Unit"
+msgstr "单位"
+
+msgctxt "widget-editor.unitColor"
+msgid "Unit Color"
+msgstr "单位颜色"
+
+msgctxt "widget-editor.units"
+msgid "Units"
+msgstr "单位"
+
+msgctxt "widget-editor.valueColor"
+msgid "Value Color"
+msgstr "数值颜色"
+
+msgctxt "widget-editor.valueOffset"
+msgid "Value Offset"
+msgstr "数值偏移"
+
+msgctxt "widget-editor.vertical"
+msgid "Vertical"
+msgstr "垂直"
+
+msgctxt "widget-editor.verticalOffset"
+msgid "Vertical Offset"
+msgstr "垂直偏移"
+
+msgctxt "widget-editor.verticalPosition"
+msgid "Vertical Position"
+msgstr "垂直位置"
+
+msgctxt "widget-editor.verticalScale"
+msgid "Vertical Scale"
+msgstr "垂直缩放"
+
+msgctxt "widget-editor.verticalSpeed"
+msgid "Vert. Speed"
+msgstr "垂直速度"
+
+msgctxt "widget-editor.width"
+msgid "Width"
+msgstr "宽度"
+
+msgctxt "widget-editor.zoneCalculation"
+msgid "Zone Calculation"
+msgstr "区间计算"
+
+msgctxt "widget-editor.zoneCalculationLthr"
+msgid "Lactate Threshold HR"
+msgstr "乳酸阈心率"
+
+msgctxt "widget-editor.zoneCalculationManual"
+msgid "Manual"
+msgstr "手动"
+
+msgctxt "widget-editor.zoneCalculationMaxHeartrate"
+msgid "Max Heart Rate"
+msgstr "最大心率"
+
+msgctxt "widget-editor.zoneFrom"
+msgid "From"
+msgstr "起"
+
+msgctxt "widget-editor.zoneLabel"
+msgid "Zone Label"
+msgstr "区间标签"
+
+msgctxt "widget-editor.zoneTo"
+msgid "To"
+msgstr "止"
+
+msgctxt "widget-editor.zoom"
+msgid "Zoom"
+msgstr "缩放"
+
+msgctxt "widgets.activityAttributes.barometric_altitude"
+msgid "Barometric Altitude"
+msgstr "气压高度"
+
+msgctxt "widgets.backdropTypes.circle"
+msgid "Circle"
+msgstr "圆形"
+
+msgctxt "widgets.backdropTypes.rectangle"
+msgid "Rectangle"
+msgstr "矩形"
+
+msgctxt "widgets.categories.camera"
+msgid "Camera"
+msgstr "相机"
+
+msgctxt "widgets.categories.cycling"
+msgid "Cycling"
+msgstr "骑行"
+
+msgctxt "widgets.categories.general"
+msgid "General"
+msgstr "常规"
+
+msgctxt "widgets.categories.motosports"
+msgid "Motorsports"
+msgstr "赛车运动"
+
+msgctxt "widgets.categories.other"
+msgid "Other"
+msgstr "其他"
+
+msgctxt "widgets.categories.running"
+msgid "Running"
+msgstr "跑步"
+
+msgctxt "widgets.categories.scuba_diving"
+msgid "Scuba Diving"
+msgstr "水肺潜水"
+
+msgctxt "widgets.displayTypes.altitudeTape"
+msgid "Altitude Tape"
+msgstr "高度带"
+
+msgctxt "widgets.displayTypes.arc"
+msgid "Arc Gauge"
+msgstr "弧形仪表"
+
+msgctxt "widgets.displayTypes.corner"
+msgid "Corner Gauge"
+msgstr "角部仪表"
+
+msgctxt "widgets.displayTypes.depthTape"
+msgid "Depth Tape"
+msgstr "深度带"
+
+msgctxt "widgets.displayTypes.gForce"
+msgid "G-Force"
+msgstr "G力"
+
+msgctxt "widgets.displayTypes.gtGauge"
+msgid "GT Gauge"
+msgstr "GT 仪表"
+
+msgctxt "widgets.displayTypes.headingCompass"
+msgid "Heading Compass"
+msgstr "航向罗盘"
+
+msgctxt "widgets.displayTypes.headingTape"
+msgid "Heading Tape"
+msgstr "航向带"
+
+msgctxt "widgets.displayTypes.heartZones"
+msgid "Heart Zones"
+msgstr "心率区间"
+
+msgctxt "widgets.displayTypes.lapTimer"
+msgid "Lap Times"
+msgstr "圈速"
+
+msgctxt "widgets.displayTypes.leanAngle"
+msgid "Lean Angle"
+msgstr "倾角"
+
+msgctxt "widgets.displayTypes.linear"
+msgid "Linear Bar"
+msgstr "线性条"
+
+msgctxt "widgets.displayTypes.splitsRun"
+msgid "Splits"
+msgstr "分段"
+
+msgctxt "widgets.displayTypes.text"
+msgid "Text"
+msgstr "文本"
+
+msgctxt "widgets.drawerGroups.map.mapTiles"
+msgid "Map Tiles"
+msgstr "地图瓦片"
+
+msgctxt "widgets.drawerGroups.map.route"
+msgid "Route"
+msgstr "路线"
+
+msgctxt "widgets.drawerGroups.map.route3d"
+msgid "3D Route"
+msgstr "3D 路线"
+
+msgctxt "widgets.drawerGroups.map.shortName"
+msgid "Map"
+msgstr "地图"
+
+msgctxt "widgets.lapTimerModes.bestLap"
+msgid "Best Lap"
+msgstr "最佳圈"
+
+msgctxt "widgets.lapTimerModes.currentLap"
+msgid "Current Lap"
+msgstr "当前圈"
+
+msgctxt "widgets.lapTimerModes.delta"
+msgid "Delta"
+msgstr "差值"
+
+msgctxt "widgets.lapTimerModes.lapLog"
+msgid "Lap Log"
+msgstr "圈记录"
+
+msgctxt "widgets.types.air_pressure.name"
+msgid "Air Pressure"
+msgstr "气压"
+
+msgctxt "widgets.types.air_pressure.shortName"
+msgid "Air Press."
+msgstr "气压"
+
+msgctxt "widgets.types.altitude.name"
+msgid "Altitude"
+msgstr "海拔高度"
+
+msgctxt "widgets.types.altitude.shortName"
+msgid "Altitude"
+msgstr "海拔"
+
+msgctxt "widgets.types.aperture.name"
+msgid "Aperture"
+msgstr "光圈"
+
+msgctxt "widgets.types.aperture.shortName"
+msgid "Aperture"
+msgstr "光圈"
+
+msgctxt "widgets.types.average_ppo2.name"
+msgid "Average ppO₂"
+msgstr "平均ppO₂"
+
+msgctxt "widgets.types.average_ppo2.shortName"
+msgid "ppO₂"
+msgstr "ppO₂"
+
+msgctxt "widgets.types.backdrop.name"
+msgid "Backdrop"
+msgstr "背景"
+
+msgctxt "widgets.types.backdrop.shortName"
+msgid "Backdrop"
+msgstr "背景"
+
+msgctxt "widgets.types.boost_pressure.name"
+msgid "Boost Pressure"
+msgstr "增压压力"
+
+msgctxt "widgets.types.boost_pressure.shortName"
+msgid "Boost"
+msgstr "增压"
+
+msgctxt "widgets.types.brake_position.name"
+msgid "Brake Position"
+msgstr "刹车位置"
+
+msgctxt "widgets.types.brake_position.shortName"
+msgid "Brake"
+msgstr "刹车"
+
+msgctxt "widgets.types.cadence.name"
+msgid "Cadence"
+msgstr "踏频"
+
+msgctxt "widgets.types.cadence.shortName"
+msgid "Cadence"
+msgstr "踏频"
+
+msgctxt "widgets.types.calories.name"
+msgid "Calories"
+msgstr "卡路里"
+
+msgctxt "widgets.types.calories.shortName"
+msgid "Calories"
+msgstr "卡路里"
+
+msgctxt "widgets.types.color_temperature.name"
+msgid "Color Temperature"
+msgstr "色温"
+
+msgctxt "widgets.types.color_temperature.shortName"
+msgid "WB"
+msgstr "色温"
+
+msgctxt "widgets.types.coolant_temperature.name"
+msgid "Coolant Temperature"
+msgstr "冷却液温度"
+
+msgctxt "widgets.types.coolant_temperature.shortName"
+msgid "Coolant"
+msgstr "冷却液"
+
+msgctxt "widgets.types.core_temperature.name"
+msgid "Core Temperature"
+msgstr "核心体温"
+
+msgctxt "widgets.types.core_temperature.shortName"
+msgid "Core T."
+msgstr "核心体温"
+
+msgctxt "widgets.types.course.name"
+msgid "Route Map"
+msgstr "路线地图"
+
+msgctxt "widgets.types.course.shortName"
+msgid "Map"
+msgstr "地图"
+
+msgctxt "widgets.types.depth.name"
+msgid "Depth"
+msgstr "深度"
+
+msgctxt "widgets.types.depth.shortName"
+msgid "Depth"
+msgstr "深度"
+
+msgctxt "widgets.types.distance.name"
+msgid "Distance"
+msgstr "距离"
+
+msgctxt "widgets.types.distance.shortName"
+msgid "Dist."
+msgstr "距离"
+
+msgctxt "widgets.types.distance_to_home.name"
+msgid "Distance to Home"
+msgstr "距家距离"
+
+msgctxt "widgets.types.distance_to_home.shortName"
+msgid "Home"
+msgstr "家"
+
+msgctxt "widgets.types.diving_profile.name"
+msgid "Diving Profile"
+msgstr "潜水剖面"
+
+msgctxt "widgets.types.diving_profile.shortName"
+msgid "Dive Profile"
+msgstr "潜水剖面"
+
+msgctxt "widgets.types.elevation.name"
+msgid "Elevation"
+msgstr "海拔"
+
+msgctxt "widgets.types.elevation.shortName"
+msgid "Elev."
+msgstr "海拔"
+
+msgctxt "widgets.types.engine_load.name"
+msgid "Engine Load"
+msgstr "发动机负载"
+
+msgctxt "widgets.types.engine_load.shortName"
+msgid "Eng. Load"
+msgstr "发动机负载"
+
+msgctxt "widgets.types.engine_power.name"
+msgid "Engine Power"
+msgstr "发动机功率"
+
+msgctxt "widgets.types.engine_power.shortName"
+msgid "Eng. Power"
+msgstr "发动机功率"
+
+msgctxt "widgets.types.ev.name"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.ev.shortName"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.first_stop_depth.name"
+msgid "First Stop Depth"
+msgstr "首个减压停留深度"
+
+msgctxt "widgets.types.first_stop_depth.shortName"
+msgid "Stop Depth"
+msgstr "停留深度"
+
+msgctxt "widgets.types.first_stop_time.name"
+msgid "First Stop Time"
+msgstr "首个减压停留时间"
+
+msgctxt "widgets.types.first_stop_time.shortName"
+msgid "Stop Time"
+msgstr "停留时间"
+
+msgctxt "widgets.types.focal_length.name"
+msgid "Focal Length"
+msgstr "焦距"
+
+msgctxt "widgets.types.focal_length.shortName"
+msgid "Focal L."
+msgstr "焦距"
+
+msgctxt "widgets.types.g_force.name"
+msgid "G-Force"
+msgstr "G力"
+
+msgctxt "widgets.types.g_force.shortName"
+msgid "G-Force"
+msgstr "G力"
+
+msgctxt "widgets.types.gas_mix.name"
+msgid "Gas Mix (O₂/He)"
+msgstr "混合气体 (O₂/He)"
+
+msgctxt "widgets.types.gas_mix.shortName"
+msgid "O₂/He"
+msgstr "O₂/He"
+
+msgctxt "widgets.types.gear_position.name"
+msgid "Gear Position"
+msgstr "挡位"
+
+msgctxt "widgets.types.gear_position.shortName"
+msgid "Gear"
+msgstr "挡位"
+
+msgctxt "widgets.types.gps_coordinates.name"
+msgid "GPS Coordinates"
+msgstr "GPS 坐标"
+
+msgctxt "widgets.types.gps_coordinates.shortName"
+msgid "Location"
+msgstr "位置"
+
+msgctxt "widgets.types.gradient.name"
+msgid "Gradient"
+msgstr "坡度"
+
+msgctxt "widgets.types.gradient.shortName"
+msgid "Grad."
+msgstr "坡度"
+
+msgctxt "widgets.types.ground_contact_time.name"
+msgid "Ground Contact Time"
+msgstr "触地时间"
+
+msgctxt "widgets.types.ground_contact_time.shortName"
+msgid "GCT"
+msgstr "触地时间"
+
+msgctxt "widgets.types.heading.name"
+msgid "Heading"
+msgstr "航向"
+
+msgctxt "widgets.types.heading.shortName"
+msgid "Heading"
+msgstr "航向"
+
+msgctxt "widgets.types.heartrate.name"
+msgid "Heart Rate"
+msgstr "心率"
+
+msgctxt "widgets.types.heartrate.shortName"
+msgid "HR"
+msgstr "心率"
+
+msgctxt "widgets.types.iso.name"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.iso.shortName"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.label.name"
+msgid "Text"
+msgstr "文本"
+
+msgctxt "widgets.types.label.shortName"
+msgid "Text"
+msgstr "文本"
+
+msgctxt "widgets.types.lap_timer.name"
+msgid "Lap Timer"
+msgstr "圈计时器"
+
+msgctxt "widgets.types.lap_timer.shortName"
+msgid "Lap Times"
+msgstr "圈速"
+
+msgctxt "widgets.types.lean_angle.name"
+msgid "Lean Angle"
+msgstr "倾角"
+
+msgctxt "widgets.types.lean_angle.shortName"
+msgid "Lean"
+msgstr "倾角"
+
+msgctxt "widgets.types.left_right_balance.name"
+msgid "Left/Right Balance"
+msgstr "左/右平衡"
+
+msgctxt "widgets.types.left_right_balance.shortName"
+msgid "L/R Bal."
+msgstr "左/右平衡"
+
+msgctxt "widgets.types.map.name"
+msgid "Street Map"
+msgstr "街道地图"
+
+msgctxt "widgets.types.map.shortName"
+msgid "Streets"
+msgstr "街道"
+
+msgctxt "widgets.types.pace.name"
+msgid "Pace"
+msgstr "配速"
+
+msgctxt "widgets.types.pace.shortName"
+msgid "Pace"
+msgstr "配速"
+
+msgctxt "widgets.types.power.name"
+msgid "Power"
+msgstr "功率"
+
+msgctxt "widgets.types.power.shortName"
+msgid "Power"
+msgstr "功率"
+
+msgctxt "widgets.types.raster.name"
+msgid "Image"
+msgstr "图片"
+
+msgctxt "widgets.types.raster.shortName"
+msgid "Image"
+msgstr "图片"
+
+msgctxt "widgets.types.rolling_chart.name"
+msgid "Charts"
+msgstr "图表"
+
+msgctxt "widgets.types.rolling_chart.shortName"
+msgid "Charts"
+msgstr "图表"
+
+msgctxt "widgets.types.rpm.name"
+msgid "RPM"
+msgstr "转速 (RPM)"
+
+msgctxt "widgets.types.rpm.shortName"
+msgid "RPM"
+msgstr "转速"
+
+msgctxt "widgets.types.shutter_speed.name"
+msgid "Shutter Speed"
+msgstr "快门速度"
+
+msgctxt "widgets.types.shutter_speed.shortName"
+msgid "Shutter"
+msgstr "快门"
+
+msgctxt "widgets.types.speed.name"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "widgets.types.speed.shortName"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "widgets.types.splits_run.name"
+msgid "Running Splits"
+msgstr "跑步分段"
+
+msgctxt "widgets.types.splits_run.shortName"
+msgid "Splits"
+msgstr "分段"
+
+msgctxt "widgets.types.stride_length.name"
+msgid "Stride Length"
+msgstr "步幅"
+
+msgctxt "widgets.types.stride_length.shortName"
+msgid "Stride"
+msgstr "步幅"
+
+msgctxt "widgets.types.stroke_rate.name"
+msgid "Stroke Rate"
+msgstr "划频"
+
+msgctxt "widgets.types.stroke_rate.shortName"
+msgid "S/R"
+msgstr "划频"
+
+msgctxt "widgets.types.temperature.name"
+msgid "Temperature"
+msgstr "温度"
+
+msgctxt "widgets.types.temperature.shortName"
+msgid "Temp."
+msgstr "温度"
+
+msgctxt "widgets.types.throttle_position.name"
+msgid "Throttle Position"
+msgstr "油门位置"
+
+msgctxt "widgets.types.throttle_position.shortName"
+msgid "Throttle"
+msgstr "油门"
+
+msgctxt "widgets.types.time.name"
+msgid "Time"
+msgstr "时间"
+
+msgctxt "widgets.types.time.shortName"
+msgid "Time"
+msgstr "时间"
+
+msgctxt "widgets.types.time_to_surface.name"
+msgid "Time to Surface"
+msgstr "上升至水面时间"
+
+msgctxt "widgets.types.time_to_surface.shortName"
+msgid "TTS"
+msgstr "TTS"
+
+msgctxt "widgets.types.torque.name"
+msgid "Torque"
+msgstr "扭矩"
+
+msgctxt "widgets.types.torque.shortName"
+msgid "Torque"
+msgstr "扭矩"
+
+msgctxt "widgets.types.total_ascent.name"
+msgid "Total Ascent"
+msgstr "累计爬升"
+
+msgctxt "widgets.types.total_ascent.shortName"
+msgid "Ascent"
+msgstr "爬升"
+
+msgctxt "widgets.types.vertical_oscillation.name"
+msgid "Vertical Oscillation"
+msgstr "垂直振幅"
+
+msgctxt "widgets.types.vertical_oscillation.shortName"
+msgid "V. Osc."
+msgstr "垂直振幅"
+
+msgctxt "widgets.types.vertical_ratio.name"
+msgid "Vertical Ratio"
+msgstr "垂直比"
+
+msgctxt "widgets.types.vertical_ratio.shortName"
+msgid "V. Ratio"
+msgstr "垂直比"
+
+msgctxt "widgets.types.vertical_speed.name"
+msgid "Vertical Speed"
+msgstr "垂直速度"
+
+msgctxt "widgets.types.vertical_speed.shortName"
+msgid "V. Speed"
+msgstr "垂直速度"
+
+msgctxt "widgets.types.water_temperature.name"
+msgid "Water Temperature"
+msgstr "水温"
+
+msgctxt "widgets.types.water_temperature.shortName"
+msgid "Water Temp."
+msgstr "水温"

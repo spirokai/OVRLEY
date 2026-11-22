@@ -1,0 +1,3400 @@
+msgid ""
+msgstr ""
+"Language: sv\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "app-shell.agentConnected"
+msgid "Agent connected"
+msgstr "Agent ansluten"
+
+msgctxt "app-shell.agentConnectedHelp"
+msgid "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it."
+msgstr "En AI-agent är ansluten via MCP och kan ändra det här fönstret. Stäng av ”Tillåt ändringar från agenter” i Inställningar för att stoppa den."
+
+msgctxt "app-shell.allowAgentEdits"
+msgid "Allow agent edits"
+msgstr "Tillåt ändringar från agenter"
+
+msgctxt "app-shell.allowAgentEditsHelp"
+msgid "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request."
+msgstr "Låter en AI-agent som är ansluten via MCP (ovrley --mcp) ändra det här fönstret, till exempel språket och lådorna. Stäng av för att neka alla förfrågningar från agenter."
+
+msgctxt "app-shell.blackBackground"
+msgid "Black background"
+msgstr "Svart bakgrund"
+
+msgctxt "app-shell.checkeredBackground"
+msgid "Checkered background"
+msgstr "Schackrutig bakgrund"
+
+msgctxt "app-shell.clearMapTileCache"
+msgid "Clear cache"
+msgstr "Rensa cache"
+
+msgctxt "app-shell.close"
+msgid "Close"
+msgstr "Stäng"
+
+msgctxt "app-shell.copyError"
+msgid "Copy error"
+msgstr "Kopiera fel"
+
+msgctxt "app-shell.dropFilesToImport"
+msgid "Drop files to import"
+msgstr "Släpp filer för att importera"
+
+msgctxt "app-shell.errorRenderingVideo"
+msgid "Error Rendering Video"
+msgstr "Fel vid videorendering"
+
+msgctxt "app-shell.file"
+msgid "File"
+msgstr "Arkiv"
+
+msgctxt "app-shell.fileMenu"
+msgid "File menu"
+msgstr "Arkivmeny"
+
+msgctxt "app-shell.grid"
+msgid "Toggle grid"
+msgstr "Växla rutnät"
+
+msgctxt "app-shell.imageBackground"
+msgid "Image background"
+msgstr "Bildbakgrund"
+
+msgctxt "app-shell.importActivity"
+msgid "Import Activity"
+msgstr "Importera aktivitet"
+
+msgctxt "app-shell.importTemplate"
+msgid "Import Template"
+msgstr "Importera mall"
+
+msgctxt "app-shell.importVideo"
+msgid "Import Videos"
+msgstr "Importera video"
+
+msgctxt "app-shell.keyboardShortcutsDescription"
+msgid "You can use the following keyboard shortcuts to improve your workflow:"
+msgstr "Följande tangentbordsgenvägar kan effektivisera ditt arbetsflöde:"
+
+msgctxt "app-shell.language"
+msgid "Language"
+msgstr "Språk"
+
+msgctxt "app-shell.loadProject"
+msgid "Load Project"
+msgstr "Öppna projekt"
+
+msgctxt "app-shell.loadingEditorData"
+msgid "Loading editor data..."
+msgstr "Läser in redigeringsdata..."
+
+msgctxt "app-shell.mapTileCache"
+msgid "Map tile cache"
+msgstr "Cache för kartrutor"
+
+msgctxt "app-shell.mapTileCacheHelp"
+msgid "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first."
+msgstr "Kartrutor som laddas ned för förhandsvisningar och renderingar sparas på disken så att kartor laddas snabbare och fungerar offline. När cachen är full tas de rutor bort först som använts minst nyligen."
+
+msgctxt "app-shell.mapTileCacheLimit"
+msgid "Cache size"
+msgstr "Cachestorlek"
+
+msgctxt "app-shell.mapTileCacheUsage"
+msgid "{0} of {1} used"
+msgstr "{0} av {1} används"
+
+msgctxt "app-shell.newProject"
+msgid "New Project"
+msgstr "Nytt projekt"
+
+msgctxt "app-shell.newTemplate"
+msgid "New Template"
+msgstr "Ny mall"
+
+msgctxt "app-shell.overlays"
+msgid "Overlays"
+msgstr "Överlägg"
+
+msgctxt "app-shell.resetZoom"
+msgid "Reset zoom"
+msgstr "Återställ zoom"
+
+msgctxt "app-shell.save"
+msgid "Save"
+msgstr "Spara"
+
+msgctxt "app-shell.saveProject"
+msgid "Save Project"
+msgstr "Spara projekt"
+
+msgctxt "app-shell.saveProjectAs"
+msgid "Save Project As"
+msgstr "Spara projekt som"
+
+msgctxt "app-shell.saveTemplate"
+msgid "Save Template"
+msgstr "Spara mall"
+
+msgctxt "app-shell.selectTemplate"
+msgid "Select Template..."
+msgstr "Välj mall..."
+
+msgctxt "app-shell.settings"
+msgid "Settings"
+msgstr "Inställningar"
+
+msgctxt "app-shell.shortcuts"
+msgid "Shortcuts"
+msgstr "Kortkommandon"
+
+msgctxt "app-shell.snapToGrid"
+msgid "Snap to grid"
+msgstr "Fäst vid rutnätet"
+
+msgctxt "app-shell.unitSystem"
+msgid "Units"
+msgstr "Enheter"
+
+msgctxt "app-shell.unitSystems.imperial"
+msgid "Imperial"
+msgstr "Brittiska"
+
+msgctxt "app-shell.unitSystems.metric"
+msgid "Metric"
+msgstr "Metriska"
+
+msgctxt "app-shell.unknownResolution"
+msgid "Unknown Resolution"
+msgstr "Okänd upplösning"
+
+msgctxt "app-shell.videoBackground"
+msgid "Video background"
+msgstr "Videobakgrund"
+
+msgctxt "app-shell.whiteBackground"
+msgid "White background"
+msgstr "Vit bakgrund"
+
+msgctxt "app-shell.widgets"
+msgid "Widgets"
+msgstr "Widgetar"
+
+msgctxt "app-shell.zoomIn"
+msgid "Zoom in"
+msgstr "Zooma in"
+
+msgctxt "app-shell.zoomOut"
+msgid "Zoom out"
+msgstr "Zooma ut"
+
+msgctxt "app-update.close"
+msgid "Close"
+msgstr "Stäng"
+
+msgctxt "app-update.continueWithInstalledVersion"
+msgid "The installed version remains available. You can close this dialog and continue working."
+msgstr "Den installerade versionen är fortfarande tillgänglig. Du kan stänga dialogrutan och fortsätta arbeta."
+
+msgctxt "app-update.downloadingUpdate"
+msgid "Downloading update"
+msgstr "Hämtar uppdatering"
+
+msgctxt "app-update.later"
+msgid "Later"
+msgstr "Senare"
+
+msgctxt "app-update.updateAvailable"
+msgid "Update available"
+msgstr "Uppdatering tillgänglig"
+
+msgctxt "app-update.updateDownloadProgress"
+msgid "Update download progress"
+msgstr "Förlopp för uppdateringshämtning"
+
+msgctxt "app-update.updateFailed"
+msgid "Update failed"
+msgstr "Uppdateringen misslyckades"
+
+msgctxt "app-update.updateNow"
+msgid "Update now"
+msgstr "Uppdatera nu"
+
+msgctxt "app-update.versionNowAvailable"
+msgid "OVRLEY <0>{{version}}</0> is now available."
+msgstr "OVRLEY <0>{{version}}</0> är nu tillgänglig."
+
+msgctxt "app.importingYourVideo"
+msgid "Importing your video..."
+msgstr "Importerar videon..."
+
+msgctxt "app.loadingProject"
+msgid "Loading project..."
+msgstr "Läser in projektet..."
+
+msgctxt "app.ovrleyIsStarting"
+msgid "OVRLEY is starting..."
+msgstr "OVRLEY startar..."
+
+msgctxt "app.processingYourActivity"
+msgid "Processing your activity..."
+msgstr "Bearbetar aktiviteten..."
+
+msgctxt "components.blueColorComponent0255"
+msgid "Blue color component (0-255)"
+msgstr "Blå färgkomponent (0-255)"
+
+msgctxt "components.brightnessPercentage0100"
+msgid "Brightness percentage (0-100)"
+msgstr "Ljusstyrka (%)"
+
+msgctxt "components.currentColorVal"
+msgid "Current color: {0}"
+msgstr "Aktuell färg: {0}"
+
+msgctxt "components.decreaseValue"
+msgid "Decrease value"
+msgstr "Minska värdet"
+
+msgctxt "components.gradientAddStopHint"
+msgid "Click to add a color stop"
+msgstr "Klicka för att lägga till ett färgstopp"
+
+msgctxt "components.gradientRemoveStop"
+msgid "Remove stop"
+msgstr "Ta bort stopp"
+
+msgctxt "components.gradientStopLabel"
+msgid "Color stop at {0}%"
+msgstr "Färgstopp vid {0} %"
+
+msgctxt "components.gradientStops"
+msgid "Gradient stops"
+msgstr "Toningsstopp"
+
+msgctxt "components.greenColorComponent0255"
+msgid "Green color component (0-255)"
+msgstr "Grön färgkomponent (0-255)"
+
+msgctxt "components.hexColorValue"
+msgid "Hex color value"
+msgstr "Hexadecimalt färgvärde"
+
+msgctxt "components.hueDegree0360"
+msgid "Hue degree (0-360)"
+msgstr "Nyansgrad (0-360)"
+
+msgctxt "components.increaseValue"
+msgid "Increase value"
+msgstr "Öka värdet"
+
+msgctxt "components.lightnessPercentage0100"
+msgid "Lightness percentage (0-100)"
+msgstr "Ljushet (%)"
+
+msgctxt "components.presets"
+msgid "Presets"
+msgstr "Förinställningar"
+
+msgctxt "components.recommended"
+msgid "Recommended"
+msgstr "Rekommenderad"
+
+msgctxt "components.redColorComponent0255"
+msgid "Red color component (0-255)"
+msgstr "Röd färgkomponent (0-255)"
+
+msgctxt "components.saturationPercentage0100"
+msgid "Saturation percentage (0-100)"
+msgstr "Mättnad (%)"
+
+msgctxt "components.system"
+msgid "System"
+msgstr "System"
+
+msgctxt "keyboard-shortcuts.activityImport"
+msgid "Import activity"
+msgstr "Importera aktivitet"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToEnd"
+msgid "Move playhead to activity trim end"
+msgstr "Flytta uppspelningshuvudet till aktivitetens trimmade slut"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToStart"
+msgid "Move playhead to activity trim start"
+msgstr "Flytta uppspelningshuvudet till aktivitetens trimmade början"
+
+msgctxt "keyboard-shortcuts.activityTrimReset"
+msgid "Reset activity trim"
+msgstr "Återställ trimningen av aktiviteten"
+
+msgctxt "keyboard-shortcuts.drawerClose"
+msgid "Close widget drawer"
+msgstr "Stäng widgetpanel"
+
+msgctxt "keyboard-shortcuts.drawerToggle"
+msgid "Open/close widget drawer"
+msgstr "Öppna/stäng widgetpanel"
+
+msgctxt "keyboard-shortcuts.editorClearSelection"
+msgid "Clear widget selection"
+msgstr "Rensa widgetmarkering"
+
+msgctxt "keyboard-shortcuts.editorCopy"
+msgid "Copy selected widgets"
+msgstr "Kopiera valda widgetar"
+
+msgctxt "keyboard-shortcuts.editorDelete"
+msgid "Delete selected widgets"
+msgstr "Ta bort valda widgetar"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetOnePixel"
+msgid "Move widget by 1 pixel"
+msgstr "Flytta widget 1 pixel"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetTenPixels"
+msgid "Move widget by 10 pixels"
+msgstr "Flytta widget 10 pixlar"
+
+msgctxt "keyboard-shortcuts.editorNudge"
+msgid "Nudge selected widgets"
+msgstr "Finjustera valda widgetar"
+
+msgctxt "keyboard-shortcuts.editorPaste"
+msgid "Paste copied widgets"
+msgstr "Klistra in kopierade widgetar"
+
+msgctxt "keyboard-shortcuts.editorResetZoom"
+msgid "Reset canvas zoom"
+msgstr "Återställ ytans zoom"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasHorizontally"
+msgid "Scroll canvas horizontally"
+msgstr "Rulla ytan vågrätt"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasVertically"
+msgid "Scroll canvas vertically"
+msgstr "Rulla ytan lodrätt"
+
+msgctxt "keyboard-shortcuts.editorToggleGrid"
+msgid "Toggle gridlines"
+msgstr "Växla rutnätslinjer"
+
+msgctxt "keyboard-shortcuts.editorToggleSnap"
+msgid "Toggle snapping to grid"
+msgstr "Växla fästning mot rutnät"
+
+msgctxt "keyboard-shortcuts.editorWheelScroll"
+msgid "Scroll canvas"
+msgstr "Rulla på ytan"
+
+msgctxt "keyboard-shortcuts.editorWheelZoom"
+msgid "Zoom canvas at pointer"
+msgstr "Zooma på pekaren"
+
+msgctxt "keyboard-shortcuts.editorZoomIn"
+msgid "Canvas zoom in"
+msgstr "Zooma in på ytan"
+
+msgctxt "keyboard-shortcuts.editorZoomOut"
+msgid "Canvas zoom out"
+msgstr "Zooma ut på ytan"
+
+msgctxt "keyboard-shortcuts.generalCommands"
+msgid "General commands"
+msgstr "Allmänna kommandon"
+
+msgctxt "keyboard-shortcuts.historyRedo"
+msgid "Redo"
+msgstr "Gör om"
+
+msgctxt "keyboard-shortcuts.historyUndo"
+msgid "Undo"
+msgstr "Ångra"
+
+msgctxt "keyboard-shortcuts.outputOpen"
+msgid "Open export folder"
+msgstr "Öppna exportmapp"
+
+msgctxt "keyboard-shortcuts.playerJumpToEnd"
+msgid "Rewind to end"
+msgstr "Spola till slutet"
+
+msgctxt "keyboard-shortcuts.playerResetToStart"
+msgid "Rewind to start"
+msgstr "Spola till början"
+
+msgctxt "keyboard-shortcuts.playerStepBackward"
+msgid "Step backward 1 second"
+msgstr "Stega bakåt 1 sekund"
+
+msgctxt "keyboard-shortcuts.playerStepForward"
+msgid "Step forward 1 second"
+msgstr "Stega framåt 1 sekund"
+
+msgctxt "keyboard-shortcuts.playerToggleMute"
+msgid "Mute/unmute video"
+msgstr "Ljud av/på"
+
+msgctxt "keyboard-shortcuts.playerTogglePlayback"
+msgid "Play/pause"
+msgstr "Spela upp/pausa"
+
+msgctxt "keyboard-shortcuts.projectNew"
+msgid "New project"
+msgstr "Nytt projekt"
+
+msgctxt "keyboard-shortcuts.projectOpen"
+msgid "Open project"
+msgstr "Öppna projekt"
+
+msgctxt "keyboard-shortcuts.projectSave"
+msgid "Save project"
+msgstr "Spara projekt"
+
+msgctxt "keyboard-shortcuts.projectSaveAs"
+msgid "Save project as"
+msgstr "Spara projekt som"
+
+msgctxt "keyboard-shortcuts.renderOpen"
+msgid "Export overlay"
+msgstr "Exportera överlägg"
+
+msgctxt "keyboard-shortcuts.syncAuto"
+msgid "Auto-sync video with activity"
+msgstr "Autosynkronisera video med aktivitet"
+
+msgctxt "keyboard-shortcuts.syncGlobalNudge"
+msgid "Adjust sync offset by 1 second"
+msgstr "Justera synkronisering 1 sekund"
+
+msgctxt "keyboard-shortcuts.templateImport"
+msgid "Open template"
+msgstr "Öppna mall"
+
+msgctxt "keyboard-shortcuts.templateNew"
+msgid "New template"
+msgstr "Ny mall"
+
+msgctxt "keyboard-shortcuts.templateSave"
+msgid "Save template"
+msgstr "Spara mall"
+
+msgctxt "keyboard-shortcuts.templateSelect"
+msgid "Open template list"
+msgstr "Öppna mallista"
+
+msgctxt "keyboard-shortcuts.timelineAndSync"
+msgid "Timeline and sync"
+msgstr "Tidslinje och synkronisering"
+
+msgctxt "keyboard-shortcuts.timelineClipNudge"
+msgid "Nudge selected clip synchronization"
+msgstr "Finjustera klippsynkronisering"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeSecond"
+msgid "Nudge selected clip sync offset by 1 second"
+msgstr "Finjustera klippsynkronisering 1 sekund"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeTenthSecond"
+msgid "Nudge selected clip sync offset by 0.1 seconds"
+msgstr "Finjustera klippsynkronisering 0,1 sekunder"
+
+msgctxt "keyboard-shortcuts.timelineFitActivity"
+msgid "Switch timeline to show activity"
+msgstr "Visa aktivitet i tidslinjen"
+
+msgctxt "keyboard-shortcuts.timelineFitAll"
+msgid "Show entire timeline"
+msgstr "Visa hela tidslinjen"
+
+msgctxt "keyboard-shortcuts.timelineFitMedia"
+msgid "Switch timeline to all media"
+msgstr "Visa alla medier i tidslinjen"
+
+msgctxt "keyboard-shortcuts.timelineFitVideo"
+msgid "Switch timeline to show video"
+msgstr "Visa video i tidslinjen"
+
+msgctxt "keyboard-shortcuts.timelineWheelPan"
+msgid "Pan timeline"
+msgstr "Panorera tidslinjen"
+
+msgctxt "keyboard-shortcuts.timelineWheelZoom"
+msgid "Zoom timeline at pointer"
+msgstr "Zooma tidslinjen vid pekaren"
+
+msgctxt "keyboard-shortcuts.trimAfterPlayhead"
+msgid "Trim after the playhead (the video, or the activity without videos)"
+msgstr "Trimma efter uppspelningshuvudet (videon, eller aktiviteten utan videor)"
+
+msgctxt "keyboard-shortcuts.trimBeforePlayhead"
+msgid "Trim before the playhead (the video, or the activity without videos)"
+msgstr "Trimma före uppspelningshuvudet (videon, eller aktiviteten utan videor)"
+
+msgctxt "keyboard-shortcuts.videoImport"
+msgid "Import video"
+msgstr "Importera video"
+
+msgctxt "keyboard-shortcuts.videoPlayer"
+msgid "Video player"
+msgstr "Videospelare"
+
+msgctxt "keyboard-shortcuts.widgetEditor"
+msgid "Widget editor"
+msgstr "Widgetredigerare"
+
+msgctxt "overlay-editor.mapReset"
+msgid "Reset"
+msgstr "Återställ"
+
+msgctxt "overlay-editor.mapViewHint"
+msgid "Double-click to pan & zoom"
+msgstr "Dubbelklicka för att panorera och zooma"
+
+msgctxt "overlay-editor.mapViewZoomHint"
+msgid "Double-click to zoom"
+msgstr "Dubbelklicka för att zooma"
+
+msgctxt "overlay-editor.statusModified"
+msgid "Modified"
+msgstr "Ändrad"
+
+msgctxt "overlay-editor.statusUnsaved"
+msgid "Unsaved"
+msgstr "Osparad"
+
+msgctxt "player.activity"
+msgid "Activity"
+msgstr "Aktivitet"
+
+msgctxt "player.all"
+msgid "All"
+msgstr "Alla"
+
+msgctxt "player.duration"
+msgid "Duration"
+msgstr "Varaktighet"
+
+msgctxt "player.resetView"
+msgid "Reset view"
+msgstr "Återställ vy"
+
+msgctxt "player.rewindToEnd"
+msgid "Rewind to end"
+msgstr "Spola till slutet"
+
+msgctxt "player.rewindToStart"
+msgid "Rewind to start"
+msgstr "Spola till början"
+
+msgctxt "player.stepBack"
+msgid "Step back"
+msgstr "Stega bakåt"
+
+msgctxt "player.stepForward"
+msgid "Step forward"
+msgstr "Stega framåt"
+
+msgctxt "player.trimActivityAfterPlayhead"
+msgid "Trim the activity after the playhead"
+msgstr "Trimma aktiviteten efter uppspelningshuvudet"
+
+msgctxt "player.trimActivityBeforePlayhead"
+msgid "Trim the activity before the playhead"
+msgstr "Trimma aktiviteten före uppspelningshuvudet"
+
+msgctxt "player.trimActivityEnd"
+msgid "Drag to trim the end of the activity"
+msgstr "Dra för att trimma aktivitetens slut"
+
+msgctxt "player.trimActivityStart"
+msgid "Drag to trim the start of the activity"
+msgstr "Dra för att trimma aktivitetens början"
+
+msgctxt "player.trimVideoAfterPlayhead"
+msgid "Trim the video after the playhead"
+msgstr "Trimma videon efter uppspelningshuvudet"
+
+msgctxt "player.trimVideoBeforePlayhead"
+msgid "Trim the video before the playhead"
+msgstr "Trimma videon före uppspelningshuvudet"
+
+msgctxt "player.video"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "player.zoomIn"
+msgid "Zoom in"
+msgstr "Zooma in"
+
+msgctxt "player.zoomOut"
+msgid "Zoom out"
+msgstr "Zooma ut"
+
+msgctxt "projects.activity"
+msgid "Activity"
+msgstr "Aktivitet"
+
+msgctxt "projects.archiveTooLarge"
+msgid "The project exceeds the 40 MiB archive limit. Remove or replace an image."
+msgstr "Projektet överskrider arkivgränsen på 40 MiB. Ta bort eller ersätt en bild."
+
+msgctxt "projects.cancel"
+msgid "Cancel"
+msgstr "Avbryt"
+
+msgctxt "projects.closeWithoutSaving"
+msgid "Close Without Saving"
+msgstr "Stäng utan att spara"
+
+msgctxt "projects.createNewProject"
+msgid "Create New Project"
+msgstr "Skapa nytt projekt"
+
+msgctxt "projects.createProject"
+msgid "create project"
+msgstr "skapa projekt"
+
+msgctxt "projects.invalidArchive"
+msgid "The project archive is invalid or damaged. Choose another project file."
+msgstr "Projektarkivet är ogiltigt eller skadat. Välj en annan projektfil."
+
+msgctxt "projects.loadAnyway"
+msgid "Load Anyway"
+msgstr "Öppna ändå"
+
+msgctxt "projects.locate"
+msgid "Locate"
+msgstr "Lokalisera"
+
+msgctxt "projects.missingSourceDescription"
+msgid "The {0} file does not seem to exist. Locate the moved file or cancel without changing the current session."
+msgstr "Källfilen ({0}) verkar inte finnas. Lokalisera den flyttade filen eller avbryt utan att ändra den aktuella sessionen."
+
+msgctxt "projects.newProject"
+msgid "New Project"
+msgstr "Nytt projekt"
+
+msgctxt "projects.openAProject"
+msgid "Open a project"
+msgstr "Öppna ett projekt"
+
+msgctxt "projects.openProject"
+msgid "open project"
+msgstr "öppna projekt"
+
+msgctxt "projects.rasterUnavailable"
+msgid "An image is unavailable. Replace it before saving."
+msgstr "En bild är inte tillgänglig. Ersätt den innan du sparar."
+
+msgctxt "projects.saveFailed"
+msgid "The project could not be saved. Check the destination and try again."
+msgstr "Projektet kunde inte sparas. Kontrollera målet och försök igen."
+
+msgctxt "projects.saveProject"
+msgid "save project"
+msgstr "spara projekt"
+
+msgctxt "projects.sourceNotFound"
+msgid "{0} source not found"
+msgstr "Källan {0} hittades inte"
+
+msgctxt "projects.unsavedChanges"
+msgid "Your project has unsaved changes. Save them or discard them."
+msgstr "Projektet innehåller osparade ändringar. Spara dem eller kasta dem."
+
+msgctxt "projects.unsavedChangesBeforeExit"
+msgid "Your project has unsaved changes. Do you want to save the changes or close without saving?"
+msgstr "Projektet innehåller osparade ändringar. Vill du spara ändringarna eller stänga utan att spara?"
+
+msgctxt "projects.unsavedChangesTitle"
+msgid "Unsaved Changes"
+msgstr "Osparade ändringar"
+
+msgctxt "projects.video"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "raster.errors.corruptAsset"
+msgid "The embedded image is damaged. Select a replacement."
+msgstr "Den inbäddade bilden är skadad. Välj en ersättning."
+
+msgctxt "raster.errors.decode"
+msgid "Image could not be decoded. Choose another image."
+msgstr "Bilden kunde inte avkodas. Välj en annan bild."
+
+msgctxt "raster.errors.encodedSize"
+msgid "Image file is larger than 5 MiB. Choose a smaller file."
+msgstr "Filen är större än 5 MiB. Välj en mindre fil."
+
+msgctxt "raster.errors.invalidConfig"
+msgid "Image settings are invalid."
+msgstr "Bildkonfigurationen är ogiltig."
+
+msgctxt "raster.errors.missing"
+msgid "Image file is missing. Select another image."
+msgstr "Bildfilen saknas. Välj en annan bild."
+
+msgctxt "raster.errors.missingAsset"
+msgid "The embedded image is missing from this project. Select a replacement."
+msgstr "Den inbäddade bilden saknas i projektet. Välj en ersättning."
+
+msgctxt "raster.errors.noImage"
+msgid "Image {{id}} has no selected file. Select one before rendering."
+msgstr "Bild {{id}} saknar vald fil. Välj en före rendering."
+
+msgctxt "raster.errors.relativePath"
+msgid "Select an image from an absolute file path."
+msgstr "Välj en bild med en absolut filsökväg."
+
+msgctxt "raster.errors.renderUnavailable"
+msgid "Image {{id}} cannot be rendered yet."
+msgstr "Bild {{id}} kan inte renderas ännu."
+
+msgctxt "raster.errors.resolution"
+msgid "Image resolution exceeds 25 megapixels. Choose a smaller image."
+msgstr "Upplösningen överstiger 25 megapixlar. Välj en mindre bild."
+
+msgctxt "raster.errors.unreadable"
+msgid "Image file cannot be read. Check its permissions or select another image."
+msgstr "Bildfilen kan inte läsas. Kontrollera behörigheterna eller välj en annan bild."
+
+msgctxt "raster.errors.unsupportedType"
+msgid "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff)."
+msgstr "Välj en PNG-, JPEG-, BMP- eller TIFF-fil (.png, .jpeg, .jpg, .bmp, .tiff)."
+
+msgctxt "raster.imageFiles"
+msgid "Image files"
+msgstr "Bildfiler"
+
+msgctxt "raster.replaceImage"
+msgid "Replace image"
+msgstr "Byt bild"
+
+msgctxt "raster.selectImage"
+msgid "Select image"
+msgstr "Välj bild"
+
+msgctxt "render-video.batchResult.cancelled"
+msgid "Batch cancelled"
+msgstr "Batch avbruten"
+
+msgctxt "render-video.batchResult.completedWithErrors"
+msgid "Batch finished with errors"
+msgstr "Batch slutförd med fel"
+
+msgctxt "render-video.batchResult.failed"
+msgid "Batch failed"
+msgstr "Batch misslyckades"
+
+msgctxt "render-video.better"
+msgid "Better"
+msgstr "Bättre"
+
+msgctxt "render-video.bitrate"
+msgid "Bitrate"
+msgstr "Bithastighet"
+
+msgctxt "render-video.cancel"
+msgid "Cancel"
+msgstr "Avbryt"
+
+msgctxt "render-video.cancelled"
+msgid "Cancelled"
+msgstr "Avbruten"
+
+msgctxt "render-video.cancelling"
+msgid "Cancelling..."
+msgstr "Avbryter..."
+
+msgctxt "render-video.chooseFolder"
+msgid "Choose folder..."
+msgstr "Välj mapp..."
+
+msgctxt "render-video.close"
+msgid "Close"
+msgstr "Stäng"
+
+msgctxt "render-video.codecOutputFormat"
+msgid "Codec / Output Format"
+msgstr "Kodek / utdataformat"
+
+msgctxt "render-video.custom"
+msgid "Custom"
+msgstr "Anpassad"
+
+msgctxt "render-video.customFps"
+msgid "Custom FPS"
+msgstr "Anpassad FPS"
+
+msgctxt "render-video.done"
+msgid "Done"
+msgstr "Klart"
+
+msgctxt "render-video.encodingOutputFile"
+msgid "Encoding output file..."
+msgstr "Kodar utdatafil..."
+
+msgctxt "render-video.encodingValVal2Frames"
+msgid "Encoding: {{val}} / {{val2}} frames"
+msgstr "Kodning: {{val}} / {{val2}} bildrutor"
+
+msgctxt "render-video.estRemaining"
+msgid "Est. Remaining"
+msgstr "Beräknad återstående tid"
+
+msgctxt "render-video.exportFinished"
+msgid "Export Finished"
+msgstr "Export klar"
+
+msgctxt "render-video.exportSettings"
+msgid "Export Settings"
+msgstr "Exportinställningar"
+
+msgctxt "render-video.exportingOverlay"
+msgid "Exporting Overlay"
+msgstr "Exporterar överlägg"
+
+msgctxt "render-video.finalizingVideo"
+msgid "Finalizing Video"
+msgstr "Slutför video"
+
+msgctxt "render-video.frameProgress"
+msgid "{{current}} / {{total}} frames"
+msgstr "{{current}} / {{total}} bildrutor"
+
+msgctxt "render-video.framerate"
+msgid "Framerate"
+msgstr "Bildfrekvens"
+
+msgctxt "render-video.fullVideo"
+msgid "Full Video"
+msgstr "Hela videon"
+
+msgctxt "render-video.hardwareAcceleration"
+msgid "Hardware Acceleration"
+msgstr "Hårdvaruacceleration"
+
+msgctxt "render-video.hardwareAccelerationVaapiHelp"
+msgid "VAAPI needs your GPU's VA-API driver. Install it with your package manager:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nRun vainfo to check that the driver loads. NVIDIA GPUs use the NVIDIA GPU option instead."
+msgstr "VAAPI kräver VA-API-drivrutinen för din GPU. Installera den med din pakethanterare:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nKör vainfo för att kontrollera att drivrutinen laddas. NVIDIA-GPU:er använder alternativet NVIDIA GPU i stället."
+
+msgctxt "render-video.hiddenByOverlap"
+msgid "Hidden behind an overlapping video"
+msgstr "Dold bakom en överlappande video"
+
+msgctxt "render-video.keepAppOpen"
+msgid "Please keep the application open during rendering"
+msgstr "Håll programmet öppet under renderingen"
+
+msgctxt "render-video.largerFile"
+msgid "Larger file"
+msgstr "Större fil"
+
+msgctxt "render-video.loadAGpxfitActivityFirst"
+msgid "Load a GPX/FIT activity first"
+msgstr "Läs först in en GPX/FIT-aktivitet"
+
+msgctxt "render-video.lockedToEachVideoFps"
+msgid "Locked to each video's FPS"
+msgstr "Låst till varje videos FPS"
+
+msgctxt "render-video.lockedToVideoFps"
+msgid "Locked to video FPS ({{fps}} fps)"
+msgstr "Låst till videons FPS ({{fps}} fps)"
+
+msgctxt "render-video.minutesMinSecondsSec"
+msgid "{{minutes}} min {{seconds}} sec"
+msgstr "{{minutes}} min {{seconds}} s"
+
+msgctxt "render-video.mp4Codecs"
+msgid "MP4 Codecs"
+msgstr "Kodekar för MP4"
+
+msgctxt "render-video.nothingToExport"
+msgid "Every video part is excluded from export."
+msgstr "Alla videodelar är undantagna från export."
+
+msgctxt "render-video.outputContainerFps"
+msgid "Output container: {{fps}} fps"
+msgstr "Utdataformat: {{fps}} fps"
+
+msgctxt "render-video.outputFile"
+msgid "Output file"
+msgstr "Utdatafil"
+
+msgctxt "render-video.outputFolder"
+msgid "Output folder"
+msgstr "Utdatamapp"
+
+msgctxt "render-video.outputPath"
+msgid "Output path"
+msgstr "Sökväg till utdatafil"
+
+msgctxt "render-video.overwrite"
+msgid "Overwrite"
+msgstr "Skriv över"
+
+msgctxt "render-video.overwriteExistingFile"
+msgid "Overwrite existing file?"
+msgstr "Skriv över befintlig fil?"
+
+msgctxt "render-video.pathErrors.outputAliasesInput"
+msgid "The output would overwrite an input video"
+msgstr "Utdata skulle skriva över en indatavideo"
+
+msgctxt "render-video.pathErrors.outputDestinationsConflict"
+msgid "Multiple batch outputs use the same destination"
+msgstr "Flera batchutdata använder samma destination"
+
+msgctxt "render-video.pathErrors.outputDirectoryInvalid"
+msgid "Choose an existing output directory"
+msgstr "Välj en befintlig utdatakatalog"
+
+msgctxt "render-video.pathErrors.outputDirectoryMissing"
+msgid "The output directory does not exist"
+msgstr "Utdatakatalogen finns inte"
+
+msgctxt "render-video.pathErrors.outputExtensionInvalid"
+msgid "The output file must use .{{extension}}"
+msgstr "Utdatafilen måste ha filändelsen .{{extension}}"
+
+msgctxt "render-video.pathErrors.outputFileRequired"
+msgid "Choose an output file"
+msgstr "Välj en utdatafil"
+
+msgctxt "render-video.pathErrors.outputFilenameRequired"
+msgid "The output path must include a file name"
+msgstr "Utdatasökvägen måste innehålla ett filnamn"
+
+msgctxt "render-video.pathErrors.outputNotFile"
+msgid "The selected output is not a file"
+msgstr "Den valda destinationen är inte en fil"
+
+msgctxt "render-video.pathErrors.outputPathIncomplete"
+msgid "Choose a complete output path, including its folder"
+msgstr "Välj en fullständig utdatasökväg, inklusive mappen"
+
+msgctxt "render-video.pathErrors.outputPathInvalid"
+msgid "The output file name or path is not valid"
+msgstr "Utdatafilens namn eller sökväg är ogiltig"
+
+msgctxt "render-video.pathErrors.outputPermissionDenied"
+msgid "You do not have permission to write the output file"
+msgstr "Du har inte behörighet att skriva utdatafilen"
+
+msgctxt "render-video.pathErrors.outputWriteFailed"
+msgid "Could not create or write the output file: {{detail}}"
+msgstr "Det gick inte att skapa eller skriva utdatafilen: {{detail}}"
+
+msgctxt "render-video.pathErrors.sourceFilenameInvalid"
+msgid "The source file name is invalid"
+msgstr "Källfilens namn är ogiltigt"
+
+msgctxt "render-video.percentComplete"
+msgid "{{percent}}% Complete"
+msgstr "{{percent}} % klart"
+
+msgctxt "render-video.preparingBatch"
+msgid "Preparing video..."
+msgstr "Förbereder video..."
+
+msgctxt "render-video.quality"
+msgid "Quality"
+msgstr "Kvalitet"
+
+msgctxt "render-video.queued"
+msgid "Queued"
+msgstr "I kö"
+
+msgctxt "render-video.reinspectionRequired"
+msgid "Sources changed or inspection expired. Inspect again before starting."
+msgstr "Källfilerna har ändrats eller kontrollen har gått ut. Kontrollera igen innan du startar."
+
+msgctxt "render-video.renderFps"
+msgid "Render FPS"
+msgstr "Renderings-FPS"
+
+msgctxt "render-video.rendering"
+msgid "Rendering..."
+msgstr "Renderar..."
+
+msgctxt "render-video.renderingAlreadyInProgress"
+msgid "Rendering already in progress"
+msgstr "Rendering pågår redan"
+
+msgctxt "render-video.renderingFrames"
+msgid "Rendering frames..."
+msgstr "Renderar bildrutor..."
+
+msgctxt "render-video.resolutionMismatchInstructions"
+msgid "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template."
+msgstr "Detta krävs för att exportera överlägget korrekt. Ändra överläggets upplösning i sidopanelens inställningar eller välj en annan mall."
+
+msgctxt "render-video.secondsSec"
+msgid "{{seconds}} sec"
+msgstr "{{seconds}} s"
+
+msgctxt "render-video.smallerFile"
+msgid "Smaller file"
+msgstr "Mindre fil"
+
+msgctxt "render-video.startRender"
+msgid "Start Render"
+msgstr "Starta rendering"
+
+msgctxt "render-video.startingRender"
+msgid "Starting render..."
+msgstr "Startar rendering..."
+
+msgctxt "render-video.transparent"
+msgid "Transparent"
+msgstr "Transparent"
+
+msgctxt "render-video.transparentCodecs"
+msgid "Transparent Codecs"
+msgstr "Transparenta kodekar"
+
+msgctxt "render-video.unavailable"
+msgid "Unavailable"
+msgstr "Ej tillgänglig"
+
+msgctxt "render-video.unstarted"
+msgid "Not started"
+msgstr "Inte startad"
+
+msgctxt "render-video.update1val"
+msgid "Update 1/{{val}}"
+msgstr "Uppdatering 1/{{val}}"
+
+msgctxt "render-video.videoImported"
+msgid "Video imported"
+msgstr "Video importerad"
+
+msgctxt "render-video.videoRequired"
+msgid "Video required"
+msgstr "Video krävs"
+
+msgctxt "render-video.videoResolutionMismatchMessage"
+msgid "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}})."
+msgstr "Överläggets upplösning {{overlayResolution}} måste matcha den importerade videons ({{videoResolution}})."
+
+msgctxt "render-video.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "Uppdateringsfrekvens för widgetar"
+
+msgctxt "render-video.worse"
+msgid "Worse"
+msgstr "Sämre"
+
+msgctxt "scene-settings.aspectRatio"
+msgid "Aspect Ratio"
+msgstr "Bildförhållande"
+
+msgctxt "scene-settings.borderThickness"
+msgid "Border Thickness"
+msgstr "Kanttjocklek"
+
+msgctxt "scene-settings.borders"
+msgid "Borders"
+msgstr "Kanter"
+
+msgctxt "scene-settings.custom"
+msgid "Custom"
+msgstr "Anpassad"
+
+msgctxt "scene-settings.customFps"
+msgid "Custom FPS"
+msgstr "Anpassad FPS"
+
+msgctxt "scene-settings.fixedWidthDigits"
+msgid "Fixed-Width Digits"
+msgstr "Siffror med fast bredd"
+
+msgctxt "scene-settings.fontLabels"
+msgid "Font - Labels"
+msgstr "Teckensnitt - etiketter"
+
+msgctxt "scene-settings.fontValues"
+msgid "Font - Values"
+msgstr "Teckensnitt - värden"
+
+msgctxt "scene-settings.framerate"
+msgid "Framerate"
+msgstr "Bildfrekvens"
+
+msgctxt "scene-settings.globalSettings"
+msgid "Global Settings"
+msgstr "Globala inställningar"
+
+msgctxt "scene-settings.height"
+msgid "Height"
+msgstr "Höjd"
+
+msgctxt "scene-settings.icons"
+msgid "Icons"
+msgstr "Ikoner"
+
+msgctxt "scene-settings.labels"
+msgid "Labels"
+msgstr "Etiketter"
+
+msgctxt "scene-settings.lockedToFps"
+msgid "Locked to {{fps}} fps"
+msgstr "Låst till {{fps}} fps"
+
+msgctxt "scene-settings.overlay"
+msgid "Overlay"
+msgstr "Överlägg"
+
+msgctxt "scene-settings.portrait"
+msgid "Portrait (4:3)"
+msgstr "Porträtt (4:3)"
+
+msgctxt "scene-settings.resolution"
+msgid "Resolution"
+msgstr "Upplösning"
+
+msgctxt "scene-settings.resolution1080p"
+msgid "1080p (1920x1080)"
+msgstr "1080p (1920x1080)"
+
+msgctxt "scene-settings.resolution1080pSquare"
+msgid "1080p Square (1080x1080)"
+msgstr "1080p kvadrat (1080x1080)"
+
+msgctxt "scene-settings.resolution1080pVertical"
+msgid "1080p Vertical (1080x1920)"
+msgstr "1080p stående (1080x1920)"
+
+msgctxt "scene-settings.resolution4k"
+msgid "4K (3840x2160)"
+msgstr "4K (3840x2160)"
+
+msgctxt "scene-settings.resolution4kSquare"
+msgid "4K Square (2160x2160)"
+msgstr "4K kvadrat (2160x2160)"
+
+msgctxt "scene-settings.resolution4kVertical"
+msgid "4K Vertical (2160x3840)"
+msgstr "4K stående (2160x3840)"
+
+msgctxt "scene-settings.resolution720p"
+msgid "720p (1280x720)"
+msgstr "720p (1280x720)"
+
+msgctxt "scene-settings.resolutionMismatch"
+msgid "Overlay and video resolutions do not match"
+msgstr "Överlägg och video har olika upplösning"
+
+msgctxt "scene-settings.resolutionQxga"
+msgid "QXGA (2048x1536)"
+msgstr "QXGA (2048x1536)"
+
+msgctxt "scene-settings.resolutionSxga"
+msgid "SXGA+ (1400x1050)"
+msgstr "SXGA+ (1400x1050)"
+
+msgctxt "scene-settings.resolutionUltrawide"
+msgid "Ultrawide (3440x1440)"
+msgstr "Ultrabrett (3440x1440)"
+
+msgctxt "scene-settings.resolutionUxga"
+msgid "UXGA (1600x1200)"
+msgstr "UXGA (1600x1200)"
+
+msgctxt "scene-settings.resolutionXga"
+msgid "XGA (1920x1440)"
+msgstr "XGA (1920x1440)"
+
+msgctxt "scene-settings.scale"
+msgid "Scale"
+msgstr "Skala"
+
+msgctxt "scene-settings.shadowDistance"
+msgid "Shadow Distance"
+msgstr "Skuggavstånd"
+
+msgctxt "scene-settings.shadowStrength"
+msgid "Shadow Strength"
+msgstr "Skuggstyrka"
+
+msgctxt "scene-settings.shadows"
+msgid "Shadows"
+msgstr "Skuggor"
+
+msgctxt "scene-settings.square"
+msgid "Square (1:1)"
+msgstr "Kvadrat (1:1)"
+
+msgctxt "scene-settings.transparency"
+msgid "Transparency"
+msgstr "Transparens"
+
+msgctxt "scene-settings.ultrawide"
+msgid "Ultrawide (21:9)"
+msgstr "Ultrabrett (21:9)"
+
+msgctxt "scene-settings.units"
+msgid "Units"
+msgstr "Enheter"
+
+msgctxt "scene-settings.values"
+msgid "Values"
+msgstr "Värden"
+
+msgctxt "scene-settings.vertical"
+msgid "Vertical (9:16)"
+msgstr "Stående (9:16)"
+
+msgctxt "scene-settings.widescreen"
+msgid "Widescreen (16:9)"
+msgstr "Bredbild (16:9)"
+
+msgctxt "scene-settings.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "Uppdateringsfrekvens för widgetar"
+
+msgctxt "scene-settings.width"
+msgid "Width"
+msgstr "Bredd"
+
+msgctxt "store.couldNotDetermineVideoCreationTime"
+msgid "Could not determine video creation time"
+msgstr "Videons skapandetid kunde inte fastställas"
+
+msgctxt "store.invalidTimestampFormats"
+msgid "Invalid timestamp formats"
+msgstr "Ogiltiga tidsstämpelformat"
+
+msgctxt "store.timezoneIsRequiredForVideoSync"
+msgid "timezone is required for video sync"
+msgstr "Tidszon krävs för videosynkronisering"
+
+msgctxt "template-manager.cancel"
+msgid "Cancel"
+msgstr "Avbryt"
+
+msgctxt "template-manager.createNewTemplate"
+msgid "Create New Template"
+msgstr "Skapa ny mall"
+
+msgctxt "template-manager.newTemplate"
+msgid "New Template"
+msgstr "Ny mall"
+
+msgctxt "template-manager.save"
+msgid "Save"
+msgstr "Spara"
+
+msgctxt "template-manager.unsavedChanges"
+msgid "Your template has unsaved changes. Save them or discard them."
+msgstr "Mallen innehåller osparade ändringar. Spara dem eller kasta dem."
+
+msgctxt "toolbar.activity"
+msgid "Activity"
+msgstr "Aktivitet"
+
+msgctxt "toolbar.activityType"
+msgid "Activity type"
+msgstr "Aktivitetstyp"
+
+msgctxt "toolbar.applyTimezone"
+msgid "Apply Timezone"
+msgstr "Tillämpa tidszon"
+
+msgctxt "toolbar.autosync"
+msgid "Auto-sync"
+msgstr "Autosynkronisera"
+
+msgctxt "toolbar.bitRate"
+msgid "Bit rate"
+msgstr "Bithastighet"
+
+msgctxt "toolbar.calculated"
+msgid "Calculated"
+msgstr "Beräknad"
+
+msgctxt "toolbar.camera"
+msgid "Camera"
+msgstr "Kamera"
+
+msgctxt "toolbar.codec"
+msgid "Codec"
+msgstr "Kodek"
+
+msgctxt "toolbar.createdAt"
+msgid "Created at"
+msgstr "Skapad"
+
+msgctxt "toolbar.creationTime"
+msgid "Creation Time"
+msgstr "Skapandetid"
+
+msgctxt "toolbar.deleteActivity"
+msgid "Delete activity"
+msgstr "Ta bort aktivitet"
+
+msgctxt "toolbar.details"
+msgid "Details"
+msgstr "Detaljer"
+
+msgctxt "toolbar.detected"
+msgid "Detected"
+msgstr "Upptäckt"
+
+msgctxt "toolbar.detectedLaps"
+msgid "Detected laps"
+msgstr "Upptäckta varv"
+
+msgctxt "toolbar.distance"
+msgid "Distance"
+msgstr "Avstånd"
+
+msgctxt "toolbar.dropActivityFile"
+msgid "Drop activity file"
+msgstr "Släpp aktivitetsfil"
+
+msgctxt "toolbar.dropVideoFile"
+msgid "Drop video files"
+msgstr "Släpp videofil"
+
+msgctxt "toolbar.duration"
+msgid "Duration"
+msgstr "Varaktighet"
+
+msgctxt "toolbar.extracted"
+msgid "Extracted"
+msgstr "Extraherad"
+
+msgctxt "toolbar.filename"
+msgid "Filename"
+msgstr "Filnamn"
+
+msgctxt "toolbar.frameRate"
+msgid "Frame rate"
+msgstr "Bildfrekvens"
+
+msgctxt "toolbar.lapDuration"
+msgid "Duration"
+msgstr "Varaktighet"
+
+msgctxt "toolbar.lapNumber"
+msgid "Lap"
+msgstr "Varv"
+
+msgctxt "toolbar.lapStart"
+msgid "Start"
+msgstr "Start"
+
+msgctxt "toolbar.loadActivity"
+msgid "Load activity"
+msgstr "Läs in aktivitet"
+
+msgctxt "toolbar.loadVideo"
+msgid "Load videos"
+msgstr "Läs in video"
+
+msgctxt "toolbar.newProject"
+msgid "New Project"
+msgstr "Nytt projekt"
+
+msgctxt "toolbar.noDataCalculated"
+msgid "No data were calculated"
+msgstr "Inga data beräknades"
+
+msgctxt "toolbar.noDataExtracted"
+msgid "No data were extracted"
+msgstr "Inga data extraherades"
+
+msgctxt "toolbar.openProject"
+msgid "Open Project"
+msgstr "Öppna projekt"
+
+msgctxt "toolbar.pinDrawer"
+msgid "Pin drawer"
+msgstr "Fäst panel"
+
+msgctxt "toolbar.projects"
+msgid "Projects"
+msgstr "Projekt"
+
+msgctxt "toolbar.resolution"
+msgid "Resolution"
+msgstr "Upplösning"
+
+msgctxt "toolbar.restoreDetectedVideoCreationTime"
+msgid "Restore detected video creation time"
+msgstr "Återställ identifierad videoskapandetid"
+
+msgctxt "toolbar.saveProject"
+msgid "Save Project"
+msgstr "Spara projekt"
+
+msgctxt "toolbar.saveProjectAs"
+msgid "Save Project As"
+msgstr "Spara projekt som"
+
+msgctxt "toolbar.showLap"
+msgid "Show lap {0}"
+msgstr "Visa varv {0}"
+
+msgctxt "toolbar.startTime"
+msgid "Start time"
+msgstr "Starttid"
+
+msgctxt "toolbar.syncOffset"
+msgid "Sync Offset"
+msgstr "Synkroniseringsförskjutning"
+
+msgctxt "toolbar.timeSource"
+msgid "Time source"
+msgstr "Tidskälla"
+
+msgctxt "toolbar.timeSourceFilename"
+msgid "Filename"
+msgstr "Filnamn"
+
+msgctxt "toolbar.timeSourceGps"
+msgid "GPS timestamp"
+msgstr "GPS-tidsstämpel"
+
+msgctxt "toolbar.timeSourceMetadata"
+msgid "Metadata"
+msgstr "Metadata"
+
+msgctxt "toolbar.timezone"
+msgid "Timezone"
+msgstr "Tidszon"
+
+msgctxt "toolbar.unknown"
+msgid "Unknown"
+msgstr "Okänd"
+
+msgctxt "toolbar.unknownTimeSource"
+msgid "Unknown ({{value}})"
+msgstr "Okänd tidskälla ({{value}})"
+
+msgctxt "toolbar.unpinDrawer"
+msgid "Unpin drawer"
+msgstr "Lossa panel"
+
+msgctxt "toolbar.valBitRate"
+msgid "{{val}} Mbps"
+msgstr "{{val}} Mbps"
+
+msgctxt "toolbar.valFps"
+msgid "{{val}} fps"
+msgstr "{{val}} fps"
+
+msgctxt "toolbar.valPoints"
+msgid "{{val}} points"
+msgstr "{{val}} punkter"
+
+msgctxt "toolbar.valResolution"
+msgid "{{width}}×{{height}}"
+msgstr "{{width}}×{{height}}"
+
+msgctxt "toolbar.video"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "toolbar.videoSync"
+msgid "Sync Doctor"
+msgstr "Videosynkronisering"
+
+msgctxt "toolbar.widgets"
+msgid "Widgets"
+msgstr "Widgetar"
+
+msgctxt "undo-redo.redoCtrlcmdshiftz"
+msgid "Redo"
+msgstr "Gör om"
+
+msgctxt "undo-redo.undoCtrlcmdz"
+msgid "Undo"
+msgstr "Ångra"
+
+msgctxt "video-preview.gpuRequired"
+msgid "Video playback requires at least an integrated GPU."
+msgstr "Videouppspelning kräver minst en integrerad GPU."
+
+msgctxt "video-preview.theVideoPreviewCouldNotBeLoaded"
+msgid "The video preview could not be loaded."
+msgstr "Videoförhandsvisningen kunde inte läsas in."
+
+msgctxt "video-preview.videoOrImage"
+msgid "Video or Image"
+msgstr "Video eller bild"
+
+msgctxt "videoSync.activityRequiredForSync"
+msgid "Activity telemetry is required for Landmark Sync"
+msgstr "Aktivitetsdata krävs för synkronisering med riktmärken"
+
+msgctxt "videoSync.applyCandidate"
+msgid "Apply offset {0} seconds"
+msgstr "Tillämpa förskjutning {0} s"
+
+msgctxt "videoSync.autodetect"
+msgid "Autodetect"
+msgstr "Auto"
+
+msgctxt "videoSync.candidates"
+msgid "Sync candidates"
+msgstr "Synkroniseringsförslag"
+
+msgctxt "videoSync.changeLandmarkType"
+msgid "Change {0} landmark type"
+msgstr "Ändra typ av riktmärke: {0}"
+
+msgctxt "videoSync.clearLandmarks"
+msgid "Clear"
+msgstr "Rensa"
+
+msgctxt "videoSync.deleteLandmark"
+msgid "Delete {0} landmark"
+msgstr "Ta bort riktmärke: {0}"
+
+msgctxt "videoSync.detectedEvent"
+msgid "detected {{label}}"
+msgstr "Identifiering: {{label}}"
+
+msgctxt "videoSync.detectedEventRange"
+msgid "{{label}} event from {{start}} to {{end}} seconds"
+msgstr "Händelse ”{{label}}”: {{start}}–{{end}} s"
+
+msgctxt "videoSync.detectedEvents"
+msgid "Detected events"
+msgstr "Händelser"
+
+msgctxt "videoSync.detection"
+msgid "Sensitivity & Detection"
+msgstr "Känslighet och identifiering"
+
+msgctxt "videoSync.landmarkAriaLabel"
+msgid "{0} landmark at {1} seconds"
+msgstr "Riktmärke ”{0}” — {1} s"
+
+msgctxt "videoSync.landmarkLimit"
+msgid "The maximum of five landmarks has been reached"
+msgstr "Maxgränsen på fem riktmärken har nåtts"
+
+msgctxt "videoSync.landmarksMatched"
+msgid "{{matched}} / {{eligible}} landmarks matched"
+msgstr "Matchningar: {{matched}} / {{eligible}}"
+
+msgctxt "videoSync.leftTurn"
+msgid "Left Turn"
+msgstr "Vänstersväng"
+
+msgctxt "videoSync.leftTurns"
+msgid "Left Turns"
+msgstr "Vänstersvängar"
+
+msgctxt "videoSync.location"
+msgid "Location"
+msgstr "Plats"
+
+msgctxt "videoSync.locationLimit"
+msgid "Only one location landmark is allowed"
+msgstr "Endast ett platsriktmärke tillåts"
+
+msgctxt "videoSync.locationOnly"
+msgid "Location only"
+msgstr "Endast plats"
+
+msgctxt "videoSync.locationSyncCandidates"
+msgid "Location Sync"
+msgstr "Platssynkronisering"
+
+msgctxt "videoSync.locations"
+msgid "Locations"
+msgstr "Platser"
+
+msgctxt "videoSync.manualSync"
+msgid "Manual Sync"
+msgstr "Manuell"
+
+msgctxt "videoSync.markControls"
+msgid "Video sync landmark controls"
+msgstr "Videomarkörer"
+
+msgctxt "videoSync.markLeftTurn"
+msgid "Mark Left Turn"
+msgstr "Markera vänstersväng"
+
+msgctxt "videoSync.markLocation"
+msgid "Mark Location"
+msgstr "Markera plats"
+
+msgctxt "videoSync.markRightTurn"
+msgid "Mark Right Turn"
+msgstr "Markera högersväng"
+
+msgctxt "videoSync.markStop"
+msgid "Mark Stop"
+msgstr "Markera stopp"
+
+msgctxt "videoSync.minimumLandmarksForSync"
+msgid "At least two landmarks are required"
+msgstr "Minst två riktmärken krävs"
+
+msgctxt "videoSync.noCandidate"
+msgid "No candidate aligns at least two landmarks"
+msgstr "Inget förslag matchar minst två riktmärken"
+
+msgctxt "videoSync.noLandmarks"
+msgid "No landmarks marked yet."
+msgstr "Inga riktmärken har markerats ännu."
+
+msgctxt "videoSync.openManualSync"
+msgid "Open Manual Sync"
+msgstr "Manuell sync"
+
+msgctxt "videoSync.playheadInsideVideo"
+msgid "Move the playhead inside the video to mark a landmark"
+msgstr "Flytta uppspelningshuvudet in i videon för att markera ett riktmärke"
+
+msgctxt "videoSync.rightTurn"
+msgid "Right Turn"
+msgstr "Högersväng"
+
+msgctxt "videoSync.rightTurns"
+msgid "Right Turns"
+msgstr "Högersvängar"
+
+msgctxt "videoSync.setLocationInMap"
+msgid "Set location"
+msgstr "Ange plats"
+
+msgctxt "videoSync.speed"
+msgid "Speed"
+msgstr "Fart"
+
+msgctxt "videoSync.speedSensitivity"
+msgid "Speed"
+msgstr "Fart"
+
+msgctxt "videoSync.staleCandidates"
+msgid "Landmarks changed. Rerun the Sync again"
+msgstr "Riktmärkena har ändrats. Kör synkroniseringen igen"
+
+msgctxt "videoSync.stop"
+msgid "Stop"
+msgstr "Stopp"
+
+msgctxt "videoSync.stops"
+msgid "Stops"
+msgstr "Stopp"
+
+msgctxt "videoSync.syncCandidates"
+msgid "Sync Candidates"
+msgstr "Synkroniseringsförslag"
+
+msgctxt "videoSync.syncLandmarks"
+msgid "Sync All Landmarks"
+msgstr "Synka alla märken"
+
+msgctxt "videoSync.syncLocation"
+msgid "Match Location Only"
+msgstr "Matcha endast plats"
+
+msgctxt "videoSync.timelineGraph"
+msgid "Activity telemetry graph"
+msgstr "Diagram över aktivitetsdata"
+
+msgctxt "videoSync.turnSensitivity"
+msgid "Min turn"
+msgstr "Min. vinkel"
+
+msgctxt "videoSync.turning"
+msgid "Turning"
+msgstr "Svängar"
+
+msgctxt "videoSync.videoLandmarks"
+msgid "Video landmarks"
+msgstr "Videoriktmärken"
+
+msgctxt "videoSync.videoRequired"
+msgid "A video is required to mark a landmark"
+msgstr "En video krävs för att markera ett riktmärke"
+
+msgctxt "videoSync.videoRequiredForSync"
+msgid "A video is required for Landmark Sync"
+msgstr "En video krävs för att synkronisera riktmärken"
+
+msgctxt "videoSync.yourLandmarks"
+msgid "Video Landmarks"
+msgstr "Dina videoriktmärken"
+
+msgctxt "widget-editor.activityStart"
+msgid "Activity"
+msgstr "aktiviteten"
+
+msgctxt "widget-editor.addMetric"
+msgid "Add metric"
+msgstr "Lägg till mätvärde"
+
+msgctxt "widget-editor.alignment"
+msgid "Alignment"
+msgstr "Justering"
+
+msgctxt "widget-editor.alignmentBelow"
+msgid "Top"
+msgstr "Topp"
+
+msgctxt "widget-editor.alignmentCentered"
+msgid "Centered"
+msgstr "Centrerad"
+
+msgctxt "widget-editor.altitudeAtStart"
+msgid "Altitude at start"
+msgstr "Höjd vid start"
+
+msgctxt "widget-editor.angleTrack"
+msgid "Angle Track"
+msgstr "Vinkelspår"
+
+msgctxt "widget-editor.arcAngle"
+msgid "Arc Angle"
+msgstr "Bågvinkel"
+
+msgctxt "widget-editor.arcTrack"
+msgid "Arc Track"
+msgstr "Bågspår"
+
+msgctxt "widget-editor.areaGradient"
+msgid "Gradient"
+msgstr "Toning"
+
+msgctxt "widget-editor.areaOpacity"
+msgid "Area Opacity"
+msgstr "Ytopacitet"
+
+msgctxt "widget-editor.areaStyling"
+msgid "Area Styling"
+msgstr "Områdesstil"
+
+msgctxt "widget-editor.axisMapping"
+msgid "Axis Mapping"
+msgstr "Axelmappning"
+
+msgctxt "widget-editor.backdropStyle"
+msgid "Backdrop Style"
+msgstr "Bakgrundsstil"
+
+msgctxt "widget-editor.backgroundColor"
+msgid "Background"
+msgstr "Bakgrund"
+
+msgctxt "widget-editor.balanceFormat"
+msgid "Balance Format"
+msgstr "Balansformat"
+
+msgctxt "widget-editor.bar"
+msgid "Bar"
+msgstr "Stapel"
+
+msgctxt "widget-editor.barCount"
+msgid "Bar Count"
+msgstr "Antal staplar"
+
+msgctxt "widget-editor.barGap"
+msgid "Bar Gap"
+msgstr "Stapelmellanrum"
+
+msgctxt "widget-editor.barHeight"
+msgid "Bar Height"
+msgstr "Stapelhöjd"
+
+msgctxt "widget-editor.barWidth"
+msgid "Bar Width"
+msgstr "Stapelbredd"
+
+msgctxt "widget-editor.border"
+msgid "Border"
+msgstr "Kant"
+
+msgctxt "widget-editor.borderColor"
+msgid "Border Color"
+msgstr "Kantfärg"
+
+msgctxt "widget-editor.borderOpacity"
+msgid "Border Opacity"
+msgstr "Kantopacitet"
+
+msgctxt "widget-editor.borderThickness"
+msgid "Border Thickness"
+msgstr "Kanttjocklek"
+
+msgctxt "widget-editor.both"
+msgid "Both"
+msgstr "Båda"
+
+msgctxt "widget-editor.bottom"
+msgid "Bottom"
+msgstr "Nederst"
+
+msgctxt "widget-editor.bottomEdgeStrip"
+msgid "Bottom edge strip"
+msgstr "Kantremsa nederst"
+
+msgctxt "widget-editor.bottomLeft"
+msgid "Bottom Left"
+msgstr "Nederst vänster"
+
+msgctxt "widget-editor.bottomRight"
+msgid "Bottom Right"
+msgstr "Nederst höger"
+
+msgctxt "widget-editor.cameraMode"
+msgid "Camera Mode"
+msgstr "Kameraläge"
+
+msgctxt "widget-editor.cardinalColor"
+msgid "Cardinal Color"
+msgstr "Väderstrecksfärg"
+
+msgctxt "widget-editor.cardinalLabels"
+msgid "Cardinal Labels"
+msgstr "Väderstreck"
+
+msgctxt "widget-editor.ceilingAreaColor"
+msgid "Area Color"
+msgstr "Fyllningsfärg"
+
+msgctxt "widget-editor.ceilingAreaOpacity"
+msgid "Area Opacity"
+msgstr "Fyllningsopacitet"
+
+msgctxt "widget-editor.ceilingLineColor"
+msgid "Line Color"
+msgstr "Linjefärg"
+
+msgctxt "widget-editor.ceilingLineOpacity"
+msgid "Line Opacity"
+msgstr "Linjeopacitet"
+
+msgctxt "widget-editor.chartMetric"
+msgid "Metric"
+msgstr "Mätvärde"
+
+msgctxt "widget-editor.chartMetrics"
+msgid "Metrics"
+msgstr "Mätvärden"
+
+msgctxt "widget-editor.chaseCamera"
+msgid "Chase Camera"
+msgstr "Följekamera"
+
+msgctxt "widget-editor.climbColor"
+msgid "Climb"
+msgstr "Stigning"
+
+msgctxt "widget-editor.color"
+msgid "Color"
+msgstr "Färg"
+
+msgctxt "widget-editor.colorNegative"
+msgid "Color Negative"
+msgstr "Negativ färg"
+
+msgctxt "widget-editor.colorPositive"
+msgid "Color Positive"
+msgstr "Positiv färg"
+
+msgctxt "widget-editor.compass"
+msgid "Compass"
+msgstr "Kompass"
+
+msgctxt "widget-editor.compassDial"
+msgid "Dial"
+msgstr "Urtavla"
+
+msgctxt "widget-editor.concentricRing"
+msgid "Concentric Ring"
+msgstr "Koncentrisk ring"
+
+msgctxt "widget-editor.continuousFill"
+msgid "Continuous Fill"
+msgstr "Löpande fyllning"
+
+msgctxt "widget-editor.coordinateFormatDdm"
+msgid "Deg / Dec Min"
+msgstr "Grad/decimalminut"
+
+msgctxt "widget-editor.coordinateFormatDms"
+msgid "Deg / Min / Sec"
+msgstr "Grad/minut/sekund"
+
+msgctxt "widget-editor.coordinates"
+msgid "Coordinates"
+msgstr "Koordinater"
+
+msgctxt "widget-editor.cornerOrientation"
+msgid "Corner Orientation"
+msgstr "Hörnorientering"
+
+msgctxt "widget-editor.cornerRadius"
+msgid "Corner Radius"
+msgstr "Hörnradie"
+
+msgctxt "widget-editor.cornerTrack"
+msgid "Corner Track"
+msgstr "Hörnspår"
+
+msgctxt "widget-editor.cornersAndEdges"
+msgid "Corners & edges"
+msgstr "Hörn & kanter"
+
+msgctxt "widget-editor.dateFormatDdMmYyyy"
+msgid "Date only (DD-MM-YYYY)"
+msgstr "Endast datum (DD-MM-ÅÅÅÅ)"
+
+msgctxt "widget-editor.dateFormatDdMmmYyyy"
+msgid "Date only (DD MMM YYYY)"
+msgstr "Endast datum (DD MMM ÅÅÅÅ)"
+
+msgctxt "widget-editor.dateFormatDdMmmmYyyy"
+msgid "Date only (DD MMMM YYYY)"
+msgstr "Endast datum (DD MMMM ÅÅÅÅ)"
+
+msgctxt "widget-editor.dateFormatMmDdYyyy"
+msgid "Date only (MM-DD-YYYY)"
+msgstr "Endast datum (MM-DD-ÅÅÅÅ)"
+
+msgctxt "widget-editor.dateFormatMmmDdYyyy"
+msgid "Date only (MMM DD YYYY)"
+msgstr "Endast datum (MMM DD ÅÅÅÅ)"
+
+msgctxt "widget-editor.dateFormatMmmmDdYyyy"
+msgid "Date only (MMMM DD YYYY)"
+msgstr "Endast datum (MMMM DD ÅÅÅÅ)"
+
+msgctxt "widget-editor.dateFormatYyyyMmDd"
+msgid "Date only (YYYY-MM-DD)"
+msgstr "Endast datum (ÅÅÅÅ-MM-DD)"
+
+msgctxt "widget-editor.dateTimeFormat12h"
+msgid "Date + time (12h)"
+msgstr "Datum + tid (12h)"
+
+msgctxt "widget-editor.dateTimeFormat12hWithSeconds"
+msgid "Date + time (12h with seconds)"
+msgstr "Datum + tid (12h med sekunder)"
+
+msgctxt "widget-editor.dateTimeFormat24h"
+msgid "Date + time (24h)"
+msgstr "Datum + tid (24h)"
+
+msgctxt "widget-editor.dateTimeFormat24hWithSeconds"
+msgid "Date + time (24h with seconds)"
+msgstr "Datum + tid (24h med sekunder)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm12h"
+msgid "Date + time (DD MMM, 12h)"
+msgstr "Datum + tid (DD MMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm24h"
+msgid "Date + time (DD MMM, 24h)"
+msgstr "Datum + tid (DD MMM, 24h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm12h"
+msgid "Date + time (DD MMMM, 12h)"
+msgstr "Datum + tid (DD MMMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm24h"
+msgid "Date + time (DD MMMM, 24h)"
+msgstr "Datum + tid (DD MMMM, 24h)"
+
+msgctxt "widget-editor.daytime"
+msgid "Time of day"
+msgstr "Tid på dagen"
+
+msgctxt "widget-editor.decimal"
+msgid "Decimal"
+msgstr "Decimal"
+
+msgctxt "widget-editor.decimals"
+msgid "Decimals"
+msgstr "Decimaler"
+
+msgctxt "widget-editor.decompressionCeiling"
+msgid "Decompression Ceiling"
+msgstr "Dekompressionstak"
+
+msgctxt "widget-editor.descentColor"
+msgid "Descent"
+msgstr "Sjunkning"
+
+msgctxt "widget-editor.diameter"
+msgid "Diameter"
+msgstr "Diameter"
+
+msgctxt "widget-editor.displayType"
+msgid "Display Type"
+msgstr "Visningstyp"
+
+msgctxt "widget-editor.elapsedFrom"
+msgid "Since the Start of"
+msgstr "Sedan starten av"
+
+msgctxt "widget-editor.elapsedTime"
+msgid "Elapsed Time"
+msgstr "Förfluten tid"
+
+msgctxt "widget-editor.elevationAtStart"
+msgid "Elevation at start"
+msgstr "Höjd vid start"
+
+msgctxt "widget-editor.emptyColor"
+msgid "Empty Color"
+msgstr "Tom färg"
+
+msgctxt "widget-editor.emptyOpacity"
+msgid "Empty Opacity"
+msgstr "Tom opacitet"
+
+msgctxt "widget-editor.exportStart"
+msgid "Export"
+msgstr "exporten"
+
+msgctxt "widget-editor.fill"
+msgid "Fill"
+msgstr "Fyllning"
+
+msgctxt "widget-editor.fillColor"
+msgid "Fill Color"
+msgstr "Fyllningsfärg"
+
+msgctxt "widget-editor.fillGradient"
+msgid "Gradient"
+msgstr "Toning"
+
+msgctxt "widget-editor.fillOpacity"
+msgid "Fill Opacity"
+msgstr "Fyllnadsopacitet"
+
+msgctxt "widget-editor.filledColor"
+msgid "Filled Color"
+msgstr "Fylld färg"
+
+msgctxt "widget-editor.filledOpacity"
+msgid "Filled Opacity"
+msgstr "Fylld opacitet"
+
+msgctxt "widget-editor.finishedColor"
+msgid "Finished Color"
+msgstr "Färdig färg"
+
+msgctxt "widget-editor.finishedOpacity"
+msgid "Finished Opacity"
+msgstr "Färdig opacitet"
+
+msgctxt "widget-editor.flatTrack"
+msgid "Flat Track"
+msgstr "Platt spår"
+
+msgctxt "widget-editor.font"
+msgid "Font"
+msgstr "Typsnitt"
+
+msgctxt "widget-editor.fontColor"
+msgid "Font Color"
+msgstr "Teckenfärg"
+
+msgctxt "widget-editor.fontFamily"
+msgid "Font Family"
+msgstr "Teckensnitt"
+
+msgctxt "widget-editor.fontSize"
+msgid "Font Size"
+msgstr "Teckenstorlek"
+
+msgctxt "widget-editor.fontWeight"
+msgid "Weight"
+msgstr "Vikt"
+
+msgctxt "widget-editor.format"
+msgid "Format"
+msgstr "Format"
+
+msgctxt "widget-editor.gaugeTrack"
+msgid "Gauge Track"
+msgstr "Mätarspår"
+
+msgctxt "widget-editor.general"
+msgid "General"
+msgstr "Allmänt"
+
+msgctxt "widget-editor.gforcePlot"
+msgid "G-Force Plot"
+msgstr "G-kraftsdiagram"
+
+msgctxt "widget-editor.glow"
+msgid "Glow"
+msgstr "Glöd"
+
+msgctxt "widget-editor.haloDiameter"
+msgid "Halo Diameter"
+msgstr "Halodiameter"
+
+msgctxt "widget-editor.headingValue"
+msgid "Value"
+msgstr "Värde"
+
+msgctxt "widget-editor.heartZones"
+msgid "Zones"
+msgstr "Zoner"
+
+msgctxt "widget-editor.height"
+msgid "Height"
+msgstr "Höjd"
+
+msgctxt "widget-editor.horizontal"
+msgid "Horizontal"
+msgstr "Horisontell"
+
+msgctxt "widget-editor.horizontalOffset"
+msgid "Horizontal Offset"
+msgstr "Sidoförskjutning"
+
+msgctxt "widget-editor.horizontalPosition"
+msgid "Horizontal Position"
+msgstr "Sidoposition"
+
+msgctxt "widget-editor.hundredths"
+msgid "Hundredths"
+msgstr "Hundradelssekunder"
+
+msgctxt "widget-editor.icon"
+msgid "Icon"
+msgstr "Ikon"
+
+msgctxt "widget-editor.imperialLabel"
+msgid "Imperial Label"
+msgstr "Imperial etikett"
+
+msgctxt "widget-editor.imperialOffsetX"
+msgid "Imperial Offset X"
+msgstr "Imperial X-flytt"
+
+msgctxt "widget-editor.imperialOffsetY"
+msgid "Imperial Offset Y"
+msgstr "Imperial Y-flytt"
+
+msgctxt "widget-editor.indicator"
+msgid "Indicator"
+msgstr "Indikator"
+
+msgctxt "widget-editor.indicatorArrow"
+msgid "Arrow"
+msgstr "Pil"
+
+msgctxt "widget-editor.indicatorColor"
+msgid "Indicator Color"
+msgstr "Indikatorfärg"
+
+msgctxt "widget-editor.indicatorLine"
+msgid "Line"
+msgstr "Linje"
+
+msgctxt "widget-editor.indicatorSize"
+msgid "Indicator Size"
+msgstr "Indikatorstorlek"
+
+msgctxt "widget-editor.indicatorStyleChevron"
+msgid "Chevron"
+msgstr "Vinkelpil"
+
+msgctxt "widget-editor.indicatorStyleHighlightBar"
+msgid "Highlight Bar"
+msgstr "Markeringsfält"
+
+msgctxt "widget-editor.invertSign"
+msgid "Invert sign"
+msgstr "Invertera tecken"
+
+msgctxt "widget-editor.italic"
+msgid "Italic"
+msgstr "Kursiv"
+
+msgctxt "widget-editor.label"
+msgid "Label"
+msgstr "Etikett"
+
+msgctxt "widget-editor.labelAxis"
+msgid "{{label}} axis"
+msgstr "{{label}}-axel"
+
+msgctxt "widget-editor.labelColor"
+msgid "Label Color"
+msgstr "Etikettfärg"
+
+msgctxt "widget-editor.labelFont"
+msgid "Label Font"
+msgstr "Etikettteckensnitt"
+
+msgctxt "widget-editor.labelFontSize"
+msgid "Label Font Size"
+msgstr "Etikettens storlek"
+
+msgctxt "widget-editor.labelSize"
+msgid "Label Size"
+msgstr "Etikettstorlek"
+
+msgctxt "widget-editor.labels"
+msgid "Labels"
+msgstr "Etiketter"
+
+msgctxt "widget-editor.latitude"
+msgid "Latitude"
+msgstr "Latitud"
+
+msgctxt "widget-editor.left"
+msgid "Left"
+msgstr "Vänster"
+
+msgctxt "widget-editor.leftEdgeStrip"
+msgid "Left edge strip"
+msgstr "Kantremsa vänster"
+
+msgctxt "widget-editor.legend"
+msgid "Legend"
+msgstr "Förklaring"
+
+msgctxt "widget-editor.letterSpacing"
+msgid "Spacing"
+msgstr "Avstånd"
+
+msgctxt "widget-editor.lineStyling"
+msgid "Line Styling"
+msgstr "Linjestil"
+
+msgctxt "widget-editor.liveValue"
+msgid "Value"
+msgstr "Värde"
+
+msgctxt "widget-editor.longitude"
+msgid "Longitude"
+msgstr "Longitud"
+
+msgctxt "widget-editor.lthr"
+msgid "Lactate Threshold HR"
+msgstr "Mjölksyratröskelpuls"
+
+msgctxt "widget-editor.majorInterval"
+msgid "Interval"
+msgstr "Intervall"
+
+msgctxt "widget-editor.majorLabels"
+msgid "Major Labels"
+msgstr "Huvudetiketter"
+
+msgctxt "widget-editor.majorLength"
+msgid "Major Length"
+msgstr "Huvudlängd"
+
+msgctxt "widget-editor.majorSpacing"
+msgid "Spacing"
+msgstr "Avstånd"
+
+msgctxt "widget-editor.majorThickness"
+msgid "Major Thickness"
+msgstr "Huvudtjocklek"
+
+msgctxt "widget-editor.majorTickColor"
+msgid "Major Color"
+msgstr "Huvudfärg"
+
+msgctxt "widget-editor.majorTicks"
+msgid "Major Ticks"
+msgstr "Huvudmarkeringar"
+
+msgctxt "widget-editor.mapBuildings"
+msgid "Buildings"
+msgstr "Byggnader"
+
+msgctxt "widget-editor.mapLabels"
+msgid "Labels"
+msgstr "Etiketter"
+
+msgctxt "widget-editor.mapLocalNames"
+msgid "Local Names"
+msgstr "Lokala namn"
+
+msgctxt "widget-editor.mapPaths"
+msgid "Paths"
+msgstr "Stigar"
+
+msgctxt "widget-editor.mapRotation"
+msgid "Map Rotation"
+msgstr "Kartrotation"
+
+msgctxt "widget-editor.mapStyle"
+msgid "Map Style"
+msgstr "Kartstil"
+
+msgctxt "widget-editor.mapView"
+msgid "Map View"
+msgstr "Kartvy"
+
+msgctxt "widget-editor.mapWebgl2Software"
+msgid "No GPU found. The map draws in software, so its preview and export may be slow."
+msgstr "Ingen GPU hittades. Kartan renderas i mjukvara, så förhandsvisning och export kan vara långsamma."
+
+msgctxt "widget-editor.mapWebgl2Unavailable"
+msgid "WebGL2 isn't available on this system, so the map can't be previewed."
+msgstr "WebGL2 är inte tillgängligt på det här systemet, så kartan kan inte förhandsvisas."
+
+msgctxt "widget-editor.marker"
+msgid "Marker"
+msgstr "Markör"
+
+msgctxt "widget-editor.markerArrow"
+msgid "Arrow"
+msgstr "Pil"
+
+msgctxt "widget-editor.markerColor"
+msgid "Marker Color"
+msgstr "Markörfärg"
+
+msgctxt "widget-editor.markerOpacity"
+msgid "Marker Opacity"
+msgstr "Marköropacitet"
+
+msgctxt "widget-editor.markerSize"
+msgid "Marker Size"
+msgstr "Markörstorlek"
+
+msgctxt "widget-editor.markerType"
+msgid "Marker Type"
+msgstr "Markörtyp"
+
+msgctxt "widget-editor.maxHeartrate"
+msgid "Max Heart Rate"
+msgstr "Maxpuls"
+
+msgctxt "widget-editor.maxSplits"
+msgid "Max Splits"
+msgstr "Max antal"
+
+msgctxt "widget-editor.metricLabel"
+msgid "Metric Label"
+msgstr "Metrisk etikett"
+
+msgctxt "widget-editor.metricOffsetX"
+msgid "Metric Offset X"
+msgstr "Metrisk X-flytt"
+
+msgctxt "widget-editor.metricOffsetY"
+msgid "Metric Offset Y"
+msgstr "Metrisk Y-flytt"
+
+msgctxt "widget-editor.minmaxLabels"
+msgid "Min/Max Labels"
+msgstr "Min/max-etiketter"
+
+msgctxt "widget-editor.minorLabels"
+msgid "Minor Labels"
+msgstr "Underetiketter"
+
+msgctxt "widget-editor.minorLength"
+msgid "Minor Length"
+msgstr "Underlängd"
+
+msgctxt "widget-editor.minorThickness"
+msgid "Minor Thickness"
+msgstr "Undertjocklek"
+
+msgctxt "widget-editor.minorTickColor"
+msgid "Minor Color"
+msgstr "Delfärg"
+
+msgctxt "widget-editor.minorTicks"
+msgid "Minor Ticks"
+msgstr "Undermarkeringar"
+
+msgctxt "widget-editor.moveDown"
+msgid "Move down"
+msgstr "Flytta ned"
+
+msgctxt "widget-editor.moveUp"
+msgid "Move up"
+msgstr "Flytta upp"
+
+msgctxt "widget-editor.msaa"
+msgid "Anti-aliasing (MSAA)"
+msgstr "Kantutjämning (MSAA)"
+
+msgctxt "widget-editor.msaaOff"
+msgid "Off"
+msgstr "Av"
+
+msgctxt "widget-editor.negativeDeltaColor"
+msgid "Negative Delta Color"
+msgstr "Negativ deltafärg"
+
+msgctxt "widget-editor.noActiveWidgets"
+msgid "No active widgets"
+msgstr "Inga aktiva widgetar"
+
+msgctxt "widget-editor.northUp"
+msgid "North Up"
+msgstr "Norr uppåt"
+
+msgctxt "widget-editor.offset"
+msgid "Offset"
+msgstr "Förskjutning"
+
+msgctxt "widget-editor.opacity"
+msgid "Opacity"
+msgstr "Opacitet"
+
+msgctxt "widget-editor.orientation"
+msgid "Orientation"
+msgstr "Orientering"
+
+msgctxt "widget-editor.percentColor"
+msgid "Percent Color"
+msgstr "Procentfärg"
+
+msgctxt "widget-editor.pitch"
+msgid "Pitch"
+msgstr "Lutning"
+
+msgctxt "widget-editor.pixelsPerDegree"
+msgid "Pixels per Degree"
+msgstr "Pixlar per grad"
+
+msgctxt "widget-editor.placement"
+msgid "Placement"
+msgstr "Placering"
+
+msgctxt "widget-editor.position"
+msgid "Position"
+msgstr "Position"
+
+msgctxt "widget-editor.positiveDeltaColor"
+msgid "Positive Delta Color"
+msgstr "Positiv deltafärg"
+
+msgctxt "widget-editor.profileDetail"
+msgid "Profile Detail"
+msgstr "Profilnivå"
+
+msgctxt "widget-editor.readout"
+msgid "Readout"
+msgstr "Avläsning"
+
+msgctxt "widget-editor.remainingColor"
+msgid "Remaining Color"
+msgstr "Återstående färg"
+
+msgctxt "widget-editor.remainingOpacity"
+msgid "Remaining Opacity"
+msgstr "Restopacitet"
+
+msgctxt "widget-editor.removeMetric"
+msgid "Remove metric"
+msgstr "Ta bort mätvärde"
+
+msgctxt "widget-editor.renumberLaps"
+msgid "Renumber laps"
+msgstr "Numrera om varv"
+
+msgctxt "widget-editor.resetField"
+msgid "Reset field"
+msgstr "Återställ fält"
+
+msgctxt "widget-editor.resetLabel"
+msgid "Reset {0}"
+msgstr "Återställ {0}"
+
+msgctxt "widget-editor.riderUp"
+msgid "Rider Up"
+msgstr "Färdriktning uppåt"
+
+msgctxt "widget-editor.right"
+msgid "Right"
+msgstr "Höger"
+
+msgctxt "widget-editor.rightEdgeStrip"
+msgid "Right edge strip"
+msgstr "Kantremsa höger"
+
+msgctxt "widget-editor.ringDiameter"
+msgid "Ring Diameter"
+msgstr "Ringdiameter"
+
+msgctxt "widget-editor.rotation"
+msgid "Rotation"
+msgstr "Rotation"
+
+msgctxt "widget-editor.rotationMode"
+msgid "Rotation Mode"
+msgstr "Rotationsläge"
+
+msgctxt "widget-editor.roundBottomLeftCorner"
+msgid "Round bottom left corner"
+msgstr "Runda vänsterhörn"
+
+msgctxt "widget-editor.roundBottomRightCorner"
+msgid "Round bottom right corner"
+msgstr "Runda högerhörn"
+
+msgctxt "widget-editor.roundTopLeftCorner"
+msgid "Round top left corner"
+msgstr "Runda övre vänster"
+
+msgctxt "widget-editor.roundTopRightCorner"
+msgid "Round top right corner"
+msgstr "Runda övre höger"
+
+msgctxt "widget-editor.routeDetail"
+msgid "Route Detail"
+msgstr "Ruttinformation"
+
+msgctxt "widget-editor.rowGap"
+msgid "Row Gap"
+msgstr "Radavstånd"
+
+msgctxt "widget-editor.segmentedBars"
+msgid "Segmented Bars"
+msgstr "Segmentstaplar"
+
+msgctxt "widget-editor.shape"
+msgid "Shape"
+msgstr "Form"
+
+msgctxt "widget-editor.showFullActivity"
+msgid "Show Full Activity"
+msgstr "Hela aktiviteten"
+
+msgctxt "widget-editor.showFullAscent"
+msgid "Show Full Ascent"
+msgstr "Total stigning"
+
+msgctxt "widget-editor.showFullDistance"
+msgid "Show Full Distance"
+msgstr "Total distans"
+
+msgctxt "widget-editor.showIndicator"
+msgid "Show Indicator"
+msgstr "Visa indikator"
+
+msgctxt "widget-editor.showLabels"
+msgid "Show Labels"
+msgstr "Visa etiketter"
+
+msgctxt "widget-editor.showSign"
+msgid "Show sign"
+msgstr "Visa tecken"
+
+msgctxt "widget-editor.showValue"
+msgid "Show Value"
+msgstr "Visa värde"
+
+msgctxt "widget-editor.singleCircle"
+msgid "Single Circle"
+msgstr "Enkel cirkel"
+
+msgctxt "widget-editor.size"
+msgid "Size"
+msgstr "Storlek"
+
+msgctxt "widget-editor.smoothing"
+msgid "Smoothing"
+msgstr "Utjämning"
+
+msgctxt "widget-editor.solidHalo"
+msgid "Solid Halo"
+msgstr "Tät halo"
+
+msgctxt "widget-editor.splitColumnBar"
+msgid "Bar"
+msgstr "Stapel"
+
+msgctxt "widget-editor.splitColumnPace"
+msgid "Pace"
+msgstr "Tempo"
+
+msgctxt "widget-editor.splitColumnSplit"
+msgid "Split"
+msgstr "Delsträcka"
+
+msgctxt "widget-editor.splitColumns"
+msgid "Columns"
+msgstr "Kolumner"
+
+msgctxt "widget-editor.splitLength"
+msgid "Split Length"
+msgstr "Delsträckans längd"
+
+msgctxt "widget-editor.splits"
+msgid "Splits"
+msgstr "Mellantider"
+
+msgctxt "widget-editor.stripColor"
+msgid "Strip Color"
+msgstr "Remsans färg"
+
+msgctxt "widget-editor.stripThickness"
+msgid "Strip Thickness"
+msgstr "Remsans tjocklek"
+
+msgctxt "widget-editor.style"
+msgid "Style"
+msgstr "Stil"
+
+msgctxt "widget-editor.tapeScale"
+msgid "Tape Scale"
+msgstr "Bandets skala"
+
+msgctxt "widget-editor.text"
+msgid "Text"
+msgstr "Text"
+
+msgctxt "widget-editor.thickness"
+msgid "Thickness"
+msgstr "Tjocklek"
+
+msgctxt "widget-editor.tickColor"
+msgid "Tick Color"
+msgstr "Streckfärg"
+
+msgctxt "widget-editor.tickLength"
+msgid "Tick Length"
+msgstr "Strecklängd"
+
+msgctxt "widget-editor.ticks"
+msgid "Ticks"
+msgstr "Skalstreck"
+
+msgctxt "widget-editor.timeFormat12h"
+msgid "Time only (12h)"
+msgstr "Endast tid (12h)"
+
+msgctxt "widget-editor.timeFormat12hWithSeconds"
+msgid "Time only (12h with seconds)"
+msgstr "Endast tid (12h med sekunder)"
+
+msgctxt "widget-editor.timeFormat24h"
+msgid "Time only (24h)"
+msgstr "Endast tid (24h)"
+
+msgctxt "widget-editor.timeFormat24hWithSeconds"
+msgid "Time only (24h with seconds)"
+msgstr "Endast tid (24h med sekunder)"
+
+msgctxt "widget-editor.timeMode"
+msgid "Time Mode"
+msgstr "Tidsläge"
+
+msgctxt "widget-editor.timeWindow"
+msgid "Time Window"
+msgstr "Tidsfönster"
+
+msgctxt "widget-editor.top"
+msgid "Top"
+msgstr "Topp"
+
+msgctxt "widget-editor.topDown"
+msgid "Top Down"
+msgstr "Ovanifrån"
+
+msgctxt "widget-editor.topEdgeStrip"
+msgid "Top edge strip"
+msgstr "Kantremsa överst"
+
+msgctxt "widget-editor.trackFill"
+msgid "Track Fill"
+msgstr "Spårfyllning"
+
+msgctxt "widget-editor.trackStyle"
+msgid "Track Style"
+msgstr "Spårstil"
+
+msgctxt "widget-editor.transparency"
+msgid "Transparency"
+msgstr "Transparens"
+
+msgctxt "widget-editor.trendSeconds"
+msgid "Trend"
+msgstr "Trend"
+
+msgctxt "widget-editor.typography"
+msgid "Typography"
+msgstr "Typografi"
+
+msgctxt "widget-editor.unit"
+msgid "Unit"
+msgstr "Enhet"
+
+msgctxt "widget-editor.unitColor"
+msgid "Unit Color"
+msgstr "Enhetsfärg"
+
+msgctxt "widget-editor.units"
+msgid "Units"
+msgstr "Enheter"
+
+msgctxt "widget-editor.valueColor"
+msgid "Value Color"
+msgstr "Värdefärg"
+
+msgctxt "widget-editor.valueOffset"
+msgid "Value Offset"
+msgstr "Värdeförskjutning"
+
+msgctxt "widget-editor.vertical"
+msgid "Vertical"
+msgstr "Vertikal"
+
+msgctxt "widget-editor.verticalOffset"
+msgid "Vertical Offset"
+msgstr "Höjdförskjutning"
+
+msgctxt "widget-editor.verticalPosition"
+msgid "Vertical Position"
+msgstr "Höjdposition"
+
+msgctxt "widget-editor.verticalScale"
+msgid "Vertical Scale"
+msgstr "Höjdskala"
+
+msgctxt "widget-editor.verticalSpeed"
+msgid "Vert. Speed"
+msgstr "Vert. hastighet"
+
+msgctxt "widget-editor.width"
+msgid "Width"
+msgstr "Bredd"
+
+msgctxt "widget-editor.zoneCalculation"
+msgid "Zone Calculation"
+msgstr "Zonberäkning"
+
+msgctxt "widget-editor.zoneCalculationLthr"
+msgid "Lactate Threshold HR"
+msgstr "Mjölksyratröskelpuls"
+
+msgctxt "widget-editor.zoneCalculationManual"
+msgid "Manual"
+msgstr "Manuell"
+
+msgctxt "widget-editor.zoneCalculationMaxHeartrate"
+msgid "Max Heart Rate"
+msgstr "Maxpuls"
+
+msgctxt "widget-editor.zoneFrom"
+msgid "From"
+msgstr "Från"
+
+msgctxt "widget-editor.zoneLabel"
+msgid "Zone Label"
+msgstr "Zonetikett"
+
+msgctxt "widget-editor.zoneTo"
+msgid "To"
+msgstr "Till"
+
+msgctxt "widget-editor.zoom"
+msgid "Zoom"
+msgstr "Zoom"
+
+msgctxt "widgets.activityAttributes.barometric_altitude"
+msgid "Barometric Altitude"
+msgstr "Barometrisk höjd"
+
+msgctxt "widgets.backdropTypes.circle"
+msgid "Circle"
+msgstr "Cirkel"
+
+msgctxt "widgets.backdropTypes.rectangle"
+msgid "Rectangle"
+msgstr "Rektangel"
+
+msgctxt "widgets.categories.camera"
+msgid "Camera"
+msgstr "Kamera"
+
+msgctxt "widgets.categories.cycling"
+msgid "Cycling"
+msgstr "Cykling"
+
+msgctxt "widgets.categories.general"
+msgid "General"
+msgstr "Allmänt"
+
+msgctxt "widgets.categories.motosports"
+msgid "Motorsports"
+msgstr "Motorsport"
+
+msgctxt "widgets.categories.other"
+msgid "Other"
+msgstr "Övrigt"
+
+msgctxt "widgets.categories.running"
+msgid "Running"
+msgstr "Löpning"
+
+msgctxt "widgets.categories.scuba_diving"
+msgid "Scuba Diving"
+msgstr "Sportdykning"
+
+msgctxt "widgets.displayTypes.altitudeTape"
+msgid "Altitude Tape"
+msgstr "Höjdband"
+
+msgctxt "widgets.displayTypes.arc"
+msgid "Arc Gauge"
+msgstr "Bågmätare"
+
+msgctxt "widgets.displayTypes.corner"
+msgid "Corner Gauge"
+msgstr "Hörnmätare"
+
+msgctxt "widgets.displayTypes.depthTape"
+msgid "Depth Tape"
+msgstr "Djupband"
+
+msgctxt "widgets.displayTypes.gForce"
+msgid "G-Force"
+msgstr "G-kraft"
+
+msgctxt "widgets.displayTypes.gtGauge"
+msgid "GT Gauge"
+msgstr "GT-mätare"
+
+msgctxt "widgets.displayTypes.headingCompass"
+msgid "Heading Compass"
+msgstr "Kurskompass"
+
+msgctxt "widgets.displayTypes.headingTape"
+msgid "Heading Tape"
+msgstr "Riktningsband"
+
+msgctxt "widgets.displayTypes.heartZones"
+msgid "Heart Zones"
+msgstr "Pulszoner"
+
+msgctxt "widgets.displayTypes.lapTimer"
+msgid "Lap Times"
+msgstr "Varvtider"
+
+msgctxt "widgets.displayTypes.leanAngle"
+msgid "Lean Angle"
+msgstr "Lutningsvinkel"
+
+msgctxt "widgets.displayTypes.linear"
+msgid "Linear Bar"
+msgstr "Linjär stapel"
+
+msgctxt "widgets.displayTypes.splitsRun"
+msgid "Splits"
+msgstr "Mellantider"
+
+msgctxt "widgets.displayTypes.text"
+msgid "Text"
+msgstr "Text"
+
+msgctxt "widgets.drawerGroups.map.mapTiles"
+msgid "Map Tiles"
+msgstr "Kartrutor"
+
+msgctxt "widgets.drawerGroups.map.route"
+msgid "Route"
+msgstr "Rutt"
+
+msgctxt "widgets.drawerGroups.map.route3d"
+msgid "3D Route"
+msgstr "3D-rutt"
+
+msgctxt "widgets.drawerGroups.map.shortName"
+msgid "Map"
+msgstr "Karta"
+
+msgctxt "widgets.lapTimerModes.bestLap"
+msgid "Best Lap"
+msgstr "Bästa varv"
+
+msgctxt "widgets.lapTimerModes.currentLap"
+msgid "Current Lap"
+msgstr "Aktuellt varv"
+
+msgctxt "widgets.lapTimerModes.delta"
+msgid "Delta"
+msgstr "Delta"
+
+msgctxt "widgets.lapTimerModes.lapLog"
+msgid "Lap Log"
+msgstr "Varvlogg"
+
+msgctxt "widgets.types.air_pressure.name"
+msgid "Air Pressure"
+msgstr "Lufttryck"
+
+msgctxt "widgets.types.air_pressure.shortName"
+msgid "Air Press."
+msgstr "Lufttryck"
+
+msgctxt "widgets.types.altitude.name"
+msgid "Altitude"
+msgstr "Höjd"
+
+msgctxt "widgets.types.altitude.shortName"
+msgid "Altitude"
+msgstr "Höjd"
+
+msgctxt "widgets.types.aperture.name"
+msgid "Aperture"
+msgstr "Bländare"
+
+msgctxt "widgets.types.aperture.shortName"
+msgid "Aperture"
+msgstr "Bländare"
+
+msgctxt "widgets.types.average_ppo2.name"
+msgid "Average ppO₂"
+msgstr "Genomsnittligt ppO₂"
+
+msgctxt "widgets.types.average_ppo2.shortName"
+msgid "ppO₂"
+msgstr "ppO₂"
+
+msgctxt "widgets.types.backdrop.name"
+msgid "Backdrop"
+msgstr "Bakgrund"
+
+msgctxt "widgets.types.backdrop.shortName"
+msgid "Backdrop"
+msgstr "Bakgrund"
+
+msgctxt "widgets.types.boost_pressure.name"
+msgid "Boost Pressure"
+msgstr "Laddtryck"
+
+msgctxt "widgets.types.boost_pressure.shortName"
+msgid "Boost"
+msgstr "Laddtryck"
+
+msgctxt "widgets.types.brake_position.name"
+msgid "Brake Position"
+msgstr "Bromsläge"
+
+msgctxt "widgets.types.brake_position.shortName"
+msgid "Brake"
+msgstr "Broms"
+
+msgctxt "widgets.types.cadence.name"
+msgid "Cadence"
+msgstr "Kadens"
+
+msgctxt "widgets.types.cadence.shortName"
+msgid "Cadence"
+msgstr "Kadens"
+
+msgctxt "widgets.types.calories.name"
+msgid "Calories"
+msgstr "Kalorier"
+
+msgctxt "widgets.types.calories.shortName"
+msgid "Calories"
+msgstr "Kalorier"
+
+msgctxt "widgets.types.color_temperature.name"
+msgid "Color Temperature"
+msgstr "Färgtemperatur"
+
+msgctxt "widgets.types.color_temperature.shortName"
+msgid "WB"
+msgstr "WB"
+
+msgctxt "widgets.types.coolant_temperature.name"
+msgid "Coolant Temperature"
+msgstr "Kylvätsketemperatur"
+
+msgctxt "widgets.types.coolant_temperature.shortName"
+msgid "Coolant"
+msgstr "Kylvätska"
+
+msgctxt "widgets.types.core_temperature.name"
+msgid "Core Temperature"
+msgstr "Kroppstemperatur"
+
+msgctxt "widgets.types.core_temperature.shortName"
+msgid "Core T."
+msgstr "Kroppstemp."
+
+msgctxt "widgets.types.course.name"
+msgid "Route Map"
+msgstr "Ruttkarta"
+
+msgctxt "widgets.types.course.shortName"
+msgid "Map"
+msgstr "Karta"
+
+msgctxt "widgets.types.depth.name"
+msgid "Depth"
+msgstr "Djup"
+
+msgctxt "widgets.types.depth.shortName"
+msgid "Depth"
+msgstr "Djup"
+
+msgctxt "widgets.types.distance.name"
+msgid "Distance"
+msgstr "Avstånd"
+
+msgctxt "widgets.types.distance.shortName"
+msgid "Dist."
+msgstr "Avst."
+
+msgctxt "widgets.types.distance_to_home.name"
+msgid "Distance to Home"
+msgstr "Avstånd hem"
+
+msgctxt "widgets.types.distance_to_home.shortName"
+msgid "Home"
+msgstr "Hem"
+
+msgctxt "widgets.types.diving_profile.name"
+msgid "Diving Profile"
+msgstr "Dykprofil"
+
+msgctxt "widgets.types.diving_profile.shortName"
+msgid "Dive Profile"
+msgstr "Dykprofil"
+
+msgctxt "widgets.types.elevation.name"
+msgid "Elevation"
+msgstr "Höjdprofil"
+
+msgctxt "widgets.types.elevation.shortName"
+msgid "Elev."
+msgstr "Profil"
+
+msgctxt "widgets.types.engine_load.name"
+msgid "Engine Load"
+msgstr "Motorlast"
+
+msgctxt "widgets.types.engine_load.shortName"
+msgid "Eng. Load"
+msgstr "Motorlast"
+
+msgctxt "widgets.types.engine_power.name"
+msgid "Engine Power"
+msgstr "Motoreffekt"
+
+msgctxt "widgets.types.engine_power.shortName"
+msgid "Eng. Power"
+msgstr "Motoreffekt"
+
+msgctxt "widgets.types.ev.name"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.ev.shortName"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.first_stop_depth.name"
+msgid "First Stop Depth"
+msgstr "Första stoppets djup"
+
+msgctxt "widgets.types.first_stop_depth.shortName"
+msgid "Stop Depth"
+msgstr "Stoppdjup"
+
+msgctxt "widgets.types.first_stop_time.name"
+msgid "First Stop Time"
+msgstr "Första stoppets tid"
+
+msgctxt "widgets.types.first_stop_time.shortName"
+msgid "Stop Time"
+msgstr "Stopptid"
+
+msgctxt "widgets.types.focal_length.name"
+msgid "Focal Length"
+msgstr "Brännvidd"
+
+msgctxt "widgets.types.focal_length.shortName"
+msgid "Focal L."
+msgstr "Brännvidd"
+
+msgctxt "widgets.types.g_force.name"
+msgid "G-Force"
+msgstr "G-kraft"
+
+msgctxt "widgets.types.g_force.shortName"
+msgid "G-Force"
+msgstr "G-kraft"
+
+msgctxt "widgets.types.gas_mix.name"
+msgid "Gas Mix (O₂/He)"
+msgstr "Gasblandning (O₂/He)"
+
+msgctxt "widgets.types.gas_mix.shortName"
+msgid "O₂/He"
+msgstr "O₂/He"
+
+msgctxt "widgets.types.gear_position.name"
+msgid "Gear Position"
+msgstr "Växelläge"
+
+msgctxt "widgets.types.gear_position.shortName"
+msgid "Gear"
+msgstr "Växel"
+
+msgctxt "widgets.types.gps_coordinates.name"
+msgid "GPS Coordinates"
+msgstr "GPS-koordinater"
+
+msgctxt "widgets.types.gps_coordinates.shortName"
+msgid "Location"
+msgstr "Position"
+
+msgctxt "widgets.types.gradient.name"
+msgid "Gradient"
+msgstr "Lutning"
+
+msgctxt "widgets.types.gradient.shortName"
+msgid "Grad."
+msgstr "Lutning"
+
+msgctxt "widgets.types.ground_contact_time.name"
+msgid "Ground Contact Time"
+msgstr "Markkontakttid"
+
+msgctxt "widgets.types.ground_contact_time.shortName"
+msgid "GCT"
+msgstr "Markkontakt"
+
+msgctxt "widgets.types.heading.name"
+msgid "Heading"
+msgstr "Riktning"
+
+msgctxt "widgets.types.heading.shortName"
+msgid "Heading"
+msgstr "Riktning"
+
+msgctxt "widgets.types.heartrate.name"
+msgid "Heart Rate"
+msgstr "Puls"
+
+msgctxt "widgets.types.heartrate.shortName"
+msgid "HR"
+msgstr "Puls"
+
+msgctxt "widgets.types.iso.name"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.iso.shortName"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.label.name"
+msgid "Text"
+msgstr "Text"
+
+msgctxt "widgets.types.label.shortName"
+msgid "Text"
+msgstr "Text"
+
+msgctxt "widgets.types.lap_timer.name"
+msgid "Lap Timer"
+msgstr "Varvtimer"
+
+msgctxt "widgets.types.lap_timer.shortName"
+msgid "Lap Times"
+msgstr "Varvtider"
+
+msgctxt "widgets.types.lean_angle.name"
+msgid "Lean Angle"
+msgstr "Lutningsvinkel"
+
+msgctxt "widgets.types.lean_angle.shortName"
+msgid "Lean"
+msgstr "Lutning"
+
+msgctxt "widgets.types.left_right_balance.name"
+msgid "Left/Right Balance"
+msgstr "Vänster/höger-balans"
+
+msgctxt "widgets.types.left_right_balance.shortName"
+msgid "L/R Bal."
+msgstr "V/H-balans"
+
+msgctxt "widgets.types.map.name"
+msgid "Street Map"
+msgstr "Gatukarta"
+
+msgctxt "widgets.types.map.shortName"
+msgid "Streets"
+msgstr "Gator"
+
+msgctxt "widgets.types.pace.name"
+msgid "Pace"
+msgstr "Tempo"
+
+msgctxt "widgets.types.pace.shortName"
+msgid "Pace"
+msgstr "Tempo"
+
+msgctxt "widgets.types.power.name"
+msgid "Power"
+msgstr "Effekt"
+
+msgctxt "widgets.types.power.shortName"
+msgid "Power"
+msgstr "Effekt"
+
+msgctxt "widgets.types.raster.name"
+msgid "Image"
+msgstr "Bild"
+
+msgctxt "widgets.types.raster.shortName"
+msgid "Image"
+msgstr "Bild"
+
+msgctxt "widgets.types.rolling_chart.name"
+msgid "Charts"
+msgstr "Diagram"
+
+msgctxt "widgets.types.rolling_chart.shortName"
+msgid "Charts"
+msgstr "Diagram"
+
+msgctxt "widgets.types.rpm.name"
+msgid "RPM"
+msgstr "RPM"
+
+msgctxt "widgets.types.rpm.shortName"
+msgid "RPM"
+msgstr "RPM"
+
+msgctxt "widgets.types.shutter_speed.name"
+msgid "Shutter Speed"
+msgstr "Slutartid"
+
+msgctxt "widgets.types.shutter_speed.shortName"
+msgid "Shutter"
+msgstr "Slutare"
+
+msgctxt "widgets.types.speed.name"
+msgid "Speed"
+msgstr "Hastighet"
+
+msgctxt "widgets.types.speed.shortName"
+msgid "Speed"
+msgstr "Hastighet"
+
+msgctxt "widgets.types.splits_run.name"
+msgid "Running Splits"
+msgstr "Löpmellantider"
+
+msgctxt "widgets.types.splits_run.shortName"
+msgid "Splits"
+msgstr "Mellantider"
+
+msgctxt "widgets.types.stride_length.name"
+msgid "Stride Length"
+msgstr "Steglängd"
+
+msgctxt "widgets.types.stride_length.shortName"
+msgid "Stride"
+msgstr "Steg"
+
+msgctxt "widgets.types.stroke_rate.name"
+msgid "Stroke Rate"
+msgstr "Taktfrekvens"
+
+msgctxt "widgets.types.stroke_rate.shortName"
+msgid "S/R"
+msgstr "Takt"
+
+msgctxt "widgets.types.temperature.name"
+msgid "Temperature"
+msgstr "Temperatur"
+
+msgctxt "widgets.types.temperature.shortName"
+msgid "Temp."
+msgstr "Temperatur"
+
+msgctxt "widgets.types.throttle_position.name"
+msgid "Throttle Position"
+msgstr "Gasläge"
+
+msgctxt "widgets.types.throttle_position.shortName"
+msgid "Throttle"
+msgstr "Gas"
+
+msgctxt "widgets.types.time.name"
+msgid "Time"
+msgstr "Tid"
+
+msgctxt "widgets.types.time.shortName"
+msgid "Time"
+msgstr "Tid"
+
+msgctxt "widgets.types.time_to_surface.name"
+msgid "Time to Surface"
+msgstr "Tid till ytan"
+
+msgctxt "widgets.types.time_to_surface.shortName"
+msgid "TTS"
+msgstr "TTS"
+
+msgctxt "widgets.types.torque.name"
+msgid "Torque"
+msgstr "Vridmoment"
+
+msgctxt "widgets.types.torque.shortName"
+msgid "Torque"
+msgstr "Moment"
+
+msgctxt "widgets.types.total_ascent.name"
+msgid "Total Ascent"
+msgstr "Total stigning"
+
+msgctxt "widgets.types.total_ascent.shortName"
+msgid "Ascent"
+msgstr "Stigning"
+
+msgctxt "widgets.types.vertical_oscillation.name"
+msgid "Vertical Oscillation"
+msgstr "Vertikal oscillation"
+
+msgctxt "widgets.types.vertical_oscillation.shortName"
+msgid "V. Osc."
+msgstr "Vert. osc."
+
+msgctxt "widgets.types.vertical_ratio.name"
+msgid "Vertical Ratio"
+msgstr "Vertikalt förhållande"
+
+msgctxt "widgets.types.vertical_ratio.shortName"
+msgid "V. Ratio"
+msgstr "Vert. förh."
+
+msgctxt "widgets.types.vertical_speed.name"
+msgid "Vertical Speed"
+msgstr "Vertikal hastighet"
+
+msgctxt "widgets.types.vertical_speed.shortName"
+msgid "V. Speed"
+msgstr "Vert. hast."
+
+msgctxt "widgets.types.water_temperature.name"
+msgid "Water Temperature"
+msgstr "Vattentemperatur"
+
+msgctxt "widgets.types.water_temperature.shortName"
+msgid "Water Temp."
+msgstr "Vattentemp."

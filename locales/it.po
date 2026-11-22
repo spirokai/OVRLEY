@@ -1,0 +1,3400 @@
+msgid ""
+msgstr ""
+"Language: it\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "app-shell.agentConnected"
+msgid "Agent connected"
+msgstr "Agente connesso"
+
+msgctxt "app-shell.agentConnectedHelp"
+msgid "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it."
+msgstr "Un agente IA è connesso tramite MCP e può modificare questa finestra. Disattiva \"Consenti modifiche da agenti\" nelle Impostazioni per fermarlo."
+
+msgctxt "app-shell.allowAgentEdits"
+msgid "Allow agent edits"
+msgstr "Consenti modifiche da agenti"
+
+msgctxt "app-shell.allowAgentEditsHelp"
+msgid "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request."
+msgstr "Consente a un agente IA connesso tramite MCP (ovrley --mcp) di modificare questa finestra, ad esempio la lingua e i pannelli. Disattivalo per rifiutare tutte le richieste degli agenti."
+
+msgctxt "app-shell.blackBackground"
+msgid "Black background"
+msgstr "Sfondo nero"
+
+msgctxt "app-shell.checkeredBackground"
+msgid "Checkered background"
+msgstr "Sfondo a scacchi"
+
+msgctxt "app-shell.clearMapTileCache"
+msgid "Clear cache"
+msgstr "Svuota cache"
+
+msgctxt "app-shell.close"
+msgid "Close"
+msgstr "Chiudi"
+
+msgctxt "app-shell.copyError"
+msgid "Copy error"
+msgstr "Copia errore"
+
+msgctxt "app-shell.dropFilesToImport"
+msgid "Drop files to import"
+msgstr "Rilascia i file da importare"
+
+msgctxt "app-shell.errorRenderingVideo"
+msgid "Error Rendering Video"
+msgstr "Errore nel rendering del video"
+
+msgctxt "app-shell.file"
+msgid "File"
+msgstr "File"
+
+msgctxt "app-shell.fileMenu"
+msgid "File menu"
+msgstr "Menu File"
+
+msgctxt "app-shell.grid"
+msgid "Toggle grid"
+msgstr "Attiva/disattiva griglia"
+
+msgctxt "app-shell.imageBackground"
+msgid "Image background"
+msgstr "Sfondo immagine"
+
+msgctxt "app-shell.importActivity"
+msgid "Import Activity"
+msgstr "Importa attività"
+
+msgctxt "app-shell.importTemplate"
+msgid "Import Template"
+msgstr "Importa modello"
+
+msgctxt "app-shell.importVideo"
+msgid "Import Videos"
+msgstr "Importa video"
+
+msgctxt "app-shell.keyboardShortcutsDescription"
+msgid "You can use the following keyboard shortcuts to improve your workflow:"
+msgstr "Puoi usare le seguenti scorciatoie da tastiera per migliorare il flusso di lavoro:"
+
+msgctxt "app-shell.language"
+msgid "Language"
+msgstr "Lingua"
+
+msgctxt "app-shell.loadProject"
+msgid "Load Project"
+msgstr "Carica progetto"
+
+msgctxt "app-shell.loadingEditorData"
+msgid "Loading editor data..."
+msgstr "Caricamento dati editor..."
+
+msgctxt "app-shell.mapTileCache"
+msgid "Map tile cache"
+msgstr "Cache dei riquadri mappa"
+
+msgctxt "app-shell.mapTileCacheHelp"
+msgid "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first."
+msgstr "I riquadri della mappa scaricati per anteprime e rendering vengono salvati su disco, così le mappe si caricano più velocemente e funzionano offline. Quando la cache è piena, vengono rimossi per primi i riquadri usati meno di recente."
+
+msgctxt "app-shell.mapTileCacheLimit"
+msgid "Cache size"
+msgstr "Dimensione cache"
+
+msgctxt "app-shell.mapTileCacheUsage"
+msgid "{0} of {1} used"
+msgstr "{0} di {1} utilizzati"
+
+msgctxt "app-shell.newProject"
+msgid "New Project"
+msgstr "Nuovo progetto"
+
+msgctxt "app-shell.newTemplate"
+msgid "New Template"
+msgstr "Nuovo modello"
+
+msgctxt "app-shell.overlays"
+msgid "Overlays"
+msgstr "Sovrapposizioni"
+
+msgctxt "app-shell.resetZoom"
+msgid "Reset zoom"
+msgstr "Reimposta zoom"
+
+msgctxt "app-shell.save"
+msgid "Save"
+msgstr "Salva"
+
+msgctxt "app-shell.saveProject"
+msgid "Save Project"
+msgstr "Salva progetto"
+
+msgctxt "app-shell.saveProjectAs"
+msgid "Save Project As"
+msgstr "Salva progetto con nome"
+
+msgctxt "app-shell.saveTemplate"
+msgid "Save Template"
+msgstr "Salva modello"
+
+msgctxt "app-shell.selectTemplate"
+msgid "Select Template..."
+msgstr "Seleziona modello..."
+
+msgctxt "app-shell.settings"
+msgid "Settings"
+msgstr "Impostazioni"
+
+msgctxt "app-shell.shortcuts"
+msgid "Shortcuts"
+msgstr "Scorciatoie"
+
+msgctxt "app-shell.snapToGrid"
+msgid "Snap to grid"
+msgstr "Aggancia alla griglia"
+
+msgctxt "app-shell.unitSystem"
+msgid "Units"
+msgstr "Unità"
+
+msgctxt "app-shell.unitSystems.imperial"
+msgid "Imperial"
+msgstr "Imperiale"
+
+msgctxt "app-shell.unitSystems.metric"
+msgid "Metric"
+msgstr "Metrico"
+
+msgctxt "app-shell.unknownResolution"
+msgid "Unknown Resolution"
+msgstr "Risoluzione sconosciuta"
+
+msgctxt "app-shell.videoBackground"
+msgid "Video background"
+msgstr "Sfondo video"
+
+msgctxt "app-shell.whiteBackground"
+msgid "White background"
+msgstr "Sfondo bianco"
+
+msgctxt "app-shell.widgets"
+msgid "Widgets"
+msgstr "Widget"
+
+msgctxt "app-shell.zoomIn"
+msgid "Zoom in"
+msgstr "Ingrandisci"
+
+msgctxt "app-shell.zoomOut"
+msgid "Zoom out"
+msgstr "Riduci"
+
+msgctxt "app-update.close"
+msgid "Close"
+msgstr "Chiudi"
+
+msgctxt "app-update.continueWithInstalledVersion"
+msgid "The installed version remains available. You can close this dialog and continue working."
+msgstr "La versione installata resta disponibile. Puoi chiudere questa finestra di dialogo e continuare a lavorare."
+
+msgctxt "app-update.downloadingUpdate"
+msgid "Downloading update"
+msgstr "Download aggiornamento"
+
+msgctxt "app-update.later"
+msgid "Later"
+msgstr "Più tardi"
+
+msgctxt "app-update.updateAvailable"
+msgid "Update available"
+msgstr "Aggiornamento disponibile"
+
+msgctxt "app-update.updateDownloadProgress"
+msgid "Update download progress"
+msgstr "Avanzamento download aggiornamento"
+
+msgctxt "app-update.updateFailed"
+msgid "Update failed"
+msgstr "Aggiornamento non riuscito"
+
+msgctxt "app-update.updateNow"
+msgid "Update now"
+msgstr "Aggiorna ora"
+
+msgctxt "app-update.versionNowAvailable"
+msgid "OVRLEY <0>{{version}}</0> is now available."
+msgstr "OVRLEY <0>{{version}}</0> è ora disponibile."
+
+msgctxt "app.importingYourVideo"
+msgid "Importing your video..."
+msgstr "Importazione del video in corso..."
+
+msgctxt "app.loadingProject"
+msgid "Loading project..."
+msgstr "Caricamento del progetto..."
+
+msgctxt "app.ovrleyIsStarting"
+msgid "OVRLEY is starting..."
+msgstr "Avvio di OVRLEY..."
+
+msgctxt "app.processingYourActivity"
+msgid "Processing your activity..."
+msgstr "Elaborazione dell'attività..."
+
+msgctxt "components.blueColorComponent0255"
+msgid "Blue color component (0-255)"
+msgstr "Componente colore blu (0-255)"
+
+msgctxt "components.brightnessPercentage0100"
+msgid "Brightness percentage (0-100)"
+msgstr "Percentuale luminosità (0-100)"
+
+msgctxt "components.currentColorVal"
+msgid "Current color: {0}"
+msgstr "Colore attuale: {0}"
+
+msgctxt "components.decreaseValue"
+msgid "Decrease value"
+msgstr "Diminuisci valore"
+
+msgctxt "components.gradientAddStopHint"
+msgid "Click to add a color stop"
+msgstr "Fai clic per aggiungere un punto colore"
+
+msgctxt "components.gradientRemoveStop"
+msgid "Remove stop"
+msgstr "Rimuovi punto"
+
+msgctxt "components.gradientStopLabel"
+msgid "Color stop at {0}%"
+msgstr "Punto colore al {0}%"
+
+msgctxt "components.gradientStops"
+msgid "Gradient stops"
+msgstr "Punti del gradiente"
+
+msgctxt "components.greenColorComponent0255"
+msgid "Green color component (0-255)"
+msgstr "Componente colore verde (0-255)"
+
+msgctxt "components.hexColorValue"
+msgid "Hex color value"
+msgstr "Valore colore esadecimale"
+
+msgctxt "components.hueDegree0360"
+msgid "Hue degree (0-360)"
+msgstr "Gradi tonalità (0-360)"
+
+msgctxt "components.increaseValue"
+msgid "Increase value"
+msgstr "Aumenta valore"
+
+msgctxt "components.lightnessPercentage0100"
+msgid "Lightness percentage (0-100)"
+msgstr "Percentuale luminosità (0-100)"
+
+msgctxt "components.presets"
+msgid "Presets"
+msgstr "Preimpostazioni"
+
+msgctxt "components.recommended"
+msgid "Recommended"
+msgstr "Consigliato"
+
+msgctxt "components.redColorComponent0255"
+msgid "Red color component (0-255)"
+msgstr "Componente colore rosso (0-255)"
+
+msgctxt "components.saturationPercentage0100"
+msgid "Saturation percentage (0-100)"
+msgstr "Percentuale saturazione (0-100)"
+
+msgctxt "components.system"
+msgid "System"
+msgstr "Sistema"
+
+msgctxt "keyboard-shortcuts.activityImport"
+msgid "Import activity"
+msgstr "Importa attività"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToEnd"
+msgid "Move playhead to activity trim end"
+msgstr "Sposta la testina alla fine del taglio dell'attività"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToStart"
+msgid "Move playhead to activity trim start"
+msgstr "Sposta la testina all'inizio del taglio dell'attività"
+
+msgctxt "keyboard-shortcuts.activityTrimReset"
+msgid "Reset activity trim"
+msgstr "Reimposta il taglio dell'attività"
+
+msgctxt "keyboard-shortcuts.drawerClose"
+msgid "Close widget drawer"
+msgstr "Chiudi pannello widget"
+
+msgctxt "keyboard-shortcuts.drawerToggle"
+msgid "Open/close widget drawer"
+msgstr "Apri/chiudi pannello widget"
+
+msgctxt "keyboard-shortcuts.editorClearSelection"
+msgid "Clear widget selection"
+msgstr "Cancella selezione widget"
+
+msgctxt "keyboard-shortcuts.editorCopy"
+msgid "Copy selected widgets"
+msgstr "Copia widget selezionati"
+
+msgctxt "keyboard-shortcuts.editorDelete"
+msgid "Delete selected widgets"
+msgstr "Elimina widget selezionati"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetOnePixel"
+msgid "Move widget by 1 pixel"
+msgstr "Sposta widget di 1 pixel"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetTenPixels"
+msgid "Move widget by 10 pixels"
+msgstr "Sposta widget di 10 pixel"
+
+msgctxt "keyboard-shortcuts.editorNudge"
+msgid "Nudge selected widgets"
+msgstr "Sposta leggermente widget selezionati"
+
+msgctxt "keyboard-shortcuts.editorPaste"
+msgid "Paste copied widgets"
+msgstr "Incolla widget copiati"
+
+msgctxt "keyboard-shortcuts.editorResetZoom"
+msgid "Reset canvas zoom"
+msgstr "Reimposta zoom canvas"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasHorizontally"
+msgid "Scroll canvas horizontally"
+msgstr "Scorri canvas orizzontalmente"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasVertically"
+msgid "Scroll canvas vertically"
+msgstr "Scorri canvas verticalmente"
+
+msgctxt "keyboard-shortcuts.editorToggleGrid"
+msgid "Toggle gridlines"
+msgstr "Attiva/disattiva linee griglia"
+
+msgctxt "keyboard-shortcuts.editorToggleSnap"
+msgid "Toggle snapping to grid"
+msgstr "Attiva/disattiva aggancio alla griglia"
+
+msgctxt "keyboard-shortcuts.editorWheelScroll"
+msgid "Scroll canvas"
+msgstr "Scorri canvas"
+
+msgctxt "keyboard-shortcuts.editorWheelZoom"
+msgid "Zoom canvas at pointer"
+msgstr "Zoom canvas sul puntatore"
+
+msgctxt "keyboard-shortcuts.editorZoomIn"
+msgid "Canvas zoom in"
+msgstr "Ingrandisci canvas"
+
+msgctxt "keyboard-shortcuts.editorZoomOut"
+msgid "Canvas zoom out"
+msgstr "Riduci canvas"
+
+msgctxt "keyboard-shortcuts.generalCommands"
+msgid "General commands"
+msgstr "Comandi generali"
+
+msgctxt "keyboard-shortcuts.historyRedo"
+msgid "Redo"
+msgstr "Ripeti"
+
+msgctxt "keyboard-shortcuts.historyUndo"
+msgid "Undo"
+msgstr "Annulla"
+
+msgctxt "keyboard-shortcuts.outputOpen"
+msgid "Open export folder"
+msgstr "Apri cartella export"
+
+msgctxt "keyboard-shortcuts.playerJumpToEnd"
+msgid "Rewind to end"
+msgstr "Vai alla fine"
+
+msgctxt "keyboard-shortcuts.playerResetToStart"
+msgid "Rewind to start"
+msgstr "Vai all'inizio"
+
+msgctxt "keyboard-shortcuts.playerStepBackward"
+msgid "Step backward 1 second"
+msgstr "Indietro di 1 secondo"
+
+msgctxt "keyboard-shortcuts.playerStepForward"
+msgid "Step forward 1 second"
+msgstr "Avanti di 1 secondo"
+
+msgctxt "keyboard-shortcuts.playerToggleMute"
+msgid "Mute/unmute video"
+msgstr "Attiva/disattiva audio video"
+
+msgctxt "keyboard-shortcuts.playerTogglePlayback"
+msgid "Play/pause"
+msgstr "Riproduci/pausa"
+
+msgctxt "keyboard-shortcuts.projectNew"
+msgid "New project"
+msgstr "Nuovo progetto"
+
+msgctxt "keyboard-shortcuts.projectOpen"
+msgid "Open project"
+msgstr "Apri progetto"
+
+msgctxt "keyboard-shortcuts.projectSave"
+msgid "Save project"
+msgstr "Salva progetto"
+
+msgctxt "keyboard-shortcuts.projectSaveAs"
+msgid "Save project as"
+msgstr "Salva progetto con nome"
+
+msgctxt "keyboard-shortcuts.renderOpen"
+msgid "Export overlay"
+msgstr "Esporta sovrapposizione"
+
+msgctxt "keyboard-shortcuts.syncAuto"
+msgid "Auto-sync video with activity"
+msgstr "Sincronizza automaticamente video e attività"
+
+msgctxt "keyboard-shortcuts.syncGlobalNudge"
+msgid "Adjust sync offset by 1 second"
+msgstr "Regola offset sincronizzazione di 1 secondo"
+
+msgctxt "keyboard-shortcuts.templateImport"
+msgid "Open template"
+msgstr "Apri modello"
+
+msgctxt "keyboard-shortcuts.templateNew"
+msgid "New template"
+msgstr "Nuovo modello"
+
+msgctxt "keyboard-shortcuts.templateSave"
+msgid "Save template"
+msgstr "Salva modello"
+
+msgctxt "keyboard-shortcuts.templateSelect"
+msgid "Open template list"
+msgstr "Apri elenco modelli"
+
+msgctxt "keyboard-shortcuts.timelineAndSync"
+msgid "Timeline and sync"
+msgstr "Timeline e sincronizzazione"
+
+msgctxt "keyboard-shortcuts.timelineClipNudge"
+msgid "Nudge selected clip synchronization"
+msgstr "Sposta sincronizzazione clip selezionata"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeSecond"
+msgid "Nudge selected clip sync offset by 1 second"
+msgstr "Sposta offset sync clip di 1 secondo"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeTenthSecond"
+msgid "Nudge selected clip sync offset by 0.1 seconds"
+msgstr "Sposta offset sync clip di 0,1 secondi"
+
+msgctxt "keyboard-shortcuts.timelineFitActivity"
+msgid "Switch timeline to show activity"
+msgstr "Mostra attività nella timeline"
+
+msgctxt "keyboard-shortcuts.timelineFitAll"
+msgid "Show entire timeline"
+msgstr "Mostra timeline completa"
+
+msgctxt "keyboard-shortcuts.timelineFitMedia"
+msgid "Switch timeline to all media"
+msgstr "Mostra tutti i media nella timeline"
+
+msgctxt "keyboard-shortcuts.timelineFitVideo"
+msgid "Switch timeline to show video"
+msgstr "Mostra video nella timeline"
+
+msgctxt "keyboard-shortcuts.timelineWheelPan"
+msgid "Pan timeline"
+msgstr "Scorri timeline"
+
+msgctxt "keyboard-shortcuts.timelineWheelZoom"
+msgid "Zoom timeline at pointer"
+msgstr "Zoom timeline sul puntatore"
+
+msgctxt "keyboard-shortcuts.trimAfterPlayhead"
+msgid "Trim after the playhead (the video, or the activity without videos)"
+msgstr "Taglia dopo la testina (il video, o l'attività senza video)"
+
+msgctxt "keyboard-shortcuts.trimBeforePlayhead"
+msgid "Trim before the playhead (the video, or the activity without videos)"
+msgstr "Taglia prima della testina (il video, o l'attività senza video)"
+
+msgctxt "keyboard-shortcuts.videoImport"
+msgid "Import video"
+msgstr "Importa video"
+
+msgctxt "keyboard-shortcuts.videoPlayer"
+msgid "Video player"
+msgstr "Lettore video"
+
+msgctxt "keyboard-shortcuts.widgetEditor"
+msgid "Widget editor"
+msgstr "Editor widget"
+
+msgctxt "overlay-editor.mapReset"
+msgid "Reset"
+msgstr "Ripristina"
+
+msgctxt "overlay-editor.mapViewHint"
+msgid "Double-click to pan & zoom"
+msgstr "Doppio clic per spostare e zoomare"
+
+msgctxt "overlay-editor.mapViewZoomHint"
+msgid "Double-click to zoom"
+msgstr "Doppio clic per zoomare"
+
+msgctxt "overlay-editor.statusModified"
+msgid "Modified"
+msgstr "Modificato"
+
+msgctxt "overlay-editor.statusUnsaved"
+msgid "Unsaved"
+msgstr "Non salvato"
+
+msgctxt "player.activity"
+msgid "Activity"
+msgstr "Attività"
+
+msgctxt "player.all"
+msgid "All"
+msgstr "Tutto"
+
+msgctxt "player.duration"
+msgid "Duration"
+msgstr "Durata"
+
+msgctxt "player.resetView"
+msgid "Reset view"
+msgstr "Reimposta visualizzazione"
+
+msgctxt "player.rewindToEnd"
+msgid "Rewind to end"
+msgstr "Vai alla fine"
+
+msgctxt "player.rewindToStart"
+msgid "Rewind to start"
+msgstr "Vai all'inizio"
+
+msgctxt "player.stepBack"
+msgid "Step back"
+msgstr "Un passo indietro"
+
+msgctxt "player.stepForward"
+msgid "Step forward"
+msgstr "Un passo avanti"
+
+msgctxt "player.trimActivityAfterPlayhead"
+msgid "Trim the activity after the playhead"
+msgstr "Taglia l'attività dopo la testina"
+
+msgctxt "player.trimActivityBeforePlayhead"
+msgid "Trim the activity before the playhead"
+msgstr "Taglia l'attività prima della testina"
+
+msgctxt "player.trimActivityEnd"
+msgid "Drag to trim the end of the activity"
+msgstr "Trascina per tagliare la fine dell'attività"
+
+msgctxt "player.trimActivityStart"
+msgid "Drag to trim the start of the activity"
+msgstr "Trascina per tagliare l'inizio dell'attività"
+
+msgctxt "player.trimVideoAfterPlayhead"
+msgid "Trim the video after the playhead"
+msgstr "Taglia il video dopo la testina"
+
+msgctxt "player.trimVideoBeforePlayhead"
+msgid "Trim the video before the playhead"
+msgstr "Taglia il video prima della testina"
+
+msgctxt "player.video"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "player.zoomIn"
+msgid "Zoom in"
+msgstr "Ingrandisci"
+
+msgctxt "player.zoomOut"
+msgid "Zoom out"
+msgstr "Riduci"
+
+msgctxt "projects.activity"
+msgid "Activity"
+msgstr "Attività"
+
+msgctxt "projects.archiveTooLarge"
+msgid "The project exceeds the 40 MiB archive limit. Remove or replace an image."
+msgstr "Il progetto supera il limite di archivio di 40 MiB. Rimuovi o sostituisci un'immagine."
+
+msgctxt "projects.cancel"
+msgid "Cancel"
+msgstr "Annulla"
+
+msgctxt "projects.closeWithoutSaving"
+msgid "Close Without Saving"
+msgstr "Chiudi senza salvare"
+
+msgctxt "projects.createNewProject"
+msgid "Create New Project"
+msgstr "Crea nuovo progetto"
+
+msgctxt "projects.createProject"
+msgid "create project"
+msgstr "crea progetto"
+
+msgctxt "projects.invalidArchive"
+msgid "The project archive is invalid or damaged. Choose another project file."
+msgstr "L'archivio del progetto non è valido o è danneggiato. Scegli un altro file."
+
+msgctxt "projects.loadAnyway"
+msgid "Load Anyway"
+msgstr "Carica comunque"
+
+msgctxt "projects.locate"
+msgid "Locate"
+msgstr "Individua"
+
+msgctxt "projects.missingSourceDescription"
+msgid "The {0} file does not seem to exist. Locate the moved file or cancel without changing the current session."
+msgstr "Il file {0} non sembra esistere. Individua il file spostato o annulla senza modificare la sessione corrente."
+
+msgctxt "projects.newProject"
+msgid "New Project"
+msgstr "Nuovo progetto"
+
+msgctxt "projects.openAProject"
+msgid "Open a project"
+msgstr "Apri un progetto"
+
+msgctxt "projects.openProject"
+msgid "open project"
+msgstr "apri progetto"
+
+msgctxt "projects.rasterUnavailable"
+msgid "An image is unavailable. Replace it before saving."
+msgstr "Un'immagine non è disponibile. Sostituiscila prima di salvare."
+
+msgctxt "projects.saveFailed"
+msgid "The project could not be saved. Check the destination and try again."
+msgstr "Impossibile salvare il progetto. Controlla la destinazione e riprova."
+
+msgctxt "projects.saveProject"
+msgid "save project"
+msgstr "salva progetto"
+
+msgctxt "projects.sourceNotFound"
+msgid "{0} source not found"
+msgstr "Origine {0} non trovata"
+
+msgctxt "projects.unsavedChanges"
+msgid "Your project has unsaved changes. Save them or discard them."
+msgstr "Il progetto contiene modifiche non salvate. Salvale o scartale."
+
+msgctxt "projects.unsavedChangesBeforeExit"
+msgid "Your project has unsaved changes. Do you want to save the changes or close without saving?"
+msgstr "Il progetto contiene modifiche non salvate. Vuoi salvare le modifiche o chiudere senza salvare?"
+
+msgctxt "projects.unsavedChangesTitle"
+msgid "Unsaved Changes"
+msgstr "Modifiche non salvate"
+
+msgctxt "projects.video"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "raster.errors.corruptAsset"
+msgid "The embedded image is damaged. Select a replacement."
+msgstr "L'immagine incorporata è danneggiata. Seleziona un'immagine sostitutiva."
+
+msgctxt "raster.errors.decode"
+msgid "Image could not be decoded. Choose another image."
+msgstr "Impossibile decodificare l'immagine. Scegline un'altra."
+
+msgctxt "raster.errors.encodedSize"
+msgid "Image file is larger than 5 MiB. Choose a smaller file."
+msgstr "Il file supera 5 MiB. Scegli un file più piccolo."
+
+msgctxt "raster.errors.invalidConfig"
+msgid "Image settings are invalid."
+msgstr "La configurazione dell'immagine non è valida."
+
+msgctxt "raster.errors.missing"
+msgid "Image file is missing. Select another image."
+msgstr "Il file immagine non esiste. Seleziona un'altra immagine."
+
+msgctxt "raster.errors.missingAsset"
+msgid "The embedded image is missing from this project. Select a replacement."
+msgstr "L'immagine incorporata manca dal progetto. Seleziona un'immagine sostitutiva."
+
+msgctxt "raster.errors.noImage"
+msgid "Image {{id}} has no selected file. Select one before rendering."
+msgstr "Nessuna immagine selezionata per {{id}}. Selezionane una prima del rendering."
+
+msgctxt "raster.errors.relativePath"
+msgid "Select an image from an absolute file path."
+msgstr "Seleziona un'immagine con un percorso assoluto."
+
+msgctxt "raster.errors.renderUnavailable"
+msgid "Image {{id}} cannot be rendered yet."
+msgstr "L'immagine {{id}} non può ancora essere renderizzata."
+
+msgctxt "raster.errors.resolution"
+msgid "Image resolution exceeds 25 megapixels. Choose a smaller image."
+msgstr "La risoluzione supera 25 megapixel. Scegli un'immagine più piccola."
+
+msgctxt "raster.errors.unreadable"
+msgid "Image file cannot be read. Check its permissions or select another image."
+msgstr "Impossibile leggere il file immagine. Controlla i permessi o selezionane un altro."
+
+msgctxt "raster.errors.unsupportedType"
+msgid "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff)."
+msgstr "Scegli un file PNG, JPEG, BMP o TIFF (.png, .jpeg, .jpg, .bmp, .tiff)."
+
+msgctxt "raster.imageFiles"
+msgid "Image files"
+msgstr "File immagine"
+
+msgctxt "raster.replaceImage"
+msgid "Replace image"
+msgstr "Sostituisci immagine"
+
+msgctxt "raster.selectImage"
+msgid "Select image"
+msgstr "Seleziona immagine"
+
+msgctxt "render-video.batchResult.cancelled"
+msgid "Batch cancelled"
+msgstr "Lotto annullato"
+
+msgctxt "render-video.batchResult.completedWithErrors"
+msgid "Batch finished with errors"
+msgstr "Lotto completato con errori"
+
+msgctxt "render-video.batchResult.failed"
+msgid "Batch failed"
+msgstr "Lotto non riuscito"
+
+msgctxt "render-video.better"
+msgid "Better"
+msgstr "Migliore"
+
+msgctxt "render-video.bitrate"
+msgid "Bitrate"
+msgstr "Bitrate"
+
+msgctxt "render-video.cancel"
+msgid "Cancel"
+msgstr "Annulla"
+
+msgctxt "render-video.cancelled"
+msgid "Cancelled"
+msgstr "Annullato"
+
+msgctxt "render-video.cancelling"
+msgid "Cancelling..."
+msgstr "Annullamento in corso..."
+
+msgctxt "render-video.chooseFolder"
+msgid "Choose folder..."
+msgstr "Scegli cartella..."
+
+msgctxt "render-video.close"
+msgid "Close"
+msgstr "Chiudi"
+
+msgctxt "render-video.codecOutputFormat"
+msgid "Codec / Output Format"
+msgstr "Codec / formato di output"
+
+msgctxt "render-video.custom"
+msgid "Custom"
+msgstr "Personalizzato"
+
+msgctxt "render-video.customFps"
+msgid "Custom FPS"
+msgstr "FPS personalizzato"
+
+msgctxt "render-video.done"
+msgid "Done"
+msgstr "Completato"
+
+msgctxt "render-video.encodingOutputFile"
+msgid "Encoding output file..."
+msgstr "Codifica file di output..."
+
+msgctxt "render-video.encodingValVal2Frames"
+msgid "Encoding: {{val}} / {{val2}} frames"
+msgstr "Codifica: {{val}} / {{val2}} fotogrammi"
+
+msgctxt "render-video.estRemaining"
+msgid "Est. Remaining"
+msgstr "Tempo rimanente stimato"
+
+msgctxt "render-video.exportFinished"
+msgid "Export Finished"
+msgstr "Esportazione completata"
+
+msgctxt "render-video.exportSettings"
+msgid "Export Settings"
+msgstr "Impostazioni esportazione"
+
+msgctxt "render-video.exportingOverlay"
+msgid "Exporting Overlay"
+msgstr "Esportazione sovrapposizione"
+
+msgctxt "render-video.finalizingVideo"
+msgid "Finalizing Video"
+msgstr "Finalizzazione video"
+
+msgctxt "render-video.frameProgress"
+msgid "{{current}} / {{total}} frames"
+msgstr "{{current}} / {{total}} fotogrammi"
+
+msgctxt "render-video.framerate"
+msgid "Framerate"
+msgstr "Frequenza fotogrammi"
+
+msgctxt "render-video.fullVideo"
+msgid "Full Video"
+msgstr "Video completo"
+
+msgctxt "render-video.hardwareAcceleration"
+msgid "Hardware Acceleration"
+msgstr "Accelerazione hardware"
+
+msgctxt "render-video.hardwareAccelerationVaapiHelp"
+msgid "VAAPI needs your GPU's VA-API driver. Install it with your package manager:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nRun vainfo to check that the driver loads. NVIDIA GPUs use the NVIDIA GPU option instead."
+msgstr "VAAPI richiede il driver VA-API della tua GPU. Installalo con il gestore di pacchetti:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nEsegui vainfo per verificare che il driver venga caricato. Le GPU NVIDIA usano invece l'opzione NVIDIA GPU."
+
+msgctxt "render-video.hiddenByOverlap"
+msgid "Hidden behind an overlapping video"
+msgstr "Nascosto da un video sovrapposto"
+
+msgctxt "render-video.keepAppOpen"
+msgid "Please keep the application open during rendering"
+msgstr "Durante il rendering, lascia aperta l'applicazione"
+
+msgctxt "render-video.largerFile"
+msgid "Larger file"
+msgstr "File più grande"
+
+msgctxt "render-video.loadAGpxfitActivityFirst"
+msgid "Load a GPX/FIT activity first"
+msgstr "Carica prima un'attività GPX/FIT"
+
+msgctxt "render-video.lockedToEachVideoFps"
+msgid "Locked to each video's FPS"
+msgstr "Bloccato agli FPS di ciascun video"
+
+msgctxt "render-video.lockedToVideoFps"
+msgid "Locked to video FPS ({{fps}} fps)"
+msgstr "Bloccato agli FPS del video ({{fps}} fps)"
+
+msgctxt "render-video.minutesMinSecondsSec"
+msgid "{{minutes}} min {{seconds}} sec"
+msgstr "{{minutes}} min {{seconds}} s"
+
+msgctxt "render-video.mp4Codecs"
+msgid "MP4 Codecs"
+msgstr "Codec MP4"
+
+msgctxt "render-video.nothingToExport"
+msgid "Every video part is excluded from export."
+msgstr "Tutte le parti dei video sono escluse dall'esportazione."
+
+msgctxt "render-video.outputContainerFps"
+msgid "Output container: {{fps}} fps"
+msgstr "Contenitore output: {{fps}} fps"
+
+msgctxt "render-video.outputFile"
+msgid "Output file"
+msgstr "File di output"
+
+msgctxt "render-video.outputFolder"
+msgid "Output folder"
+msgstr "Cartella di output"
+
+msgctxt "render-video.outputPath"
+msgid "Output path"
+msgstr "Percorso output"
+
+msgctxt "render-video.overwrite"
+msgid "Overwrite"
+msgstr "Sovrascrivi"
+
+msgctxt "render-video.overwriteExistingFile"
+msgid "Overwrite existing file?"
+msgstr "Sovrascrivere il file esistente?"
+
+msgctxt "render-video.pathErrors.outputAliasesInput"
+msgid "The output would overwrite an input video"
+msgstr "L’output sovrascriverebbe un video di input"
+
+msgctxt "render-video.pathErrors.outputDestinationsConflict"
+msgid "Multiple batch outputs use the same destination"
+msgstr "Più output del batch usano la stessa destinazione"
+
+msgctxt "render-video.pathErrors.outputDirectoryInvalid"
+msgid "Choose an existing output directory"
+msgstr "Scegli una cartella di output esistente"
+
+msgctxt "render-video.pathErrors.outputDirectoryMissing"
+msgid "The output directory does not exist"
+msgstr "La cartella di output non esiste"
+
+msgctxt "render-video.pathErrors.outputExtensionInvalid"
+msgid "The output file must use .{{extension}}"
+msgstr "Il file di output deve usare l’estensione .{{extension}}"
+
+msgctxt "render-video.pathErrors.outputFileRequired"
+msgid "Choose an output file"
+msgstr "Scegli un file di output"
+
+msgctxt "render-video.pathErrors.outputFilenameRequired"
+msgid "The output path must include a file name"
+msgstr "Il percorso di output deve includere un nome di file"
+
+msgctxt "render-video.pathErrors.outputNotFile"
+msgid "The selected output is not a file"
+msgstr "La destinazione selezionata non è un file"
+
+msgctxt "render-video.pathErrors.outputPathIncomplete"
+msgid "Choose a complete output path, including its folder"
+msgstr "Scegli un percorso di output completo, inclusa la cartella"
+
+msgctxt "render-video.pathErrors.outputPathInvalid"
+msgid "The output file name or path is not valid"
+msgstr "Il nome o il percorso del file di output non è valido"
+
+msgctxt "render-video.pathErrors.outputPermissionDenied"
+msgid "You do not have permission to write the output file"
+msgstr "Non hai il permesso di scrivere il file di output"
+
+msgctxt "render-video.pathErrors.outputWriteFailed"
+msgid "Could not create or write the output file: {{detail}}"
+msgstr "Impossibile creare o scrivere il file di output: {{detail}}"
+
+msgctxt "render-video.pathErrors.sourceFilenameInvalid"
+msgid "The source file name is invalid"
+msgstr "Il nome del file sorgente non è valido"
+
+msgctxt "render-video.percentComplete"
+msgid "{{percent}}% Complete"
+msgstr "{{percent}}% completato"
+
+msgctxt "render-video.preparingBatch"
+msgid "Preparing video..."
+msgstr "Preparazione del video..."
+
+msgctxt "render-video.quality"
+msgid "Quality"
+msgstr "Qualità"
+
+msgctxt "render-video.queued"
+msgid "Queued"
+msgstr "In coda"
+
+msgctxt "render-video.reinspectionRequired"
+msgid "Sources changed or inspection expired. Inspect again before starting."
+msgstr "I file sono cambiati o la verifica è scaduta. Verifica di nuovo prima di iniziare."
+
+msgctxt "render-video.renderFps"
+msgid "Render FPS"
+msgstr "FPS rendering"
+
+msgctxt "render-video.rendering"
+msgid "Rendering..."
+msgstr "Rendering in corso..."
+
+msgctxt "render-video.renderingAlreadyInProgress"
+msgid "Rendering already in progress"
+msgstr "Rendering già in corso"
+
+msgctxt "render-video.renderingFrames"
+msgid "Rendering frames..."
+msgstr "Rendering fotogrammi..."
+
+msgctxt "render-video.resolutionMismatchInstructions"
+msgid "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template."
+msgstr "Questo è necessario per esportare correttamente la sovrapposizione. Modifica la risoluzione della sovrapposizione nelle impostazioni della barra laterale o scegli un altro modello."
+
+msgctxt "render-video.secondsSec"
+msgid "{{seconds}} sec"
+msgstr "{{seconds}} s"
+
+msgctxt "render-video.smallerFile"
+msgid "Smaller file"
+msgstr "File più piccolo"
+
+msgctxt "render-video.startRender"
+msgid "Start Render"
+msgstr "Avvia rendering"
+
+msgctxt "render-video.startingRender"
+msgid "Starting render..."
+msgstr "Avvio rendering..."
+
+msgctxt "render-video.transparent"
+msgid "Transparent"
+msgstr "Trasparente"
+
+msgctxt "render-video.transparentCodecs"
+msgid "Transparent Codecs"
+msgstr "Codec con trasparenza"
+
+msgctxt "render-video.unavailable"
+msgid "Unavailable"
+msgstr "Non disponibile"
+
+msgctxt "render-video.unstarted"
+msgid "Not started"
+msgstr "Non avviato"
+
+msgctxt "render-video.update1val"
+msgid "Update 1/{{val}}"
+msgstr "Aggiornamento 1/{{val}}"
+
+msgctxt "render-video.videoImported"
+msgid "Video imported"
+msgstr "Video importato"
+
+msgctxt "render-video.videoRequired"
+msgid "Video required"
+msgstr "Video richiesto"
+
+msgctxt "render-video.videoResolutionMismatchMessage"
+msgid "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}})."
+msgstr "La risoluzione della sovrapposizione {{overlayResolution}} deve corrispondere a quella del video importato ({{videoResolution}})."
+
+msgctxt "render-video.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "Frequenza aggiornamento widget"
+
+msgctxt "render-video.worse"
+msgid "Worse"
+msgstr "Peggiore"
+
+msgctxt "scene-settings.aspectRatio"
+msgid "Aspect Ratio"
+msgstr "Rapporto d'aspetto"
+
+msgctxt "scene-settings.borderThickness"
+msgid "Border Thickness"
+msgstr "Spessore bordi"
+
+msgctxt "scene-settings.borders"
+msgid "Borders"
+msgstr "Bordi"
+
+msgctxt "scene-settings.custom"
+msgid "Custom"
+msgstr "Personalizzato"
+
+msgctxt "scene-settings.customFps"
+msgid "Custom FPS"
+msgstr "FPS personalizzato"
+
+msgctxt "scene-settings.fixedWidthDigits"
+msgid "Fixed-Width Digits"
+msgstr "Cifre a larghezza fissa"
+
+msgctxt "scene-settings.fontLabels"
+msgid "Font - Labels"
+msgstr "Carattere - etichette"
+
+msgctxt "scene-settings.fontValues"
+msgid "Font - Values"
+msgstr "Carattere - valori"
+
+msgctxt "scene-settings.framerate"
+msgid "Framerate"
+msgstr "Frequenza fotogrammi"
+
+msgctxt "scene-settings.globalSettings"
+msgid "Global Settings"
+msgstr "Impostazioni globali"
+
+msgctxt "scene-settings.height"
+msgid "Height"
+msgstr "Altezza"
+
+msgctxt "scene-settings.icons"
+msgid "Icons"
+msgstr "Icone"
+
+msgctxt "scene-settings.labels"
+msgid "Labels"
+msgstr "Etichette"
+
+msgctxt "scene-settings.lockedToFps"
+msgid "Locked to {{fps}} fps"
+msgstr "Bloccato a {{fps}} fps"
+
+msgctxt "scene-settings.overlay"
+msgid "Overlay"
+msgstr "Sovrapposizione"
+
+msgctxt "scene-settings.portrait"
+msgid "Portrait (4:3)"
+msgstr "Ritratto (4:3)"
+
+msgctxt "scene-settings.resolution"
+msgid "Resolution"
+msgstr "Risoluzione"
+
+msgctxt "scene-settings.resolution1080p"
+msgid "1080p (1920x1080)"
+msgstr "1080p (1920x1080)"
+
+msgctxt "scene-settings.resolution1080pSquare"
+msgid "1080p Square (1080x1080)"
+msgstr "1080p quadrato (1080x1080)"
+
+msgctxt "scene-settings.resolution1080pVertical"
+msgid "1080p Vertical (1080x1920)"
+msgstr "1080p verticale (1080x1920)"
+
+msgctxt "scene-settings.resolution4k"
+msgid "4K (3840x2160)"
+msgstr "4K (3840x2160)"
+
+msgctxt "scene-settings.resolution4kSquare"
+msgid "4K Square (2160x2160)"
+msgstr "4K quadrato (2160x2160)"
+
+msgctxt "scene-settings.resolution4kVertical"
+msgid "4K Vertical (2160x3840)"
+msgstr "4K verticale (2160x3840)"
+
+msgctxt "scene-settings.resolution720p"
+msgid "720p (1280x720)"
+msgstr "720p (1280x720)"
+
+msgctxt "scene-settings.resolutionMismatch"
+msgid "Overlay and video resolutions do not match"
+msgstr "Le risoluzioni di sovrapposizione e video non corrispondono"
+
+msgctxt "scene-settings.resolutionQxga"
+msgid "QXGA (2048x1536)"
+msgstr "QXGA (2048x1536)"
+
+msgctxt "scene-settings.resolutionSxga"
+msgid "SXGA+ (1400x1050)"
+msgstr "SXGA+ (1400x1050)"
+
+msgctxt "scene-settings.resolutionUltrawide"
+msgid "Ultrawide (3440x1440)"
+msgstr "Ultrawide (3440x1440)"
+
+msgctxt "scene-settings.resolutionUxga"
+msgid "UXGA (1600x1200)"
+msgstr "UXGA (1600x1200)"
+
+msgctxt "scene-settings.resolutionXga"
+msgid "XGA (1920x1440)"
+msgstr "XGA (1920x1440)"
+
+msgctxt "scene-settings.scale"
+msgid "Scale"
+msgstr "Scala"
+
+msgctxt "scene-settings.shadowDistance"
+msgid "Shadow Distance"
+msgstr "Distanza ombra"
+
+msgctxt "scene-settings.shadowStrength"
+msgid "Shadow Strength"
+msgstr "Intensità ombra"
+
+msgctxt "scene-settings.shadows"
+msgid "Shadows"
+msgstr "Ombre"
+
+msgctxt "scene-settings.square"
+msgid "Square (1:1)"
+msgstr "Quadrato (1:1)"
+
+msgctxt "scene-settings.transparency"
+msgid "Transparency"
+msgstr "Trasparenza"
+
+msgctxt "scene-settings.ultrawide"
+msgid "Ultrawide (21:9)"
+msgstr "Ultrawide (21:9)"
+
+msgctxt "scene-settings.units"
+msgid "Units"
+msgstr "Unità"
+
+msgctxt "scene-settings.values"
+msgid "Values"
+msgstr "Valori"
+
+msgctxt "scene-settings.vertical"
+msgid "Vertical (9:16)"
+msgstr "Verticale (9:16)"
+
+msgctxt "scene-settings.widescreen"
+msgid "Widescreen (16:9)"
+msgstr "Panoramico (16:9)"
+
+msgctxt "scene-settings.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "Frequenza aggiornamento widget"
+
+msgctxt "scene-settings.width"
+msgid "Width"
+msgstr "Larghezza"
+
+msgctxt "store.couldNotDetermineVideoCreationTime"
+msgid "Could not determine video creation time"
+msgstr "Impossibile determinare l'ora di creazione del video"
+
+msgctxt "store.invalidTimestampFormats"
+msgid "Invalid timestamp formats"
+msgstr "Formati timestamp non validi"
+
+msgctxt "store.timezoneIsRequiredForVideoSync"
+msgid "timezone is required for video sync"
+msgstr "il fuso orario è richiesto per la sincronizzazione video"
+
+msgctxt "template-manager.cancel"
+msgid "Cancel"
+msgstr "Annulla"
+
+msgctxt "template-manager.createNewTemplate"
+msgid "Create New Template"
+msgstr "Crea nuovo modello"
+
+msgctxt "template-manager.newTemplate"
+msgid "New Template"
+msgstr "Nuovo modello"
+
+msgctxt "template-manager.save"
+msgid "Save"
+msgstr "Salva"
+
+msgctxt "template-manager.unsavedChanges"
+msgid "Your template has unsaved changes. Save them or discard them."
+msgstr "Il modello contiene modifiche non salvate. Salvale o scartale."
+
+msgctxt "toolbar.activity"
+msgid "Activity"
+msgstr "Attività"
+
+msgctxt "toolbar.activityType"
+msgid "Activity type"
+msgstr "Tipo attività"
+
+msgctxt "toolbar.applyTimezone"
+msgid "Apply Timezone"
+msgstr "Applica fuso orario"
+
+msgctxt "toolbar.autosync"
+msgid "Auto-sync"
+msgstr "Sincronizzazione"
+
+msgctxt "toolbar.bitRate"
+msgid "Bit rate"
+msgstr "Bitrate"
+
+msgctxt "toolbar.calculated"
+msgid "Calculated"
+msgstr "Calcolato"
+
+msgctxt "toolbar.camera"
+msgid "Camera"
+msgstr "Fotocamera"
+
+msgctxt "toolbar.codec"
+msgid "Codec"
+msgstr "Codec"
+
+msgctxt "toolbar.createdAt"
+msgid "Created at"
+msgstr "Creato il"
+
+msgctxt "toolbar.creationTime"
+msgid "Creation Time"
+msgstr "Ora di creazione"
+
+msgctxt "toolbar.deleteActivity"
+msgid "Delete activity"
+msgstr "Elimina attività"
+
+msgctxt "toolbar.details"
+msgid "Details"
+msgstr "Dettagli"
+
+msgctxt "toolbar.detected"
+msgid "Detected"
+msgstr "Rilevato"
+
+msgctxt "toolbar.detectedLaps"
+msgid "Detected laps"
+msgstr "Giri rilevati"
+
+msgctxt "toolbar.distance"
+msgid "Distance"
+msgstr "Distanza"
+
+msgctxt "toolbar.dropActivityFile"
+msgid "Drop activity file"
+msgstr "Trascina file attività"
+
+msgctxt "toolbar.dropVideoFile"
+msgid "Drop video files"
+msgstr "Trascina file video"
+
+msgctxt "toolbar.duration"
+msgid "Duration"
+msgstr "Durata"
+
+msgctxt "toolbar.extracted"
+msgid "Extracted"
+msgstr "Estratto"
+
+msgctxt "toolbar.filename"
+msgid "Filename"
+msgstr "Nome file"
+
+msgctxt "toolbar.frameRate"
+msgid "Frame rate"
+msgstr "FPS"
+
+msgctxt "toolbar.lapDuration"
+msgid "Duration"
+msgstr "Durata"
+
+msgctxt "toolbar.lapNumber"
+msgid "Lap"
+msgstr "Giro"
+
+msgctxt "toolbar.lapStart"
+msgid "Start"
+msgstr "Inizio"
+
+msgctxt "toolbar.loadActivity"
+msgid "Load activity"
+msgstr "Carica attività"
+
+msgctxt "toolbar.loadVideo"
+msgid "Load videos"
+msgstr "Carica video"
+
+msgctxt "toolbar.newProject"
+msgid "New Project"
+msgstr "Nuovo progetto"
+
+msgctxt "toolbar.noDataCalculated"
+msgid "No data were calculated"
+msgstr "Nessun dato calcolato"
+
+msgctxt "toolbar.noDataExtracted"
+msgid "No data were extracted"
+msgstr "Nessun dato estratto"
+
+msgctxt "toolbar.openProject"
+msgid "Open Project"
+msgstr "Apri progetto"
+
+msgctxt "toolbar.pinDrawer"
+msgid "Pin drawer"
+msgstr "Fissa pannello"
+
+msgctxt "toolbar.projects"
+msgid "Projects"
+msgstr "Progetti"
+
+msgctxt "toolbar.resolution"
+msgid "Resolution"
+msgstr "Risoluzione"
+
+msgctxt "toolbar.restoreDetectedVideoCreationTime"
+msgid "Restore detected video creation time"
+msgstr "Ripristina ora di creazione video rilevata"
+
+msgctxt "toolbar.saveProject"
+msgid "Save Project"
+msgstr "Salva progetto"
+
+msgctxt "toolbar.saveProjectAs"
+msgid "Save Project As"
+msgstr "Salva progetto con nome"
+
+msgctxt "toolbar.showLap"
+msgid "Show lap {0}"
+msgstr "Mostra giro {0}"
+
+msgctxt "toolbar.startTime"
+msgid "Start time"
+msgstr "Ora di inizio"
+
+msgctxt "toolbar.syncOffset"
+msgid "Sync Offset"
+msgstr "Offset sincronizzazione"
+
+msgctxt "toolbar.timeSource"
+msgid "Time source"
+msgstr "Sorgente temporale"
+
+msgctxt "toolbar.timeSourceFilename"
+msgid "Filename"
+msgstr "Nome file"
+
+msgctxt "toolbar.timeSourceGps"
+msgid "GPS timestamp"
+msgstr "Timestamp GPS"
+
+msgctxt "toolbar.timeSourceMetadata"
+msgid "Metadata"
+msgstr "Metadati"
+
+msgctxt "toolbar.timezone"
+msgid "Timezone"
+msgstr "Fuso orario"
+
+msgctxt "toolbar.unknown"
+msgid "Unknown"
+msgstr "Sconosciuto"
+
+msgctxt "toolbar.unknownTimeSource"
+msgid "Unknown ({{value}})"
+msgstr "Sorgente temporale sconosciuta ({{value}})"
+
+msgctxt "toolbar.unpinDrawer"
+msgid "Unpin drawer"
+msgstr "Sgancia pannello"
+
+msgctxt "toolbar.valBitRate"
+msgid "{{val}} Mbps"
+msgstr "{{val}} Mbps"
+
+msgctxt "toolbar.valFps"
+msgid "{{val}} fps"
+msgstr "{{val}} fps"
+
+msgctxt "toolbar.valPoints"
+msgid "{{val}} points"
+msgstr "{{val}} punti"
+
+msgctxt "toolbar.valResolution"
+msgid "{{width}}×{{height}}"
+msgstr "{{width}}×{{height}}"
+
+msgctxt "toolbar.video"
+msgid "Video"
+msgstr "Video"
+
+msgctxt "toolbar.videoSync"
+msgid "Sync Doctor"
+msgstr "Sincronizzazione video"
+
+msgctxt "toolbar.widgets"
+msgid "Widgets"
+msgstr "Widget"
+
+msgctxt "undo-redo.redoCtrlcmdshiftz"
+msgid "Redo"
+msgstr "Ripeti"
+
+msgctxt "undo-redo.undoCtrlcmdz"
+msgid "Undo"
+msgstr "Annulla"
+
+msgctxt "video-preview.gpuRequired"
+msgid "Video playback requires at least an integrated GPU."
+msgstr "La riproduzione video richiede almeno una GPU integrata."
+
+msgctxt "video-preview.theVideoPreviewCouldNotBeLoaded"
+msgid "The video preview could not be loaded."
+msgstr "Impossibile caricare l'anteprima video."
+
+msgctxt "video-preview.videoOrImage"
+msgid "Video or Image"
+msgstr "Video o immagine"
+
+msgctxt "videoSync.activityRequiredForSync"
+msgid "Activity telemetry is required for Landmark Sync"
+msgstr "Per la sincronizzazione tramite riferimenti servono i dati dell’attività"
+
+msgctxt "videoSync.applyCandidate"
+msgid "Apply offset {0} seconds"
+msgstr "Applica scostamento di {0} s"
+
+msgctxt "videoSync.autodetect"
+msgid "Autodetect"
+msgstr "Auto"
+
+msgctxt "videoSync.candidates"
+msgid "Sync candidates"
+msgstr "Opzioni sync"
+
+msgctxt "videoSync.changeLandmarkType"
+msgid "Change {0} landmark type"
+msgstr "Modifica il tipo di riferimento: {0}"
+
+msgctxt "videoSync.clearLandmarks"
+msgid "Clear"
+msgstr "Svuota"
+
+msgctxt "videoSync.deleteLandmark"
+msgid "Delete {0} landmark"
+msgstr "Elimina il riferimento: {0}"
+
+msgctxt "videoSync.detectedEvent"
+msgid "detected {{label}}"
+msgstr "Rilevamento: {{label}}"
+
+msgctxt "videoSync.detectedEventRange"
+msgid "{{label}} event from {{start}} to {{end}} seconds"
+msgstr "Evento «{{label}}»: {{start}}–{{end}} s"
+
+msgctxt "videoSync.detectedEvents"
+msgid "Detected events"
+msgstr "Eventi rilevati"
+
+msgctxt "videoSync.detection"
+msgid "Sensitivity & Detection"
+msgstr "Sensibilità e rilevamento"
+
+msgctxt "videoSync.landmarkAriaLabel"
+msgid "{0} landmark at {1} seconds"
+msgstr "Riferimento «{0}» — {1} s"
+
+msgctxt "videoSync.landmarkLimit"
+msgid "The maximum of five landmarks has been reached"
+msgstr "È stato raggiunto il limite massimo di cinque riferimenti"
+
+msgctxt "videoSync.landmarksMatched"
+msgid "{{matched}} / {{eligible}} landmarks matched"
+msgstr "Corrispondenze: {{matched}} / {{eligible}}"
+
+msgctxt "videoSync.leftTurn"
+msgid "Left Turn"
+msgstr "Svolta sin."
+
+msgctxt "videoSync.leftTurns"
+msgid "Left Turns"
+msgstr "Svolte sin."
+
+msgctxt "videoSync.location"
+msgid "Location"
+msgstr "Posizione"
+
+msgctxt "videoSync.locationLimit"
+msgid "Only one location landmark is allowed"
+msgstr "È consentito un solo riferimento di posizione"
+
+msgctxt "videoSync.locationOnly"
+msgid "Location only"
+msgstr "Solo posizione"
+
+msgctxt "videoSync.locationSyncCandidates"
+msgid "Location Sync"
+msgstr "Posizione"
+
+msgctxt "videoSync.locations"
+msgid "Locations"
+msgstr "Posizioni"
+
+msgctxt "videoSync.manualSync"
+msgid "Manual Sync"
+msgstr "Manuale"
+
+msgctxt "videoSync.markControls"
+msgid "Video sync landmark controls"
+msgstr "Controlli marcatori"
+
+msgctxt "videoSync.markLeftTurn"
+msgid "Mark Left Turn"
+msgstr "Segna sinistra"
+
+msgctxt "videoSync.markLocation"
+msgid "Mark Location"
+msgstr "Segna posizione"
+
+msgctxt "videoSync.markRightTurn"
+msgid "Mark Right Turn"
+msgstr "Segna svolta a destra"
+
+msgctxt "videoSync.markStop"
+msgid "Mark Stop"
+msgstr "Segna fermata"
+
+msgctxt "videoSync.minimumLandmarksForSync"
+msgid "At least two landmarks are required"
+msgstr "Sono necessari almeno due riferimenti"
+
+msgctxt "videoSync.noCandidate"
+msgid "No candidate aligns at least two landmarks"
+msgstr "Nessun candidato corrisponde ad almeno due riferimenti"
+
+msgctxt "videoSync.noLandmarks"
+msgid "No landmarks marked yet."
+msgstr "Nessun riferimento ancora segnato."
+
+msgctxt "videoSync.openManualSync"
+msgid "Open Manual Sync"
+msgstr "Apri sync manuale"
+
+msgctxt "videoSync.playheadInsideVideo"
+msgid "Move the playhead inside the video to mark a landmark"
+msgstr "Testina nel video per marcare"
+
+msgctxt "videoSync.rightTurn"
+msgid "Right Turn"
+msgstr "Svolta a destra"
+
+msgctxt "videoSync.rightTurns"
+msgid "Right Turns"
+msgstr "Svolte a destra"
+
+msgctxt "videoSync.setLocationInMap"
+msgid "Set location"
+msgstr "Imposta posizione"
+
+msgctxt "videoSync.speed"
+msgid "Speed"
+msgstr "Veloc."
+
+msgctxt "videoSync.speedSensitivity"
+msgid "Speed"
+msgstr "Veloc."
+
+msgctxt "videoSync.staleCandidates"
+msgid "Landmarks changed. Rerun the Sync again"
+msgstr "Segni cambiati. Rifai sync"
+
+msgctxt "videoSync.stop"
+msgid "Stop"
+msgstr "Stop"
+
+msgctxt "videoSync.stops"
+msgid "Stops"
+msgstr "Fermate"
+
+msgctxt "videoSync.syncCandidates"
+msgid "Sync Candidates"
+msgstr "Opzioni sync"
+
+msgctxt "videoSync.syncLandmarks"
+msgid "Sync All Landmarks"
+msgstr "Sync tutti i segni"
+
+msgctxt "videoSync.syncLocation"
+msgid "Match Location Only"
+msgstr "Abbina solo la posizione"
+
+msgctxt "videoSync.timelineGraph"
+msgid "Activity telemetry graph"
+msgstr "Grafico dei dati dell’attività"
+
+msgctxt "videoSync.turnSensitivity"
+msgid "Min turn"
+msgstr "Svolta min."
+
+msgctxt "videoSync.turning"
+msgid "Turning"
+msgstr "Svolte"
+
+msgctxt "videoSync.videoLandmarks"
+msgid "Video landmarks"
+msgstr "Riferimenti video"
+
+msgctxt "videoSync.videoRequired"
+msgid "A video is required to mark a landmark"
+msgstr "Serve un video per segnare un riferimento"
+
+msgctxt "videoSync.videoRequiredForSync"
+msgid "A video is required for Landmark Sync"
+msgstr "Serve un video per sincronizzare i riferimenti"
+
+msgctxt "videoSync.yourLandmarks"
+msgid "Video Landmarks"
+msgstr "I tuoi segni video"
+
+msgctxt "widget-editor.activityStart"
+msgid "Activity"
+msgstr "dell'attività"
+
+msgctxt "widget-editor.addMetric"
+msgid "Add metric"
+msgstr "Aggiungi metrica"
+
+msgctxt "widget-editor.alignment"
+msgid "Alignment"
+msgstr "Allineamento"
+
+msgctxt "widget-editor.alignmentBelow"
+msgid "Top"
+msgstr "In alto"
+
+msgctxt "widget-editor.alignmentCentered"
+msgid "Centered"
+msgstr "Centrato"
+
+msgctxt "widget-editor.altitudeAtStart"
+msgid "Altitude at start"
+msgstr "Quota iniziale"
+
+msgctxt "widget-editor.angleTrack"
+msgid "Angle Track"
+msgstr "Indicatore angolo"
+
+msgctxt "widget-editor.arcAngle"
+msgid "Arc Angle"
+msgstr "Angolo arco"
+
+msgctxt "widget-editor.arcTrack"
+msgid "Arc Track"
+msgstr "Indicatore arco"
+
+msgctxt "widget-editor.areaGradient"
+msgid "Gradient"
+msgstr "Sfumatura"
+
+msgctxt "widget-editor.areaOpacity"
+msgid "Area Opacity"
+msgstr "Opacità dell'area"
+
+msgctxt "widget-editor.areaStyling"
+msgid "Area Styling"
+msgstr "Stile area"
+
+msgctxt "widget-editor.axisMapping"
+msgid "Axis Mapping"
+msgstr "Mappatura assi"
+
+msgctxt "widget-editor.backdropStyle"
+msgid "Backdrop Style"
+msgstr "Stile sfondo"
+
+msgctxt "widget-editor.backgroundColor"
+msgid "Background"
+msgstr "Sfondo"
+
+msgctxt "widget-editor.balanceFormat"
+msgid "Balance Format"
+msgstr "Formato bilancio"
+
+msgctxt "widget-editor.bar"
+msgid "Bar"
+msgstr "Barra"
+
+msgctxt "widget-editor.barCount"
+msgid "Bar Count"
+msgstr "Numero barre"
+
+msgctxt "widget-editor.barGap"
+msgid "Bar Gap"
+msgstr "Spazio barre"
+
+msgctxt "widget-editor.barHeight"
+msgid "Bar Height"
+msgstr "Altezza barra"
+
+msgctxt "widget-editor.barWidth"
+msgid "Bar Width"
+msgstr "Larghezza barra"
+
+msgctxt "widget-editor.border"
+msgid "Border"
+msgstr "Bordo"
+
+msgctxt "widget-editor.borderColor"
+msgid "Border Color"
+msgstr "Colore bordo"
+
+msgctxt "widget-editor.borderOpacity"
+msgid "Border Opacity"
+msgstr "Opacità bordo"
+
+msgctxt "widget-editor.borderThickness"
+msgid "Border Thickness"
+msgstr "Spessore bordo"
+
+msgctxt "widget-editor.both"
+msgid "Both"
+msgstr "Entrambi"
+
+msgctxt "widget-editor.bottom"
+msgid "Bottom"
+msgstr "In basso"
+
+msgctxt "widget-editor.bottomEdgeStrip"
+msgid "Bottom edge strip"
+msgstr "Striscia inferiore"
+
+msgctxt "widget-editor.bottomLeft"
+msgid "Bottom Left"
+msgstr "Basso a sinistra"
+
+msgctxt "widget-editor.bottomRight"
+msgid "Bottom Right"
+msgstr "Basso a destra"
+
+msgctxt "widget-editor.cameraMode"
+msgid "Camera Mode"
+msgstr "Modalità telecamera"
+
+msgctxt "widget-editor.cardinalColor"
+msgid "Cardinal Color"
+msgstr "Colore cardinali"
+
+msgctxt "widget-editor.cardinalLabels"
+msgid "Cardinal Labels"
+msgstr "Punti cardinali"
+
+msgctxt "widget-editor.ceilingAreaColor"
+msgid "Area Color"
+msgstr "Colore area"
+
+msgctxt "widget-editor.ceilingAreaOpacity"
+msgid "Area Opacity"
+msgstr "Opacità area"
+
+msgctxt "widget-editor.ceilingLineColor"
+msgid "Line Color"
+msgstr "Colore linea"
+
+msgctxt "widget-editor.ceilingLineOpacity"
+msgid "Line Opacity"
+msgstr "Opacità linea"
+
+msgctxt "widget-editor.chartMetric"
+msgid "Metric"
+msgstr "Metrica"
+
+msgctxt "widget-editor.chartMetrics"
+msgid "Metrics"
+msgstr "Metriche"
+
+msgctxt "widget-editor.chaseCamera"
+msgid "Chase Camera"
+msgstr "Telecamera di inseguimento"
+
+msgctxt "widget-editor.climbColor"
+msgid "Climb"
+msgstr "Salita"
+
+msgctxt "widget-editor.color"
+msgid "Color"
+msgstr "Colore"
+
+msgctxt "widget-editor.colorNegative"
+msgid "Color Negative"
+msgstr "Colore negativo"
+
+msgctxt "widget-editor.colorPositive"
+msgid "Color Positive"
+msgstr "Colore positivo"
+
+msgctxt "widget-editor.compass"
+msgid "Compass"
+msgstr "Bussola"
+
+msgctxt "widget-editor.compassDial"
+msgid "Dial"
+msgstr "Quadrante"
+
+msgctxt "widget-editor.concentricRing"
+msgid "Concentric Ring"
+msgstr "Anello concentrico"
+
+msgctxt "widget-editor.continuousFill"
+msgid "Continuous Fill"
+msgstr "Riempimento unico"
+
+msgctxt "widget-editor.coordinateFormatDdm"
+msgid "Deg / Dec Min"
+msgstr "Gradi / Min dec"
+
+msgctxt "widget-editor.coordinateFormatDms"
+msgid "Deg / Min / Sec"
+msgstr "Gradi / Min / Sec"
+
+msgctxt "widget-editor.coordinates"
+msgid "Coordinates"
+msgstr "Coordinate"
+
+msgctxt "widget-editor.cornerOrientation"
+msgid "Corner Orientation"
+msgstr "Posizione angolo"
+
+msgctxt "widget-editor.cornerRadius"
+msgid "Corner Radius"
+msgstr "Raggio angolo"
+
+msgctxt "widget-editor.cornerTrack"
+msgid "Corner Track"
+msgstr "Indicatore angolo"
+
+msgctxt "widget-editor.cornersAndEdges"
+msgid "Corners & edges"
+msgstr "Angoli e bordi"
+
+msgctxt "widget-editor.dateFormatDdMmYyyy"
+msgid "Date only (DD-MM-YYYY)"
+msgstr "Solo data (DD-MM-AAAA)"
+
+msgctxt "widget-editor.dateFormatDdMmmYyyy"
+msgid "Date only (DD MMM YYYY)"
+msgstr "Solo data (DD MMM AAAA)"
+
+msgctxt "widget-editor.dateFormatDdMmmmYyyy"
+msgid "Date only (DD MMMM YYYY)"
+msgstr "Solo data (DD MMMM AAAA)"
+
+msgctxt "widget-editor.dateFormatMmDdYyyy"
+msgid "Date only (MM-DD-YYYY)"
+msgstr "Solo data (MM-DD-AAAA)"
+
+msgctxt "widget-editor.dateFormatMmmDdYyyy"
+msgid "Date only (MMM DD YYYY)"
+msgstr "Solo data (MMM DD AAAA)"
+
+msgctxt "widget-editor.dateFormatMmmmDdYyyy"
+msgid "Date only (MMMM DD YYYY)"
+msgstr "Solo data (MMMM DD AAAA)"
+
+msgctxt "widget-editor.dateFormatYyyyMmDd"
+msgid "Date only (YYYY-MM-DD)"
+msgstr "Solo data (AAAA-MM-DD)"
+
+msgctxt "widget-editor.dateTimeFormat12h"
+msgid "Date + time (12h)"
+msgstr "Data + ora (12h)"
+
+msgctxt "widget-editor.dateTimeFormat12hWithSeconds"
+msgid "Date + time (12h with seconds)"
+msgstr "Data + ora (12h con secondi)"
+
+msgctxt "widget-editor.dateTimeFormat24h"
+msgid "Date + time (24h)"
+msgstr "Data + ora (24h)"
+
+msgctxt "widget-editor.dateTimeFormat24hWithSeconds"
+msgid "Date + time (24h with seconds)"
+msgstr "Data + ora (24h con secondi)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm12h"
+msgid "Date + time (DD MMM, 12h)"
+msgstr "Data + ora (DD MMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm24h"
+msgid "Date + time (DD MMM, 24h)"
+msgstr "Data + ora (DD MMM, 24h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm12h"
+msgid "Date + time (DD MMMM, 12h)"
+msgstr "Data + ora (DD MMMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm24h"
+msgid "Date + time (DD MMMM, 24h)"
+msgstr "Data + ora (DD MMMM, 24h)"
+
+msgctxt "widget-editor.daytime"
+msgid "Time of day"
+msgstr "Ora del giorno"
+
+msgctxt "widget-editor.decimal"
+msgid "Decimal"
+msgstr "Decimale"
+
+msgctxt "widget-editor.decimals"
+msgid "Decimals"
+msgstr "Decimali"
+
+msgctxt "widget-editor.decompressionCeiling"
+msgid "Decompression Ceiling"
+msgstr "Tetto di decompressione"
+
+msgctxt "widget-editor.descentColor"
+msgid "Descent"
+msgstr "Discesa"
+
+msgctxt "widget-editor.diameter"
+msgid "Diameter"
+msgstr "Diametro"
+
+msgctxt "widget-editor.displayType"
+msgid "Display Type"
+msgstr "Tipo di vista"
+
+msgctxt "widget-editor.elapsedFrom"
+msgid "Since the Start of"
+msgstr "Dall'inizio"
+
+msgctxt "widget-editor.elapsedTime"
+msgid "Elapsed Time"
+msgstr "Tempo trascorso"
+
+msgctxt "widget-editor.elevationAtStart"
+msgid "Elevation at start"
+msgstr "Quota iniziale"
+
+msgctxt "widget-editor.emptyColor"
+msgid "Empty Color"
+msgstr "Colore vuoto"
+
+msgctxt "widget-editor.emptyOpacity"
+msgid "Empty Opacity"
+msgstr "Opacità vuota"
+
+msgctxt "widget-editor.exportStart"
+msgid "Export"
+msgstr "dell'esportazione"
+
+msgctxt "widget-editor.fill"
+msgid "Fill"
+msgstr "Riempimento"
+
+msgctxt "widget-editor.fillColor"
+msgid "Fill Color"
+msgstr "Colore riempimento"
+
+msgctxt "widget-editor.fillGradient"
+msgid "Gradient"
+msgstr "Sfumatura"
+
+msgctxt "widget-editor.fillOpacity"
+msgid "Fill Opacity"
+msgstr "Opacità riempita"
+
+msgctxt "widget-editor.filledColor"
+msgid "Filled Color"
+msgstr "Colore pieno"
+
+msgctxt "widget-editor.filledOpacity"
+msgid "Filled Opacity"
+msgstr "Opacità piena"
+
+msgctxt "widget-editor.finishedColor"
+msgid "Finished Color"
+msgstr "Colore completato"
+
+msgctxt "widget-editor.finishedOpacity"
+msgid "Finished Opacity"
+msgstr "Opacità completata"
+
+msgctxt "widget-editor.flatTrack"
+msgid "Flat Track"
+msgstr "Stile piatto"
+
+msgctxt "widget-editor.font"
+msgid "Font"
+msgstr "Carattere"
+
+msgctxt "widget-editor.fontColor"
+msgid "Font Color"
+msgstr "Colore carattere"
+
+msgctxt "widget-editor.fontFamily"
+msgid "Font Family"
+msgstr "Carattere"
+
+msgctxt "widget-editor.fontSize"
+msgid "Font Size"
+msgstr "Dimensione testo"
+
+msgctxt "widget-editor.fontWeight"
+msgid "Weight"
+msgstr "Peso"
+
+msgctxt "widget-editor.format"
+msgid "Format"
+msgstr "Formato"
+
+msgctxt "widget-editor.gaugeTrack"
+msgid "Gauge Track"
+msgstr "Indicatore lineare"
+
+msgctxt "widget-editor.general"
+msgid "General"
+msgstr "Generale"
+
+msgctxt "widget-editor.gforcePlot"
+msgid "G-Force Plot"
+msgstr "Grafico forza G"
+
+msgctxt "widget-editor.glow"
+msgid "Glow"
+msgstr "Bagliore"
+
+msgctxt "widget-editor.haloDiameter"
+msgid "Halo Diameter"
+msgstr "Diametro alone"
+
+msgctxt "widget-editor.headingValue"
+msgid "Value"
+msgstr "Valore"
+
+msgctxt "widget-editor.heartZones"
+msgid "Zones"
+msgstr "Zone"
+
+msgctxt "widget-editor.height"
+msgid "Height"
+msgstr "Altezza"
+
+msgctxt "widget-editor.horizontal"
+msgid "Horizontal"
+msgstr "Orizzontale"
+
+msgctxt "widget-editor.horizontalOffset"
+msgid "Horizontal Offset"
+msgstr "Offset orizzontale"
+
+msgctxt "widget-editor.horizontalPosition"
+msgid "Horizontal Position"
+msgstr "Posizione laterale"
+
+msgctxt "widget-editor.hundredths"
+msgid "Hundredths"
+msgstr "Centesimi di secondo"
+
+msgctxt "widget-editor.icon"
+msgid "Icon"
+msgstr "Icona"
+
+msgctxt "widget-editor.imperialLabel"
+msgid "Imperial Label"
+msgstr "Dicitura imperiale"
+
+msgctxt "widget-editor.imperialOffsetX"
+msgid "Imperial Offset X"
+msgstr "Offset X imperiale"
+
+msgctxt "widget-editor.imperialOffsetY"
+msgid "Imperial Offset Y"
+msgstr "Offset Y imperiale"
+
+msgctxt "widget-editor.indicator"
+msgid "Indicator"
+msgstr "Indicatore"
+
+msgctxt "widget-editor.indicatorArrow"
+msgid "Arrow"
+msgstr "Freccia"
+
+msgctxt "widget-editor.indicatorColor"
+msgid "Indicator Color"
+msgstr "Colore indicatore"
+
+msgctxt "widget-editor.indicatorLine"
+msgid "Line"
+msgstr "Linea"
+
+msgctxt "widget-editor.indicatorSize"
+msgid "Indicator Size"
+msgstr "Misura indicatore"
+
+msgctxt "widget-editor.indicatorStyleChevron"
+msgid "Chevron"
+msgstr "Freccia a V"
+
+msgctxt "widget-editor.indicatorStyleHighlightBar"
+msgid "Highlight Bar"
+msgstr "Barra evidenziata"
+
+msgctxt "widget-editor.invertSign"
+msgid "Invert sign"
+msgstr "Inverti segno"
+
+msgctxt "widget-editor.italic"
+msgid "Italic"
+msgstr "Corsivo"
+
+msgctxt "widget-editor.label"
+msgid "Label"
+msgstr "Etichetta"
+
+msgctxt "widget-editor.labelAxis"
+msgid "{{label}} axis"
+msgstr "Asse {{label}}"
+
+msgctxt "widget-editor.labelColor"
+msgid "Label Color"
+msgstr "Colore etichette"
+
+msgctxt "widget-editor.labelFont"
+msgid "Label Font"
+msgstr "Font etichette"
+
+msgctxt "widget-editor.labelFontSize"
+msgid "Label Font Size"
+msgstr "Dimensione testo"
+
+msgctxt "widget-editor.labelSize"
+msgid "Label Size"
+msgstr "Misura etichette"
+
+msgctxt "widget-editor.labels"
+msgid "Labels"
+msgstr "Etichette"
+
+msgctxt "widget-editor.latitude"
+msgid "Latitude"
+msgstr "Latitudine"
+
+msgctxt "widget-editor.left"
+msgid "Left"
+msgstr "Sinistra"
+
+msgctxt "widget-editor.leftEdgeStrip"
+msgid "Left edge strip"
+msgstr "Striscia sinistra"
+
+msgctxt "widget-editor.legend"
+msgid "Legend"
+msgstr "Legenda"
+
+msgctxt "widget-editor.letterSpacing"
+msgid "Spacing"
+msgstr "Spaziatura"
+
+msgctxt "widget-editor.lineStyling"
+msgid "Line Styling"
+msgstr "Stile linea"
+
+msgctxt "widget-editor.liveValue"
+msgid "Value"
+msgstr "Valore"
+
+msgctxt "widget-editor.longitude"
+msgid "Longitude"
+msgstr "Longitudine"
+
+msgctxt "widget-editor.lthr"
+msgid "Lactate Threshold HR"
+msgstr "FC soglia lattato"
+
+msgctxt "widget-editor.majorInterval"
+msgid "Interval"
+msgstr "Intervallo"
+
+msgctxt "widget-editor.majorLabels"
+msgid "Major Labels"
+msgstr "Etichette grandi"
+
+msgctxt "widget-editor.majorLength"
+msgid "Major Length"
+msgstr "Lunghezza maggiore"
+
+msgctxt "widget-editor.majorSpacing"
+msgid "Spacing"
+msgstr "Spaziatura"
+
+msgctxt "widget-editor.majorThickness"
+msgid "Major Thickness"
+msgstr "Spessore maggiore"
+
+msgctxt "widget-editor.majorTickColor"
+msgid "Major Color"
+msgstr "Colore princ."
+
+msgctxt "widget-editor.majorTicks"
+msgid "Major Ticks"
+msgstr "Tacche principali"
+
+msgctxt "widget-editor.mapBuildings"
+msgid "Buildings"
+msgstr "Edifici"
+
+msgctxt "widget-editor.mapLabels"
+msgid "Labels"
+msgstr "Etichette"
+
+msgctxt "widget-editor.mapLocalNames"
+msgid "Local Names"
+msgstr "Nomi locali"
+
+msgctxt "widget-editor.mapPaths"
+msgid "Paths"
+msgstr "Sentieri"
+
+msgctxt "widget-editor.mapRotation"
+msgid "Map Rotation"
+msgstr "Rotazione mappa"
+
+msgctxt "widget-editor.mapStyle"
+msgid "Map Style"
+msgstr "Stile mappa"
+
+msgctxt "widget-editor.mapView"
+msgid "Map View"
+msgstr "Vista mappa"
+
+msgctxt "widget-editor.mapWebgl2Software"
+msgid "No GPU found. The map draws in software, so its preview and export may be slow."
+msgstr "Nessuna GPU trovata. La mappa viene renderizzata via software, quindi anteprima ed esportazione potrebbero essere lente."
+
+msgctxt "widget-editor.mapWebgl2Unavailable"
+msgid "WebGL2 isn't available on this system, so the map can't be previewed."
+msgstr "WebGL2 non è disponibile su questo sistema, quindi la mappa non può essere visualizzata in anteprima."
+
+msgctxt "widget-editor.marker"
+msgid "Marker"
+msgstr "Marcatore"
+
+msgctxt "widget-editor.markerArrow"
+msgid "Arrow"
+msgstr "Freccia"
+
+msgctxt "widget-editor.markerColor"
+msgid "Marker Color"
+msgstr "Colore marcatore"
+
+msgctxt "widget-editor.markerOpacity"
+msgid "Marker Opacity"
+msgstr "Opacità marcatore"
+
+msgctxt "widget-editor.markerSize"
+msgid "Marker Size"
+msgstr "Misura marcatore"
+
+msgctxt "widget-editor.markerType"
+msgid "Marker Type"
+msgstr "Tipo marcatore"
+
+msgctxt "widget-editor.maxHeartrate"
+msgid "Max Heart Rate"
+msgstr "FC massima"
+
+msgctxt "widget-editor.maxSplits"
+msgid "Max Splits"
+msgstr "Parziali max"
+
+msgctxt "widget-editor.metricLabel"
+msgid "Metric Label"
+msgstr "Etichetta metrica"
+
+msgctxt "widget-editor.metricOffsetX"
+msgid "Metric Offset X"
+msgstr "Offset X metrico"
+
+msgctxt "widget-editor.metricOffsetY"
+msgid "Metric Offset Y"
+msgstr "Offset Y metrico"
+
+msgctxt "widget-editor.minmaxLabels"
+msgid "Min/Max Labels"
+msgstr "Etichette min max"
+
+msgctxt "widget-editor.minorLabels"
+msgid "Minor Labels"
+msgstr "Etichette minori"
+
+msgctxt "widget-editor.minorLength"
+msgid "Minor Length"
+msgstr "Lunghezza minore"
+
+msgctxt "widget-editor.minorThickness"
+msgid "Minor Thickness"
+msgstr "Spessore minore"
+
+msgctxt "widget-editor.minorTickColor"
+msgid "Minor Color"
+msgstr "Colore sec."
+
+msgctxt "widget-editor.minorTicks"
+msgid "Minor Ticks"
+msgstr "Tacche minori"
+
+msgctxt "widget-editor.moveDown"
+msgid "Move down"
+msgstr "Sposta giù"
+
+msgctxt "widget-editor.moveUp"
+msgid "Move up"
+msgstr "Sposta su"
+
+msgctxt "widget-editor.msaa"
+msgid "Anti-aliasing (MSAA)"
+msgstr "Antialiasing (MSAA)"
+
+msgctxt "widget-editor.msaaOff"
+msgid "Off"
+msgstr "Disattivato"
+
+msgctxt "widget-editor.negativeDeltaColor"
+msgid "Negative Delta Color"
+msgstr "Colore calo"
+
+msgctxt "widget-editor.noActiveWidgets"
+msgid "No active widgets"
+msgstr "Widget non attivi"
+
+msgctxt "widget-editor.northUp"
+msgid "North Up"
+msgstr "Nord in alto"
+
+msgctxt "widget-editor.offset"
+msgid "Offset"
+msgstr "Offset"
+
+msgctxt "widget-editor.opacity"
+msgid "Opacity"
+msgstr "Opacità"
+
+msgctxt "widget-editor.orientation"
+msgid "Orientation"
+msgstr "Orientamento"
+
+msgctxt "widget-editor.percentColor"
+msgid "Percent Color"
+msgstr "Colore percentuale"
+
+msgctxt "widget-editor.pitch"
+msgid "Pitch"
+msgstr "Inclinazione"
+
+msgctxt "widget-editor.pixelsPerDegree"
+msgid "Pixels per Degree"
+msgstr "Pixel per grado"
+
+msgctxt "widget-editor.placement"
+msgid "Placement"
+msgstr "Posizionamento"
+
+msgctxt "widget-editor.position"
+msgid "Position"
+msgstr "Posizione"
+
+msgctxt "widget-editor.positiveDeltaColor"
+msgid "Positive Delta Color"
+msgstr "Colore aumento"
+
+msgctxt "widget-editor.profileDetail"
+msgid "Profile Detail"
+msgstr "Dettaglio profilo"
+
+msgctxt "widget-editor.readout"
+msgid "Readout"
+msgstr "Visualizzazione"
+
+msgctxt "widget-editor.remainingColor"
+msgid "Remaining Color"
+msgstr "Colore rimanente"
+
+msgctxt "widget-editor.remainingOpacity"
+msgid "Remaining Opacity"
+msgstr "Opacità rimanente"
+
+msgctxt "widget-editor.removeMetric"
+msgid "Remove metric"
+msgstr "Rimuovi metrica"
+
+msgctxt "widget-editor.renumberLaps"
+msgid "Renumber laps"
+msgstr "Rinumera i giri"
+
+msgctxt "widget-editor.resetField"
+msgid "Reset field"
+msgstr "Reimposta campo"
+
+msgctxt "widget-editor.resetLabel"
+msgid "Reset {0}"
+msgstr "Reimposta {0}"
+
+msgctxt "widget-editor.riderUp"
+msgid "Rider Up"
+msgstr "Direzione in alto"
+
+msgctxt "widget-editor.right"
+msgid "Right"
+msgstr "Destra"
+
+msgctxt "widget-editor.rightEdgeStrip"
+msgid "Right edge strip"
+msgstr "Striscia destra"
+
+msgctxt "widget-editor.ringDiameter"
+msgid "Ring Diameter"
+msgstr "Diametro anello"
+
+msgctxt "widget-editor.rotation"
+msgid "Rotation"
+msgstr "Rotazione"
+
+msgctxt "widget-editor.rotationMode"
+msgid "Rotation Mode"
+msgstr "Modalità di rotazione"
+
+msgctxt "widget-editor.roundBottomLeftCorner"
+msgid "Round bottom left corner"
+msgstr "Basso sinistro"
+
+msgctxt "widget-editor.roundBottomRightCorner"
+msgid "Round bottom right corner"
+msgstr "Basso destro"
+
+msgctxt "widget-editor.roundTopLeftCorner"
+msgid "Round top left corner"
+msgstr "Alto sinistro"
+
+msgctxt "widget-editor.roundTopRightCorner"
+msgid "Round top right corner"
+msgstr "Alto destro"
+
+msgctxt "widget-editor.routeDetail"
+msgid "Route Detail"
+msgstr "Dettaglio percorso"
+
+msgctxt "widget-editor.rowGap"
+msgid "Row Gap"
+msgstr "Spaziatura righe"
+
+msgctxt "widget-editor.segmentedBars"
+msgid "Segmented Bars"
+msgstr "Barre segmentate"
+
+msgctxt "widget-editor.shape"
+msgid "Shape"
+msgstr "Forma"
+
+msgctxt "widget-editor.showFullActivity"
+msgid "Show Full Activity"
+msgstr "Attività completa"
+
+msgctxt "widget-editor.showFullAscent"
+msgid "Show Full Ascent"
+msgstr "Salita completa"
+
+msgctxt "widget-editor.showFullDistance"
+msgid "Show Full Distance"
+msgstr "Distanza completa"
+
+msgctxt "widget-editor.showIndicator"
+msgid "Show Indicator"
+msgstr "Mostra indicatore"
+
+msgctxt "widget-editor.showLabels"
+msgid "Show Labels"
+msgstr "Mostra etichette"
+
+msgctxt "widget-editor.showSign"
+msgid "Show sign"
+msgstr "Mostra segno"
+
+msgctxt "widget-editor.showValue"
+msgid "Show Value"
+msgstr "Mostra valore"
+
+msgctxt "widget-editor.singleCircle"
+msgid "Single Circle"
+msgstr "Cerchio singolo"
+
+msgctxt "widget-editor.size"
+msgid "Size"
+msgstr "Dimensione"
+
+msgctxt "widget-editor.smoothing"
+msgid "Smoothing"
+msgstr "Levigatura"
+
+msgctxt "widget-editor.solidHalo"
+msgid "Solid Halo"
+msgstr "Alone pieno"
+
+msgctxt "widget-editor.splitColumnBar"
+msgid "Bar"
+msgstr "Barra"
+
+msgctxt "widget-editor.splitColumnPace"
+msgid "Pace"
+msgstr "Passo"
+
+msgctxt "widget-editor.splitColumnSplit"
+msgid "Split"
+msgstr "Parziale"
+
+msgctxt "widget-editor.splitColumns"
+msgid "Columns"
+msgstr "Colonne"
+
+msgctxt "widget-editor.splitLength"
+msgid "Split Length"
+msgstr "Lunghezza parziale"
+
+msgctxt "widget-editor.splits"
+msgid "Splits"
+msgstr "Parziali"
+
+msgctxt "widget-editor.stripColor"
+msgid "Strip Color"
+msgstr "Colore striscia"
+
+msgctxt "widget-editor.stripThickness"
+msgid "Strip Thickness"
+msgstr "Spessore striscia"
+
+msgctxt "widget-editor.style"
+msgid "Style"
+msgstr "Stile"
+
+msgctxt "widget-editor.tapeScale"
+msgid "Tape Scale"
+msgstr "Scala nastro"
+
+msgctxt "widget-editor.text"
+msgid "Text"
+msgstr "Testo"
+
+msgctxt "widget-editor.thickness"
+msgid "Thickness"
+msgstr "Spessore"
+
+msgctxt "widget-editor.tickColor"
+msgid "Tick Color"
+msgstr "Colore tacche"
+
+msgctxt "widget-editor.tickLength"
+msgid "Tick Length"
+msgstr "Lunghezza tacche"
+
+msgctxt "widget-editor.ticks"
+msgid "Ticks"
+msgstr "Tacche"
+
+msgctxt "widget-editor.timeFormat12h"
+msgid "Time only (12h)"
+msgstr "Solo ora (12h)"
+
+msgctxt "widget-editor.timeFormat12hWithSeconds"
+msgid "Time only (12h with seconds)"
+msgstr "Solo ora (12h con secondi)"
+
+msgctxt "widget-editor.timeFormat24h"
+msgid "Time only (24h)"
+msgstr "Solo ora (24h)"
+
+msgctxt "widget-editor.timeFormat24hWithSeconds"
+msgid "Time only (24h with seconds)"
+msgstr "Solo ora (24h con secondi)"
+
+msgctxt "widget-editor.timeMode"
+msgid "Time Mode"
+msgstr "Modalità oraria"
+
+msgctxt "widget-editor.timeWindow"
+msgid "Time Window"
+msgstr "Finestra temporale"
+
+msgctxt "widget-editor.top"
+msgid "Top"
+msgstr "In alto"
+
+msgctxt "widget-editor.topDown"
+msgid "Top Down"
+msgstr "Vista dall'alto"
+
+msgctxt "widget-editor.topEdgeStrip"
+msgid "Top edge strip"
+msgstr "Striscia superiore"
+
+msgctxt "widget-editor.trackFill"
+msgid "Track Fill"
+msgstr "Riempimento traccia"
+
+msgctxt "widget-editor.trackStyle"
+msgid "Track Style"
+msgstr "Stile traccia"
+
+msgctxt "widget-editor.transparency"
+msgid "Transparency"
+msgstr "Trasparenza"
+
+msgctxt "widget-editor.trendSeconds"
+msgid "Trend"
+msgstr "Tendenza"
+
+msgctxt "widget-editor.typography"
+msgid "Typography"
+msgstr "Tipografia"
+
+msgctxt "widget-editor.unit"
+msgid "Unit"
+msgstr "Unità"
+
+msgctxt "widget-editor.unitColor"
+msgid "Unit Color"
+msgstr "Colore unità"
+
+msgctxt "widget-editor.units"
+msgid "Units"
+msgstr "Unità"
+
+msgctxt "widget-editor.valueColor"
+msgid "Value Color"
+msgstr "Colore valore"
+
+msgctxt "widget-editor.valueOffset"
+msgid "Value Offset"
+msgstr "Offset valore"
+
+msgctxt "widget-editor.vertical"
+msgid "Vertical"
+msgstr "Verticale"
+
+msgctxt "widget-editor.verticalOffset"
+msgid "Vertical Offset"
+msgstr "Offset verticale"
+
+msgctxt "widget-editor.verticalPosition"
+msgid "Vertical Position"
+msgstr "Posizione altezza"
+
+msgctxt "widget-editor.verticalScale"
+msgid "Vertical Scale"
+msgstr "Scala verticale"
+
+msgctxt "widget-editor.verticalSpeed"
+msgid "Vert. Speed"
+msgstr "Vel. verticale"
+
+msgctxt "widget-editor.width"
+msgid "Width"
+msgstr "Larghezza"
+
+msgctxt "widget-editor.zoneCalculation"
+msgid "Zone Calculation"
+msgstr "Calcolo delle zone"
+
+msgctxt "widget-editor.zoneCalculationLthr"
+msgid "Lactate Threshold HR"
+msgstr "FC soglia lattato"
+
+msgctxt "widget-editor.zoneCalculationManual"
+msgid "Manual"
+msgstr "Manuale"
+
+msgctxt "widget-editor.zoneCalculationMaxHeartrate"
+msgid "Max Heart Rate"
+msgstr "FC massima"
+
+msgctxt "widget-editor.zoneFrom"
+msgid "From"
+msgstr "Da"
+
+msgctxt "widget-editor.zoneLabel"
+msgid "Zone Label"
+msgstr "Etichetta zona"
+
+msgctxt "widget-editor.zoneTo"
+msgid "To"
+msgstr "A"
+
+msgctxt "widget-editor.zoom"
+msgid "Zoom"
+msgstr "Zoom"
+
+msgctxt "widgets.activityAttributes.barometric_altitude"
+msgid "Barometric Altitude"
+msgstr "Altitudine barometrica"
+
+msgctxt "widgets.backdropTypes.circle"
+msgid "Circle"
+msgstr "Cerchio"
+
+msgctxt "widgets.backdropTypes.rectangle"
+msgid "Rectangle"
+msgstr "Rettangolo"
+
+msgctxt "widgets.categories.camera"
+msgid "Camera"
+msgstr "Fotocamera"
+
+msgctxt "widgets.categories.cycling"
+msgid "Cycling"
+msgstr "Ciclismo"
+
+msgctxt "widgets.categories.general"
+msgid "General"
+msgstr "Generale"
+
+msgctxt "widgets.categories.motosports"
+msgid "Motorsports"
+msgstr "Motorsport"
+
+msgctxt "widgets.categories.other"
+msgid "Other"
+msgstr "Altro"
+
+msgctxt "widgets.categories.running"
+msgid "Running"
+msgstr "Corsa"
+
+msgctxt "widgets.categories.scuba_diving"
+msgid "Scuba Diving"
+msgstr "Immersioni subacquee"
+
+msgctxt "widgets.displayTypes.altitudeTape"
+msgid "Altitude Tape"
+msgstr "Nastro altitudine"
+
+msgctxt "widgets.displayTypes.arc"
+msgid "Arc Gauge"
+msgstr "Indicatore ad arco"
+
+msgctxt "widgets.displayTypes.corner"
+msgid "Corner Gauge"
+msgstr "Indicatore angolare"
+
+msgctxt "widgets.displayTypes.depthTape"
+msgid "Depth Tape"
+msgstr "Nastro profondità"
+
+msgctxt "widgets.displayTypes.gForce"
+msgid "G-Force"
+msgstr "Forza G"
+
+msgctxt "widgets.displayTypes.gtGauge"
+msgid "GT Gauge"
+msgstr "Indicatore GT"
+
+msgctxt "widgets.displayTypes.headingCompass"
+msgid "Heading Compass"
+msgstr "Bussola di rotta"
+
+msgctxt "widgets.displayTypes.headingTape"
+msgid "Heading Tape"
+msgstr "Nastro direzione"
+
+msgctxt "widgets.displayTypes.heartZones"
+msgid "Heart Zones"
+msgstr "Zone cardiache"
+
+msgctxt "widgets.displayTypes.lapTimer"
+msgid "Lap Times"
+msgstr "Tempi sul giro"
+
+msgctxt "widgets.displayTypes.leanAngle"
+msgid "Lean Angle"
+msgstr "Angolo di inclinazione"
+
+msgctxt "widgets.displayTypes.linear"
+msgid "Linear Bar"
+msgstr "Barra lineare"
+
+msgctxt "widgets.displayTypes.splitsRun"
+msgid "Splits"
+msgstr "Parziali"
+
+msgctxt "widgets.displayTypes.text"
+msgid "Text"
+msgstr "Testo"
+
+msgctxt "widgets.drawerGroups.map.mapTiles"
+msgid "Map Tiles"
+msgstr "Tile della mappa"
+
+msgctxt "widgets.drawerGroups.map.route"
+msgid "Route"
+msgstr "Percorso"
+
+msgctxt "widgets.drawerGroups.map.route3d"
+msgid "3D Route"
+msgstr "Percorso 3D"
+
+msgctxt "widgets.drawerGroups.map.shortName"
+msgid "Map"
+msgstr "Mappa"
+
+msgctxt "widgets.lapTimerModes.bestLap"
+msgid "Best Lap"
+msgstr "Giro migliore"
+
+msgctxt "widgets.lapTimerModes.currentLap"
+msgid "Current Lap"
+msgstr "Giro corrente"
+
+msgctxt "widgets.lapTimerModes.delta"
+msgid "Delta"
+msgstr "Delta"
+
+msgctxt "widgets.lapTimerModes.lapLog"
+msgid "Lap Log"
+msgstr "Registro giri"
+
+msgctxt "widgets.types.air_pressure.name"
+msgid "Air Pressure"
+msgstr "Pressione atmosferica"
+
+msgctxt "widgets.types.air_pressure.shortName"
+msgid "Air Press."
+msgstr "Pressione"
+
+msgctxt "widgets.types.altitude.name"
+msgid "Altitude"
+msgstr "Altitudine"
+
+msgctxt "widgets.types.altitude.shortName"
+msgid "Altitude"
+msgstr "Altitudine"
+
+msgctxt "widgets.types.aperture.name"
+msgid "Aperture"
+msgstr "Diaframma"
+
+msgctxt "widgets.types.aperture.shortName"
+msgid "Aperture"
+msgstr "Diaframma"
+
+msgctxt "widgets.types.average_ppo2.name"
+msgid "Average ppO₂"
+msgstr "ppO₂ media"
+
+msgctxt "widgets.types.average_ppo2.shortName"
+msgid "ppO₂"
+msgstr "ppO₂"
+
+msgctxt "widgets.types.backdrop.name"
+msgid "Backdrop"
+msgstr "Sfondo"
+
+msgctxt "widgets.types.backdrop.shortName"
+msgid "Backdrop"
+msgstr "Sfondo"
+
+msgctxt "widgets.types.boost_pressure.name"
+msgid "Boost Pressure"
+msgstr "Pressione di sovralimentazione"
+
+msgctxt "widgets.types.boost_pressure.shortName"
+msgid "Boost"
+msgstr "Turbo"
+
+msgctxt "widgets.types.brake_position.name"
+msgid "Brake Position"
+msgstr "Posizione freno"
+
+msgctxt "widgets.types.brake_position.shortName"
+msgid "Brake"
+msgstr "Freno"
+
+msgctxt "widgets.types.cadence.name"
+msgid "Cadence"
+msgstr "Cadenza"
+
+msgctxt "widgets.types.cadence.shortName"
+msgid "Cadence"
+msgstr "Cadenza"
+
+msgctxt "widgets.types.calories.name"
+msgid "Calories"
+msgstr "Calorie"
+
+msgctxt "widgets.types.calories.shortName"
+msgid "Calories"
+msgstr "Calorie"
+
+msgctxt "widgets.types.color_temperature.name"
+msgid "Color Temperature"
+msgstr "Temperatura colore"
+
+msgctxt "widgets.types.color_temperature.shortName"
+msgid "WB"
+msgstr "WB"
+
+msgctxt "widgets.types.coolant_temperature.name"
+msgid "Coolant Temperature"
+msgstr "Temperatura del liquido di raffreddamento"
+
+msgctxt "widgets.types.coolant_temperature.shortName"
+msgid "Coolant"
+msgstr "Refrig."
+
+msgctxt "widgets.types.core_temperature.name"
+msgid "Core Temperature"
+msgstr "Temperatura corporea"
+
+msgctxt "widgets.types.core_temperature.shortName"
+msgid "Core T."
+msgstr "Temp. corp."
+
+msgctxt "widgets.types.course.name"
+msgid "Route Map"
+msgstr "Mappa percorso"
+
+msgctxt "widgets.types.course.shortName"
+msgid "Map"
+msgstr "Mappa"
+
+msgctxt "widgets.types.depth.name"
+msgid "Depth"
+msgstr "Profondità"
+
+msgctxt "widgets.types.depth.shortName"
+msgid "Depth"
+msgstr "Profondità"
+
+msgctxt "widgets.types.distance.name"
+msgid "Distance"
+msgstr "Distanza"
+
+msgctxt "widgets.types.distance.shortName"
+msgid "Dist."
+msgstr "Dist."
+
+msgctxt "widgets.types.distance_to_home.name"
+msgid "Distance to Home"
+msgstr "Distanza da casa"
+
+msgctxt "widgets.types.distance_to_home.shortName"
+msgid "Home"
+msgstr "Casa"
+
+msgctxt "widgets.types.diving_profile.name"
+msgid "Diving Profile"
+msgstr "Profilo di immersione"
+
+msgctxt "widgets.types.diving_profile.shortName"
+msgid "Dive Profile"
+msgstr "Profilo immersione"
+
+msgctxt "widgets.types.elevation.name"
+msgid "Elevation"
+msgstr "Profilo altimetrico"
+
+msgctxt "widgets.types.elevation.shortName"
+msgid "Elev."
+msgstr "Profilo"
+
+msgctxt "widgets.types.engine_load.name"
+msgid "Engine Load"
+msgstr "Carico motore"
+
+msgctxt "widgets.types.engine_load.shortName"
+msgid "Eng. Load"
+msgstr "Carico mot."
+
+msgctxt "widgets.types.engine_power.name"
+msgid "Engine Power"
+msgstr "Potenza motore"
+
+msgctxt "widgets.types.engine_power.shortName"
+msgid "Eng. Power"
+msgstr "Pot. motore"
+
+msgctxt "widgets.types.ev.name"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.ev.shortName"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.first_stop_depth.name"
+msgid "First Stop Depth"
+msgstr "Profondità della prima sosta"
+
+msgctxt "widgets.types.first_stop_depth.shortName"
+msgid "Stop Depth"
+msgstr "Prof. sosta"
+
+msgctxt "widgets.types.first_stop_time.name"
+msgid "First Stop Time"
+msgstr "Durata della prima sosta"
+
+msgctxt "widgets.types.first_stop_time.shortName"
+msgid "Stop Time"
+msgstr "Durata sosta"
+
+msgctxt "widgets.types.focal_length.name"
+msgid "Focal Length"
+msgstr "Lunghezza focale"
+
+msgctxt "widgets.types.focal_length.shortName"
+msgid "Focal L."
+msgstr "Focale"
+
+msgctxt "widgets.types.g_force.name"
+msgid "G-Force"
+msgstr "Forza G"
+
+msgctxt "widgets.types.g_force.shortName"
+msgid "G-Force"
+msgstr "Forza G"
+
+msgctxt "widgets.types.gas_mix.name"
+msgid "Gas Mix (O₂/He)"
+msgstr "Miscela di gas (O₂/He)"
+
+msgctxt "widgets.types.gas_mix.shortName"
+msgid "O₂/He"
+msgstr "O₂/He"
+
+msgctxt "widgets.types.gear_position.name"
+msgid "Gear Position"
+msgstr "Posizione marcia"
+
+msgctxt "widgets.types.gear_position.shortName"
+msgid "Gear"
+msgstr "Marcia"
+
+msgctxt "widgets.types.gps_coordinates.name"
+msgid "GPS Coordinates"
+msgstr "Coordinate GPS"
+
+msgctxt "widgets.types.gps_coordinates.shortName"
+msgid "Location"
+msgstr "Posizione"
+
+msgctxt "widgets.types.gradient.name"
+msgid "Gradient"
+msgstr "Pendenza"
+
+msgctxt "widgets.types.gradient.shortName"
+msgid "Grad."
+msgstr "Pendenza"
+
+msgctxt "widgets.types.ground_contact_time.name"
+msgid "Ground Contact Time"
+msgstr "Tempo contatto suolo"
+
+msgctxt "widgets.types.ground_contact_time.shortName"
+msgid "GCT"
+msgstr "Contatto"
+
+msgctxt "widgets.types.heading.name"
+msgid "Heading"
+msgstr "Direzione"
+
+msgctxt "widgets.types.heading.shortName"
+msgid "Heading"
+msgstr "Direzione"
+
+msgctxt "widgets.types.heartrate.name"
+msgid "Heart Rate"
+msgstr "Frequenza cardiaca"
+
+msgctxt "widgets.types.heartrate.shortName"
+msgid "HR"
+msgstr "FC"
+
+msgctxt "widgets.types.iso.name"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.iso.shortName"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.label.name"
+msgid "Text"
+msgstr "Testo"
+
+msgctxt "widgets.types.label.shortName"
+msgid "Text"
+msgstr "Testo"
+
+msgctxt "widgets.types.lap_timer.name"
+msgid "Lap Timer"
+msgstr "Cronometro giri"
+
+msgctxt "widgets.types.lap_timer.shortName"
+msgid "Lap Times"
+msgstr "Tempi giri"
+
+msgctxt "widgets.types.lean_angle.name"
+msgid "Lean Angle"
+msgstr "Angolo inclinazione"
+
+msgctxt "widgets.types.lean_angle.shortName"
+msgid "Lean"
+msgstr "Inclinazione"
+
+msgctxt "widgets.types.left_right_balance.name"
+msgid "Left/Right Balance"
+msgstr "Bilanciamento sinistra/destra"
+
+msgctxt "widgets.types.left_right_balance.shortName"
+msgid "L/R Bal."
+msgstr "Bil. S/D"
+
+msgctxt "widgets.types.map.name"
+msgid "Street Map"
+msgstr "Mappa stradale"
+
+msgctxt "widgets.types.map.shortName"
+msgid "Streets"
+msgstr "Strade"
+
+msgctxt "widgets.types.pace.name"
+msgid "Pace"
+msgstr "Passo"
+
+msgctxt "widgets.types.pace.shortName"
+msgid "Pace"
+msgstr "Passo"
+
+msgctxt "widgets.types.power.name"
+msgid "Power"
+msgstr "Potenza"
+
+msgctxt "widgets.types.power.shortName"
+msgid "Power"
+msgstr "Potenza"
+
+msgctxt "widgets.types.raster.name"
+msgid "Image"
+msgstr "Immagine"
+
+msgctxt "widgets.types.raster.shortName"
+msgid "Image"
+msgstr "Immagine"
+
+msgctxt "widgets.types.rolling_chart.name"
+msgid "Charts"
+msgstr "Grafici"
+
+msgctxt "widgets.types.rolling_chart.shortName"
+msgid "Charts"
+msgstr "Grafici"
+
+msgctxt "widgets.types.rpm.name"
+msgid "RPM"
+msgstr "Giri motore"
+
+msgctxt "widgets.types.rpm.shortName"
+msgid "RPM"
+msgstr "RPM"
+
+msgctxt "widgets.types.shutter_speed.name"
+msgid "Shutter Speed"
+msgstr "Velocità otturatore"
+
+msgctxt "widgets.types.shutter_speed.shortName"
+msgid "Shutter"
+msgstr "Otturatore"
+
+msgctxt "widgets.types.speed.name"
+msgid "Speed"
+msgstr "Velocità"
+
+msgctxt "widgets.types.speed.shortName"
+msgid "Speed"
+msgstr "Velocità"
+
+msgctxt "widgets.types.splits_run.name"
+msgid "Running Splits"
+msgstr "Parziali di corsa"
+
+msgctxt "widgets.types.splits_run.shortName"
+msgid "Splits"
+msgstr "Parziali"
+
+msgctxt "widgets.types.stride_length.name"
+msgid "Stride Length"
+msgstr "Lunghezza passo"
+
+msgctxt "widgets.types.stride_length.shortName"
+msgid "Stride"
+msgstr "Passo"
+
+msgctxt "widgets.types.stroke_rate.name"
+msgid "Stroke Rate"
+msgstr "Frequenza bracciate"
+
+msgctxt "widgets.types.stroke_rate.shortName"
+msgid "S/R"
+msgstr "Bracciate"
+
+msgctxt "widgets.types.temperature.name"
+msgid "Temperature"
+msgstr "Temperatura"
+
+msgctxt "widgets.types.temperature.shortName"
+msgid "Temp."
+msgstr "Temperatura"
+
+msgctxt "widgets.types.throttle_position.name"
+msgid "Throttle Position"
+msgstr "Posizione acceleratore"
+
+msgctxt "widgets.types.throttle_position.shortName"
+msgid "Throttle"
+msgstr "Acceleratore"
+
+msgctxt "widgets.types.time.name"
+msgid "Time"
+msgstr "Tempo"
+
+msgctxt "widgets.types.time.shortName"
+msgid "Time"
+msgstr "Tempo"
+
+msgctxt "widgets.types.time_to_surface.name"
+msgid "Time to Surface"
+msgstr "Tempo alla superficie"
+
+msgctxt "widgets.types.time_to_surface.shortName"
+msgid "TTS"
+msgstr "TTS"
+
+msgctxt "widgets.types.torque.name"
+msgid "Torque"
+msgstr "Coppia"
+
+msgctxt "widgets.types.torque.shortName"
+msgid "Torque"
+msgstr "Coppia"
+
+msgctxt "widgets.types.total_ascent.name"
+msgid "Total Ascent"
+msgstr "Dislivello positivo totale"
+
+msgctxt "widgets.types.total_ascent.shortName"
+msgid "Ascent"
+msgstr "Salita"
+
+msgctxt "widgets.types.vertical_oscillation.name"
+msgid "Vertical Oscillation"
+msgstr "Oscillazione verticale"
+
+msgctxt "widgets.types.vertical_oscillation.shortName"
+msgid "V. Osc."
+msgstr "Osc. verticale"
+
+msgctxt "widgets.types.vertical_ratio.name"
+msgid "Vertical Ratio"
+msgstr "Rapporto verticale"
+
+msgctxt "widgets.types.vertical_ratio.shortName"
+msgid "V. Ratio"
+msgstr "Rapporto vert."
+
+msgctxt "widgets.types.vertical_speed.name"
+msgid "Vertical Speed"
+msgstr "Velocità verticale"
+
+msgctxt "widgets.types.vertical_speed.shortName"
+msgid "V. Speed"
+msgstr "Vel. verticale"
+
+msgctxt "widgets.types.water_temperature.name"
+msgid "Water Temperature"
+msgstr "Temperatura dell’acqua"
+
+msgctxt "widgets.types.water_temperature.shortName"
+msgid "Water Temp."
+msgstr "Temp. acqua"

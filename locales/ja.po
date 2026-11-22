@@ -1,0 +1,3400 @@
+msgid ""
+msgstr ""
+"Language: ja\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+
+msgctxt "app-shell.agentConnected"
+msgid "Agent connected"
+msgstr "エージェント接続中"
+
+msgctxt "app-shell.agentConnectedHelp"
+msgid "An AI agent is connected over MCP and may change this window. Turn off \"Allow agent edits\" in Settings to stop it."
+msgstr "AI エージェントが MCP で接続しており、このウィンドウを変更する可能性があります。停止するには、設定で「エージェントによる編集を許可」をオフにしてください。"
+
+msgctxt "app-shell.allowAgentEdits"
+msgid "Allow agent edits"
+msgstr "エージェントによる編集を許可"
+
+msgctxt "app-shell.allowAgentEditsHelp"
+msgid "Lets an AI agent connected over MCP (ovrley --mcp) change this window, such as the language and the drawers. Turn it off to refuse every agent request."
+msgstr "MCP（ovrley --mcp）で接続した AI エージェントが、言語やドロワーなどこのウィンドウを変更できるようにします。オフにすると、エージェントからの要求をすべて拒否します。"
+
+msgctxt "app-shell.blackBackground"
+msgid "Black background"
+msgstr "黒い背景"
+
+msgctxt "app-shell.checkeredBackground"
+msgid "Checkered background"
+msgstr "市松模様の背景"
+
+msgctxt "app-shell.clearMapTileCache"
+msgid "Clear cache"
+msgstr "キャッシュを消去"
+
+msgctxt "app-shell.close"
+msgid "Close"
+msgstr "閉じる"
+
+msgctxt "app-shell.copyError"
+msgid "Copy error"
+msgstr "エラーをコピー"
+
+msgctxt "app-shell.dropFilesToImport"
+msgid "Drop files to import"
+msgstr "ファイルをドロップしてインポート"
+
+msgctxt "app-shell.errorRenderingVideo"
+msgid "Error Rendering Video"
+msgstr "動画のレンダリングエラー"
+
+msgctxt "app-shell.file"
+msgid "File"
+msgstr "ファイル"
+
+msgctxt "app-shell.fileMenu"
+msgid "File menu"
+msgstr "ファイルメニュー"
+
+msgctxt "app-shell.grid"
+msgid "Toggle grid"
+msgstr "グリッドの切り替え"
+
+msgctxt "app-shell.imageBackground"
+msgid "Image background"
+msgstr "画像の背景"
+
+msgctxt "app-shell.importActivity"
+msgid "Import Activity"
+msgstr "アクティビティをインポート"
+
+msgctxt "app-shell.importTemplate"
+msgid "Import Template"
+msgstr "テンプレートをインポート"
+
+msgctxt "app-shell.importVideo"
+msgid "Import Videos"
+msgstr "動画をインポート"
+
+msgctxt "app-shell.keyboardShortcutsDescription"
+msgid "You can use the following keyboard shortcuts to improve your workflow:"
+msgstr "次のキーボードショートカットを使うと作業を効率化できます:"
+
+msgctxt "app-shell.language"
+msgid "Language"
+msgstr "言語"
+
+msgctxt "app-shell.loadProject"
+msgid "Load Project"
+msgstr "プロジェクトを読み込む"
+
+msgctxt "app-shell.loadingEditorData"
+msgid "Loading editor data..."
+msgstr "エディターのデータを読み込んでいます..."
+
+msgctxt "app-shell.mapTileCache"
+msgid "Map tile cache"
+msgstr "地図タイルキャッシュ"
+
+msgctxt "app-shell.mapTileCacheHelp"
+msgid "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first."
+msgstr "プレビューやレンダリング用にダウンロードした地図タイルはディスクに保存され、地図の読み込みが速くなりオフラインでも使えます。キャッシュがいっぱいになると、最も長く使われていないタイルから削除されます。"
+
+msgctxt "app-shell.mapTileCacheLimit"
+msgid "Cache size"
+msgstr "キャッシュサイズ"
+
+msgctxt "app-shell.mapTileCacheUsage"
+msgid "{0} of {1} used"
+msgstr "{1} 中 {0} 使用"
+
+msgctxt "app-shell.newProject"
+msgid "New Project"
+msgstr "新規プロジェクト"
+
+msgctxt "app-shell.newTemplate"
+msgid "New Template"
+msgstr "新規テンプレート"
+
+msgctxt "app-shell.overlays"
+msgid "Overlays"
+msgstr "オーバーレイ"
+
+msgctxt "app-shell.resetZoom"
+msgid "Reset zoom"
+msgstr "ズームをリセット"
+
+msgctxt "app-shell.save"
+msgid "Save"
+msgstr "保存"
+
+msgctxt "app-shell.saveProject"
+msgid "Save Project"
+msgstr "プロジェクトを保存"
+
+msgctxt "app-shell.saveProjectAs"
+msgid "Save Project As"
+msgstr "プロジェクトを別名で保存"
+
+msgctxt "app-shell.saveTemplate"
+msgid "Save Template"
+msgstr "テンプレートを保存"
+
+msgctxt "app-shell.selectTemplate"
+msgid "Select Template..."
+msgstr "テンプレートを選択..."
+
+msgctxt "app-shell.settings"
+msgid "Settings"
+msgstr "設定"
+
+msgctxt "app-shell.shortcuts"
+msgid "Shortcuts"
+msgstr "ショートカット"
+
+msgctxt "app-shell.snapToGrid"
+msgid "Snap to grid"
+msgstr "グリッドにスナップ"
+
+msgctxt "app-shell.unitSystem"
+msgid "Units"
+msgstr "単位"
+
+msgctxt "app-shell.unitSystems.imperial"
+msgid "Imperial"
+msgstr "ヤード・ポンド法"
+
+msgctxt "app-shell.unitSystems.metric"
+msgid "Metric"
+msgstr "メートル法"
+
+msgctxt "app-shell.unknownResolution"
+msgid "Unknown Resolution"
+msgstr "不明な解像度"
+
+msgctxt "app-shell.videoBackground"
+msgid "Video background"
+msgstr "動画の背景"
+
+msgctxt "app-shell.whiteBackground"
+msgid "White background"
+msgstr "白い背景"
+
+msgctxt "app-shell.widgets"
+msgid "Widgets"
+msgstr "ウィジェット"
+
+msgctxt "app-shell.zoomIn"
+msgid "Zoom in"
+msgstr "ズームイン"
+
+msgctxt "app-shell.zoomOut"
+msgid "Zoom out"
+msgstr "ズームアウト"
+
+msgctxt "app-update.close"
+msgid "Close"
+msgstr "閉じる"
+
+msgctxt "app-update.continueWithInstalledVersion"
+msgid "The installed version remains available. You can close this dialog and continue working."
+msgstr "インストール済みのバージョンは引き続き利用できます。このダイアログを閉じて作業を続けられます。"
+
+msgctxt "app-update.downloadingUpdate"
+msgid "Downloading update"
+msgstr "更新をダウンロード中"
+
+msgctxt "app-update.later"
+msgid "Later"
+msgstr "後で"
+
+msgctxt "app-update.updateAvailable"
+msgid "Update available"
+msgstr "更新があります"
+
+msgctxt "app-update.updateDownloadProgress"
+msgid "Update download progress"
+msgstr "更新のダウンロード状況"
+
+msgctxt "app-update.updateFailed"
+msgid "Update failed"
+msgstr "更新に失敗しました"
+
+msgctxt "app-update.updateNow"
+msgid "Update now"
+msgstr "今すぐ更新"
+
+msgctxt "app-update.versionNowAvailable"
+msgid "OVRLEY <0>{{version}}</0> is now available."
+msgstr "OVRLEY <0>{{version}}</0> が利用可能です。"
+
+msgctxt "app.importingYourVideo"
+msgid "Importing your video..."
+msgstr "動画を読み込んでいます..."
+
+msgctxt "app.loadingProject"
+msgid "Loading project..."
+msgstr "プロジェクトを読み込んでいます..."
+
+msgctxt "app.ovrleyIsStarting"
+msgid "OVRLEY is starting..."
+msgstr "OVRLEYを起動しています..."
+
+msgctxt "app.processingYourActivity"
+msgid "Processing your activity..."
+msgstr "アクティビティを処理しています..."
+
+msgctxt "components.blueColorComponent0255"
+msgid "Blue color component (0-255)"
+msgstr "青のカラー成分 (0-255)"
+
+msgctxt "components.brightnessPercentage0100"
+msgid "Brightness percentage (0-100)"
+msgstr "明るさ (%) (0-100)"
+
+msgctxt "components.currentColorVal"
+msgid "Current color: {0}"
+msgstr "現在のカラー: {0}"
+
+msgctxt "components.decreaseValue"
+msgid "Decrease value"
+msgstr "値を減らす"
+
+msgctxt "components.gradientAddStopHint"
+msgid "Click to add a color stop"
+msgstr "クリックしてカラーストップを追加"
+
+msgctxt "components.gradientRemoveStop"
+msgid "Remove stop"
+msgstr "ストップを削除"
+
+msgctxt "components.gradientStopLabel"
+msgid "Color stop at {0}%"
+msgstr "{0}% のカラーストップ"
+
+msgctxt "components.gradientStops"
+msgid "Gradient stops"
+msgstr "グラデーションストップ"
+
+msgctxt "components.greenColorComponent0255"
+msgid "Green color component (0-255)"
+msgstr "緑のカラー成分 (0-255)"
+
+msgctxt "components.hexColorValue"
+msgid "Hex color value"
+msgstr "16進数カラー値"
+
+msgctxt "components.hueDegree0360"
+msgid "Hue degree (0-360)"
+msgstr "色相 (0-360度)"
+
+msgctxt "components.increaseValue"
+msgid "Increase value"
+msgstr "値を増やす"
+
+msgctxt "components.lightnessPercentage0100"
+msgid "Lightness percentage (0-100)"
+msgstr "明度 (%) (0-100)"
+
+msgctxt "components.presets"
+msgid "Presets"
+msgstr "プリセット"
+
+msgctxt "components.recommended"
+msgid "Recommended"
+msgstr "推奨"
+
+msgctxt "components.redColorComponent0255"
+msgid "Red color component (0-255)"
+msgstr "赤のカラー成分 (0-255)"
+
+msgctxt "components.saturationPercentage0100"
+msgid "Saturation percentage (0-100)"
+msgstr "彩度 (%) (0-100)"
+
+msgctxt "components.system"
+msgid "System"
+msgstr "システム"
+
+msgctxt "keyboard-shortcuts.activityImport"
+msgid "Import activity"
+msgstr "アクティビティをインポート"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToEnd"
+msgid "Move playhead to activity trim end"
+msgstr "再生ヘッドをアクティビティのトリム終了へ移動"
+
+msgctxt "keyboard-shortcuts.activityTrimGoToStart"
+msgid "Move playhead to activity trim start"
+msgstr "再生ヘッドをアクティビティのトリム開始へ移動"
+
+msgctxt "keyboard-shortcuts.activityTrimReset"
+msgid "Reset activity trim"
+msgstr "アクティビティのトリムをリセット"
+
+msgctxt "keyboard-shortcuts.drawerClose"
+msgid "Close widget drawer"
+msgstr "ウィジェットドロワーを閉じる"
+
+msgctxt "keyboard-shortcuts.drawerToggle"
+msgid "Open/close widget drawer"
+msgstr "ウィジェットドロワーを開閉"
+
+msgctxt "keyboard-shortcuts.editorClearSelection"
+msgid "Clear widget selection"
+msgstr "ウィジェットの選択を解除"
+
+msgctxt "keyboard-shortcuts.editorCopy"
+msgid "Copy selected widgets"
+msgstr "選択したウィジェットをコピー"
+
+msgctxt "keyboard-shortcuts.editorDelete"
+msgid "Delete selected widgets"
+msgstr "選択したウィジェットを削除"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetOnePixel"
+msgid "Move widget by 1 pixel"
+msgstr "ウィジェットを1ピクセル移動"
+
+msgctxt "keyboard-shortcuts.editorMoveWidgetTenPixels"
+msgid "Move widget by 10 pixels"
+msgstr "ウィジェットを10ピクセル移動"
+
+msgctxt "keyboard-shortcuts.editorNudge"
+msgid "Nudge selected widgets"
+msgstr "選択したウィジェットを微調整"
+
+msgctxt "keyboard-shortcuts.editorPaste"
+msgid "Paste copied widgets"
+msgstr "コピーしたウィジェットを貼り付け"
+
+msgctxt "keyboard-shortcuts.editorResetZoom"
+msgid "Reset canvas zoom"
+msgstr "キャンバスのズームをリセット"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasHorizontally"
+msgid "Scroll canvas horizontally"
+msgstr "キャンバスを水平にスクロール"
+
+msgctxt "keyboard-shortcuts.editorScrollCanvasVertically"
+msgid "Scroll canvas vertically"
+msgstr "キャンバスを垂直にスクロール"
+
+msgctxt "keyboard-shortcuts.editorToggleGrid"
+msgid "Toggle gridlines"
+msgstr "グリッド線を切り替え"
+
+msgctxt "keyboard-shortcuts.editorToggleSnap"
+msgid "Toggle snapping to grid"
+msgstr "グリッドスナップを切り替え"
+
+msgctxt "keyboard-shortcuts.editorWheelScroll"
+msgid "Scroll canvas"
+msgstr "キャンバスをスクロール"
+
+msgctxt "keyboard-shortcuts.editorWheelZoom"
+msgid "Zoom canvas at pointer"
+msgstr "ポインター位置でキャンバスをズーム"
+
+msgctxt "keyboard-shortcuts.editorZoomIn"
+msgid "Canvas zoom in"
+msgstr "キャンバスをズームイン"
+
+msgctxt "keyboard-shortcuts.editorZoomOut"
+msgid "Canvas zoom out"
+msgstr "キャンバスをズームアウト"
+
+msgctxt "keyboard-shortcuts.generalCommands"
+msgid "General commands"
+msgstr "一般コマンド"
+
+msgctxt "keyboard-shortcuts.historyRedo"
+msgid "Redo"
+msgstr "やり直す"
+
+msgctxt "keyboard-shortcuts.historyUndo"
+msgid "Undo"
+msgstr "元に戻す"
+
+msgctxt "keyboard-shortcuts.outputOpen"
+msgid "Open export folder"
+msgstr "書き出しフォルダーを開く"
+
+msgctxt "keyboard-shortcuts.playerJumpToEnd"
+msgid "Rewind to end"
+msgstr "最後に移動"
+
+msgctxt "keyboard-shortcuts.playerResetToStart"
+msgid "Rewind to start"
+msgstr "最初に戻る"
+
+msgctxt "keyboard-shortcuts.playerStepBackward"
+msgid "Step backward 1 second"
+msgstr "1秒戻る"
+
+msgctxt "keyboard-shortcuts.playerStepForward"
+msgid "Step forward 1 second"
+msgstr "1秒進む"
+
+msgctxt "keyboard-shortcuts.playerToggleMute"
+msgid "Mute/unmute video"
+msgstr "動画のミュート切替"
+
+msgctxt "keyboard-shortcuts.playerTogglePlayback"
+msgid "Play/pause"
+msgstr "再生/一時停止"
+
+msgctxt "keyboard-shortcuts.projectNew"
+msgid "New project"
+msgstr "新規プロジェクト"
+
+msgctxt "keyboard-shortcuts.projectOpen"
+msgid "Open project"
+msgstr "プロジェクトを開く"
+
+msgctxt "keyboard-shortcuts.projectSave"
+msgid "Save project"
+msgstr "プロジェクトを保存"
+
+msgctxt "keyboard-shortcuts.projectSaveAs"
+msgid "Save project as"
+msgstr "プロジェクトを別名で保存"
+
+msgctxt "keyboard-shortcuts.renderOpen"
+msgid "Export overlay"
+msgstr "オーバーレイを書き出す"
+
+msgctxt "keyboard-shortcuts.syncAuto"
+msgid "Auto-sync video with activity"
+msgstr "動画とアクティビティを自動同期"
+
+msgctxt "keyboard-shortcuts.syncGlobalNudge"
+msgid "Adjust sync offset by 1 second"
+msgstr "同期オフセットを1秒調整"
+
+msgctxt "keyboard-shortcuts.templateImport"
+msgid "Open template"
+msgstr "テンプレートを開く"
+
+msgctxt "keyboard-shortcuts.templateNew"
+msgid "New template"
+msgstr "新規テンプレート"
+
+msgctxt "keyboard-shortcuts.templateSave"
+msgid "Save template"
+msgstr "テンプレートを保存"
+
+msgctxt "keyboard-shortcuts.templateSelect"
+msgid "Open template list"
+msgstr "テンプレート一覧を開く"
+
+msgctxt "keyboard-shortcuts.timelineAndSync"
+msgid "Timeline and sync"
+msgstr "タイムラインと同期"
+
+msgctxt "keyboard-shortcuts.timelineClipNudge"
+msgid "Nudge selected clip synchronization"
+msgstr "選択クリップの同期を微調整"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeSecond"
+msgid "Nudge selected clip sync offset by 1 second"
+msgstr "選択クリップの同期を1秒調整"
+
+msgctxt "keyboard-shortcuts.timelineClipNudgeTenthSecond"
+msgid "Nudge selected clip sync offset by 0.1 seconds"
+msgstr "選択クリップの同期を0.1秒調整"
+
+msgctxt "keyboard-shortcuts.timelineFitActivity"
+msgid "Switch timeline to show activity"
+msgstr "アクティビティ表示に切り替え"
+
+msgctxt "keyboard-shortcuts.timelineFitAll"
+msgid "Show entire timeline"
+msgstr "タイムライン全体を表示"
+
+msgctxt "keyboard-shortcuts.timelineFitMedia"
+msgid "Switch timeline to all media"
+msgstr "全メディア表示に切り替え"
+
+msgctxt "keyboard-shortcuts.timelineFitVideo"
+msgid "Switch timeline to show video"
+msgstr "動画表示に切り替え"
+
+msgctxt "keyboard-shortcuts.timelineWheelPan"
+msgid "Pan timeline"
+msgstr "タイムラインをパン"
+
+msgctxt "keyboard-shortcuts.timelineWheelZoom"
+msgid "Zoom timeline at pointer"
+msgstr "ポインター位置でタイムラインをズーム"
+
+msgctxt "keyboard-shortcuts.trimAfterPlayhead"
+msgid "Trim after the playhead (the video, or the activity without videos)"
+msgstr "再生ヘッドより後をトリム（動画、動画がない場合はアクティビティ）"
+
+msgctxt "keyboard-shortcuts.trimBeforePlayhead"
+msgid "Trim before the playhead (the video, or the activity without videos)"
+msgstr "再生ヘッドより前をトリム（動画、動画がない場合はアクティビティ）"
+
+msgctxt "keyboard-shortcuts.videoImport"
+msgid "Import video"
+msgstr "動画をインポート"
+
+msgctxt "keyboard-shortcuts.videoPlayer"
+msgid "Video player"
+msgstr "動画プレーヤー"
+
+msgctxt "keyboard-shortcuts.widgetEditor"
+msgid "Widget editor"
+msgstr "ウィジェットエディター"
+
+msgctxt "overlay-editor.mapReset"
+msgid "Reset"
+msgstr "リセット"
+
+msgctxt "overlay-editor.mapViewHint"
+msgid "Double-click to pan & zoom"
+msgstr "ダブルクリックで移動・ズーム"
+
+msgctxt "overlay-editor.mapViewZoomHint"
+msgid "Double-click to zoom"
+msgstr "ダブルクリックでズーム"
+
+msgctxt "overlay-editor.statusModified"
+msgid "Modified"
+msgstr "変更済み"
+
+msgctxt "overlay-editor.statusUnsaved"
+msgid "Unsaved"
+msgstr "未保存"
+
+msgctxt "player.activity"
+msgid "Activity"
+msgstr "アクティビティ"
+
+msgctxt "player.all"
+msgid "All"
+msgstr "すべて"
+
+msgctxt "player.duration"
+msgid "Duration"
+msgstr "再生時間"
+
+msgctxt "player.resetView"
+msgid "Reset view"
+msgstr "表示をリセット"
+
+msgctxt "player.rewindToEnd"
+msgid "Rewind to end"
+msgstr "最後に移動"
+
+msgctxt "player.rewindToStart"
+msgid "Rewind to start"
+msgstr "最初に戻る"
+
+msgctxt "player.stepBack"
+msgid "Step back"
+msgstr "1ステップ戻る"
+
+msgctxt "player.stepForward"
+msgid "Step forward"
+msgstr "1ステップ進む"
+
+msgctxt "player.trimActivityAfterPlayhead"
+msgid "Trim the activity after the playhead"
+msgstr "再生ヘッドより後のアクティビティをトリム"
+
+msgctxt "player.trimActivityBeforePlayhead"
+msgid "Trim the activity before the playhead"
+msgstr "再生ヘッドより前のアクティビティをトリム"
+
+msgctxt "player.trimActivityEnd"
+msgid "Drag to trim the end of the activity"
+msgstr "ドラッグしてアクティビティの終了をトリム"
+
+msgctxt "player.trimActivityStart"
+msgid "Drag to trim the start of the activity"
+msgstr "ドラッグしてアクティビティの開始をトリム"
+
+msgctxt "player.trimVideoAfterPlayhead"
+msgid "Trim the video after the playhead"
+msgstr "再生ヘッドより後の動画をトリム"
+
+msgctxt "player.trimVideoBeforePlayhead"
+msgid "Trim the video before the playhead"
+msgstr "再生ヘッドより前の動画をトリム"
+
+msgctxt "player.video"
+msgid "Video"
+msgstr "動画"
+
+msgctxt "player.zoomIn"
+msgid "Zoom in"
+msgstr "ズームイン"
+
+msgctxt "player.zoomOut"
+msgid "Zoom out"
+msgstr "ズームアウト"
+
+msgctxt "projects.activity"
+msgid "Activity"
+msgstr "アクティビティ"
+
+msgctxt "projects.archiveTooLarge"
+msgid "The project exceeds the 40 MiB archive limit. Remove or replace an image."
+msgstr "プロジェクトが 40 MiB のアーカイブ制限を超えています。画像を削除または交換してください。"
+
+msgctxt "projects.cancel"
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgctxt "projects.closeWithoutSaving"
+msgid "Close Without Saving"
+msgstr "保存せずに閉じる"
+
+msgctxt "projects.createNewProject"
+msgid "Create New Project"
+msgstr "新規プロジェクトを作成"
+
+msgctxt "projects.createProject"
+msgid "create project"
+msgstr "プロジェクトを作成"
+
+msgctxt "projects.invalidArchive"
+msgid "The project archive is invalid or damaged. Choose another project file."
+msgstr "プロジェクトアーカイブが無効か破損しています。別のプロジェクトファイルを選択してください。"
+
+msgctxt "projects.loadAnyway"
+msgid "Load Anyway"
+msgstr "このまま読み込む"
+
+msgctxt "projects.locate"
+msgid "Locate"
+msgstr "場所を指定"
+
+msgctxt "projects.missingSourceDescription"
+msgid "The {0} file does not seem to exist. Locate the moved file or cancel without changing the current session."
+msgstr "{0}ファイルが存在しないようです。移動したファイルの場所を指定するか、キャンセルして現在のセッションを変更せずに続けてください。"
+
+msgctxt "projects.newProject"
+msgid "New Project"
+msgstr "新規プロジェクト"
+
+msgctxt "projects.openAProject"
+msgid "Open a project"
+msgstr "プロジェクトを開く"
+
+msgctxt "projects.openProject"
+msgid "open project"
+msgstr "プロジェクトを開く"
+
+msgctxt "projects.rasterUnavailable"
+msgid "An image is unavailable. Replace it before saving."
+msgstr "画像を使用できません。保存する前に交換してください。"
+
+msgctxt "projects.saveFailed"
+msgid "The project could not be saved. Check the destination and try again."
+msgstr "プロジェクトを保存できませんでした。保存先を確認して再試行してください。"
+
+msgctxt "projects.saveProject"
+msgid "save project"
+msgstr "プロジェクトを保存"
+
+msgctxt "projects.sourceNotFound"
+msgid "{0} source not found"
+msgstr "{0}ソースが見つかりません"
+
+msgctxt "projects.unsavedChanges"
+msgid "Your project has unsaved changes. Save them or discard them."
+msgstr "プロジェクトに未保存の変更があります。保存するか破棄してください。"
+
+msgctxt "projects.unsavedChangesBeforeExit"
+msgid "Your project has unsaved changes. Do you want to save the changes or close without saving?"
+msgstr "プロジェクトに未保存の変更があります。変更を保存しますか、それとも保存せずに閉じますか？"
+
+msgctxt "projects.unsavedChangesTitle"
+msgid "Unsaved Changes"
+msgstr "未保存の変更"
+
+msgctxt "projects.video"
+msgid "Video"
+msgstr "動画"
+
+msgctxt "raster.errors.corruptAsset"
+msgid "The embedded image is damaged. Select a replacement."
+msgstr "埋め込まれた画像が破損しています。別の画像を選択してください。"
+
+msgctxt "raster.errors.decode"
+msgid "Image could not be decoded. Choose another image."
+msgstr "画像をデコードできません。別の画像を選択してください。"
+
+msgctxt "raster.errors.encodedSize"
+msgid "Image file is larger than 5 MiB. Choose a smaller file."
+msgstr "ファイルが 5 MiB を超えています。小さいファイルを選択してください。"
+
+msgctxt "raster.errors.invalidConfig"
+msgid "Image settings are invalid."
+msgstr "画像設定が無効です。"
+
+msgctxt "raster.errors.missing"
+msgid "Image file is missing. Select another image."
+msgstr "画像ファイルが見つかりません。別の画像を選択してください。"
+
+msgctxt "raster.errors.missingAsset"
+msgid "The embedded image is missing from this project. Select a replacement."
+msgstr "このプロジェクトに埋め込まれた画像がありません。別の画像を選択してください。"
+
+msgctxt "raster.errors.noImage"
+msgid "Image {{id}} has no selected file. Select one before rendering."
+msgstr "画像 {{id}} が選択されていません。レンダリング前に選択してください。"
+
+msgctxt "raster.errors.relativePath"
+msgid "Select an image from an absolute file path."
+msgstr "絶対パスで画像を選択してください。"
+
+msgctxt "raster.errors.renderUnavailable"
+msgid "Image {{id}} cannot be rendered yet."
+msgstr "画像 {{id}} はまだレンダリングできません。"
+
+msgctxt "raster.errors.resolution"
+msgid "Image resolution exceeds 25 megapixels. Choose a smaller image."
+msgstr "解像度が 25 メガピクセルを超えています。小さい画像を選択してください。"
+
+msgctxt "raster.errors.unreadable"
+msgid "Image file cannot be read. Check its permissions or select another image."
+msgstr "画像ファイルを読み取れません。権限を確認するか、別の画像を選択してください。"
+
+msgctxt "raster.errors.unsupportedType"
+msgid "Choose a PNG, JPEG, BMP, or TIFF file (.png, .jpeg, .jpg, .bmp, .tiff)."
+msgstr "PNG、JPEG、BMP、TIFF ファイルを選択してください（.png、.jpeg、.jpg、.bmp、.tiff）。"
+
+msgctxt "raster.imageFiles"
+msgid "Image files"
+msgstr "画像ファイル"
+
+msgctxt "raster.replaceImage"
+msgid "Replace image"
+msgstr "画像を置換"
+
+msgctxt "raster.selectImage"
+msgid "Select image"
+msgstr "画像を選択"
+
+msgctxt "render-video.batchResult.cancelled"
+msgid "Batch cancelled"
+msgstr "バッチがキャンセルされました"
+
+msgctxt "render-video.batchResult.completedWithErrors"
+msgid "Batch finished with errors"
+msgstr "エラーが発生してバッチが終了しました"
+
+msgctxt "render-video.batchResult.failed"
+msgid "Batch failed"
+msgstr "バッチが失敗しました"
+
+msgctxt "render-video.better"
+msgid "Better"
+msgstr "高画質"
+
+msgctxt "render-video.bitrate"
+msgid "Bitrate"
+msgstr "ビットレート"
+
+msgctxt "render-video.cancel"
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgctxt "render-video.cancelled"
+msgid "Cancelled"
+msgstr "キャンセル済み"
+
+msgctxt "render-video.cancelling"
+msgid "Cancelling..."
+msgstr "キャンセル中..."
+
+msgctxt "render-video.chooseFolder"
+msgid "Choose folder..."
+msgstr "フォルダーを選択..."
+
+msgctxt "render-video.close"
+msgid "Close"
+msgstr "閉じる"
+
+msgctxt "render-video.codecOutputFormat"
+msgid "Codec / Output Format"
+msgstr "コーデック / 出力形式"
+
+msgctxt "render-video.custom"
+msgid "Custom"
+msgstr "カスタム"
+
+msgctxt "render-video.customFps"
+msgid "Custom FPS"
+msgstr "カスタムFPS"
+
+msgctxt "render-video.done"
+msgid "Done"
+msgstr "完了"
+
+msgctxt "render-video.encodingOutputFile"
+msgid "Encoding output file..."
+msgstr "出力ファイルをエンコード中..."
+
+msgctxt "render-video.encodingValVal2Frames"
+msgid "Encoding: {{val}} / {{val2}} frames"
+msgstr "エンコード中: {{val}} / {{val2}} フレーム"
+
+msgctxt "render-video.estRemaining"
+msgid "Est. Remaining"
+msgstr "推定残り時間"
+
+msgctxt "render-video.exportFinished"
+msgid "Export Finished"
+msgstr "エクスポート完了"
+
+msgctxt "render-video.exportSettings"
+msgid "Export Settings"
+msgstr "書き出し設定"
+
+msgctxt "render-video.exportingOverlay"
+msgid "Exporting Overlay"
+msgstr "オーバーレイを書き出し中"
+
+msgctxt "render-video.finalizingVideo"
+msgid "Finalizing Video"
+msgstr "動画を仕上げています"
+
+msgctxt "render-video.frameProgress"
+msgid "{{current}} / {{total}} frames"
+msgstr "{{current}} / {{total}} フレーム"
+
+msgctxt "render-video.framerate"
+msgid "Framerate"
+msgstr "フレームレート"
+
+msgctxt "render-video.fullVideo"
+msgid "Full Video"
+msgstr "動画全体"
+
+msgctxt "render-video.hardwareAcceleration"
+msgid "Hardware Acceleration"
+msgstr "ハードウェアアクセラレーション"
+
+msgctxt "render-video.hardwareAccelerationVaapiHelp"
+msgid "VAAPI needs your GPU's VA-API driver. Install it with your package manager:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nRun vainfo to check that the driver loads. NVIDIA GPUs use the NVIDIA GPU option instead."
+msgstr "VAAPI を使うには GPU の VA-API ドライバーが必要です。パッケージマネージャーでインストールしてください:\n\nIntel\n• Debian/Ubuntu: intel-media-va-driver-non-free\n• Fedora (RPM Fusion), Arch: intel-media-driver\n\nAMD\n• Debian/Ubuntu: mesa-va-drivers\n• Fedora (RPM Fusion): mesa-va-drivers-freeworld\n• Arch: mesa\n\nvainfo を実行してドライバーが読み込まれることを確認してください。NVIDIA GPU では代わりに「NVIDIA GPU」オプションを使用します。"
+
+msgctxt "render-video.hiddenByOverlap"
+msgid "Hidden behind an overlapping video"
+msgstr "重なっている動画の後ろに隠れています"
+
+msgctxt "render-video.keepAppOpen"
+msgid "Please keep the application open during rendering"
+msgstr "レンダリング中はアプリケーションを開いたままにしてください"
+
+msgctxt "render-video.largerFile"
+msgid "Larger file"
+msgstr "大きいファイル"
+
+msgctxt "render-video.loadAGpxfitActivityFirst"
+msgid "Load a GPX/FIT activity first"
+msgstr "まずGPX/FITアクティビティを読み込んでください"
+
+msgctxt "render-video.lockedToEachVideoFps"
+msgid "Locked to each video's FPS"
+msgstr "各動画のFPSに固定"
+
+msgctxt "render-video.lockedToVideoFps"
+msgid "Locked to video FPS ({{fps}} fps)"
+msgstr "動画のFPSに固定 ({{fps}} fps)"
+
+msgctxt "render-video.minutesMinSecondsSec"
+msgid "{{minutes}} min {{seconds}} sec"
+msgstr "{{minutes}}分 {{seconds}}秒"
+
+msgctxt "render-video.mp4Codecs"
+msgid "MP4 Codecs"
+msgstr "MP4コーデック"
+
+msgctxt "render-video.nothingToExport"
+msgid "Every video part is excluded from export."
+msgstr "すべての動画パートが書き出しから除外されています。"
+
+msgctxt "render-video.outputContainerFps"
+msgid "Output container: {{fps}} fps"
+msgstr "出力コンテナ: {{fps}} fps"
+
+msgctxt "render-video.outputFile"
+msgid "Output file"
+msgstr "出力ファイル"
+
+msgctxt "render-video.outputFolder"
+msgid "Output folder"
+msgstr "出力フォルダー"
+
+msgctxt "render-video.outputPath"
+msgid "Output path"
+msgstr "出力パス"
+
+msgctxt "render-video.overwrite"
+msgid "Overwrite"
+msgstr "上書き"
+
+msgctxt "render-video.overwriteExistingFile"
+msgid "Overwrite existing file?"
+msgstr "既存のファイルを上書きしますか？"
+
+msgctxt "render-video.pathErrors.outputAliasesInput"
+msgid "The output would overwrite an input video"
+msgstr "出力ファイルが入力動画を上書きしてしまいます"
+
+msgctxt "render-video.pathErrors.outputDestinationsConflict"
+msgid "Multiple batch outputs use the same destination"
+msgstr "複数のバッチ出力が同じ出力先を使用しています"
+
+msgctxt "render-video.pathErrors.outputDirectoryInvalid"
+msgid "Choose an existing output directory"
+msgstr "既存の出力ディレクトリを選択してください"
+
+msgctxt "render-video.pathErrors.outputDirectoryMissing"
+msgid "The output directory does not exist"
+msgstr "出力ディレクトリが存在しません"
+
+msgctxt "render-video.pathErrors.outputExtensionInvalid"
+msgid "The output file must use .{{extension}}"
+msgstr "出力ファイルの拡張子は .{{extension}} にしてください"
+
+msgctxt "render-video.pathErrors.outputFileRequired"
+msgid "Choose an output file"
+msgstr "出力ファイルを選択してください"
+
+msgctxt "render-video.pathErrors.outputFilenameRequired"
+msgid "The output path must include a file name"
+msgstr "出力パスにはファイル名が必要です"
+
+msgctxt "render-video.pathErrors.outputNotFile"
+msgid "The selected output is not a file"
+msgstr "選択した出力先はファイルではありません"
+
+msgctxt "render-video.pathErrors.outputPathIncomplete"
+msgid "Choose a complete output path, including its folder"
+msgstr "フォルダーを含む完全な出力パスを選択してください"
+
+msgctxt "render-video.pathErrors.outputPathInvalid"
+msgid "The output file name or path is not valid"
+msgstr "出力ファイル名またはパスが無効です"
+
+msgctxt "render-video.pathErrors.outputPermissionDenied"
+msgid "You do not have permission to write the output file"
+msgstr "出力ファイルへの書き込み権限がありません"
+
+msgctxt "render-video.pathErrors.outputWriteFailed"
+msgid "Could not create or write the output file: {{detail}}"
+msgstr "出力ファイルを作成または書き込みできませんでした：{{detail}}"
+
+msgctxt "render-video.pathErrors.sourceFilenameInvalid"
+msgid "The source file name is invalid"
+msgstr "元のファイル名が無効です"
+
+msgctxt "render-video.percentComplete"
+msgid "{{percent}}% Complete"
+msgstr "{{percent}}% 完了"
+
+msgctxt "render-video.preparingBatch"
+msgid "Preparing video..."
+msgstr "動画を準備中..."
+
+msgctxt "render-video.quality"
+msgid "Quality"
+msgstr "画質"
+
+msgctxt "render-video.queued"
+msgid "Queued"
+msgstr "待機中"
+
+msgctxt "render-video.reinspectionRequired"
+msgid "Sources changed or inspection expired. Inspect again before starting."
+msgstr "ファイルが変更されたか、検査の有効期限が切れました。開始前に再検査してください。"
+
+msgctxt "render-video.renderFps"
+msgid "Render FPS"
+msgstr "レンダリングFPS"
+
+msgctxt "render-video.rendering"
+msgid "Rendering..."
+msgstr "レンダリング中..."
+
+msgctxt "render-video.renderingAlreadyInProgress"
+msgid "Rendering already in progress"
+msgstr "レンダリングは既に進行中です"
+
+msgctxt "render-video.renderingFrames"
+msgid "Rendering frames..."
+msgstr "フレームをレンダリング中..."
+
+msgctxt "render-video.resolutionMismatchInstructions"
+msgid "This is necessary to properly export the overlay. Please change the overlay resolution in the sidebar settings or pick a different template."
+msgstr "オーバーレイを正しく書き出すために必要です。サイドバー設定でオーバーレイの解像度を変更するか、別のテンプレートを選択してください。"
+
+msgctxt "render-video.secondsSec"
+msgid "{{seconds}} sec"
+msgstr "{{seconds}}秒"
+
+msgctxt "render-video.smallerFile"
+msgid "Smaller file"
+msgstr "小さいファイル"
+
+msgctxt "render-video.startRender"
+msgid "Start Render"
+msgstr "レンダリング開始"
+
+msgctxt "render-video.startingRender"
+msgid "Starting render..."
+msgstr "レンダリングを開始中..."
+
+msgctxt "render-video.transparent"
+msgid "Transparent"
+msgstr "透明"
+
+msgctxt "render-video.transparentCodecs"
+msgid "Transparent Codecs"
+msgstr "透過対応コーデック"
+
+msgctxt "render-video.unavailable"
+msgid "Unavailable"
+msgstr "利用できません"
+
+msgctxt "render-video.unstarted"
+msgid "Not started"
+msgstr "未開始"
+
+msgctxt "render-video.update1val"
+msgid "Update 1/{{val}}"
+msgstr "更新 1/{{val}}"
+
+msgctxt "render-video.videoImported"
+msgid "Video imported"
+msgstr "動画を読み込みました"
+
+msgctxt "render-video.videoRequired"
+msgid "Video required"
+msgstr "動画が必要です"
+
+msgctxt "render-video.videoResolutionMismatchMessage"
+msgid "Overlay resolution {{overlayResolution}} must match imported video ({{videoResolution}})."
+msgstr "オーバーレイの解像度 {{overlayResolution}} は、読み込んだ動画の解像度 ({{videoResolution}}) と一致している必要があります。"
+
+msgctxt "render-video.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "ウィジェット更新頻度"
+
+msgctxt "render-video.worse"
+msgid "Worse"
+msgstr "低画質"
+
+msgctxt "scene-settings.aspectRatio"
+msgid "Aspect Ratio"
+msgstr "アスペクト比"
+
+msgctxt "scene-settings.borderThickness"
+msgid "Border Thickness"
+msgstr "境界線の太さ"
+
+msgctxt "scene-settings.borders"
+msgid "Borders"
+msgstr "境界線"
+
+msgctxt "scene-settings.custom"
+msgid "Custom"
+msgstr "カスタム"
+
+msgctxt "scene-settings.customFps"
+msgid "Custom FPS"
+msgstr "カスタムFPS"
+
+msgctxt "scene-settings.fixedWidthDigits"
+msgid "Fixed-Width Digits"
+msgstr "等幅数字"
+
+msgctxt "scene-settings.fontLabels"
+msgid "Font - Labels"
+msgstr "フォント - ラベル"
+
+msgctxt "scene-settings.fontValues"
+msgid "Font - Values"
+msgstr "フォント - 値"
+
+msgctxt "scene-settings.framerate"
+msgid "Framerate"
+msgstr "フレームレート"
+
+msgctxt "scene-settings.globalSettings"
+msgid "Global Settings"
+msgstr "全般設定"
+
+msgctxt "scene-settings.height"
+msgid "Height"
+msgstr "高さ"
+
+msgctxt "scene-settings.icons"
+msgid "Icons"
+msgstr "アイコン"
+
+msgctxt "scene-settings.labels"
+msgid "Labels"
+msgstr "ラベル"
+
+msgctxt "scene-settings.lockedToFps"
+msgid "Locked to {{fps}} fps"
+msgstr "{{fps}} fpsに固定"
+
+msgctxt "scene-settings.overlay"
+msgid "Overlay"
+msgstr "オーバーレイ"
+
+msgctxt "scene-settings.portrait"
+msgid "Portrait (4:3)"
+msgstr "ポートレート (4:3)"
+
+msgctxt "scene-settings.resolution"
+msgid "Resolution"
+msgstr "解像度"
+
+msgctxt "scene-settings.resolution1080p"
+msgid "1080p (1920x1080)"
+msgstr "1080p (1920x1080)"
+
+msgctxt "scene-settings.resolution1080pSquare"
+msgid "1080p Square (1080x1080)"
+msgstr "1080p 正方形 (1080x1080)"
+
+msgctxt "scene-settings.resolution1080pVertical"
+msgid "1080p Vertical (1080x1920)"
+msgstr "1080p 縦長 (1080x1920)"
+
+msgctxt "scene-settings.resolution4k"
+msgid "4K (3840x2160)"
+msgstr "4K (3840x2160)"
+
+msgctxt "scene-settings.resolution4kSquare"
+msgid "4K Square (2160x2160)"
+msgstr "4K 正方形 (2160x2160)"
+
+msgctxt "scene-settings.resolution4kVertical"
+msgid "4K Vertical (2160x3840)"
+msgstr "4K 縦長 (2160x3840)"
+
+msgctxt "scene-settings.resolution720p"
+msgid "720p (1280x720)"
+msgstr "720p (1280x720)"
+
+msgctxt "scene-settings.resolutionMismatch"
+msgid "Overlay and video resolutions do not match"
+msgstr "オーバーレイと動画の解像度が一致しません"
+
+msgctxt "scene-settings.resolutionQxga"
+msgid "QXGA (2048x1536)"
+msgstr "QXGA (2048x1536)"
+
+msgctxt "scene-settings.resolutionSxga"
+msgid "SXGA+ (1400x1050)"
+msgstr "SXGA+ (1400x1050)"
+
+msgctxt "scene-settings.resolutionUltrawide"
+msgid "Ultrawide (3440x1440)"
+msgstr "ウルトラワイド (3440x1440)"
+
+msgctxt "scene-settings.resolutionUxga"
+msgid "UXGA (1600x1200)"
+msgstr "UXGA (1600x1200)"
+
+msgctxt "scene-settings.resolutionXga"
+msgid "XGA (1920x1440)"
+msgstr "XGA (1920x1440)"
+
+msgctxt "scene-settings.scale"
+msgid "Scale"
+msgstr "スケール"
+
+msgctxt "scene-settings.shadowDistance"
+msgid "Shadow Distance"
+msgstr "影の距離"
+
+msgctxt "scene-settings.shadowStrength"
+msgid "Shadow Strength"
+msgstr "影の強さ"
+
+msgctxt "scene-settings.shadows"
+msgid "Shadows"
+msgstr "影"
+
+msgctxt "scene-settings.square"
+msgid "Square (1:1)"
+msgstr "正方形 (1:1)"
+
+msgctxt "scene-settings.transparency"
+msgid "Transparency"
+msgstr "透過"
+
+msgctxt "scene-settings.ultrawide"
+msgid "Ultrawide (21:9)"
+msgstr "ウルトラワイド (21:9)"
+
+msgctxt "scene-settings.units"
+msgid "Units"
+msgstr "単位"
+
+msgctxt "scene-settings.values"
+msgid "Values"
+msgstr "値"
+
+msgctxt "scene-settings.vertical"
+msgid "Vertical (9:16)"
+msgstr "縦長 (9:16)"
+
+msgctxt "scene-settings.widescreen"
+msgid "Widescreen (16:9)"
+msgstr "ワイドスクリーン (16:9)"
+
+msgctxt "scene-settings.widgetUpdateRate"
+msgid "Widget Update Rate"
+msgstr "ウィジェット更新頻度"
+
+msgctxt "scene-settings.width"
+msgid "Width"
+msgstr "幅"
+
+msgctxt "store.couldNotDetermineVideoCreationTime"
+msgid "Could not determine video creation time"
+msgstr "動画の作成時刻を特定できませんでした"
+
+msgctxt "store.invalidTimestampFormats"
+msgid "Invalid timestamp formats"
+msgstr "無効なタイムスタンプ形式"
+
+msgctxt "store.timezoneIsRequiredForVideoSync"
+msgid "timezone is required for video sync"
+msgstr "動画の同期にはタイムゾーンが必要です"
+
+msgctxt "template-manager.cancel"
+msgid "Cancel"
+msgstr "キャンセル"
+
+msgctxt "template-manager.createNewTemplate"
+msgid "Create New Template"
+msgstr "新規テンプレートを作成"
+
+msgctxt "template-manager.newTemplate"
+msgid "New Template"
+msgstr "新規テンプレート"
+
+msgctxt "template-manager.save"
+msgid "Save"
+msgstr "保存"
+
+msgctxt "template-manager.unsavedChanges"
+msgid "Your template has unsaved changes. Save them or discard them."
+msgstr "テンプレートに未保存の変更があります。保存するか破棄してください。"
+
+msgctxt "toolbar.activity"
+msgid "Activity"
+msgstr "アクティビティ"
+
+msgctxt "toolbar.activityType"
+msgid "Activity type"
+msgstr "アクティビティの種類"
+
+msgctxt "toolbar.applyTimezone"
+msgid "Apply Timezone"
+msgstr "タイムゾーンを適用"
+
+msgctxt "toolbar.autosync"
+msgid "Auto-sync"
+msgstr "自動同期"
+
+msgctxt "toolbar.bitRate"
+msgid "Bit rate"
+msgstr "ビットレート"
+
+msgctxt "toolbar.calculated"
+msgid "Calculated"
+msgstr "計算済み"
+
+msgctxt "toolbar.camera"
+msgid "Camera"
+msgstr "カメラ"
+
+msgctxt "toolbar.codec"
+msgid "Codec"
+msgstr "コーデック"
+
+msgctxt "toolbar.createdAt"
+msgid "Created at"
+msgstr "作成日時"
+
+msgctxt "toolbar.creationTime"
+msgid "Creation Time"
+msgstr "作成時刻"
+
+msgctxt "toolbar.deleteActivity"
+msgid "Delete activity"
+msgstr "アクティビティを削除"
+
+msgctxt "toolbar.details"
+msgid "Details"
+msgstr "詳細"
+
+msgctxt "toolbar.detected"
+msgid "Detected"
+msgstr "検出済み"
+
+msgctxt "toolbar.detectedLaps"
+msgid "Detected laps"
+msgstr "検出されたラップ"
+
+msgctxt "toolbar.distance"
+msgid "Distance"
+msgstr "距離"
+
+msgctxt "toolbar.dropActivityFile"
+msgid "Drop activity file"
+msgstr "アクティビティファイルをドロップ"
+
+msgctxt "toolbar.dropVideoFile"
+msgid "Drop video files"
+msgstr "動画ファイルをドロップ"
+
+msgctxt "toolbar.duration"
+msgid "Duration"
+msgstr "再生時間"
+
+msgctxt "toolbar.extracted"
+msgid "Extracted"
+msgstr "抽出済み"
+
+msgctxt "toolbar.filename"
+msgid "Filename"
+msgstr "ファイル名"
+
+msgctxt "toolbar.frameRate"
+msgid "Frame rate"
+msgstr "フレームレート"
+
+msgctxt "toolbar.lapDuration"
+msgid "Duration"
+msgstr "時間"
+
+msgctxt "toolbar.lapNumber"
+msgid "Lap"
+msgstr "ラップ"
+
+msgctxt "toolbar.lapStart"
+msgid "Start"
+msgstr "開始"
+
+msgctxt "toolbar.loadActivity"
+msgid "Load activity"
+msgstr "アクティビティを読み込む"
+
+msgctxt "toolbar.loadVideo"
+msgid "Load videos"
+msgstr "動画を読み込む"
+
+msgctxt "toolbar.newProject"
+msgid "New Project"
+msgstr "新規"
+
+msgctxt "toolbar.noDataCalculated"
+msgid "No data were calculated"
+msgstr "データを計算できませんでした"
+
+msgctxt "toolbar.noDataExtracted"
+msgid "No data were extracted"
+msgstr "データを抽出できませんでした"
+
+msgctxt "toolbar.openProject"
+msgid "Open Project"
+msgstr "開く"
+
+msgctxt "toolbar.pinDrawer"
+msgid "Pin drawer"
+msgstr "ドロワーを固定"
+
+msgctxt "toolbar.projects"
+msgid "Projects"
+msgstr "プロジェクト"
+
+msgctxt "toolbar.resolution"
+msgid "Resolution"
+msgstr "解像度"
+
+msgctxt "toolbar.restoreDetectedVideoCreationTime"
+msgid "Restore detected video creation time"
+msgstr "検出した動画の作成時刻に戻す"
+
+msgctxt "toolbar.saveProject"
+msgid "Save Project"
+msgstr "プロジェクトを保存"
+
+msgctxt "toolbar.saveProjectAs"
+msgid "Save Project As"
+msgstr "プロジェクトを別名で保存"
+
+msgctxt "toolbar.showLap"
+msgid "Show lap {0}"
+msgstr "ラップ {0} を表示"
+
+msgctxt "toolbar.startTime"
+msgid "Start time"
+msgstr "開始時刻"
+
+msgctxt "toolbar.syncOffset"
+msgid "Sync Offset"
+msgstr "同期オフセット"
+
+msgctxt "toolbar.timeSource"
+msgid "Time source"
+msgstr "時刻のソース"
+
+msgctxt "toolbar.timeSourceFilename"
+msgid "Filename"
+msgstr "ファイル名"
+
+msgctxt "toolbar.timeSourceGps"
+msgid "GPS timestamp"
+msgstr "GPSタイムスタンプ"
+
+msgctxt "toolbar.timeSourceMetadata"
+msgid "Metadata"
+msgstr "メタデータ"
+
+msgctxt "toolbar.timezone"
+msgid "Timezone"
+msgstr "タイムゾーン"
+
+msgctxt "toolbar.unknown"
+msgid "Unknown"
+msgstr "不明"
+
+msgctxt "toolbar.unknownTimeSource"
+msgid "Unknown ({{value}})"
+msgstr "不明な時刻ソース ({{value}})"
+
+msgctxt "toolbar.unpinDrawer"
+msgid "Unpin drawer"
+msgstr "ドロワーの固定を解除"
+
+msgctxt "toolbar.valBitRate"
+msgid "{{val}} Mbps"
+msgstr "{{val}} Mbps"
+
+msgctxt "toolbar.valFps"
+msgid "{{val}} fps"
+msgstr "{{val}} fps"
+
+msgctxt "toolbar.valPoints"
+msgid "{{val}} points"
+msgstr "{{val}}ポイント"
+
+msgctxt "toolbar.valResolution"
+msgid "{{width}}×{{height}}"
+msgstr "{{width}}×{{height}}"
+
+msgctxt "toolbar.video"
+msgid "Video"
+msgstr "動画"
+
+msgctxt "toolbar.videoSync"
+msgid "Sync Doctor"
+msgstr "動画同期"
+
+msgctxt "toolbar.widgets"
+msgid "Widgets"
+msgstr "ウィジェット"
+
+msgctxt "undo-redo.redoCtrlcmdshiftz"
+msgid "Redo"
+msgstr "やり直す"
+
+msgctxt "undo-redo.undoCtrlcmdz"
+msgid "Undo"
+msgstr "元に戻す"
+
+msgctxt "video-preview.gpuRequired"
+msgid "Video playback requires at least an integrated GPU."
+msgstr "動画の再生には内蔵GPU以上が必要です。"
+
+msgctxt "video-preview.theVideoPreviewCouldNotBeLoaded"
+msgid "The video preview could not be loaded."
+msgstr "動画プレビューを読み込めませんでした。"
+
+msgctxt "video-preview.videoOrImage"
+msgid "Video or Image"
+msgstr "動画または画像"
+
+msgctxt "videoSync.activityRequiredForSync"
+msgid "Activity telemetry is required for Landmark Sync"
+msgstr "ランドマーク同期にはアクティビティデータが必要です"
+
+msgctxt "videoSync.applyCandidate"
+msgid "Apply offset {0} seconds"
+msgstr "オフセット {0} 秒を適用"
+
+msgctxt "videoSync.autodetect"
+msgid "Autodetect"
+msgstr "自動検出"
+
+msgctxt "videoSync.candidates"
+msgid "Sync candidates"
+msgstr "同期候補"
+
+msgctxt "videoSync.changeLandmarkType"
+msgid "Change {0} landmark type"
+msgstr "基準点の種類を変更: {0}"
+
+msgctxt "videoSync.clearLandmarks"
+msgid "Clear"
+msgstr "クリア"
+
+msgctxt "videoSync.deleteLandmark"
+msgid "Delete {0} landmark"
+msgstr "基準点を削除: {0}"
+
+msgctxt "videoSync.detectedEvent"
+msgid "detected {{label}}"
+msgstr "検出: {{label}}"
+
+msgctxt "videoSync.detectedEventRange"
+msgid "{{label}} event from {{start}} to {{end}} seconds"
+msgstr "「{{label}}」イベント: {{start}}～{{end}}秒"
+
+msgctxt "videoSync.detectedEvents"
+msgid "Detected events"
+msgstr "検出されたイベント"
+
+msgctxt "videoSync.detection"
+msgid "Sensitivity & Detection"
+msgstr "感度と検出"
+
+msgctxt "videoSync.landmarkAriaLabel"
+msgid "{0} landmark at {1} seconds"
+msgstr "{1}秒地点の基準点「{0}」"
+
+msgctxt "videoSync.landmarkLimit"
+msgid "The maximum of five landmarks has been reached"
+msgstr "基準点は最大5個です"
+
+msgctxt "videoSync.landmarksMatched"
+msgid "{{matched}} / {{eligible}} landmarks matched"
+msgstr "一致: {{matched}} / {{eligible}}"
+
+msgctxt "videoSync.leftTurn"
+msgid "Left Turn"
+msgstr "左折"
+
+msgctxt "videoSync.leftTurns"
+msgid "Left Turns"
+msgstr "左折"
+
+msgctxt "videoSync.location"
+msgid "Location"
+msgstr "位置"
+
+msgctxt "videoSync.locationLimit"
+msgid "Only one location landmark is allowed"
+msgstr "位置の基準点は1つだけ設定できます"
+
+msgctxt "videoSync.locationOnly"
+msgid "Location only"
+msgstr "位置のみ"
+
+msgctxt "videoSync.locationSyncCandidates"
+msgid "Location Sync"
+msgstr "位置で同期"
+
+msgctxt "videoSync.locations"
+msgid "Locations"
+msgstr "位置"
+
+msgctxt "videoSync.manualSync"
+msgid "Manual Sync"
+msgstr "手動同期"
+
+msgctxt "videoSync.markControls"
+msgid "Video sync landmark controls"
+msgstr "動画同期の基準点操作"
+
+msgctxt "videoSync.markLeftTurn"
+msgid "Mark Left Turn"
+msgstr "左折をマーク"
+
+msgctxt "videoSync.markLocation"
+msgid "Mark Location"
+msgstr "位置をマーク"
+
+msgctxt "videoSync.markRightTurn"
+msgid "Mark Right Turn"
+msgstr "右折をマーク"
+
+msgctxt "videoSync.markStop"
+msgid "Mark Stop"
+msgstr "停止をマーク"
+
+msgctxt "videoSync.minimumLandmarksForSync"
+msgid "At least two landmarks are required"
+msgstr "基準点を2つ以上設定してください"
+
+msgctxt "videoSync.noCandidate"
+msgid "No candidate aligns at least two landmarks"
+msgstr "2つ以上の基準点に一致する候補はありません"
+
+msgctxt "videoSync.noLandmarks"
+msgid "No landmarks marked yet."
+msgstr "基準点はまだ設定されていません。"
+
+msgctxt "videoSync.openManualSync"
+msgid "Open Manual Sync"
+msgstr "手動同期を開く"
+
+msgctxt "videoSync.playheadInsideVideo"
+msgid "Move the playhead inside the video to mark a landmark"
+msgstr "基準点をマークするには再生ヘッドを動画内に移動してください"
+
+msgctxt "videoSync.rightTurn"
+msgid "Right Turn"
+msgstr "右折"
+
+msgctxt "videoSync.rightTurns"
+msgid "Right Turns"
+msgstr "右折"
+
+msgctxt "videoSync.setLocationInMap"
+msgid "Set location"
+msgstr "位置を設定"
+
+msgctxt "videoSync.speed"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "videoSync.speedSensitivity"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "videoSync.staleCandidates"
+msgid "Landmarks changed. Rerun the Sync again"
+msgstr "基準点が変更されました。同期を再実行してください"
+
+msgctxt "videoSync.stop"
+msgid "Stop"
+msgstr "停止"
+
+msgctxt "videoSync.stops"
+msgid "Stops"
+msgstr "停止"
+
+msgctxt "videoSync.syncCandidates"
+msgid "Sync Candidates"
+msgstr "同期候補"
+
+msgctxt "videoSync.syncLandmarks"
+msgid "Sync All Landmarks"
+msgstr "すべての基準点を同期"
+
+msgctxt "videoSync.syncLocation"
+msgid "Match Location Only"
+msgstr "位置のみを照合"
+
+msgctxt "videoSync.timelineGraph"
+msgid "Activity telemetry graph"
+msgstr "アクティビティデータのグラフ"
+
+msgctxt "videoSync.turnSensitivity"
+msgid "Min turn"
+msgstr "最小旋回角度"
+
+msgctxt "videoSync.turning"
+msgid "Turning"
+msgstr "旋回"
+
+msgctxt "videoSync.videoLandmarks"
+msgid "Video landmarks"
+msgstr "動画の基準点"
+
+msgctxt "videoSync.videoRequired"
+msgid "A video is required to mark a landmark"
+msgstr "基準点をマークするには動画が必要です"
+
+msgctxt "videoSync.videoRequiredForSync"
+msgid "A video is required for Landmark Sync"
+msgstr "基準点同期には動画が必要です"
+
+msgctxt "videoSync.yourLandmarks"
+msgid "Video Landmarks"
+msgstr "動画の基準点"
+
+msgctxt "widget-editor.activityStart"
+msgid "Activity"
+msgstr "アクティビティの開始"
+
+msgctxt "widget-editor.addMetric"
+msgid "Add metric"
+msgstr "指標を追加"
+
+msgctxt "widget-editor.alignment"
+msgid "Alignment"
+msgstr "配置"
+
+msgctxt "widget-editor.alignmentBelow"
+msgid "Top"
+msgstr "上"
+
+msgctxt "widget-editor.alignmentCentered"
+msgid "Centered"
+msgstr "中央"
+
+msgctxt "widget-editor.altitudeAtStart"
+msgid "Altitude at start"
+msgstr "開始時の高度"
+
+msgctxt "widget-editor.angleTrack"
+msgid "Angle Track"
+msgstr "角度表示"
+
+msgctxt "widget-editor.arcAngle"
+msgid "Arc Angle"
+msgstr "円弧角度"
+
+msgctxt "widget-editor.arcTrack"
+msgid "Arc Track"
+msgstr "円弧トラック"
+
+msgctxt "widget-editor.areaGradient"
+msgid "Gradient"
+msgstr "グラデーション"
+
+msgctxt "widget-editor.areaOpacity"
+msgid "Area Opacity"
+msgstr "塗りの不透明度"
+
+msgctxt "widget-editor.areaStyling"
+msgid "Area Styling"
+msgstr "エリアの外観"
+
+msgctxt "widget-editor.axisMapping"
+msgid "Axis Mapping"
+msgstr "軸の割り当て"
+
+msgctxt "widget-editor.backdropStyle"
+msgid "Backdrop Style"
+msgstr "背景スタイル"
+
+msgctxt "widget-editor.backgroundColor"
+msgid "Background"
+msgstr "背景"
+
+msgctxt "widget-editor.balanceFormat"
+msgid "Balance Format"
+msgstr "バランス形式"
+
+msgctxt "widget-editor.bar"
+msgid "Bar"
+msgstr "バー"
+
+msgctxt "widget-editor.barCount"
+msgid "Bar Count"
+msgstr "バー数"
+
+msgctxt "widget-editor.barGap"
+msgid "Bar Gap"
+msgstr "バー間隔"
+
+msgctxt "widget-editor.barHeight"
+msgid "Bar Height"
+msgstr "バーの高さ"
+
+msgctxt "widget-editor.barWidth"
+msgid "Bar Width"
+msgstr "バーの幅"
+
+msgctxt "widget-editor.border"
+msgid "Border"
+msgstr "境界線"
+
+msgctxt "widget-editor.borderColor"
+msgid "Border Color"
+msgstr "境界線の色"
+
+msgctxt "widget-editor.borderOpacity"
+msgid "Border Opacity"
+msgstr "境界線の不透明度"
+
+msgctxt "widget-editor.borderThickness"
+msgid "Border Thickness"
+msgstr "境界線の太さ"
+
+msgctxt "widget-editor.both"
+msgid "Both"
+msgstr "両方"
+
+msgctxt "widget-editor.bottom"
+msgid "Bottom"
+msgstr "下"
+
+msgctxt "widget-editor.bottomEdgeStrip"
+msgid "Bottom edge strip"
+msgstr "下エッジストリップ"
+
+msgctxt "widget-editor.bottomLeft"
+msgid "Bottom Left"
+msgstr "左下"
+
+msgctxt "widget-editor.bottomRight"
+msgid "Bottom Right"
+msgstr "右下"
+
+msgctxt "widget-editor.cameraMode"
+msgid "Camera Mode"
+msgstr "カメラモード"
+
+msgctxt "widget-editor.cardinalColor"
+msgid "Cardinal Color"
+msgstr "方位色"
+
+msgctxt "widget-editor.cardinalLabels"
+msgid "Cardinal Labels"
+msgstr "方位ラベル"
+
+msgctxt "widget-editor.ceilingAreaColor"
+msgid "Area Color"
+msgstr "領域の色"
+
+msgctxt "widget-editor.ceilingAreaOpacity"
+msgid "Area Opacity"
+msgstr "領域の不透明度"
+
+msgctxt "widget-editor.ceilingLineColor"
+msgid "Line Color"
+msgstr "線の色"
+
+msgctxt "widget-editor.ceilingLineOpacity"
+msgid "Line Opacity"
+msgstr "線の不透明度"
+
+msgctxt "widget-editor.chartMetric"
+msgid "Metric"
+msgstr "指標"
+
+msgctxt "widget-editor.chartMetrics"
+msgid "Metrics"
+msgstr "指標"
+
+msgctxt "widget-editor.chaseCamera"
+msgid "Chase Camera"
+msgstr "追尾カメラ"
+
+msgctxt "widget-editor.climbColor"
+msgid "Climb"
+msgstr "上昇"
+
+msgctxt "widget-editor.color"
+msgid "Color"
+msgstr "カラー"
+
+msgctxt "widget-editor.colorNegative"
+msgid "Color Negative"
+msgstr "負の値の色"
+
+msgctxt "widget-editor.colorPositive"
+msgid "Color Positive"
+msgstr "正の値の色"
+
+msgctxt "widget-editor.compass"
+msgid "Compass"
+msgstr "コンパス"
+
+msgctxt "widget-editor.compassDial"
+msgid "Dial"
+msgstr "ダイヤル"
+
+msgctxt "widget-editor.concentricRing"
+msgid "Concentric Ring"
+msgstr "同心円"
+
+msgctxt "widget-editor.continuousFill"
+msgid "Continuous Fill"
+msgstr "連続塗り"
+
+msgctxt "widget-editor.coordinateFormatDdm"
+msgid "Deg / Dec Min"
+msgstr "度 / 10進分"
+
+msgctxt "widget-editor.coordinateFormatDms"
+msgid "Deg / Min / Sec"
+msgstr "度 / 分 / 秒"
+
+msgctxt "widget-editor.coordinates"
+msgid "Coordinates"
+msgstr "座標"
+
+msgctxt "widget-editor.cornerOrientation"
+msgid "Corner Orientation"
+msgstr "コーナーの向き"
+
+msgctxt "widget-editor.cornerRadius"
+msgid "Corner Radius"
+msgstr "角の丸み"
+
+msgctxt "widget-editor.cornerTrack"
+msgid "Corner Track"
+msgstr "コーナーゲージ"
+
+msgctxt "widget-editor.cornersAndEdges"
+msgid "Corners & edges"
+msgstr "角と辺"
+
+msgctxt "widget-editor.dateFormatDdMmYyyy"
+msgid "Date only (DD-MM-YYYY)"
+msgstr "日付のみ (DD-MM-YYYY)"
+
+msgctxt "widget-editor.dateFormatDdMmmYyyy"
+msgid "Date only (DD MMM YYYY)"
+msgstr "日付のみ (DD MMM YYYY)"
+
+msgctxt "widget-editor.dateFormatDdMmmmYyyy"
+msgid "Date only (DD MMMM YYYY)"
+msgstr "日付のみ (DD MMMM YYYY)"
+
+msgctxt "widget-editor.dateFormatMmDdYyyy"
+msgid "Date only (MM-DD-YYYY)"
+msgstr "日付のみ (MM-DD-YYYY)"
+
+msgctxt "widget-editor.dateFormatMmmDdYyyy"
+msgid "Date only (MMM DD YYYY)"
+msgstr "日付のみ (MMM DD YYYY)"
+
+msgctxt "widget-editor.dateFormatMmmmDdYyyy"
+msgid "Date only (MMMM DD YYYY)"
+msgstr "日付のみ (MMMM DD YYYY)"
+
+msgctxt "widget-editor.dateFormatYyyyMmDd"
+msgid "Date only (YYYY-MM-DD)"
+msgstr "日付のみ (YYYY-MM-DD)"
+
+msgctxt "widget-editor.dateTimeFormat12h"
+msgid "Date + time (12h)"
+msgstr "日付 + 時刻 (12h)"
+
+msgctxt "widget-editor.dateTimeFormat12hWithSeconds"
+msgid "Date + time (12h with seconds)"
+msgstr "日付 + 時刻 (12h、秒付き)"
+
+msgctxt "widget-editor.dateTimeFormat24h"
+msgid "Date + time (24h)"
+msgstr "日付 + 時刻 (24h)"
+
+msgctxt "widget-editor.dateTimeFormat24hWithSeconds"
+msgid "Date + time (24h with seconds)"
+msgstr "日付 + 時刻 (24h、秒付き)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm12h"
+msgid "Date + time (DD MMM, 12h)"
+msgstr "日付 + 時刻 (DD MMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmm24h"
+msgid "Date + time (DD MMM, 24h)"
+msgstr "日付 + 時刻 (DD MMM, 24h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm12h"
+msgid "Date + time (DD MMMM, 12h)"
+msgstr "日付 + 時刻 (DD MMMM, 12h)"
+
+msgctxt "widget-editor.dateTimeFormatDdMmmm24h"
+msgid "Date + time (DD MMMM, 24h)"
+msgstr "日付 + 時刻 (DD MMMM, 24h)"
+
+msgctxt "widget-editor.daytime"
+msgid "Time of day"
+msgstr "時刻"
+
+msgctxt "widget-editor.decimal"
+msgid "Decimal"
+msgstr "小数"
+
+msgctxt "widget-editor.decimals"
+msgid "Decimals"
+msgstr "小数点以下の桁数"
+
+msgctxt "widget-editor.decompressionCeiling"
+msgid "Decompression Ceiling"
+msgstr "減圧シーリング"
+
+msgctxt "widget-editor.descentColor"
+msgid "Descent"
+msgstr "下降"
+
+msgctxt "widget-editor.diameter"
+msgid "Diameter"
+msgstr "直径"
+
+msgctxt "widget-editor.displayType"
+msgid "Display Type"
+msgstr "表示タイプ"
+
+msgctxt "widget-editor.elapsedFrom"
+msgid "Since the Start of"
+msgstr "経過時間の起点："
+
+msgctxt "widget-editor.elapsedTime"
+msgid "Elapsed Time"
+msgstr "経過時間"
+
+msgctxt "widget-editor.elevationAtStart"
+msgid "Elevation at start"
+msgstr "開始時の標高"
+
+msgctxt "widget-editor.emptyColor"
+msgid "Empty Color"
+msgstr "空の部分の色"
+
+msgctxt "widget-editor.emptyOpacity"
+msgid "Empty Opacity"
+msgstr "空の部分の不透明度"
+
+msgctxt "widget-editor.exportStart"
+msgid "Export"
+msgstr "エクスポートの開始"
+
+msgctxt "widget-editor.fill"
+msgid "Fill"
+msgstr "塗りつぶし"
+
+msgctxt "widget-editor.fillColor"
+msgid "Fill Color"
+msgstr "塗りつぶしの色"
+
+msgctxt "widget-editor.fillGradient"
+msgid "Gradient"
+msgstr "グラデーション"
+
+msgctxt "widget-editor.fillOpacity"
+msgid "Fill Opacity"
+msgstr "塗りつぶしの不透明度"
+
+msgctxt "widget-editor.filledColor"
+msgid "Filled Color"
+msgstr "塗りつぶし済みの色"
+
+msgctxt "widget-editor.filledOpacity"
+msgid "Filled Opacity"
+msgstr "塗りつぶし済みの不透明度"
+
+msgctxt "widget-editor.finishedColor"
+msgid "Finished Color"
+msgstr "完了部分の色"
+
+msgctxt "widget-editor.finishedOpacity"
+msgid "Finished Opacity"
+msgstr "完了部分の不透明度"
+
+msgctxt "widget-editor.flatTrack"
+msgid "Flat Track"
+msgstr "フラットトラック"
+
+msgctxt "widget-editor.font"
+msgid "Font"
+msgstr "フォント"
+
+msgctxt "widget-editor.fontColor"
+msgid "Font Color"
+msgstr "フォントの色"
+
+msgctxt "widget-editor.fontFamily"
+msgid "Font Family"
+msgstr "フォント"
+
+msgctxt "widget-editor.fontSize"
+msgid "Font Size"
+msgstr "フォントサイズ"
+
+msgctxt "widget-editor.fontWeight"
+msgid "Weight"
+msgstr "太さ"
+
+msgctxt "widget-editor.format"
+msgid "Format"
+msgstr "形式"
+
+msgctxt "widget-editor.gaugeTrack"
+msgid "Gauge Track"
+msgstr "ゲージトラック"
+
+msgctxt "widget-editor.general"
+msgid "General"
+msgstr "一般"
+
+msgctxt "widget-editor.gforcePlot"
+msgid "G-Force Plot"
+msgstr "Gフォースグラフ"
+
+msgctxt "widget-editor.glow"
+msgid "Glow"
+msgstr "グロー"
+
+msgctxt "widget-editor.haloDiameter"
+msgid "Halo Diameter"
+msgstr "ハローの直径"
+
+msgctxt "widget-editor.headingValue"
+msgid "Value"
+msgstr "値"
+
+msgctxt "widget-editor.heartZones"
+msgid "Zones"
+msgstr "ゾーン"
+
+msgctxt "widget-editor.height"
+msgid "Height"
+msgstr "高さ"
+
+msgctxt "widget-editor.horizontal"
+msgid "Horizontal"
+msgstr "水平"
+
+msgctxt "widget-editor.horizontalOffset"
+msgid "Horizontal Offset"
+msgstr "水平オフセット"
+
+msgctxt "widget-editor.horizontalPosition"
+msgid "Horizontal Position"
+msgstr "水平位置"
+
+msgctxt "widget-editor.hundredths"
+msgid "Hundredths"
+msgstr "1/100秒"
+
+msgctxt "widget-editor.icon"
+msgid "Icon"
+msgstr "アイコン"
+
+msgctxt "widget-editor.imperialLabel"
+msgid "Imperial Label"
+msgstr "インペリアルラベル"
+
+msgctxt "widget-editor.imperialOffsetX"
+msgid "Imperial Offset X"
+msgstr "インペリアルXオフセット"
+
+msgctxt "widget-editor.imperialOffsetY"
+msgid "Imperial Offset Y"
+msgstr "インペリアルYオフセット"
+
+msgctxt "widget-editor.indicator"
+msgid "Indicator"
+msgstr "インジケーター"
+
+msgctxt "widget-editor.indicatorArrow"
+msgid "Arrow"
+msgstr "矢印"
+
+msgctxt "widget-editor.indicatorColor"
+msgid "Indicator Color"
+msgstr "インジケーターの色"
+
+msgctxt "widget-editor.indicatorLine"
+msgid "Line"
+msgstr "ライン"
+
+msgctxt "widget-editor.indicatorSize"
+msgid "Indicator Size"
+msgstr "インジケーターサイズ"
+
+msgctxt "widget-editor.indicatorStyleChevron"
+msgid "Chevron"
+msgstr "シェブロン"
+
+msgctxt "widget-editor.indicatorStyleHighlightBar"
+msgid "Highlight Bar"
+msgstr "ハイライトバー"
+
+msgctxt "widget-editor.invertSign"
+msgid "Invert sign"
+msgstr "符号を反転"
+
+msgctxt "widget-editor.italic"
+msgid "Italic"
+msgstr "斜体"
+
+msgctxt "widget-editor.label"
+msgid "Label"
+msgstr "ラベル"
+
+msgctxt "widget-editor.labelAxis"
+msgid "{{label}} axis"
+msgstr "{{label}}軸"
+
+msgctxt "widget-editor.labelColor"
+msgid "Label Color"
+msgstr "ラベルの色"
+
+msgctxt "widget-editor.labelFont"
+msgid "Label Font"
+msgstr "ラベルのフォント"
+
+msgctxt "widget-editor.labelFontSize"
+msgid "Label Font Size"
+msgstr "ラベルのフォントサイズ"
+
+msgctxt "widget-editor.labelSize"
+msgid "Label Size"
+msgstr "ラベルサイズ"
+
+msgctxt "widget-editor.labels"
+msgid "Labels"
+msgstr "ラベル"
+
+msgctxt "widget-editor.latitude"
+msgid "Latitude"
+msgstr "緯度"
+
+msgctxt "widget-editor.left"
+msgid "Left"
+msgstr "左"
+
+msgctxt "widget-editor.leftEdgeStrip"
+msgid "Left edge strip"
+msgstr "左エッジストリップ"
+
+msgctxt "widget-editor.legend"
+msgid "Legend"
+msgstr "凡例"
+
+msgctxt "widget-editor.letterSpacing"
+msgid "Spacing"
+msgstr "間隔"
+
+msgctxt "widget-editor.lineStyling"
+msgid "Line Styling"
+msgstr "線の外観"
+
+msgctxt "widget-editor.liveValue"
+msgid "Value"
+msgstr "値"
+
+msgctxt "widget-editor.longitude"
+msgid "Longitude"
+msgstr "経度"
+
+msgctxt "widget-editor.lthr"
+msgid "Lactate Threshold HR"
+msgstr "乳酸閾値心拍数"
+
+msgctxt "widget-editor.majorInterval"
+msgid "Interval"
+msgstr "間隔"
+
+msgctxt "widget-editor.majorLabels"
+msgid "Major Labels"
+msgstr "主目盛ラベル"
+
+msgctxt "widget-editor.majorLength"
+msgid "Major Length"
+msgstr "主目盛の長さ"
+
+msgctxt "widget-editor.majorSpacing"
+msgid "Spacing"
+msgstr "幅"
+
+msgctxt "widget-editor.majorThickness"
+msgid "Major Thickness"
+msgstr "主目盛の太さ"
+
+msgctxt "widget-editor.majorTickColor"
+msgid "Major Color"
+msgstr "主目盛り色"
+
+msgctxt "widget-editor.majorTicks"
+msgid "Major Ticks"
+msgstr "主目盛"
+
+msgctxt "widget-editor.mapBuildings"
+msgid "Buildings"
+msgstr "建物"
+
+msgctxt "widget-editor.mapLabels"
+msgid "Labels"
+msgstr "ラベル"
+
+msgctxt "widget-editor.mapLocalNames"
+msgid "Local Names"
+msgstr "現地名"
+
+msgctxt "widget-editor.mapPaths"
+msgid "Paths"
+msgstr "小道"
+
+msgctxt "widget-editor.mapRotation"
+msgid "Map Rotation"
+msgstr "マップの回転"
+
+msgctxt "widget-editor.mapStyle"
+msgid "Map Style"
+msgstr "地図スタイル"
+
+msgctxt "widget-editor.mapView"
+msgid "Map View"
+msgstr "地図ビュー"
+
+msgctxt "widget-editor.mapWebgl2Software"
+msgid "No GPU found. The map draws in software, so its preview and export may be slow."
+msgstr "GPU が見つかりません。マップはソフトウェアで描画されるため、プレビューと書き出しが遅くなる場合があります。"
+
+msgctxt "widget-editor.mapWebgl2Unavailable"
+msgid "WebGL2 isn't available on this system, so the map can't be previewed."
+msgstr "このシステムでは WebGL2 を利用できないため、マップをプレビューできません。"
+
+msgctxt "widget-editor.marker"
+msgid "Marker"
+msgstr "マーカー"
+
+msgctxt "widget-editor.markerArrow"
+msgid "Arrow"
+msgstr "矢印"
+
+msgctxt "widget-editor.markerColor"
+msgid "Marker Color"
+msgstr "マーカーの色"
+
+msgctxt "widget-editor.markerOpacity"
+msgid "Marker Opacity"
+msgstr "マーカーの不透明度"
+
+msgctxt "widget-editor.markerSize"
+msgid "Marker Size"
+msgstr "マーカーサイズ"
+
+msgctxt "widget-editor.markerType"
+msgid "Marker Type"
+msgstr "マーカータイプ"
+
+msgctxt "widget-editor.maxHeartrate"
+msgid "Max Heart Rate"
+msgstr "最大心拍数"
+
+msgctxt "widget-editor.maxSplits"
+msgid "Max Splits"
+msgstr "最大スプリット数"
+
+msgctxt "widget-editor.metricLabel"
+msgid "Metric Label"
+msgstr "メートル法ラベル"
+
+msgctxt "widget-editor.metricOffsetX"
+msgid "Metric Offset X"
+msgstr "メートル法Xオフセット"
+
+msgctxt "widget-editor.metricOffsetY"
+msgid "Metric Offset Y"
+msgstr "メートル法Yオフセット"
+
+msgctxt "widget-editor.minmaxLabels"
+msgid "Min/Max Labels"
+msgstr "最小/最大ラベル"
+
+msgctxt "widget-editor.minorLabels"
+msgid "Minor Labels"
+msgstr "補助目盛ラベル"
+
+msgctxt "widget-editor.minorLength"
+msgid "Minor Length"
+msgstr "補助目盛の長さ"
+
+msgctxt "widget-editor.minorThickness"
+msgid "Minor Thickness"
+msgstr "補助目盛の太さ"
+
+msgctxt "widget-editor.minorTickColor"
+msgid "Minor Color"
+msgstr "副目盛り色"
+
+msgctxt "widget-editor.minorTicks"
+msgid "Minor Ticks"
+msgstr "補助目盛"
+
+msgctxt "widget-editor.moveDown"
+msgid "Move down"
+msgstr "下へ移動"
+
+msgctxt "widget-editor.moveUp"
+msgid "Move up"
+msgstr "上へ移動"
+
+msgctxt "widget-editor.msaa"
+msgid "Anti-aliasing (MSAA)"
+msgstr "アンチエイリアス (MSAA)"
+
+msgctxt "widget-editor.msaaOff"
+msgid "Off"
+msgstr "オフ"
+
+msgctxt "widget-editor.negativeDeltaColor"
+msgid "Negative Delta Color"
+msgstr "負の差分の色"
+
+msgctxt "widget-editor.noActiveWidgets"
+msgid "No active widgets"
+msgstr "有効なウィジェットなし"
+
+msgctxt "widget-editor.northUp"
+msgid "North Up"
+msgstr "北を上"
+
+msgctxt "widget-editor.offset"
+msgid "Offset"
+msgstr "オフセット"
+
+msgctxt "widget-editor.opacity"
+msgid "Opacity"
+msgstr "不透明度"
+
+msgctxt "widget-editor.orientation"
+msgid "Orientation"
+msgstr "向き"
+
+msgctxt "widget-editor.percentColor"
+msgid "Percent Color"
+msgstr "パーセントの色"
+
+msgctxt "widget-editor.pitch"
+msgid "Pitch"
+msgstr "傾き"
+
+msgctxt "widget-editor.pixelsPerDegree"
+msgid "Pixels per Degree"
+msgstr "1度あたりのピクセル"
+
+msgctxt "widget-editor.placement"
+msgid "Placement"
+msgstr "配置"
+
+msgctxt "widget-editor.position"
+msgid "Position"
+msgstr "位置"
+
+msgctxt "widget-editor.positiveDeltaColor"
+msgid "Positive Delta Color"
+msgstr "正の差分の色"
+
+msgctxt "widget-editor.profileDetail"
+msgid "Profile Detail"
+msgstr "プロファイル詳細"
+
+msgctxt "widget-editor.readout"
+msgid "Readout"
+msgstr "表示"
+
+msgctxt "widget-editor.remainingColor"
+msgid "Remaining Color"
+msgstr "残り部分の色"
+
+msgctxt "widget-editor.remainingOpacity"
+msgid "Remaining Opacity"
+msgstr "残り部分の不透明度"
+
+msgctxt "widget-editor.removeMetric"
+msgid "Remove metric"
+msgstr "指標を削除"
+
+msgctxt "widget-editor.renumberLaps"
+msgid "Renumber laps"
+msgstr "ラップ番号を振り直す"
+
+msgctxt "widget-editor.resetField"
+msgid "Reset field"
+msgstr "フィールドをリセット"
+
+msgctxt "widget-editor.resetLabel"
+msgid "Reset {0}"
+msgstr "{0}をリセット"
+
+msgctxt "widget-editor.riderUp"
+msgid "Rider Up"
+msgstr "進行方向を上"
+
+msgctxt "widget-editor.right"
+msgid "Right"
+msgstr "右"
+
+msgctxt "widget-editor.rightEdgeStrip"
+msgid "Right edge strip"
+msgstr "右エッジストリップ"
+
+msgctxt "widget-editor.ringDiameter"
+msgid "Ring Diameter"
+msgstr "リングの直径"
+
+msgctxt "widget-editor.rotation"
+msgid "Rotation"
+msgstr "回転"
+
+msgctxt "widget-editor.rotationMode"
+msgid "Rotation Mode"
+msgstr "回転モード"
+
+msgctxt "widget-editor.roundBottomLeftCorner"
+msgid "Round bottom left corner"
+msgstr "左下の角を丸くする"
+
+msgctxt "widget-editor.roundBottomRightCorner"
+msgid "Round bottom right corner"
+msgstr "右下の角を丸くする"
+
+msgctxt "widget-editor.roundTopLeftCorner"
+msgid "Round top left corner"
+msgstr "左上の角を丸くする"
+
+msgctxt "widget-editor.roundTopRightCorner"
+msgid "Round top right corner"
+msgstr "右上の角を丸くする"
+
+msgctxt "widget-editor.routeDetail"
+msgid "Route Detail"
+msgstr "ルート詳細"
+
+msgctxt "widget-editor.rowGap"
+msgid "Row Gap"
+msgstr "行間"
+
+msgctxt "widget-editor.segmentedBars"
+msgid "Segmented Bars"
+msgstr "セグメントバー"
+
+msgctxt "widget-editor.shape"
+msgid "Shape"
+msgstr "形状"
+
+msgctxt "widget-editor.showFullActivity"
+msgid "Show Full Activity"
+msgstr "全アクティビティ"
+
+msgctxt "widget-editor.showFullAscent"
+msgid "Show Full Ascent"
+msgstr "累積標高全体"
+
+msgctxt "widget-editor.showFullDistance"
+msgid "Show Full Distance"
+msgstr "全距離"
+
+msgctxt "widget-editor.showIndicator"
+msgid "Show Indicator"
+msgstr "インジケーターを表示"
+
+msgctxt "widget-editor.showLabels"
+msgid "Show Labels"
+msgstr "ラベルを表示"
+
+msgctxt "widget-editor.showSign"
+msgid "Show sign"
+msgstr "符号を表示"
+
+msgctxt "widget-editor.showValue"
+msgid "Show Value"
+msgstr "値を表示"
+
+msgctxt "widget-editor.singleCircle"
+msgid "Single Circle"
+msgstr "単一円"
+
+msgctxt "widget-editor.size"
+msgid "Size"
+msgstr "サイズ"
+
+msgctxt "widget-editor.smoothing"
+msgid "Smoothing"
+msgstr "スムージング"
+
+msgctxt "widget-editor.solidHalo"
+msgid "Solid Halo"
+msgstr "塗りつぶしハロー"
+
+msgctxt "widget-editor.splitColumnBar"
+msgid "Bar"
+msgstr "バー"
+
+msgctxt "widget-editor.splitColumnPace"
+msgid "Pace"
+msgstr "ペース"
+
+msgctxt "widget-editor.splitColumnSplit"
+msgid "Split"
+msgstr "スプリット"
+
+msgctxt "widget-editor.splitColumns"
+msgid "Columns"
+msgstr "列"
+
+msgctxt "widget-editor.splitLength"
+msgid "Split Length"
+msgstr "スプリット距離"
+
+msgctxt "widget-editor.splits"
+msgid "Splits"
+msgstr "スプリット"
+
+msgctxt "widget-editor.stripColor"
+msgid "Strip Color"
+msgstr "ストリップの色"
+
+msgctxt "widget-editor.stripThickness"
+msgid "Strip Thickness"
+msgstr "ストリップの太さ"
+
+msgctxt "widget-editor.style"
+msgid "Style"
+msgstr "スタイル"
+
+msgctxt "widget-editor.tapeScale"
+msgid "Tape Scale"
+msgstr "テープスケール"
+
+msgctxt "widget-editor.text"
+msgid "Text"
+msgstr "テキスト"
+
+msgctxt "widget-editor.thickness"
+msgid "Thickness"
+msgstr "太さ"
+
+msgctxt "widget-editor.tickColor"
+msgid "Tick Color"
+msgstr "目盛の色"
+
+msgctxt "widget-editor.tickLength"
+msgid "Tick Length"
+msgstr "目盛りの長さ"
+
+msgctxt "widget-editor.ticks"
+msgid "Ticks"
+msgstr "目盛"
+
+msgctxt "widget-editor.timeFormat12h"
+msgid "Time only (12h)"
+msgstr "時刻のみ (12h)"
+
+msgctxt "widget-editor.timeFormat12hWithSeconds"
+msgid "Time only (12h with seconds)"
+msgstr "時刻のみ (12h、秒付き)"
+
+msgctxt "widget-editor.timeFormat24h"
+msgid "Time only (24h)"
+msgstr "時刻のみ (24h)"
+
+msgctxt "widget-editor.timeFormat24hWithSeconds"
+msgid "Time only (24h with seconds)"
+msgstr "時刻のみ (24h、秒付き)"
+
+msgctxt "widget-editor.timeMode"
+msgid "Time Mode"
+msgstr "時間モード"
+
+msgctxt "widget-editor.timeWindow"
+msgid "Time Window"
+msgstr "時間範囲"
+
+msgctxt "widget-editor.top"
+msgid "Top"
+msgstr "上"
+
+msgctxt "widget-editor.topDown"
+msgid "Top Down"
+msgstr "真上から"
+
+msgctxt "widget-editor.topEdgeStrip"
+msgid "Top edge strip"
+msgstr "上エッジストリップ"
+
+msgctxt "widget-editor.trackFill"
+msgid "Track Fill"
+msgstr "トラックの塗り"
+
+msgctxt "widget-editor.trackStyle"
+msgid "Track Style"
+msgstr "トラックスタイル"
+
+msgctxt "widget-editor.transparency"
+msgid "Transparency"
+msgstr "透過"
+
+msgctxt "widget-editor.trendSeconds"
+msgid "Trend"
+msgstr "トレンド"
+
+msgctxt "widget-editor.typography"
+msgid "Typography"
+msgstr "タイポグラフィ"
+
+msgctxt "widget-editor.unit"
+msgid "Unit"
+msgstr "単位"
+
+msgctxt "widget-editor.unitColor"
+msgid "Unit Color"
+msgstr "単位の色"
+
+msgctxt "widget-editor.units"
+msgid "Units"
+msgstr "単位"
+
+msgctxt "widget-editor.valueColor"
+msgid "Value Color"
+msgstr "値の色"
+
+msgctxt "widget-editor.valueOffset"
+msgid "Value Offset"
+msgstr "値のオフセット"
+
+msgctxt "widget-editor.vertical"
+msgid "Vertical"
+msgstr "垂直"
+
+msgctxt "widget-editor.verticalOffset"
+msgid "Vertical Offset"
+msgstr "垂直オフセット"
+
+msgctxt "widget-editor.verticalPosition"
+msgid "Vertical Position"
+msgstr "垂直位置"
+
+msgctxt "widget-editor.verticalScale"
+msgid "Vertical Scale"
+msgstr "垂直スケール"
+
+msgctxt "widget-editor.verticalSpeed"
+msgid "Vert. Speed"
+msgstr "昇降速度"
+
+msgctxt "widget-editor.width"
+msgid "Width"
+msgstr "幅"
+
+msgctxt "widget-editor.zoneCalculation"
+msgid "Zone Calculation"
+msgstr "ゾーン計算"
+
+msgctxt "widget-editor.zoneCalculationLthr"
+msgid "Lactate Threshold HR"
+msgstr "乳酸閾値心拍数"
+
+msgctxt "widget-editor.zoneCalculationManual"
+msgid "Manual"
+msgstr "手動"
+
+msgctxt "widget-editor.zoneCalculationMaxHeartrate"
+msgid "Max Heart Rate"
+msgstr "最大心拍数"
+
+msgctxt "widget-editor.zoneFrom"
+msgid "From"
+msgstr "開始"
+
+msgctxt "widget-editor.zoneLabel"
+msgid "Zone Label"
+msgstr "ゾーンラベル"
+
+msgctxt "widget-editor.zoneTo"
+msgid "To"
+msgstr "終了"
+
+msgctxt "widget-editor.zoom"
+msgid "Zoom"
+msgstr "ズーム"
+
+msgctxt "widgets.activityAttributes.barometric_altitude"
+msgid "Barometric Altitude"
+msgstr "気圧高度"
+
+msgctxt "widgets.backdropTypes.circle"
+msgid "Circle"
+msgstr "円"
+
+msgctxt "widgets.backdropTypes.rectangle"
+msgid "Rectangle"
+msgstr "長方形"
+
+msgctxt "widgets.categories.camera"
+msgid "Camera"
+msgstr "カメラ"
+
+msgctxt "widgets.categories.cycling"
+msgid "Cycling"
+msgstr "サイクリング"
+
+msgctxt "widgets.categories.general"
+msgid "General"
+msgstr "一般"
+
+msgctxt "widgets.categories.motosports"
+msgid "Motorsports"
+msgstr "モータースポーツ"
+
+msgctxt "widgets.categories.other"
+msgid "Other"
+msgstr "その他"
+
+msgctxt "widgets.categories.running"
+msgid "Running"
+msgstr "ランニング"
+
+msgctxt "widgets.categories.scuba_diving"
+msgid "Scuba Diving"
+msgstr "スキューバダイビング"
+
+msgctxt "widgets.displayTypes.altitudeTape"
+msgid "Altitude Tape"
+msgstr "高度テープ"
+
+msgctxt "widgets.displayTypes.arc"
+msgid "Arc Gauge"
+msgstr "円弧ゲージ"
+
+msgctxt "widgets.displayTypes.corner"
+msgid "Corner Gauge"
+msgstr "コーナーゲージ"
+
+msgctxt "widgets.displayTypes.depthTape"
+msgid "Depth Tape"
+msgstr "深度テープ"
+
+msgctxt "widgets.displayTypes.gForce"
+msgid "G-Force"
+msgstr "Gフォース"
+
+msgctxt "widgets.displayTypes.gtGauge"
+msgid "GT Gauge"
+msgstr "GTゲージ"
+
+msgctxt "widgets.displayTypes.headingCompass"
+msgid "Heading Compass"
+msgstr "方位コンパス"
+
+msgctxt "widgets.displayTypes.headingTape"
+msgid "Heading Tape"
+msgstr "方位テープ"
+
+msgctxt "widgets.displayTypes.heartZones"
+msgid "Heart Zones"
+msgstr "心拍ゾーン"
+
+msgctxt "widgets.displayTypes.lapTimer"
+msgid "Lap Times"
+msgstr "ラップタイム"
+
+msgctxt "widgets.displayTypes.leanAngle"
+msgid "Lean Angle"
+msgstr "傾斜角"
+
+msgctxt "widgets.displayTypes.linear"
+msgid "Linear Bar"
+msgstr "リニアバー"
+
+msgctxt "widgets.displayTypes.splitsRun"
+msgid "Splits"
+msgstr "スプリット"
+
+msgctxt "widgets.displayTypes.text"
+msgid "Text"
+msgstr "テキスト"
+
+msgctxt "widgets.drawerGroups.map.mapTiles"
+msgid "Map Tiles"
+msgstr "マップタイル"
+
+msgctxt "widgets.drawerGroups.map.route"
+msgid "Route"
+msgstr "ルート"
+
+msgctxt "widgets.drawerGroups.map.route3d"
+msgid "3D Route"
+msgstr "3D ルート"
+
+msgctxt "widgets.drawerGroups.map.shortName"
+msgid "Map"
+msgstr "マップ"
+
+msgctxt "widgets.lapTimerModes.bestLap"
+msgid "Best Lap"
+msgstr "ベストラップ"
+
+msgctxt "widgets.lapTimerModes.currentLap"
+msgid "Current Lap"
+msgstr "現在のラップ"
+
+msgctxt "widgets.lapTimerModes.delta"
+msgid "Delta"
+msgstr "差分"
+
+msgctxt "widgets.lapTimerModes.lapLog"
+msgid "Lap Log"
+msgstr "ラップログ"
+
+msgctxt "widgets.types.air_pressure.name"
+msgid "Air Pressure"
+msgstr "気圧"
+
+msgctxt "widgets.types.air_pressure.shortName"
+msgid "Air Press."
+msgstr "気圧"
+
+msgctxt "widgets.types.altitude.name"
+msgid "Altitude"
+msgstr "高度"
+
+msgctxt "widgets.types.altitude.shortName"
+msgid "Altitude"
+msgstr "高度"
+
+msgctxt "widgets.types.aperture.name"
+msgid "Aperture"
+msgstr "絞り"
+
+msgctxt "widgets.types.aperture.shortName"
+msgid "Aperture"
+msgstr "絞り"
+
+msgctxt "widgets.types.average_ppo2.name"
+msgid "Average ppO₂"
+msgstr "平均ppO₂"
+
+msgctxt "widgets.types.average_ppo2.shortName"
+msgid "ppO₂"
+msgstr "ppO₂"
+
+msgctxt "widgets.types.backdrop.name"
+msgid "Backdrop"
+msgstr "背景"
+
+msgctxt "widgets.types.backdrop.shortName"
+msgid "Backdrop"
+msgstr "背景"
+
+msgctxt "widgets.types.boost_pressure.name"
+msgid "Boost Pressure"
+msgstr "ブースト圧"
+
+msgctxt "widgets.types.boost_pressure.shortName"
+msgid "Boost"
+msgstr "ブースト"
+
+msgctxt "widgets.types.brake_position.name"
+msgid "Brake Position"
+msgstr "ブレーキ位置"
+
+msgctxt "widgets.types.brake_position.shortName"
+msgid "Brake"
+msgstr "ブレーキ"
+
+msgctxt "widgets.types.cadence.name"
+msgid "Cadence"
+msgstr "ケイデンス"
+
+msgctxt "widgets.types.cadence.shortName"
+msgid "Cadence"
+msgstr "ケイデンス"
+
+msgctxt "widgets.types.calories.name"
+msgid "Calories"
+msgstr "カロリー"
+
+msgctxt "widgets.types.calories.shortName"
+msgid "Calories"
+msgstr "カロリー"
+
+msgctxt "widgets.types.color_temperature.name"
+msgid "Color Temperature"
+msgstr "色温度"
+
+msgctxt "widgets.types.color_temperature.shortName"
+msgid "WB"
+msgstr "色温度"
+
+msgctxt "widgets.types.coolant_temperature.name"
+msgid "Coolant Temperature"
+msgstr "冷却水温"
+
+msgctxt "widgets.types.coolant_temperature.shortName"
+msgid "Coolant"
+msgstr "冷却水温"
+
+msgctxt "widgets.types.core_temperature.name"
+msgid "Core Temperature"
+msgstr "深部体温"
+
+msgctxt "widgets.types.core_temperature.shortName"
+msgid "Core T."
+msgstr "深部体温"
+
+msgctxt "widgets.types.course.name"
+msgid "Route Map"
+msgstr "ルートマップ"
+
+msgctxt "widgets.types.course.shortName"
+msgid "Map"
+msgstr "マップ"
+
+msgctxt "widgets.types.depth.name"
+msgid "Depth"
+msgstr "水深"
+
+msgctxt "widgets.types.depth.shortName"
+msgid "Depth"
+msgstr "水深"
+
+msgctxt "widgets.types.distance.name"
+msgid "Distance"
+msgstr "距離"
+
+msgctxt "widgets.types.distance.shortName"
+msgid "Dist."
+msgstr "距離"
+
+msgctxt "widgets.types.distance_to_home.name"
+msgid "Distance to Home"
+msgstr "自宅までの距離"
+
+msgctxt "widgets.types.distance_to_home.shortName"
+msgid "Home"
+msgstr "自宅"
+
+msgctxt "widgets.types.diving_profile.name"
+msgid "Diving Profile"
+msgstr "ダイビングプロファイル"
+
+msgctxt "widgets.types.diving_profile.shortName"
+msgid "Dive Profile"
+msgstr "潜水プロファイル"
+
+msgctxt "widgets.types.elevation.name"
+msgid "Elevation"
+msgstr "標高"
+
+msgctxt "widgets.types.elevation.shortName"
+msgid "Elev."
+msgstr "標高"
+
+msgctxt "widgets.types.engine_load.name"
+msgid "Engine Load"
+msgstr "エンジン負荷"
+
+msgctxt "widgets.types.engine_load.shortName"
+msgid "Eng. Load"
+msgstr "エンジン負荷"
+
+msgctxt "widgets.types.engine_power.name"
+msgid "Engine Power"
+msgstr "エンジン出力"
+
+msgctxt "widgets.types.engine_power.shortName"
+msgid "Eng. Power"
+msgstr "エンジン出力"
+
+msgctxt "widgets.types.ev.name"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.ev.shortName"
+msgid "EV"
+msgstr "EV"
+
+msgctxt "widgets.types.first_stop_depth.name"
+msgid "First Stop Depth"
+msgstr "最初の減圧停止深度"
+
+msgctxt "widgets.types.first_stop_depth.shortName"
+msgid "Stop Depth"
+msgstr "停止深度"
+
+msgctxt "widgets.types.first_stop_time.name"
+msgid "First Stop Time"
+msgstr "最初の減圧停止時間"
+
+msgctxt "widgets.types.first_stop_time.shortName"
+msgid "Stop Time"
+msgstr "停止時間"
+
+msgctxt "widgets.types.focal_length.name"
+msgid "Focal Length"
+msgstr "焦点距離"
+
+msgctxt "widgets.types.focal_length.shortName"
+msgid "Focal L."
+msgstr "焦点距離"
+
+msgctxt "widgets.types.g_force.name"
+msgid "G-Force"
+msgstr "Gフォース"
+
+msgctxt "widgets.types.g_force.shortName"
+msgid "G-Force"
+msgstr "Gフォース"
+
+msgctxt "widgets.types.gas_mix.name"
+msgid "Gas Mix (O₂/He)"
+msgstr "混合ガス (O₂/He)"
+
+msgctxt "widgets.types.gas_mix.shortName"
+msgid "O₂/He"
+msgstr "O₂/He"
+
+msgctxt "widgets.types.gear_position.name"
+msgid "Gear Position"
+msgstr "ギア位置"
+
+msgctxt "widgets.types.gear_position.shortName"
+msgid "Gear"
+msgstr "ギア"
+
+msgctxt "widgets.types.gps_coordinates.name"
+msgid "GPS Coordinates"
+msgstr "GPS座標"
+
+msgctxt "widgets.types.gps_coordinates.shortName"
+msgid "Location"
+msgstr "位置"
+
+msgctxt "widgets.types.gradient.name"
+msgid "Gradient"
+msgstr "勾配"
+
+msgctxt "widgets.types.gradient.shortName"
+msgid "Grad."
+msgstr "勾配"
+
+msgctxt "widgets.types.ground_contact_time.name"
+msgid "Ground Contact Time"
+msgstr "接地時間"
+
+msgctxt "widgets.types.ground_contact_time.shortName"
+msgid "GCT"
+msgstr "接地"
+
+msgctxt "widgets.types.heading.name"
+msgid "Heading"
+msgstr "方位"
+
+msgctxt "widgets.types.heading.shortName"
+msgid "Heading"
+msgstr "方位"
+
+msgctxt "widgets.types.heartrate.name"
+msgid "Heart Rate"
+msgstr "心拍数"
+
+msgctxt "widgets.types.heartrate.shortName"
+msgid "HR"
+msgstr "心拍数"
+
+msgctxt "widgets.types.iso.name"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.iso.shortName"
+msgid "ISO"
+msgstr "ISO"
+
+msgctxt "widgets.types.label.name"
+msgid "Text"
+msgstr "テキスト"
+
+msgctxt "widgets.types.label.shortName"
+msgid "Text"
+msgstr "テキスト"
+
+msgctxt "widgets.types.lap_timer.name"
+msgid "Lap Timer"
+msgstr "ラップタイマー"
+
+msgctxt "widgets.types.lap_timer.shortName"
+msgid "Lap Times"
+msgstr "ラップタイム"
+
+msgctxt "widgets.types.lean_angle.name"
+msgid "Lean Angle"
+msgstr "傾斜角"
+
+msgctxt "widgets.types.lean_angle.shortName"
+msgid "Lean"
+msgstr "傾斜角"
+
+msgctxt "widgets.types.left_right_balance.name"
+msgid "Left/Right Balance"
+msgstr "左右バランス"
+
+msgctxt "widgets.types.left_right_balance.shortName"
+msgid "L/R Bal."
+msgstr "左右バランス"
+
+msgctxt "widgets.types.map.name"
+msgid "Street Map"
+msgstr "ストリートマップ"
+
+msgctxt "widgets.types.map.shortName"
+msgid "Streets"
+msgstr "街路"
+
+msgctxt "widgets.types.pace.name"
+msgid "Pace"
+msgstr "ペース"
+
+msgctxt "widgets.types.pace.shortName"
+msgid "Pace"
+msgstr "ペース"
+
+msgctxt "widgets.types.power.name"
+msgid "Power"
+msgstr "パワー"
+
+msgctxt "widgets.types.power.shortName"
+msgid "Power"
+msgstr "パワー"
+
+msgctxt "widgets.types.raster.name"
+msgid "Image"
+msgstr "画像"
+
+msgctxt "widgets.types.raster.shortName"
+msgid "Image"
+msgstr "画像"
+
+msgctxt "widgets.types.rolling_chart.name"
+msgid "Charts"
+msgstr "チャート"
+
+msgctxt "widgets.types.rolling_chart.shortName"
+msgid "Charts"
+msgstr "チャート"
+
+msgctxt "widgets.types.rpm.name"
+msgid "RPM"
+msgstr "エンジン回転数"
+
+msgctxt "widgets.types.rpm.shortName"
+msgid "RPM"
+msgstr "回転数"
+
+msgctxt "widgets.types.shutter_speed.name"
+msgid "Shutter Speed"
+msgstr "シャッター速度"
+
+msgctxt "widgets.types.shutter_speed.shortName"
+msgid "Shutter"
+msgstr "シャッター"
+
+msgctxt "widgets.types.speed.name"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "widgets.types.speed.shortName"
+msgid "Speed"
+msgstr "速度"
+
+msgctxt "widgets.types.splits_run.name"
+msgid "Running Splits"
+msgstr "ランニングスプリット"
+
+msgctxt "widgets.types.splits_run.shortName"
+msgid "Splits"
+msgstr "スプリット"
+
+msgctxt "widgets.types.stride_length.name"
+msgid "Stride Length"
+msgstr "ストライド長"
+
+msgctxt "widgets.types.stride_length.shortName"
+msgid "Stride"
+msgstr "ストライド"
+
+msgctxt "widgets.types.stroke_rate.name"
+msgid "Stroke Rate"
+msgstr "ストローク数"
+
+msgctxt "widgets.types.stroke_rate.shortName"
+msgid "S/R"
+msgstr "ストローク数"
+
+msgctxt "widgets.types.temperature.name"
+msgid "Temperature"
+msgstr "温度"
+
+msgctxt "widgets.types.temperature.shortName"
+msgid "Temp."
+msgstr "温度"
+
+msgctxt "widgets.types.throttle_position.name"
+msgid "Throttle Position"
+msgstr "スロットル位置"
+
+msgctxt "widgets.types.throttle_position.shortName"
+msgid "Throttle"
+msgstr "スロットル"
+
+msgctxt "widgets.types.time.name"
+msgid "Time"
+msgstr "時刻"
+
+msgctxt "widgets.types.time.shortName"
+msgid "Time"
+msgstr "時刻"
+
+msgctxt "widgets.types.time_to_surface.name"
+msgid "Time to Surface"
+msgstr "浮上までの時間"
+
+msgctxt "widgets.types.time_to_surface.shortName"
+msgid "TTS"
+msgstr "TTS"
+
+msgctxt "widgets.types.torque.name"
+msgid "Torque"
+msgstr "トルク"
+
+msgctxt "widgets.types.torque.shortName"
+msgid "Torque"
+msgstr "トルク"
+
+msgctxt "widgets.types.total_ascent.name"
+msgid "Total Ascent"
+msgstr "累積標高"
+
+msgctxt "widgets.types.total_ascent.shortName"
+msgid "Ascent"
+msgstr "累積標高"
+
+msgctxt "widgets.types.vertical_oscillation.name"
+msgid "Vertical Oscillation"
+msgstr "上下動"
+
+msgctxt "widgets.types.vertical_oscillation.shortName"
+msgid "V. Osc."
+msgstr "上下動"
+
+msgctxt "widgets.types.vertical_ratio.name"
+msgid "Vertical Ratio"
+msgstr "上下動比"
+
+msgctxt "widgets.types.vertical_ratio.shortName"
+msgid "V. Ratio"
+msgstr "上下動比"
+
+msgctxt "widgets.types.vertical_speed.name"
+msgid "Vertical Speed"
+msgstr "垂直速度"
+
+msgctxt "widgets.types.vertical_speed.shortName"
+msgid "V. Speed"
+msgstr "垂直速度"
+
+msgctxt "widgets.types.water_temperature.name"
+msgid "Water Temperature"
+msgstr "水温"
+
+msgctxt "widgets.types.water_temperature.shortName"
+msgid "Water Temp."
+msgstr "水温"
