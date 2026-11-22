@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2" height="2" viewBox="0 0 2 2">
+  <!-- Opaque: the canvas black, and `Theme.grid-line` at 20% over it (theme.slint). Change them together. -->
+  <rect width="2" height="2" fill="#000000"/>
+  <path fill="#041112" d="M0 0H1L0 1ZM2 0V1L1 0ZM2 2H1L2 1ZM0 2V1L1 2Z"/>
+</svg>

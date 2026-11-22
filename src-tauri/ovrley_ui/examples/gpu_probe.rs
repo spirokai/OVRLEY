@@ -2,8 +2,11 @@
 //! window costs, with and without Slint.
 //!
 //! `cargo run -p ovrley_ui --example gpu_probe -- <mode> <fps> [busy]`
-//! - `raw` (Windows): winit + wgpu on the shared DX12 device: a full-window clear and present per
-//!   frame.
+//! - `raw`: winit + wgpu on the shared device (DX12 on Windows, Vulkan on Linux): a full-window
+//!   clear and present per frame.
+//! - `copy`: like `raw`, but each frame writes the 2 px strips the playhead left and entered into a
+//!   persistent scene texture and copies the whole scene into a swapchain image made a copy
+//!   destination: the patched Skia surface's partial path, without Skia.
 //! - `d3d-full` (Windows): winit + an own FLIP_SEQUENTIAL DXGI swapchain on the shared DX12 queue:
 //!   a full-window clear, a 2 px playhead, and `Present1` without dirty rectangles.
 //! - `d3d-dirty` (Windows): the same swapchain, but once each buffer has been drawn whole, only the
@@ -17,10 +20,15 @@
 //! window of that size instead of maximizing. `PROBE_IDLE=<s>` keeps the window still for that
 //! long before the frames start (to measure DWM against its own baseline).
 //!
-//! The probe prints frames and CPU time; GPU time comes from outside. On Windows, read the
-//! process's `\GPU Engine(pid_<pid>_*engtype_3D)\Running Time` counter (100 ns units) before and
-//! after a span, run with `WGPU_VALIDATION=0 WGPU_DEBUG=0` (debug builds otherwise turn on the
-//! D3D12 debug layer), and measure `dwm.exe` the same way, as an idle→active delta.
+//! The probe prints frames and CPU time; GPU time comes from outside. Run with
+//! `WGPU_VALIDATION=0 WGPU_DEBUG=0` (debug builds otherwise turn on the D3D12 debug layer or the
+//! Vulkan validation layers).
+//! - Windows: read the process's `\GPU Engine(pid_<pid>_*engtype_3D)\Running Time` counter
+//!   (100 ns units) before and after a span, and measure `dwm.exe` the same way, as an idle→active
+//!   delta.
+//! - Linux (NVIDIA): the driver keeps no per-process engine time. Sample `nvidia-smi dmon -s puc`
+//!   (the whole GPU: power, utilisation, clocks) and `nvidia-smi pmon -s u` (SM % per process, the
+//!   probe's and the compositor's) over the `PROBE_IDLE` span and the frames span.
 
 use slint::winit_030::{winit, WinitWindowAccessor};
 use slint::ComponentHandle;
@@ -118,8 +126,8 @@ fn main() {
         std::process::id()
     );
     match mode {
-        #[cfg(windows)]
         "raw" => raw::run(raw::Kind::Wgpu, fps),
+        "copy" => raw::run(raw::Kind::Copy, fps),
         #[cfg(windows)]
         "d3d-full" => raw::run(raw::Kind::D3dFull, fps),
         #[cfg(windows)]
@@ -184,8 +192,7 @@ fn run_slint(software: bool, fps: u32, busy: bool) {
     window.run().expect("run");
 }
 
-/// The Windows-only modes: presentation without Slint, through wgpu or an own DXGI swapchain.
-#[cfg(windows)]
+/// Presentation without Slint: through wgpu, or (Windows) an own DXGI swapchain.
 mod raw {
     use super::{attributes, idle, seconds, winit};
     use slint::wgpu_30::wgpu;
@@ -198,15 +205,21 @@ mod raw {
     #[derive(Clone, Copy, PartialEq, Eq, Debug)]
     pub enum Kind {
         Wgpu,
+        Copy,
+        #[cfg(windows)]
         D3dFull,
+        #[cfg(windows)]
         D3dDirty,
     }
 
     const PLAYHEAD_WIDTH: i32 = 2;
     const PLAYHEAD_STEP: i32 = 7;
+    const SCENE_BACKGROUND: [u8; 4] = [0x1f, 0x1b, 0x1b, 0xff];
+    const SCENE_PLAYHEAD: [u8; 4] = [0x4d, 0x48, 0xe5, 0xff];
 
     enum Presenter {
         Wgpu(wgpu::Surface<'static>, wgpu::SurfaceConfiguration),
+        #[cfg(windows)]
         D3d(d3d::Chain),
     }
 
@@ -216,6 +229,8 @@ mod raw {
         interval: Option<Duration>,
         window: Option<Arc<winit::window::Window>>,
         presenter: Option<Presenter>,
+        /// `copy`: the persistent scene, at the swapchain's size and format.
+        scene: Option<wgpu::Texture>,
         playhead: i32,
         next_frame: Instant,
         started: Instant,
@@ -238,6 +253,7 @@ mod raw {
             interval: (fps > 0).then(|| Duration::from_secs_f64(1.0 / f64::from(fps))),
             window: None,
             presenter: None,
+            scene: None,
             playhead: 0,
             next_frame: now + idle(),
             started: now,
@@ -256,7 +272,9 @@ mod raw {
                     config.width = width.max(1);
                     config.height = height.max(1);
                     surface.configure(&self.gpu.device, config);
+                    self.scene = None;
                 }
+                #[cfg(windows)]
                 Some(Presenter::D3d(chain)) => chain.resize(width.max(1), height.max(1)),
                 None => {}
             }
@@ -276,7 +294,7 @@ mod raw {
                 previous + PLAYHEAD_STEP
             };
             match self.presenter.as_mut() {
-                Some(Presenter::Wgpu(surface, _)) => {
+                Some(Presenter::Wgpu(surface, config)) => {
                     let frame = match surface.get_current_texture() {
                         wgpu::CurrentSurfaceTexture::Success(frame) => frame,
                         other => {
@@ -284,42 +302,84 @@ mod raw {
                             return;
                         }
                     };
-                    let view = frame
-                        .texture
-                        .create_view(&wgpu::TextureViewDescriptor::default());
                     let mut encoder =
                         self.gpu
                             .device
                             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                                label: Some("probe clear"),
+                                label: Some("probe frame"),
                             });
-                    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        label: Some("probe clear"),
-                        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                            view: &view,
-                            depth_slice: None,
-                            resolve_target: None,
-                            ops: wgpu::Operations {
-                                load: wgpu::LoadOp::Clear(wgpu::Color {
-                                    r: 0.1,
-                                    g: 0.1,
-                                    b: 0.12,
-                                    a: 1.0,
-                                }),
-                                store: wgpu::StoreOp::Store,
-                            },
-                        })],
-                        depth_stencil_attachment: None,
-                        timestamp_writes: None,
-                        occlusion_query_set: None,
-                        multiview_mask: None,
-                    });
+                    if self.kind == Kind::Copy {
+                        let device = &self.gpu.device;
+                        let scene = self
+                            .scene
+                            .get_or_insert_with(|| create_scene(device, config));
+                        let last = config.width as i32 - PLAYHEAD_WIDTH;
+                        for (x, color) in
+                            [(previous, SCENE_BACKGROUND), (self.playhead, SCENE_PLAYHEAD)]
+                        {
+                            let strip = color.repeat(PLAYHEAD_WIDTH as usize * config.height as usize);
+                            self.gpu.queue.write_texture(
+                                wgpu::TexelCopyTextureInfo {
+                                    texture: scene,
+                                    mip_level: 0,
+                                    origin: wgpu::Origin3d {
+                                        x: x.clamp(0, last.max(0)) as u32,
+                                        y: 0,
+                                        z: 0,
+                                    },
+                                    aspect: wgpu::TextureAspect::All,
+                                },
+                                &strip,
+                                wgpu::TexelCopyBufferLayout {
+                                    offset: 0,
+                                    bytes_per_row: Some(PLAYHEAD_WIDTH as u32 * 4),
+                                    rows_per_image: None,
+                                },
+                                wgpu::Extent3d {
+                                    width: PLAYHEAD_WIDTH as u32,
+                                    height: config.height,
+                                    depth_or_array_layers: 1,
+                                },
+                            );
+                        }
+                        encoder.copy_texture_to_texture(
+                            scene.as_image_copy(),
+                            frame.texture.as_image_copy(),
+                            frame.texture.size(),
+                        );
+                    } else {
+                        let view = frame
+                            .texture
+                            .create_view(&wgpu::TextureViewDescriptor::default());
+                        encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                            label: Some("probe clear"),
+                            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                                view: &view,
+                                depth_slice: None,
+                                resolve_target: None,
+                                ops: wgpu::Operations {
+                                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                                        r: 0.1,
+                                        g: 0.1,
+                                        b: 0.12,
+                                        a: 1.0,
+                                    }),
+                                    store: wgpu::StoreOp::Store,
+                                },
+                            })],
+                            depth_stencil_attachment: None,
+                            timestamp_writes: None,
+                            occlusion_query_set: None,
+                            multiview_mask: None,
+                        });
+                    }
                     self.gpu.queue.submit(Some(encoder.finish()));
                     if let Some(window) = &self.window {
                         window.pre_present_notify();
                     }
                     self.gpu.queue.present(frame);
                 }
+                #[cfg(windows)]
                 Some(Presenter::D3d(chain)) => {
                     if let Some(window) = &self.window {
                         window.pre_present_notify();
@@ -345,7 +405,7 @@ mod raw {
             );
             let size = window.inner_size();
             self.presenter = Some(match self.kind {
-                Kind::Wgpu => {
+                Kind::Wgpu | Kind::Copy => {
                     let surface = self
                         .gpu
                         .instance
@@ -371,6 +431,13 @@ mod raw {
                         })
                         .unwrap_or(capabilities.formats[0]);
                     config.present_mode = wgpu::PresentMode::AutoVsync;
+                    if self.kind == Kind::Copy {
+                        assert!(
+                            capabilities.usages.contains(wgpu::TextureUsages::COPY_DST),
+                            "the surface can't be a copy destination"
+                        );
+                        config.usage |= wgpu::TextureUsages::COPY_DST;
+                    }
                     surface.configure(&self.gpu.device, &config);
                     println!(
                         "probe: wgpu surface {}x{} {:?} {:?}",
@@ -378,6 +445,7 @@ mod raw {
                     );
                     Presenter::Wgpu(surface, config)
                 }
+                #[cfg(windows)]
                 Kind::D3dFull | Kind::D3dDirty => {
                     use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
                     let RawWindowHandle::Win32(handle) =
@@ -460,8 +528,27 @@ mod raw {
         }
     }
 
+    /// `copy`: a scene for frames of `config`'s size and format.
+    fn create_scene(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> wgpu::Texture {
+        device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("probe scene"),
+            size: wgpu::Extent3d {
+                width: config.width,
+                height: config.height,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: wgpu::TextureDimension::D2,
+            format: config.format,
+            usage: wgpu::TextureUsages::COPY_SRC | wgpu::TextureUsages::COPY_DST,
+            view_formats: &[],
+        })
+    }
+
     /// An own DXGI swapchain on the shared DX12 queue, so that the swap effect and `Present1`'s
     /// dirty rectangles (which wgpu does not expose) can be measured.
+    #[cfg(windows)]
     mod d3d {
         use windows::core::Interface;
         use windows::Win32::Foundation::{HANDLE, HWND, RECT};

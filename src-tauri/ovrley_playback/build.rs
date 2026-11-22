@@ -1,8 +1,11 @@
 // Links MDK from the SDK that `MDK_SDK` points at (spike D4): nothing is downloaded, copied or
-// bundled.
-// - macOS: mdk.framework. The binary that uses this crate adds an rpath to `$MDK_SDK/lib` itself
-//   (a dependency's build script cannot add link arguments to the final binary); this crate's
-//   own examples get theirs here.
+// bundled. `MDK_SDK` comes from `.env.local` through `scripts/native-playback.mjs`, or from the
+// shell.
+// - macOS: mdk.framework. The binary that uses this crate adds an rpath to the library folder
+//   itself (a dependency's build script cannot add link arguments to the final binary), which it
+//   reads as `DEP_MDK_LIB_DIR` (`links = "mdk"`); this crate's own examples get theirs here.
+// - Linux: libmdk.so, found the same way through an rpath to `$MDK_SDK/lib/<arch>`; libmdk finds
+//   the libc++ and FFmpeg next to it through its own `$ORIGIN` runpath.
 // - Windows: mdk.lib. Windows has no rpath: `$MDK_SDK/bin/x64` (mdk.dll, ffmpeg-*.dll) must be on
 //   `PATH` when the binary runs.
 
@@ -16,37 +19,63 @@ fn main() {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=src/player.rs");
     let target_os = std::env::var("CARGO_CFG_TARGET_OS").expect("cargo sets CARGO_CFG_TARGET_OS");
+    let target_arch = std::env::var("CARGO_CFG_TARGET_ARCH").expect("cargo sets CARGO_CFG_TARGET_ARCH");
     let archive = match target_os.as_str() {
         "macos" => "mdk-sdk-macOS.tar.xz",
         "windows" => "mdk-sdk-windows-clang.7z",
-        other => panic!("ovrley_playback: macOS and Windows only for now, not {other}"),
+        "linux" => "mdk-sdk-linux.tar.xz",
+        other => panic!("ovrley_playback: macOS, Windows and Linux only, not {other}"),
     };
     let sdk = std::env::var("MDK_SDK")
-        .unwrap_or_else(|_| panic!("ovrley_playback: set MDK_SDK to the extracted mdk-sdk folder ({archive} from {SDK_URL})"));
+        .unwrap_or_else(|_| panic!("ovrley_playback: set MDK_SDK in .env.local to the extracted mdk-sdk folder ({archive} from {SDK_URL})"));
     let sdk = std::path::PathBuf::from(sdk);
 
     let mut cpp = cpp_build::Config::new();
     cpp.include(sdk.join("include"));
-    if target_os == "macos" {
-        let lib = sdk.join("lib");
-        if !lib.join("mdk.framework").is_dir() {
-            panic!("ovrley_playback: MDK_SDK={} has no lib/mdk.framework (expected {archive} from {SDK_URL})", sdk.display());
+    match target_os.as_str() {
+        "macos" => {
+            let lib = sdk.join("lib");
+            if !lib.join("mdk.framework").is_dir() {
+                panic!("ovrley_playback: MDK_SDK={} has no lib/mdk.framework (expected {archive} from {SDK_URL})", sdk.display());
+            }
+            cpp.flag("-std=c++17").build("src/lib.rs");
+            println!("cargo:rustc-link-search=framework={}", lib.display());
+            println!("cargo:rustc-link-lib=framework=mdk");
+            println!("cargo:rustc-link-arg-examples=-Wl,-rpath,{}", lib.display());
+            println!("cargo:lib_dir={}", lib.display());
         }
-        cpp.flag("-std=c++17").build("src/lib.rs");
-        println!("cargo:rustc-link-search=framework={}", lib.display());
-        println!("cargo:rustc-link-lib=framework=mdk");
-        println!("cargo:rustc-link-arg-examples=-Wl,-rpath,{}", lib.display());
-    } else {
-        let lib = sdk.join("lib/x64");
-        if !lib.join("mdk.lib").is_file() {
-            panic!("ovrley_playback: MDK_SDK={} has no lib/x64/mdk.lib (expected {archive} from {SDK_URL})", sdk.display());
+        "linux" => {
+            let lib = sdk.join("lib").join(linux_lib_dir(&target_arch));
+            if !lib.join("libmdk.so").is_file() {
+                panic!("ovrley_playback: MDK_SDK={} has no {}/libmdk.so (expected {archive} from {SDK_URL})", sdk.display(), lib.display());
+            }
+            cpp.flag("-std=c++17").build("src/lib.rs");
+            println!("cargo:rustc-link-search=native={}", lib.display());
+            println!("cargo:rustc-link-lib=dylib=mdk");
+            println!("cargo:rustc-link-arg-examples=-Wl,-rpath,{}", lib.display());
+            println!("cargo:lib_dir={}", lib.display());
         }
-        cpp.flag("/std:c++17")
-            .flag("/EHsc")
-            .define("NOMINMAX", None)
-            .define("WIN32_LEAN_AND_MEAN", None)
-            .build("src/lib.rs");
-        println!("cargo:rustc-link-search=native={}", lib.display());
-        println!("cargo:rustc-link-lib=dylib=mdk");
+        _ => {
+            let lib = sdk.join("lib/x64");
+            if !lib.join("mdk.lib").is_file() {
+                panic!("ovrley_playback: MDK_SDK={} has no lib/x64/mdk.lib (expected {archive} from {SDK_URL})", sdk.display());
+            }
+            cpp.flag("/std:c++17")
+                .flag("/EHsc")
+                .define("NOMINMAX", None)
+                .define("WIN32_LEAN_AND_MEAN", None)
+                .build("src/lib.rs");
+            println!("cargo:rustc-link-search=native={}", lib.display());
+            println!("cargo:rustc-link-lib=dylib=mdk");
+        }
+    }
+}
+
+/// The SDK's library folder for a Rust target architecture (`lib/amd64`, `lib/arm64`, …).
+fn linux_lib_dir(target_arch: &str) -> &'static str {
+    match target_arch {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        other => panic!("ovrley_playback: no MDK SDK library folder for {other}"),
     }
 }

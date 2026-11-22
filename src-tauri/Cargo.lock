@@ -5977,11 +5977,13 @@ name = "ovrley_ui"
 version = "0.1.0"
 dependencies = [
  "arboard",
+ "ash",
  "block2 0.6.2",
  "env_logger",
  "i-slint-backend-testing",
  "iconify",
  "image",
+ "khronos-egl",
  "libc",
  "log",
  "objc2 0.6.5",

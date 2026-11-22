@@ -190,8 +190,9 @@ import { VideoSync } from "../video-sync/index.slint";
 import { VideoSyncScreens } from "../video-sync/preview-screens.slint";
 
 // `OverlayCanvas`: the scene rectangle in the background colour, `rounded-sm`, a `border` at
-// 50%, shadow `0 5px 20px 3px` black at 20%; the checker pattern while the background is checker
-// and the grid is hidden; grid lines in `#003836`; the widget images (D10); the session error.
+// 50%; the checker pattern while the background is checker and the grid is hidden; grid lines in
+// `#003836`; the widget images (D10); the session error. No drop shadow: Slint draws it whole
+// under the scene on every repaint.
 component OverlayCanvas inherits Rectangle {
     in property <BackgroundMode> background-mode;
     in property <color> background-color;
@@ -199,7 +200,6 @@ component OverlayCanvas inherits Rectangle {
     in property <image> video-frame;
     in property <bool> grid-visible;
     in property <string> grid-commands;
-    in property <string> checkerboard-commands;
     in property <float> display-scale;
     in property <[WidgetView]> widgets;
     in property <string> error;
@@ -209,13 +209,9 @@ component OverlayCanvas inherits Rectangle {
         border-width: 1px;
         border-color: Theme.border.transparentize(0.5);
         background: root.background-color;
-        drop-shadow-offset-y: 5px;
-        drop-shadow-blur: 20px;
-        drop-shadow-color: #00000033;
         clip: true;
         if root.background-mode == BackgroundMode.checker && !root.grid-visible: Checkerboard {
             scale: root.display-scale;
-            commands: root.checkerboard-commands;
         }
         // `object-cover`.
         if root.background-mode == BackgroundMode.image: Image {
@@ -357,7 +353,6 @@ export component OverlayEditorView inherits Rectangle {
                 video-frame: OverlayEditor.video-frame;
                 grid-visible: OverlayEditor.grid-visible;
                 grid-commands: OverlayEditor.grid-commands;
-                checkerboard-commands: OverlayEditor.checkerboard-commands;
                 display-scale: OverlayEditor.display-scale;
                 widgets: OverlayEditor.widgets;
                 error: OverlayEditor.error;

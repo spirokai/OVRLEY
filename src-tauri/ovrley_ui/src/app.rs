@@ -53,7 +53,7 @@ impl Projections {
         self.widget_drawer.project(&window, store);
         self.maps.project(store);
         self.scene_settings.project(&window, store);
-        #[cfg(all(feature = "video-playback", any(target_os = "macos", windows)))]
+        #[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
         features::video_playback::project(store);
     }
 }
@@ -236,11 +236,11 @@ pub fn run(
         timer
     });
 
-    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows)))]
+    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
     features::video_playback::start_if_requested(&window, gpu.as_ref(), &dispatcher.handle());
     let _gpu = gpu;
     let result = window.run().map_err(|error| format!("The window failed: {error}"));
-    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows)))]
+    #[cfg(all(feature = "video-playback", any(target_os = "macos", windows, target_os = "linux")))]
     features::video_playback::shutdown();
     dispatcher.flush_preferences();
     result

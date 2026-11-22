@@ -1,12 +1,14 @@
 [package]
 # Phase 6B spike (branch spike/mdk-macos, never merged): video playback rendered into a texture
-# of the shared wgpu device. macOS (Metal) and Windows (D3D12), with MDK through the `cpp` crate
-# over its C++ API.
+# of the shared wgpu device. macOS (Metal), Windows (D3D12) and Linux (OpenGL, bridged into the
+# Vulkan device by ovrley_ui), with MDK through the `cpp` crate over its C++ API.
 name = "ovrley_playback"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.98"
 publish = false
+# Hands the SDK's library folder to dependents' build scripts as `DEP_MDK_LIB_DIR`, for their rpath.
+links = "mdk"
 license = "GPL-3.0-or-later"
 
 [dependencies]

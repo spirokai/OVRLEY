@@ -1,5 +1,5 @@
 //! A video player: MDK decodes the media (with audio) and renders each frame into a texture the
-//! caller owns: Metal on macOS, D3D12 on Windows.
+//! caller owns: Metal on macOS, D3D12 on Windows, an OpenGL framebuffer on Linux.
 //!
 //! Adapted from Gyroflow's `qml-video-rs` (MIT, Copyright (c) 2021 AdrianEddy), whose MDK
 //! integration drove this work: the decoder list, the player setup and above all the teardown
@@ -212,6 +212,8 @@ impl Player {
             ra.cmdQueue = queue;
             ra.texture = texture;
             raw->player->setRenderAPI(&ra);
+            #else
+            (void)raw; (void)device; (void)queue; (void)texture;
             #endif
         })
     }
@@ -232,6 +234,8 @@ impl Player {
             ra.cmdQueue = static_cast<ID3D12CommandQueue*>(const_cast<void*>(queue));
             ra.rt = static_cast<ID3D12Resource*>(const_cast<void*>(texture));
             raw->player->setRenderAPI(&ra);
+            #else
+            (void)raw; (void)queue; (void)texture;
             #endif
         })
     }
@@ -250,7 +254,28 @@ impl Player {
             mdk::D3D11RenderAPI ra{};
             ra.rtv = static_cast<ID3D11DeviceChild*>(const_cast<void*>(texture));
             raw->player->setRenderAPI(&ra);
+            #else
+            (void)raw; (void)texture;
             #endif
+        })
+    }
+
+    /// Renders into framebuffer `fbo` of the OpenGL context current on the render thread. GL's
+    /// framebuffer origin is bottom-left; the frame is flipped so that row 0 is the top, as the
+    /// caller's Vulkan sampler reads it.
+    ///
+    /// # Safety
+    /// The context must stay current on the render thread, and the framebuffer alive, until the
+    /// target is replaced or the player is dropped (MDK releases its GL resources in `Drop`).
+    #[cfg(target_os = "linux")]
+    pub unsafe fn set_gl_target(&self, fbo: u32) {
+        let raw = self.raw;
+        let fbo = fbo as i32;
+        cpp!([raw as "OvrleyPlayer*", fbo as "int"] {
+            mdk::GLRenderAPI ra{};
+            ra.fbo = fbo;
+            raw->player->setRenderAPI(&ra);
+            raw->player->scale(1.0f, -1.0f);
         })
     }
 
@@ -446,7 +471,10 @@ pub fn version() -> String {
 /// The decoders: `MDK_DECODERS` (comma-separated) when set, else the spike's default (D9): the
 /// platform's hardware decoder that renders without a copy, then FFmpeg's software decoder.
 /// Windows: `D3D12` (FFmpeg's d3d12va) and `MFT:d3d=12` are the decoders MDK renders zero-copy
-/// into a D3D12 target.
+/// into a D3D12 target. Linux: `CUDA` (NVIDIA, CUDA–GL interop) and `VAAPI` (Mesa's Intel and AMD
+/// drivers, dma-buf into EGL) render zero-copy into a GL target; `CUDA` goes first because it
+/// fails at once without NVIDIA's driver, while VAAPI also opens on NVIDIA through
+/// nvidia-vaapi-driver.
 pub fn decoders_from_env() -> Vec<String> {
     match std::env::var("MDK_DECODERS") {
         Ok(list) if !list.trim().is_empty() => list
@@ -454,6 +482,7 @@ pub fn decoders_from_env() -> Vec<String> {
             .map(|name| name.trim().to_string())
             .collect(),
         _ if cfg!(windows) => vec!["D3D12".into(), "MFT:d3d=12".into(), "FFmpeg".into()],
+        _ if cfg!(target_os = "linux") => vec!["CUDA".into(), "VAAPI".into(), "FFmpeg".into()],
         _ => vec!["VT:duration=0".into(), "FFmpeg".into()],
     }
 }

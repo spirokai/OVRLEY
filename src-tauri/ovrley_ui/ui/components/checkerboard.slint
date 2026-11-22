@@ -1,23 +1,29 @@
 import { Theme } from "../theme/theme.slint";
 
-// `.bg-overlay-grid-muted`: two 45° gradients that colour the four corner triangles of each
-// 2.37rem tile. Tiled, they form `grid-line`-at-20% diamonds with a 2.37rem diagonal centred on
-// the tile corners. This draws those diamonds as one path.
+// `.bg-overlay-grid-muted` over the canvas black: two 45° gradients that colour the four corner
+// triangles of each 2.37rem tile. Tiled, they form `grid-line`-at-20% diamonds with a 2.37rem
+// diagonal centred on the tile corners. One opaque tile repeats as a texture: one textured
+// rectangle per repaint, where a path of every diamond cost Skia CPU work on each repaint. The
+// tile bakes in both colours, as `colorize` tints only one.
 export component Checkerboard inherits Rectangle {
     // The canvas draws the pattern inside the zoomed scene, so its tiles scale with the zoom.
     in property <float> scale: 1;
-    // The diamonds in tile units (`checkerboard_commands`), covering at least this element.
-    in property <string> commands;
     property <length> tile: Theme.checkerboard-tile * 1rem * root.scale;
-    clip: true;
 
-    Path {
-        width: root.width;
-        height: root.height;
-        viewbox-width: root.width / root.tile;
-        viewbox-height: root.height / root.tile;
-        commands: root.commands;
-        fill: Theme.checkerboard-color;
-        stroke-width: 0px;
+    // The tile SVG is 2px; the transform scales it to the tile, and Skia rasterizes it again at
+    // the magnified size, so the diagonals stay sharp.
+    Image {
+        x: 0;
+        y: 0;
+        width: root.width / root.tile * 2px;
+        height: root.height / root.tile * 2px;
+        source: @image-url("checkerboard-tile.svg");
+        horizontal-tiling: repeat;
+        vertical-tiling: repeat;
+        horizontal-alignment: left;
+        vertical-alignment: top;
+        transform-origin: { x: 0px, y: 0px };
+        transform-scale-x: root.tile / 2px;
+        transform-scale-y: root.tile / 2px;
     }
 }

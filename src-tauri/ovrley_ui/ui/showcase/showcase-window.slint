@@ -69,8 +69,6 @@ export component ShowcaseWindow inherits FluidWindow {
     min-height: 720px;
     preferred-width: 1280px;
     preferred-height: 860px;
-    // The checkerboard row's diamonds: 16rem × 6rem in 2.37rem tiles.
-    in property <string> checkerboard-commands;
 
     property <bool> switch-a: true;
     property <bool> switch-b;
@@ -200,10 +198,8 @@ export component ShowcaseWindow inherits FluidWindow {
                 Row {
                     caption: "Checkerboard";
                     Checkerboard {
-                        commands: root.checkerboard-commands;
                         width: 16rem;
                         height: 6rem;
-                        background: Theme.background;
                     }
                 }
             }

@@ -14,9 +14,10 @@ dev-windows = []
 # Dev only (`pnpm dev:native:live`, with SLINT_LIVE_PREVIEW=1): saving a .slint file reloads the
 # UI inside the running app. Never in release builds.
 live-preview = ["slint/live-preview"]
-# Phase 6B spike (branch spike/mdk-macos, never merged): video playback in the canvas, macOS and
-# Windows. Runs only with OVRLEY_PLAYBACK set; needs MDK_SDK at build time.
-video-playback = ["dep:ovrley_playback"]
+# Phase 6B spike (branch spike/mdk-macos, never merged): video playback in the canvas, macOS,
+# Windows and Linux. Runs only with OVRLEY_PLAYBACK set; needs MDK_SDK at build time (.env.local,
+# `pnpm dev:native:playback`).
+video-playback = ["dep:ovrley_playback", "dep:ash", "dep:khronos-egl"]
 
 [[bin]]
 # Packaging renames it in Phase 9.
@@ -94,6 +95,12 @@ windows = { version = "0.62", default-features = false, features = [
 
 # The Wayland drop listener (winit reports no drops on Wayland).
 [target.'cfg(target_os = "linux")'.dependencies]
+ovrley_playback = { path = "../ovrley_playback", optional = true }
+# Video playback's Vulkan–OpenGL bridge: MDK draws with OpenGL into Vulkan memory the shared device
+# exports. ash at wgpu-hal's version; EGL loaded at run time (libEGL.so.1), so any vendor's driver
+# behind glvnd serves it.
+ash = { version = "0.38", optional = true }
+khronos-egl = { version = "6", features = ["dynamic"], optional = true }
 libc = "0.2"
 wayland-client = "0.31.15"
 wayland-backend = { version = "0.3.17", features = ["client_system", "dlopen"] }
