@@ -4614,9 +4614,10 @@ dependencies = [
  "ash",
  "cpp",
  "cpp_build",
- "env_logger",
  "khronos-egl",
  "log",
+ "pollster",
+ "thiserror 2.0.21",
  "wgpu",
  "windows",
 ]
@@ -4649,7 +4650,6 @@ name = "ovrley_ui"
 version = "0.1.0"
 dependencies = [
  "arboard",
- "ash",
  "block2 0.6.2",
  "dirs 6.0.0",
  "env_logger",

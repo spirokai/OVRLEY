@@ -92,7 +92,7 @@ pub fn open() -> GpuChoice {
         required_limits: adapter.limits(),
         ..Default::default()
     };
-    let (device, queue) = match request_device(&adapter, &descriptor) {
+    let (device, queue) = match ovrley_playback::request_device(&adapter, &descriptor) {
         Ok(pair) => pair,
         Err(error) => {
             log::warn!("could not open a device on {}: {error}", describe(&info));
@@ -119,52 +119,4 @@ pub fn open() -> GpuChoice {
         queue,
         lost,
     })
-}
-
-#[cfg(not(target_os = "linux"))]
-fn request_device(
-    adapter: &wgpu::Adapter,
-    descriptor: &wgpu::DeviceDescriptor,
-) -> Result<(wgpu::Device, wgpu::Queue), String> {
-    pollster::block_on(adapter.request_device(descriptor)).map_err(|error| error.to_string())
-}
-
-/// Video playback's Vulkan–OpenGL bridge (`ovrley_playback::target`) shares
-/// semaphores with OpenGL through `VK_KHR_external_semaphore_fd`, which wgpu does not enable
-/// itself (it enables `VK_KHR_external_memory_fd` when the driver has it). Without the extension
-/// the device opens as usual and playback reports it at start.
-#[cfg(target_os = "linux")]
-fn request_device(
-    adapter: &wgpu::Adapter,
-    descriptor: &wgpu::DeviceDescriptor,
-) -> Result<(wgpu::Device, wgpu::Queue), String> {
-    type Vulkan = wgpu::wgc::api::Vulkan;
-    let semaphore_fd = ash::khr::external_semaphore_fd::NAME;
-    let opened = {
-        let hal_adapter =
-            unsafe { adapter.as_hal::<Vulkan>() }.expect("the Linux adapter is Vulkan (backend())");
-        if !hal_adapter.physical_device_capabilities().supports_extension(semaphore_fd) {
-            None
-        } else {
-            let callback: Box<wgpu::hal::vulkan::CreateDeviceCallback> =
-                Box::new(move |args| args.extensions.push(semaphore_fd));
-            // SAFETY: the callback only adds an extension the adapter supports.
-            Some(unsafe {
-                hal_adapter.open_with_callback(
-                    descriptor.required_features,
-                    &descriptor.required_limits,
-                    &descriptor.memory_hints,
-                    Some(callback),
-                )
-            })
-        }
-    };
-    match opened {
-        None => pollster::block_on(adapter.request_device(descriptor)).map_err(|error| error.to_string()),
-        Some(opened) => {
-            let opened = opened.map_err(|error| error.to_string())?;
-            // SAFETY: opened from this adapter with the descriptor's features and limits.
-            unsafe { adapter.create_device_from_hal(opened, descriptor) }.map_err(|error| error.to_string())
-        }
-    }
 }

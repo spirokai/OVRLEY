@@ -1,18 +1,17 @@
-//! A video player: MDK decodes the media (with audio) and renders each frame into a texture the
-//! caller owns: Metal on macOS, D3D11 on Windows, an OpenGL framebuffer on Linux.
+//! MDK's player behind a safe Rust type: it decodes one media (with audio) and draws its frames
+//! into the render target [`crate::Surface`] gives it.
 //!
-//! Adapted from Gyroflow's `qml-video-rs` (MIT, Copyright (c) 2021 AdrianEddy), whose MDK
-//! integration drove this work: the decoder list, the player setup and above all the teardown
-//! order, which is where MDK integrations crash.
+//! The binding's player setup and teardown order are adapted from Gyroflow's `qml-video-rs` (MIT,
+//! Copyright (c) 2021 AdrianEddy). Teardown is where MDK integrations crash: see [`Player`]'s
+//! `Drop`.
 //!
-//! Threads: MDK calls [`Callbacks`] from its own threads. Everything else, [`Player::render`]
-//! and dropping the player above all, belongs on the thread that owns the GPU queue (the UI
-//! thread).
-//!
-//! One player plays one media: hosts use [`crate::target::Surface`], which makes a player per media.
+//! Threads: MDK calls [`Callbacks`] from its own threads. Everything else, drawing and dropping
+//! the player above all, belongs on the thread that owns the GPU queue.
 
 use cpp::cpp;
 use std::ffi::{c_char, c_void, CStr, CString};
+use std::fmt;
+use std::sync::Once;
 
 cpp! {{
     #ifdef _WIN32
@@ -21,18 +20,14 @@ cpp! {{
     #endif
     #include <mdk/Player.h>
     #include <mdk/RenderAPI.h>
-    #include <mdk/VideoFrame.h>
     #include <atomic>
     #include <chrono>
     #include <memory>
     #include <mutex>
-    #include <sstream>
-    #include <string>
     #include <thread>
-    #include <vector>
 
     extern "C" void ovrley_playback_on_render(void* rust);
-    extern "C" void ovrley_playback_on_event(void* rust, int64_t error, const char* category, const char* detail);
+    extern "C" void ovrley_playback_on_event(int64_t error, const char* category, const char* detail);
     extern "C" void ovrley_playback_on_status(void* rust, uint32_t old_status, uint32_t new_status);
     extern "C" void ovrley_playback_on_seek(void* rust, int64_t result);
     extern "C" void ovrley_playback_on_log(int level, const char* message);
@@ -48,50 +43,32 @@ cpp! {{
         mdk::Player* player = nullptr;
         std::shared_ptr<OvrleyListenerGuard> guard;
         void* rust = nullptr;
-        std::atomic<int> rotation{-1}; // clockwise degrees of the first frame, -1 before it
-        std::atomic<bool> loaded{false};
-        std::atomic<int64_t> media_start{-1}; // the container's start in ms, -1 before it is loaded
-    };
-
-    struct OvrleyMediaSummary {
-        int64_t duration_ms;
-        int32_t width;
-        int32_t height;
-        float fps;
-        int32_t stream_rotation;
-        int32_t has_video;
+        std::atomic<int64_t> media_start{-1}; // the container's start in ms, -1 until it is loaded
     };
 }}
 
-/// What MDK reports from its threads.
-#[derive(Debug, Clone)]
+/// What a player reports from MDK's threads.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Event {
-    /// An MDK media event. `"size"` (category `"video"`) marks the first decoded frame.
-    Media {
-        error: i64,
-        category: String,
-        detail: String,
-    },
-    /// A media status change (`mdk::MediaStatus` bits).
-    Status { old: u32, new: u32 },
-    /// A seek finished: the position in ms, or a negative `mdk::SeekError`.
-    Seek { result: i64 },
+    /// The media cannot be played: MDK found it invalid, or its path cannot be handed to MDK.
+    Failed,
+    /// A [`Player::seek`] finished, at its target or with an error (which the crate logs).
+    SeekFinished,
 }
 
-/// Called from MDK's threads. `render` must not call [`Player::render`] (MDK deadlocks); it
-/// schedules it on the render thread.
+/// What MDK calls from its own threads. Neither callback may block or panic: a panic aborts the
+/// process.
 pub struct Callbacks {
+    /// The player has something to draw. Schedules [`crate::Surface::render`] on the render
+    /// thread; calling it from here deadlocks MDK.
     pub render: Box<dyn Fn() + Send + Sync>,
     pub event: Box<dyn Fn(Event) + Send + Sync>,
 }
 
-/// `mdk::MediaStatus` bits.
-pub mod status {
-    pub const LOADED: u32 = 1 << 2;
-    pub const PREPARED: u32 = 1 << 8;
-    pub const END: u32 = 1 << 6;
-    pub const SEEKING: u32 = 1 << 7;
-    pub const INVALID: u32 = 1 << 31;
+impl fmt::Debug for Callbacks {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Callbacks").finish_non_exhaustive()
+    }
 }
 
 /// `mdk::State`.
@@ -102,33 +79,33 @@ pub enum State {
     Paused,
 }
 
-/// The first video stream, once the media is loaded.
-#[repr(C)]
-#[derive(Debug, Clone, Copy, Default)]
-pub struct MediaSummary {
-    pub duration_ms: i64,
-    pub width: i32,
-    pub height: i32,
-    pub fps: f32,
-    /// Clockwise degrees from the container (`VideoStreamInfo::rotation`).
-    pub stream_rotation: i32,
-    has_video: i32,
+/// `mdk::MediaStatus::Invalid`: the media failed to load.
+const STATUS_INVALID: u32 = 1 << 31;
+
+/// One MDK player, which plays one media. Not `Send`: it lives on the render thread.
+pub struct Player {
+    /// `OvrleyPlayer*`, owned; deleted in `Drop`.
+    raw: *mut c_void,
+    /// Owned; MDK's listeners reach it through `OvrleyPlayer::rust` until `Drop` silences them.
+    callbacks: *mut Callbacks,
 }
 
-pub struct Player {
-    raw: *mut c_void,
-    callbacks: *mut Callbacks,
-    opened: bool,
+impl fmt::Debug for Player {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Player").finish_non_exhaustive()
+    }
 }
 
 impl Player {
-    /// A player with `decoders` (MDK's names with options, e.g. `VT:duration=0`), set up for a
-    /// local file.
-    pub fn new(decoders: &[String], callbacks: Callbacks) -> Self {
+    /// A player with `decoders` (MDK's names with options, comma-separated, e.g.
+    /// `VT:duration=0,FFmpeg`), set up for a local file.
+    pub(crate) fn new(decoders: &str, callbacks: Callbacks) -> Self {
+        let decoders = CString::new(decoders).expect("decoder names come from the environment, which has no NUL");
+        let decoders = decoders.as_ptr();
         let callbacks = Box::into_raw(Box::new(callbacks));
-        let rust = callbacks as *mut c_void;
-        let joined = CString::new(decoders.join(",")).expect("decoder names have no NUL");
-        let decoders = joined.as_ptr();
+        let rust = callbacks.cast::<c_void>();
+        // SAFETY: `decoders` is a C string alive for the call. `rust` stays valid until `Drop`,
+        // which silences every listener before it frees it.
         let raw = unsafe {
             cpp!([rust as "void*", decoders as "const char*"] -> *mut c_void as "void*" {
                 auto p = new OvrleyPlayer();
@@ -136,42 +113,25 @@ impl Player {
                 p->rust = rust;
                 p->guard = std::make_shared<OvrleyListenerGuard>();
 
-                std::vector<std::string> names;
-                std::stringstream list(decoders);
-                std::string name;
-                while (std::getline(list, name, ',')) if (!name.empty()) names.push_back(name);
-                p->player->setDecoders(mdk::MediaType::Video, names);
-
+                p->player->setProperty("video.decoders", decoders);
                 p->player->setProperty("continue_at_end", "1");
                 p->player->setBufferRange(0);
-                p->player->setAspectRatio(mdk::KeepAspectRatioCrop); // CSS object-cover
+                p->player->setAspectRatio(mdk::KeepAspectRatioCrop);
 
-                // Called with MDK's video mutex held: it reads the rotation of the first frame only.
-                // VideoFrame::rotation() is counter-clockwise; stored clockwise.
-                p->player->onFrame<mdk::VideoFrame>([p](mdk::VideoFrame& frame, int) -> int {
-                    if (p->rotation.load(std::memory_order_relaxed) >= 0) return 0;
-                    if (frame && frame.timestamp() != mdk::TimestampEOS) {
-                        int ccw = frame.rotation() % 360;
-                        if (ccw < 0) ccw += 360;
-                        p->rotation = (360 - ccw) % 360;
-                    }
-                    return 0;
-                });
                 p->player->setRenderCallback([rust](void*) { ovrley_playback_on_render(rust); });
                 const auto guard = p->guard;
                 p->player->onEvent([p, guard](const mdk::MediaEvent& event) -> bool {
                     const std::lock_guard<std::recursive_mutex> lock(guard->mutex);
                     if (!guard->alive) return false;
-                    ovrley_playback_on_event(p->rust, event.error, event.category.c_str(), event.detail.c_str());
+                    ovrley_playback_on_event(event.error, event.category.c_str(), event.detail.c_str());
                     return true;
                 });
                 p->player->onMediaStatus([p, guard](mdk::MediaStatus old_status, mdk::MediaStatus new_status) -> bool {
                     const std::lock_guard<std::recursive_mutex> lock(guard->mutex);
                     if (!guard->alive) return false; // unloads the media at its next status change
-                    if ((new_status & mdk::MediaStatus::Loaded) && (new_status & mdk::MediaStatus::Prepared) && !p->loaded) {
+                    if ((new_status & mdk::MediaStatus::Loaded) && (new_status & mdk::MediaStatus::Prepared) && p->media_start < 0) {
                         const auto start = p->player->mediaInfo().start_time;
                         p->media_start = start > 0 ? start : 0;
-                        p->loaded = true;
                     }
                     ovrley_playback_on_status(p->rust, uint32_t(old_status), uint32_t(new_status));
                     return true;
@@ -179,17 +139,22 @@ impl Player {
                 return p;
             })
         };
-        Self { raw, callbacks, opened: false }
+        Self { raw, callbacks }
     }
 
-    /// Sets the media and prepares it, paused, at `start_seconds`. Once per player.
-    pub fn open(&mut self, path: &str, start_seconds: f64) {
-        assert!(!self.opened, "a player plays one media");
-        self.opened = true;
+    /// Sets the media and prepares it, paused, at `start_seconds`. A path MDK cannot take (one with
+    /// a NUL) is reported as [`Event::Failed`], as an unplayable file is.
+    pub(crate) fn open(&self, path: &str, start_seconds: f64) {
+        let Ok(url) = CString::new(path) else {
+            log::error!("playback: {path:?} holds a NUL, which MDK cannot open");
+            // SAFETY: `callbacks` is owned by `self` and freed only in `Drop`.
+            (unsafe { &*self.callbacks }.event)(Event::Failed);
+            return;
+        };
+        let url = url.as_ptr();
         let raw = self.raw;
         let start_ms = milliseconds(start_seconds);
-        let url = CString::new(path).expect("a path has no NUL");
-        let url = url.as_ptr();
+        // SAFETY: `raw` is this player's; `url` is a C string alive for the call.
         unsafe {
             cpp!([raw as "OvrleyPlayer*", url as "const char*", start_ms as "int64_t"] {
                 raw->player->setMedia(url);
@@ -212,17 +177,20 @@ impl Player {
         texture: *const c_void,
     ) {
         let raw = self.raw;
-        cpp!([raw as "OvrleyPlayer*", device as "const void*", queue as "const void*", texture as "const void*"] {
-            #ifdef __APPLE__
-            mdk::MetalRenderAPI ra{};
-            ra.device = device;
-            ra.cmdQueue = queue;
-            ra.texture = texture;
-            raw->player->setRenderAPI(&ra);
-            #else
-            (void)raw; (void)device; (void)queue; (void)texture;
-            #endif
-        })
+        // SAFETY: the caller upholds the objects' validity; `raw` is this player's.
+        unsafe {
+            cpp!([raw as "OvrleyPlayer*", device as "const void*", queue as "const void*", texture as "const void*"] {
+                #ifdef __APPLE__
+                mdk::MetalRenderAPI ra{};
+                ra.device = device;
+                ra.cmdQueue = queue;
+                ra.texture = texture;
+                raw->player->setRenderAPI(&ra);
+                #else
+                (void)raw; (void)device; (void)queue; (void)texture;
+                #endif
+            })
+        }
     }
 
     /// Renders into `texture` (`ID3D12Resource*`, a 2D render target) through `queue`
@@ -235,16 +203,19 @@ impl Player {
     #[cfg(windows)]
     pub(crate) unsafe fn set_d3d12_target(&self, queue: *const c_void, texture: *const c_void) {
         let raw = self.raw;
-        cpp!([raw as "OvrleyPlayer*", queue as "const void*", texture as "const void*"] {
-            #ifdef _WIN32
-            mdk::D3D12RenderAPI ra{};
-            ra.cmdQueue = static_cast<ID3D12CommandQueue*>(const_cast<void*>(queue));
-            ra.rt = static_cast<ID3D12Resource*>(const_cast<void*>(texture));
-            raw->player->setRenderAPI(&ra);
-            #else
-            (void)raw; (void)queue; (void)texture;
-            #endif
-        })
+        // SAFETY: the caller upholds the objects' validity; `raw` is this player's.
+        unsafe {
+            cpp!([raw as "OvrleyPlayer*", queue as "const void*", texture as "const void*"] {
+                #ifdef _WIN32
+                mdk::D3D12RenderAPI ra{};
+                ra.cmdQueue = static_cast<ID3D12CommandQueue*>(const_cast<void*>(queue));
+                ra.rt = static_cast<ID3D12Resource*>(const_cast<void*>(texture));
+                raw->player->setRenderAPI(&ra);
+                #else
+                (void)raw; (void)queue; (void)texture;
+                #endif
+            })
+        }
     }
 
     /// Renders into `texture` (`ID3D11Texture2D*`, a 2D render target) on its device's immediate
@@ -256,15 +227,18 @@ impl Player {
     #[cfg(windows)]
     pub(crate) unsafe fn set_d3d11_target(&self, texture: *const c_void) {
         let raw = self.raw;
-        cpp!([raw as "OvrleyPlayer*", texture as "const void*"] {
-            #ifdef _WIN32
-            mdk::D3D11RenderAPI ra{};
-            ra.rtv = static_cast<ID3D11DeviceChild*>(const_cast<void*>(texture));
-            raw->player->setRenderAPI(&ra);
-            #else
-            (void)raw; (void)texture;
-            #endif
-        })
+        // SAFETY: the caller upholds the texture's validity; `raw` is this player's.
+        unsafe {
+            cpp!([raw as "OvrleyPlayer*", texture as "const void*"] {
+                #ifdef _WIN32
+                mdk::D3D11RenderAPI ra{};
+                ra.rtv = static_cast<ID3D11DeviceChild*>(const_cast<void*>(texture));
+                raw->player->setRenderAPI(&ra);
+                #else
+                (void)raw; (void)texture;
+                #endif
+            })
+        }
     }
 
     /// Renders into framebuffer `fbo` of the OpenGL context current on the render thread. GL's
@@ -272,34 +246,41 @@ impl Player {
     /// caller's Vulkan sampler reads it.
     ///
     /// # Safety
-    /// The context must stay current on the render thread, and the framebuffer alive, until the
-    /// target is replaced or the player is dropped (MDK releases its GL resources in `Drop`).
+    /// The context must be current on the render thread whenever the player draws or is dropped
+    /// (MDK releases its GL resources in `Drop`), and the framebuffer alive until the target is
+    /// replaced or the player is dropped.
     #[cfg(target_os = "linux")]
     pub(crate) unsafe fn set_gl_target(&self, fbo: u32) {
         let raw = self.raw;
-        let fbo = fbo as i32;
-        cpp!([raw as "OvrleyPlayer*", fbo as "int"] {
-            mdk::GLRenderAPI ra{};
-            ra.fbo = fbo;
-            raw->player->setRenderAPI(&ra);
-            raw->player->scale(1.0f, -1.0f);
-        })
+        let fbo = i32::try_from(fbo).expect("OpenGL framebuffer names are small");
+        // SAFETY: the caller upholds the framebuffer's validity; `raw` is this player's.
+        unsafe {
+            cpp!([raw as "OvrleyPlayer*", fbo as "int"] {
+                mdk::GLRenderAPI ra{};
+                ra.fbo = fbo;
+                raw->player->setRenderAPI(&ra);
+                raw->player->scale(1.0f, -1.0f);
+            })
+        }
     }
 
+    /// The render target's size. MDK calls [`Callbacks::render`] from within.
     pub(crate) fn set_surface_size(&self, width: i32, height: i32) {
         let raw = self.raw;
+        // SAFETY: `raw` is this player's.
         unsafe {
-            cpp!([raw as "OvrleyPlayer*", width as "int", height as "int"] { raw->player->setVideoSurfaceSize(width, height); })
+            cpp!([raw as "OvrleyPlayer*", width as "int", height as "int"] {
+                raw->player->setVideoSurfaceSize(width, height);
+            })
         }
     }
 
-    /// Draws the next or current frame into the target: its timestamp in seconds, or < 0 when
-    /// no frame was rendered. Render thread only, never from [`Callbacks::render`].
-    pub fn render(&self) -> f64 {
+    /// Draws the next or current frame into the target: its timestamp in seconds, or < 0 when no
+    /// frame was drawn. Render thread only, with the target's context ready.
+    pub(crate) fn render(&self) -> f64 {
         let raw = self.raw;
-        unsafe {
-            cpp!([raw as "OvrleyPlayer*"] -> f64 as "double" { return raw->player->renderVideo(); })
-        }
+        // SAFETY: `raw` is this player's.
+        unsafe { cpp!([raw as "OvrleyPlayer*"] -> f64 as "double" { return raw->player->renderVideo(); }) }
     }
 
     pub fn set_state(&self, state: State) {
@@ -309,28 +290,30 @@ impl Player {
             State::Playing => 1,
             State::Paused => 2,
         };
-        unsafe {
-            cpp!([raw as "OvrleyPlayer*", value as "int"] { raw->player->set(mdk::State(value)); })
-        }
+        // SAFETY: `raw` is this player's; `value` is an `mdk::State`.
+        unsafe { cpp!([raw as "OvrleyPlayer*", value as "int"] { raw->player->set(mdk::State(value)); }) }
     }
 
+    #[must_use]
     pub fn state(&self) -> State {
         let raw = self.raw;
-        match unsafe {
-            cpp!([raw as "OvrleyPlayer*"] -> i32 as "int" { return int(raw->player->state()); })
-        } {
+        // SAFETY: `raw` is this player's.
+        let value = unsafe { cpp!([raw as "OvrleyPlayer*"] -> i32 as "int" { return int(raw->player->state()); }) };
+        match value {
             1 => State::Playing,
             2 => State::Paused,
             _ => State::Stopped,
         }
     }
 
-    /// Seeks to the frame nearest `seconds` from the media's start (`FromStart | InCache`). The
-    /// result arrives as [`Event::Seek`]; past the last frame it is `OutOfRange`, with the last frame
-    /// drawn all the same. `false` when MDK refused, and then no result comes.
+    /// Seeks to the frame nearest `seconds` from the media's start (`FromStart | InCache`). Its end
+    /// arrives as [`Event::SeekFinished`]; past the last frame it ends with `OutOfRange`, with the
+    /// last frame drawn all the same. `false` when MDK refused, and then no event comes.
+    #[must_use]
     pub fn seek(&self, seconds: f64) -> bool {
         let raw = self.raw;
         let ms = milliseconds(seconds);
+        // SAFETY: `raw` is this player's. The callback reaches Rust only while the listeners live.
         unsafe {
             cpp!([raw as "OvrleyPlayer*", ms as "int64_t"] -> bool as "bool" {
                 const auto guard = raw->guard;
@@ -343,81 +326,35 @@ impl Player {
         }
     }
 
-    pub fn set_mute(&self, mute: bool) {
+    pub fn set_muted(&self, muted: bool) {
         let raw = self.raw;
-        unsafe { cpp!([raw as "OvrleyPlayer*", mute as "bool"] { raw->player->setMute(mute); }) }
+        // SAFETY: `raw` is this player's.
+        unsafe { cpp!([raw as "OvrleyPlayer*", muted as "bool"] { raw->player->setMute(muted); }) }
     }
 
     /// Where the media's timestamps start, once it is loaded.
-    pub fn media_start_seconds(&self) -> Option<f64> {
+    pub(crate) fn media_start_seconds(&self) -> Option<f64> {
         let raw = self.raw;
-        let ms = unsafe {
-            cpp!([raw as "OvrleyPlayer*"] -> i64 as "int64_t" { return raw->media_start.load(); })
-        };
+        // SAFETY: `raw` is this player's.
+        let ms = unsafe { cpp!([raw as "OvrleyPlayer*"] -> i64 as "int64_t" { return raw->media_start.load(); }) };
+        // Container start times are far below 2^52 ms, where f64 stops being exact.
+        #[expect(clippy::cast_precision_loss, reason = "a start time in ms is exact in f64")]
         (ms >= 0).then(|| ms as f64 / 1000.0)
-    }
-
-    /// The first frame's clockwise rotation, once it was decoded.
-    pub fn frame_rotation(&self) -> Option<i32> {
-        let raw = self.raw;
-        let value = unsafe {
-            cpp!([raw as "OvrleyPlayer*"] -> i32 as "int" { return raw->rotation.load(); })
-        };
-        (value >= 0).then_some(value)
-    }
-
-    /// The first video stream, once the media is loaded.
-    pub fn media_summary(&self) -> Option<MediaSummary> {
-        let raw = self.raw;
-        let mut summary = MediaSummary::default();
-        let out = &mut summary as *mut MediaSummary as *mut c_void;
-        unsafe {
-            cpp!([raw as "OvrleyPlayer*", out as "void*"] {
-                auto s = static_cast<OvrleyMediaSummary*>(out);
-                const auto& info = raw->player->mediaInfo();
-                s->duration_ms = info.duration;
-                if (info.video.empty()) return;
-                const auto& v = info.video[0];
-                s->has_video = 1;
-                s->width = v.codec.width;
-                s->height = v.codec.height;
-                s->fps = v.codec.frame_rate;
-                s->stream_rotation = v.rotation;
-            })
-        };
-        (summary.has_video != 0).then_some(summary)
-    }
-
-    /// An MDK player property, e.g. `"video.decoder"`.
-    pub fn property(&self, key: &str) -> String {
-        let raw = self.raw;
-        let key = CString::new(key).expect("a key has no NUL");
-        let key = key.as_ptr();
-        let mut out = String::new();
-        let out_ptr = &mut out as *mut String as *mut c_void;
-        unsafe {
-            cpp!([raw as "OvrleyPlayer*", key as "const char*", out_ptr as "void*"] {
-                const auto property = raw->player->property(key);
-                const char* value = property.c_str();
-                rust!(OvrleyMdkSetString [out_ptr: *mut c_void as "void*", value: *const c_char as "const char*"] {
-                    *(out_ptr as *mut String) = CStr::from_ptr(value).to_string_lossy().into_owned();
-                });
-            })
-        };
-        out
     }
 }
 
 impl Drop for Player {
-    /// Teardown, in this order: stop; mark the listeners dead; replace the other callbacks
-    /// with no-ops (null leaves MDK a C callback that dereferences a null pointer); release the
-    /// GPU resources on this (the render) thread; delete the player about a second later.
+    /// Teardown, in this order: stop (waiting up to 3 s, on this thread); mark the listeners dead;
+    /// replace the render callback with a no-op (null leaves MDK a C callback that dereferences a
+    /// null pointer); release the GPU resources on this (the render) thread; delete the player about
+    /// a second later, on a thread of its own.
     fn drop(&mut self) {
         let raw = self.raw;
+        // SAFETY: `raw` is this player's and is not used after this block, which deletes it.
         let stopped = unsafe {
             cpp!([raw as "OvrleyPlayer*"] -> bool as "bool" {
                 bool stopped = true;
-                if (raw->loaded) {
+                if (raw->media_start >= 0) {
                     raw->player->set(mdk::State::Stopped);
                     stopped = raw->player->waitFor(mdk::State::Stopped, 3000);
                 }
@@ -426,8 +363,6 @@ impl Drop for Player {
                     raw->guard->alive = false;
                 }
                 raw->player->setRenderCallback([](void*) {});
-                raw->player->onStateChanged([](mdk::State) {});
-                raw->player->onFrame<mdk::VideoFrame>([](mdk::VideoFrame&, int) -> int { return 0; });
                 raw->player->setVideoSurfaceSize(-1, -1);
                 auto player = raw->player;
                 std::thread([player] {
@@ -439,118 +374,116 @@ impl Drop for Player {
             })
         };
         if !stopped {
-            log::error!("mdk: the player did not stop within 3 s; deleting it anyway");
+            log::error!("playback: the player did not stop within 3 s; deleting it anyway");
         }
-        // No callback reaches Rust after the block above: the listeners are dead and the render
-        // callback was replaced under the mutex MDK holds while it runs.
+        // SAFETY: from `Box::into_raw` in `new`. No callback reaches it any more: the listeners are
+        // dead and the render callback was replaced under the mutex MDK holds while it runs.
         drop(unsafe { Box::from_raw(self.callbacks) });
     }
 }
 
-/// Routes MDK's errors into the `log` crate. Its other levels log every seek and stream.
-pub fn install_log_handler() {
-    unsafe {
-        cpp!([] {
-            mdk::setLogHandler([](mdk::LogLevel level, const char* message) { ovrley_playback_on_log(int(level), message); });
-            mdk::SetGlobalOption("log", "Error");
-        })
-    }
+/// Routes MDK's errors into the `log` crate, once per process. Its other levels log every seek and
+/// stream.
+pub(crate) fn install_log_handler() {
+    static INSTALL: Once = Once::new();
+    INSTALL.call_once(|| {
+        // SAFETY: sets MDK's global handler, which only calls `ovrley_playback_on_log`.
+        unsafe {
+            cpp!([] {
+                mdk::setLogHandler([](mdk::LogLevel level, const char* message) { ovrley_playback_on_log(int(level), message); });
+                mdk::SetGlobalOption("log", "Error");
+            })
+        }
+    });
 }
 
 /// MDK's version, `major.minor.patch`.
-pub fn version() -> String {
+pub(crate) fn version() -> String {
+    // SAFETY: a plain query.
     let v = unsafe { cpp!([] -> i32 as "int" { return mdk::version(); }) };
     format!("{}.{}.{}", (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff)
 }
 
-/// The Windows render targets. The decoders follow the target, so that frames stay on one D3D API.
-#[cfg(windows)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum WindowsTarget {
-    D3d11,
-    D3d12,
-}
-
-#[cfg(windows)]
-impl WindowsTarget {
-    /// The target OVRLEY plays through. The D3D12 path is kept and compiled, but nothing selects it.
-    pub const ACTIVE: Self = Self::D3d11;
-}
-
-/// The decoders: in debug builds `MDK_DECODERS` (comma-separated) when set, else the
-/// platform's hardware decoder that renders without a copy, then FFmpeg's software decoder.
-/// Windows: `D3D11` for the D3D11 target; `D3D12` (FFmpeg's d3d12va) and `MFT:d3d=12` for the
-/// D3D12 target. Linux: `CUDA` (NVIDIA, CUDA–GL interop) and `VAAPI` (Mesa's Intel and AMD
-/// drivers, dma-buf into EGL) render zero-copy into a GL target; `CUDA` goes first because it
-/// fails at once without NVIDIA's driver, while VAAPI also opens on NVIDIA through
-/// nvidia-vaapi-driver.
-pub fn decoders_from_env() -> Vec<String> {
+/// The decoders, comma-separated: in debug builds `MDK_DECODERS` when set, else the platform's
+/// hardware decoder that renders without a copy, then FFmpeg's software decoder.
+/// - Windows: the active target's (`WindowsTarget::decoders`).
+/// - Linux: `CUDA` (NVIDIA, CUDA–GL interop) and `VAAPI` (Mesa's Intel and AMD drivers, dma-buf
+///   into EGL) render zero-copy into a GL target. `CUDA` goes first because it fails at once
+///   without NVIDIA's driver, while VAAPI also opens on NVIDIA through nvidia-vaapi-driver.
+/// - macOS: VideoToolbox.
+pub(crate) fn decoders() -> String {
+    #[cfg(windows)]
+    const PLATFORM: &str = crate::surface::WindowsTarget::ACTIVE.decoders();
+    #[cfg(target_os = "macos")]
+    const PLATFORM: &str = "VT:duration=0,FFmpeg";
+    #[cfg(target_os = "linux")]
+    const PLATFORM: &str = "CUDA,VAAPI,FFmpeg";
     match std::env::var("MDK_DECODERS") {
-        Ok(list) if cfg!(debug_assertions) && !list.trim().is_empty() => list
-            .split(',')
-            .map(|name| name.trim().to_string())
-            .collect(),
-        _ => {
-            #[cfg(windows)]
-            let names: &[&str] = match WindowsTarget::ACTIVE {
-                WindowsTarget::D3d11 => &["D3D11", "FFmpeg"],
-                WindowsTarget::D3d12 => &["D3D12", "MFT:d3d=12", "FFmpeg"],
-            };
-            #[cfg(target_os = "linux")]
-            let names: &[&str] = &["CUDA", "VAAPI", "FFmpeg"];
-            #[cfg(target_os = "macos")]
-            let names: &[&str] = &["VT:duration=0", "FFmpeg"];
-            names.iter().map(|name| name.to_string()).collect()
+        Ok(list) if cfg!(debug_assertions) && !list.trim().is_empty() => {
+            list.split(',').map(str::trim).collect::<Vec<_>>().join(",")
         }
+        _ => PLATFORM.to_string(),
     }
 }
 
+#[expect(clippy::cast_possible_truncation, reason = "media times in ms fit i64; NaN becomes 0")]
 fn milliseconds(seconds: f64) -> i64 {
     (seconds * 1000.0).round() as i64
 }
 
-fn text(ptr: *const c_char) -> String {
-    unsafe { CStr::from_ptr(ptr) }
-        .to_string_lossy()
-        .into_owned()
+/// # Safety
+/// `text` is a valid C string.
+unsafe fn string(text: *const c_char) -> String {
+    // SAFETY: the caller's contract.
+    unsafe { CStr::from_ptr(text) }.to_string_lossy().into_owned()
+}
+
+/// # Safety
+/// `rust` is a player's `callbacks`, alive (the listener guard ensures it for MDK's calls).
+unsafe fn callbacks<'a>(rust: *mut c_void) -> &'a Callbacks {
+    // SAFETY: the caller's contract.
+    unsafe { &*rust.cast::<Callbacks>() }
 }
 
 #[no_mangle]
-extern "C" fn ovrley_playback_on_render(rust: *mut c_void) {
-    let callbacks = unsafe { &*(rust as *const Callbacks) };
-    (callbacks.render)();
+unsafe extern "C" fn ovrley_playback_on_render(rust: *mut c_void) {
+    // SAFETY: MDK passes back the `rust` the player registered.
+    (unsafe { callbacks(rust) }.render)();
 }
 
 #[no_mangle]
-extern "C" fn ovrley_playback_on_event(
-    rust: *mut c_void,
-    error: i64,
-    category: *const c_char,
-    detail: *const c_char,
-) {
-    let callbacks = unsafe { &*(rust as *const Callbacks) };
-    (callbacks.event)(Event::Media {
-        error,
-        category: text(category),
-        detail: text(detail),
-    });
+unsafe extern "C" fn ovrley_playback_on_event(error: i64, category: *const c_char, detail: *const c_char) {
+    // SAFETY: both are `std::string::c_str()` of the event, alive for the call.
+    let (category, detail) = unsafe { (string(category), string(detail)) };
+    if error < 0 {
+        log::warn!("playback: event {category} {detail} ({error})");
+    } else {
+        log::debug!("playback: event {category} {detail} ({error})");
+    }
 }
 
 #[no_mangle]
-extern "C" fn ovrley_playback_on_status(rust: *mut c_void, old: u32, new: u32) {
-    let callbacks = unsafe { &*(rust as *const Callbacks) };
-    (callbacks.event)(Event::Status { old, new });
+unsafe extern "C" fn ovrley_playback_on_status(rust: *mut c_void, old: u32, new: u32) {
+    log::trace!("playback: status {old:#x} → {new:#x}");
+    if new & STATUS_INVALID != 0 {
+        // SAFETY: MDK passes back the `rust` the player registered.
+        (unsafe { callbacks(rust) }.event)(Event::Failed);
+    }
 }
 
 #[no_mangle]
-extern "C" fn ovrley_playback_on_seek(rust: *mut c_void, result: i64) {
-    let callbacks = unsafe { &*(rust as *const Callbacks) };
-    (callbacks.event)(Event::Seek { result });
+unsafe extern "C" fn ovrley_playback_on_seek(rust: *mut c_void, result: i64) {
+    if result < 0 {
+        log::debug!("playback: a seek ended with {result}");
+    }
+    // SAFETY: MDK passes back the `rust` the player registered.
+    (unsafe { callbacks(rust) }.event)(Event::SeekFinished);
 }
 
 #[no_mangle]
-extern "C" fn ovrley_playback_on_log(level: i32, message: *const c_char) {
-    let message = text(message);
+unsafe extern "C" fn ovrley_playback_on_log(level: i32, message: *const c_char) {
+    // SAFETY: MDK passes a C string alive for the call.
+    let message = unsafe { string(message) };
     let message = message.trim_end();
     match level {
         1 => log::error!(target: "mdk", "{message}"),

@@ -19,8 +19,7 @@ use ovrley_app::features::video_preview::preview::{self, Placeholder, Preview, S
 use ovrley_app::lib::video_program::program::PlaybackSource;
 use ovrley_app::store::slices::editor::PreviewPlaybackState;
 use ovrley_app::store::{DispatchHandle, Store};
-use ovrley_playback::player::{status, Callbacks, Event, State};
-use ovrley_playback::target::{Renderer, Surface};
+use ovrley_playback::{Callbacks, Event, Renderer, State, Surface};
 use slint::ComponentHandle;
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -120,7 +119,7 @@ impl Slot {
     fn set_muted(&mut self, muted: bool) {
         if self.muted != muted {
             if let Some(player) = self.surface.player() {
-                player.set_mute(muted);
+                player.set_muted(muted);
             }
             self.muted = muted;
         }
@@ -257,6 +256,8 @@ struct VideoPlayback {
     cut_timer: slint::Timer,
     resize_timer: slint::Timer,
     pending_size: Option<(u32, u32)>,
+    /// The longest texture side the device allows.
+    max_side: u32,
 }
 
 /// Makes the players on the shared device. Without one there is no video: the timeline clock plays
@@ -267,12 +268,13 @@ pub fn start(window: &AppWindow, gpu: Option<&GpuDevice>, dispatch: &DispatchHan
         return;
     };
     let slots = Renderer::new(&gpu.device, &gpu.queue).and_then(|renderer| {
-        Ok([
+        let slots = [
             Slot::new(Surface::new(&renderer, INITIAL_SIZE)?),
             Slot::new(Surface::new(&renderer, INITIAL_SIZE)?),
-        ])
+        ];
+        Ok((slots, renderer.max_side()))
     });
-    let slots = match slots {
+    let (slots, max_side) = match slots {
         Ok(slots) => slots,
         Err(error) => {
             log::error!("playback: no video on this GPU: {error}");
@@ -292,6 +294,7 @@ pub fn start(window: &AppWindow, gpu: Option<&GpuDevice>, dispatch: &DispatchHan
         cut_timer: slint::Timer::default(),
         resize_timer: slint::Timer::default(),
         pending_size: None,
+        max_side,
     };
     VIDEO_PLAYBACK.with(|cell| *cell.borrow_mut() = Some(state));
     dispatch.dispatch(|store, _| store.player.video_clock_available = true);
@@ -381,18 +384,8 @@ fn callbacks(generation: u64) -> Callbacks {
             }
         }),
         event: Box::new(move |event| match event {
-            Event::Seek { result } => post(move || with_video_playback(|state| state.seek_finished(generation, result))),
-            Event::Status { new, .. } if new & status::INVALID != 0 => {
-                post(move || with_video_playback(|state| state.failed(generation)))
-            }
-            Event::Status { old, new } => log::trace!("playback: status {old:#x} → {new:#x}"),
-            Event::Media { error, category, detail } => {
-                if error < 0 {
-                    log::warn!("playback: event {category} {detail} ({error})");
-                } else {
-                    log::debug!("playback: event {category} {detail} ({error})");
-                }
-            }
+            Event::SeekFinished => post(move || with_video_playback(|state| state.seek_finished(generation))),
+            Event::Failed => post(move || with_video_playback(|state| state.failed(generation))),
         }),
     }
 }
@@ -467,14 +460,11 @@ impl VideoPlayback {
         })
     }
 
-    fn seek_finished(&mut self, generation: u64, result: i64) -> Option<Effect> {
+    fn seek_finished(&mut self, generation: u64) -> Option<Effect> {
         let index = self.slot_of(generation)?;
         let slot = &mut self.slots[index];
         let media = slot.media.as_mut()?;
         media.seeking = false;
-        if result < 0 {
-            log::debug!("playback: a seek ended with {result}");
-        }
         if media.seek_waiting {
             slot.send_seek();
         }
@@ -645,11 +635,12 @@ impl VideoPlayback {
         lost.then_some(Effect::Resume)
     }
 
-    /// The textures follow the visible surface's size in physical pixels, once it settled. Sync
-    /// Doctor's screen is also the scene at its mode's display scale.
+    /// The textures follow the visible surface's size in physical pixels, once it settled, up to
+    /// the device's longest side. Sync Doctor's screen is also the scene at its mode's display scale.
     fn follow_size(&mut self, window: &AppWindow, store: &Store) {
-        let scale = ovrley_app::features::overlay_editor::display_scale(store) * f64::from(window.window().scale_factor());
         let (width, height) = ovrley_app::features::overlay_editor::scene_size(store);
+        let scale = (ovrley_app::features::overlay_editor::display_scale(store) * f64::from(window.window().scale_factor()))
+            .min(f64::from(self.max_side) / width.max(height));
         let size = ((width * scale).round().max(2.0) as u32, (height * scale).round().max(2.0) as u32);
         if self.slots.iter().all(|slot| slot.surface.size() == size) {
             self.pending_size = None;
