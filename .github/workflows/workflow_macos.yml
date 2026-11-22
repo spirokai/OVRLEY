@@ -180,15 +180,15 @@ jobs:
           dmg_read_write="$RUNNER_TEMP/OVRLEY-install-rw.dmg"
           dmg_mount="$RUNNER_TEMP/ovrley-dmg-mount"
           dmg_finder_name="$(basename "$dmg_mount")"
-          background_source="src-tauri/dmg/background.png"
-          retina_background_source="src-tauri/dmg/background@2x.png"
+          background_source="packaging/macos/background.png"
+          retina_background_source="packaging/macos/background@2x.png"
           rm -rf "$dmg_staging" "$dmg_mount" "$dmg_source" "$dmg_read_write"
           mkdir -p "$dmg_staging" "$dmg_mount"
           ditto "$app_bundle" "$dmg_staging/OVRLEY.app"
           cp packaging/install/INSTALL-macos.txt "$dmg_staging/INSTALL.txt"
           ln -s /Applications "$dmg_staging/Applications"
 
-          [[ -e "$retina_background_source" && ! -f "$background_source" ]] && { echo 'The Retina DMG background requires src-tauri/dmg/background.png.' >&2; exit 1; }
+          [[ -e "$retina_background_source" && ! -f "$background_source" ]] && { echo 'The Retina DMG background requires packaging/macos/background.png.' >&2; exit 1; }
           if [[ -f "$background_source" ]]; then
             background_width="$(sips -g pixelWidth "$background_source" | awk '/pixelWidth/ { print $2 }')"
             background_height="$(sips -g pixelHeight "$background_source" | awk '/pixelHeight/ { print $2 }')"

@@ -136,7 +136,7 @@ pub fn fit_restored_window(window: &winit::window::Window) {
 /// The window icon on Windows and Linux, from the Tauri app's icons.
 #[cfg(not(target_os = "macos"))]
 fn window_icon() -> Option<winit::window::Icon> {
-    let decoded = image::load_from_memory_with_format(include_bytes!("../../../icons/128x128.png"), image::ImageFormat::Png)
+    let decoded = image::load_from_memory_with_format(include_bytes!("../../../../assets/icons/128x128.png"), image::ImageFormat::Png)
         .map_err(|error| log::warn!("could not decode the window icon: {error}"))
         .ok()?
         .into_rgba8();

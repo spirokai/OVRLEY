@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="app/public/logo.svg" alt="OVRLEY Logo" height="60" />
+  <img src="assets/logo.svg" alt="OVRLEY Logo" height="60" />
 </div>
 
 <br />

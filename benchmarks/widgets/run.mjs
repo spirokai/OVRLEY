@@ -121,7 +121,7 @@ async function main() {
     const cases = createCases({
       activities,
       template: await json(join(root, 'templates/futuristic-hud.json')),
-      image: join(root, 'src-tauri/icons/128x128@2x.png'),
+      image: join(root, 'assets/icons/128x128@2x.png'),
       frames,
       warmup,
       fps,
@@ -150,7 +150,7 @@ async function main() {
     const resources = await json(join(directory, 'fonts.json'))
     for (const font of resources) files.set(`/data/${font.path}`, join(directory, font.path))
     for (const entry of cases) if (entry.split_table !== null) files.set(`/data/${entry.split_table}`, join(directory, entry.split_table))
-    files.set('/data/image.png', join(root, 'src-tauri/icons/128x128@2x.png'))
+    files.set('/data/image.png', join(root, 'assets/icons/128x128@2x.png'))
     const results = []
     const environment = { cpu: cpus()[0].model, os: platform(), artifacts: { native: await fingerprint(binary) } }
     if (['both', 'wasm'].includes(values.backend)) environment.artifacts.wasm = await fingerprint(join(artifactDir, 'wasm_bindings.wasm'))

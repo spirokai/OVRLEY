@@ -203,9 +203,9 @@ jobs:
           ln -s ../lib/ovrley/OVRLEY "$app_dir/usr/bin/OVRLEY"
 
           for size in 32x32 64x64 128x128; do
-            install -Dm0644 "src-tauri/icons/$size.png" "$app_dir/usr/share/icons/hicolor/$size/apps/ovrley.png"
+            install -Dm0644 "assets/icons/$size.png" "$app_dir/usr/share/icons/hicolor/$size/apps/ovrley.png"
           done
-          install -Dm0644 src-tauri/icons/128x128@2x.png "$app_dir/usr/share/icons/hicolor/256x256/apps/ovrley.png"
+          install -Dm0644 assets/icons/128x128@2x.png "$app_dir/usr/share/icons/hicolor/256x256/apps/ovrley.png"
           ln -s usr/share/applications/com.ovrley.desktop.desktop "$app_dir/com.ovrley.desktop.desktop"
           ln -s usr/share/icons/hicolor/128x128/apps/ovrley.png "$app_dir/ovrley.png"
           ln -s ovrley.png "$app_dir/.DirIcon"

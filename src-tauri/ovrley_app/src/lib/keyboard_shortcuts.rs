@@ -1,6 +1,6 @@
 //! Port of `lib/keyboard-shortcuts.js`: the shortcut manifest and its matcher (plan D7).
 //!
-//! `app/src/data/keyboardShortcuts.json` stays where the React app keeps it. It is embedded and
+//! `assets/keyboard-shortcuts.json` is embedded and
 //! parsed once, strictly: an unknown scope, modifier or field fails.
 
 use serde::Deserialize;
@@ -95,9 +95,9 @@ pub fn manifest() -> &'static Manifest {
     static MANIFEST: OnceLock<Manifest> = OnceLock::new();
     MANIFEST.get_or_init(|| {
         serde_json::from_str(include_str!(
-            "../../../../app/src/data/keyboardShortcuts.json"
+            "../../../../assets/keyboard-shortcuts.json"
         ))
-        .unwrap_or_else(|error| panic!("keyboardShortcuts.json is malformed: {error}"))
+        .unwrap_or_else(|error| panic!("keyboard-shortcuts.json is malformed: {error}"))
     })
 }
 

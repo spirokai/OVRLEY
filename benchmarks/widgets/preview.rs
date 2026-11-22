@@ -58,7 +58,7 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
                 .images
                 .register(
                     "benchmark-image".into(),
-                    &fs::read(plan.root.join("src-tauri/icons/128x128@2x.png"))
+                    &fs::read(plan.root.join("assets/icons/128x128@2x.png"))
                         .map_err(|error| error.to_string())?,
                 )
                 .map_err(|error| error.to_string())?;
