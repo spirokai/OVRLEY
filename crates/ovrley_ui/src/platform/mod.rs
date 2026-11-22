@@ -19,6 +19,32 @@ use slint::winit_030::winit;
 use slint::ComponentHandle;
 use std::cell::RefCell;
 
+/// Standard output as `--mcp` was given it, for the protocol alone. Everything else that writes
+/// there goes to the null device from here on: MDK puts its banner into C's stdout as it loads,
+/// before `main`, and C writes it out whenever it flushes.
+pub fn take_standard_output() -> std::io::Result<std::fs::File> {
+    #[cfg(unix)]
+    let output = std::os::fd::AsFd::as_fd(&std::io::stdout()).try_clone_to_owned()?;
+    #[cfg(windows)]
+    let output = std::os::windows::io::AsHandle::as_handle(&std::io::stdout()).try_clone_to_owned()?;
+    let null = if cfg!(windows) { c"NUL" } else { c"/dev/null" };
+    // SAFETY: the path is a C string, and the descriptor is this function's own until it closes it.
+    // On Windows they are the Universal CRT's, which MDK shares.
+    unsafe {
+        let null = libc::open(null.as_ptr(), libc::O_WRONLY);
+        if null < 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        let redirected = libc::dup2(null, 1);
+        let error = std::io::Error::last_os_error();
+        libc::close(null);
+        if redirected < 0 {
+            return Err(error);
+        }
+    }
+    Ok(output.into())
+}
+
 /// The Linux app id, which is the desktop entry's name, so the window finds its launcher and icon.
 /// The Flatpak's entry has the sandbox's id (`FLATPAK_ID`, the runtime's documented variable).
 #[cfg(any(test, all(unix, not(target_os = "macos"))))]

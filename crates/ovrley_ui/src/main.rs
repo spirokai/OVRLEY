@@ -3,8 +3,9 @@
 //!
 //! Startup, in order: logging; runtime paths and distribution; the preferences file; the language
 //! and drawer hydration; backend selection with the shared GPU device; then the window
-//! (`app::run`), and after an update the relaunch. A failure before the window exists is shown in a native message dialog. A failure
-//! once it exists (a malformed `lng`) is shown in the window, as `main.jsx` does.
+//! (`app::run`), and after an update the relaunch. A failure before the window exists is shown in a
+//! native message dialog. A failure once it exists (a malformed `lng`) is shown in the window, as
+//! `main.jsx` does.
 
 // A release build is a GUI app without a console. `--mcp` uses the pipes its client passes.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -31,6 +32,13 @@ fn main() -> ExitCode {
 }
 
 fn serve_mcp() -> ExitCode {
+    let output = match ovrley_ui::platform::take_standard_output() {
+        Ok(output) => output,
+        Err(error) => {
+            log::error!("the MCP connection has no standard output: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
     let roots = match RuntimeRoots::from_platform() {
         Ok(roots) => roots,
         Err(error) => {
@@ -39,7 +47,7 @@ fn serve_mcp() -> ExitCode {
         }
     };
     let mut client = ovrley_mcp::link::LinkClient::new(ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir));
-    match ovrley_mcp::protocol::run_stdio(&mut client) {
+    match ovrley_mcp::protocol::run_stdio(&mut client, output) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             log::error!("the MCP connection failed: {error}");
@@ -66,7 +74,7 @@ fn start() -> Result<(), String> {
     let gpu = ovrley_ui::platform::select_backend()?;
     let agent_socket = ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir);
     let paths = roots.app_paths()?;
-    // The installed map styles and the tile cache, as the Tauri shell opens them (phase 5 D9).
+    // The installed map styles and the tile cache (phase 5 D9).
     let maps = std::sync::Arc::new(ovrley_app::store::services::NativeMapServices::open(&roots, &preferences)?);
     let exit = ovrley_ui::app::run(store, distribution, paths, &roots.app_cache_dir, preferences, maps, gpu, agent_socket)?;
     if exit == ovrley_ui::app::Exit::Relaunch {
@@ -79,7 +87,7 @@ fn start() -> Result<(), String> {
 }
 
 /// The settings file. The debug snapshot tour (`OVRLEY_SNAPSHOT`) changes the language and the
-/// drawer, so it reads the file but never writes it: it is shared with the React app.
+/// drawer, so it reads the user's file but never writes it.
 fn open_preferences(app_data_dir: &std::path::Path) -> Result<PreferencesStore, String> {
     if cfg!(debug_assertions) && std::env::var_os("OVRLEY_SNAPSHOT").is_some() {
         let path = app_data_dir.join(ovrley_app::lib::preferences_store::PREFERENCES_FILE_NAME);

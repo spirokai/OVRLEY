@@ -152,19 +152,18 @@ pub fn handle_line(line: &str, caller: &mut dyn ToolCaller) -> Option<Value> {
 }
 
 /// The `--mcp` process: reads requests from standard input until it closes, and answers on
-/// standard output.
-pub fn run_stdio(caller: &mut dyn ToolCaller) -> std::io::Result<()> {
+/// `output`, the standard output it was started with.
+pub fn run_stdio(caller: &mut dyn ToolCaller, mut output: impl Write) -> std::io::Result<()> {
     let stdin = std::io::stdin();
-    let mut stdout = std::io::stdout().lock();
     for line in stdin.lock().lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
         }
         if let Some(answer) = handle_line(&line, caller) {
-            serde_json::to_writer(&mut stdout, &answer)?;
-            stdout.write_all(b"\n")?;
-            stdout.flush()?;
+            serde_json::to_writer(&mut output, &answer)?;
+            output.write_all(b"\n")?;
+            output.flush()?;
         }
     }
     Ok(())

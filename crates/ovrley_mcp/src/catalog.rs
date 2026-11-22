@@ -210,7 +210,9 @@ pub fn tools() -> Vec<ToolDefinition> {
                           (file, format, duration, laps and which are disabled), the template (source, name, save status), the \
                           unit system, the widgets (id, type, name, position, selected), whether undo and redo are available, and \
                           playback (state, playhead, timeline minimum and total duration), the activity trim and the video clips \
-                          (id, file, start, duration, missing, warning count). The project section is empty until projects arrive.",
+                          (id, file, start, duration, missing, warning count), the project (name, path, status), the scene (size, aspect ratio, \
+                          frame rate, widget update rate, global defaults), the render (busy, target, percent) and Sync Doctor \
+                          (target video, landmark count, location, searches).",
             input_schema: input_schema::<NoArguments>(),
             read_only: true,
         },
@@ -393,7 +395,7 @@ pub fn is_tool(name: &str) -> bool {
 }
 
 /// What an agent sees when edits are off.
-pub const EDITS_OFF: &str = "Agent edits are turned off in OVRLEY. Turn on \"Allow agent edits\" in Settings > General, then try again.";
+pub const EDITS_OFF: &str = "Agent edits are turned off in OVRLEY. Turn on \"Allow agent edits\" in Settings, then try again.";
 
 fn arguments<T: DeserializeOwned>(value: Value) -> Result<T, ToolOutcome> {
     // Clients may omit `arguments` for a tool that takes none.
