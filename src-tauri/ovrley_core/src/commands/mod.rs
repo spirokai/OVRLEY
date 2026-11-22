@@ -1,228 +1,38 @@
-//! Backend command implementations used by the Tauri shell.
+//! Core operations the app calls directly: templates, the preview frame, video telemetry, and
+//! opening render outputs in the system.
 //!
-//! Framework-agnostic template, activity, preview and OS helpers. Production
-//! rendering, progress and cancellation belong to `render_jobs::execution`.
+//! Production rendering, progress and cancellation belong to `render_jobs::execution`.
 
-pub mod elevation_geometry;
-pub mod route_geometry;
-
+use crate::activity::build_dense_activity_report_validated;
 use crate::activity::finalize::FinalizeActivityResponse;
-use crate::activity::{build_dense_activity_report_validated, parse_activity_json};
-use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::{parse_config_json, parse_template_json};
-use crate::output::RenderOutputKind;
-use serde::Serialize;
-use serde_json::{json, Value};
+use crate::paths::AppPaths;
+use crate::render::render_preview_frame;
+use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::paths::AppPaths;
-use crate::render::render_preview_frame;
-
-/// Health-check response sent to the frontend.
-#[derive(Debug, Serialize)]
-pub struct HealthResponse {
-    /// Machine-readable status string.
-    pub status: String,
-    /// Human-readable readiness details, including ffmpeg resolution.
-    pub message: String,
-    /// Whether the Rust backend is usable.
-    pub ready: bool,
+/// Whether a listed template is bundled or the user's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TemplateKind {
+    BuiltIn,
+    User,
 }
 
-/// Reports backend readiness and ffmpeg discovery state.
-pub fn backend_health(paths: &AppPaths) -> HealthResponse {
-    let message = match resolve_ffmpeg_binary(&paths.repo_root) {
-        Ok(path) => format!("Rust backend ready; ffmpeg={}", path.display()),
-        Err(error) => format!("Rust backend ready; {error}"),
-    };
-
-    HealthResponse {
-        status: "ok".to_string(),
-        message,
-        ready: true,
-    }
-}
-
-/// Returns the target operating system name for frontend feature gates.
-pub fn backend_current_os() -> Value {
-    json!({
-        "os": std::env::consts::OS
-    })
-}
-
-/// Parses and finalizes a native CSV activity without a frontend RawActivity hop.
-pub fn backend_parse_csv_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    crate::activity::csv::parse_csv_activity_path(Path::new(path), Some(&paths.repo_root))
-}
-
-/// Parses and finalizes a native VBO activity without a frontend RawActivity hop.
-pub fn backend_parse_vbo_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response =
-        crate::activity::vbo::parse_vbo_activity_path(Path::new(path), Some(&paths.repo_root))?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native TCX activity through the shared raw-sample pipeline.
-pub fn backend_parse_tcx_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::tcx::parse_tcx_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native FIT activity through the shared raw-sample pipeline.
-pub fn backend_parse_fit_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::fit::parse_fit_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native GPX activity through the shared raw-sample pipeline.
-pub fn backend_parse_gpx_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::gpx::parse_gpx_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native IGC flight log through the shared raw-sample pipeline.
-pub fn backend_parse_igc_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::igc::parse_igc_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native DJI SRT file through the shared raw-sample pipeline.
-pub fn backend_parse_srt_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::srt::parse_srt_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native UDDF dive.
-pub fn backend_parse_uddf_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::uddf::parse_uddf_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Parses and finalizes a native Subsurface XML/SSRF dive.
-pub fn backend_parse_subsurface_activity(
-    paths: &AppPaths,
-    path: &str,
-) -> CoreResult<FinalizeActivityResponse> {
-    let mut response = crate::activity::parsers::subsurface::parse_subsurface_activity_path(
-        Path::new(path),
-        Some(&paths.repo_root),
-    )?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
-/// Lists canonical bundled capabilities and lazy system font identities.
-pub fn backend_list_system_fonts(paths: &AppPaths) -> CoreResult<Value> {
-    Ok(serde_json::to_value(crate::fonts::font_catalog(
-        &paths.font_dirs,
-    )?)?)
-}
-
-/// Resolves the selected font's actual faces, including italic availability.
-pub fn backend_font_capabilities(paths: &AppPaths, font_id: &str) -> CoreResult<Value> {
-    Ok(serde_json::to_value(crate::fonts::font_capabilities(
-        &paths.font_dirs,
-        font_id,
-    )?)?)
-}
-
-/// Supplies one face's bytes (bundled or system) for browser font registration.
-pub fn backend_font_data(
-    paths: &AppPaths,
-    font_id: &str,
-    face_index: usize,
-) -> CoreResult<Vec<u8>> {
-    crate::fonts::face_data(&paths.font_dirs, font_id, face_index)
-}
-
-/// Renders one transparent preview PNG for the requested second.
-///
-/// `config_json` carries the full export scene; only the rendered window is
-/// narrowed to the requested frame, so plots keep the export range.
-///
-/// The file is written into the public downloads directory so it is easy to
-/// inspect from the desktop app during development workflows.
-pub fn backend_render_preview_frame(
-    paths: &AppPaths,
-    config_json: &str,
-    parsed_activity_json: &str,
-    second: f64,
-    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
-    map_source: Option<&ovrley_map::MapSource>,
-) -> CoreResult<Value> {
-    let config = parse_config_json(config_json)?;
-    let parsed_activity = parse_activity_json(parsed_activity_json)?;
-    let output_path = render_preview_frame_config(
-        paths,
-        config,
-        &parsed_activity,
-        second,
-        raster_resources,
-        map_source,
-    )?;
-    let filename = output_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .expect("the preview frame's file name is ASCII")
-        .to_string();
-    Ok(json!({
-        "filename": filename,
-        "path": output_path,
-        "second": second
-    }))
+/// One listed template.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TemplateDescriptor {
+    pub id: String,
+    pub name: String,
+    pub kind: TemplateKind,
+    /// The scene's size, 0 when the file declares none.
+    pub width: u32,
+    pub height: u32,
+    /// User templates only.
+    pub path: Option<String>,
 }
 
 /// Renders the frame at `second` of a render config to a transparent PNG in Downloads and returns
@@ -262,7 +72,7 @@ pub fn render_preview_frame_config(
 ///
 /// Built-in templates are de-duplicated by filename, while user templates are
 /// exposed with a `user:` id prefix to avoid collisions.
-pub fn backend_list_templates(paths: &AppPaths) -> CoreResult<Value> {
+pub fn list_templates(paths: &AppPaths) -> Vec<TemplateDescriptor> {
     let mut templates = Vec::new();
     let mut seen = BTreeSet::new();
 
@@ -282,7 +92,7 @@ pub fn backend_list_templates(paths: &AppPaths) -> CoreResult<Value> {
                 if !seen.insert(filename.to_string()) {
                     continue;
                 }
-                if let Some(descriptor) = template_descriptor(&path, filename, "built-in", filename)
+                if let Some(descriptor) = template_descriptor(&path, filename, TemplateKind::BuiltIn, filename)
                 {
                     templates.push(descriptor);
                 }
@@ -306,17 +116,17 @@ pub fn backend_list_templates(paths: &AppPaths) -> CoreResult<Value> {
             if !seen.insert(id.clone()) {
                 continue;
             }
-            if let Some(descriptor) = template_descriptor(&path, filename, "user", &id) {
+            if let Some(descriptor) = template_descriptor(&path, filename, TemplateKind::User, &id) {
                 templates.push(descriptor);
             }
         }
     }
 
-    Ok(Value::Array(templates))
+    templates
 }
 
-/// Reads a template by built-in filename, user-prefixed id, or unqualified id.
-pub fn backend_get_template(paths: &AppPaths, filename: &str) -> CoreResult<String> {
+/// Reads a template's document by built-in filename, user-prefixed id, or unqualified id.
+pub fn read_template(paths: &AppPaths, filename: &str) -> CoreResult<Value> {
     let (source, normalized) = parse_template_id(filename);
     let template_path = match source {
         TemplateSource::User => paths.user_template_path(&normalized),
@@ -327,19 +137,11 @@ pub fn backend_get_template(paths: &AppPaths, filename: &str) -> CoreResult<Stri
     }
     .ok_or_else(|| CoreError::Config(format!("Template not found: {normalized}")))?;
 
-    fs::read_to_string(&template_path).map_err(|error| CoreError::Io {
+    let text = fs::read_to_string(&template_path).map_err(|error| CoreError::Io {
         path: template_path.clone(),
         source: error,
-    })
-}
-
-/// Opens the remembered render output directory, or the platform default.
-pub fn backend_open_output_directory(
-    paths: &AppPaths,
-    directory: Option<&str>,
-) -> CoreResult<Value> {
-    open_output_directory(paths, directory)?;
-    Ok(json!({ "message": "Folder opened" }))
+    })?;
+    Ok(serde_json::from_str(&text)?)
 }
 
 /// Opens the render output folder in the system file browser: `directory` (absolute, existing),
@@ -365,28 +167,6 @@ pub fn open_output_directory(paths: &AppPaths, directory: Option<&str>) -> CoreR
     open_path_in_system(&target)
 }
 
-/// Returns a fresh suggested render output path.
-pub fn backend_suggest_output_path(
-    paths: &AppPaths,
-    output_kind: RenderOutputKind,
-    remembered_directory: Option<&str>,
-) -> CoreResult<PathBuf> {
-    let remembered_directory = remembered_directory.map(Path::new);
-    crate::output::suggest_output_path(paths, output_kind, remembered_directory)
-}
-
-/// Opens the user templates directory in the system file browser.
-pub fn backend_open_templates(paths: &AppPaths) -> CoreResult<Value> {
-    open_path_in_system(&paths.user_templates_dir)?;
-    Ok(json!({ "message": "Folder opened" }))
-}
-
-/// Opens a rendered video from its accepted absolute path.
-pub fn backend_open_video(output_path: &str) -> CoreResult<Value> {
-    open_rendered_video(output_path)?;
-    Ok(json!({ "message": "Video opened" }))
-}
-
 /// Opens a rendered file (a video, or the debug PNG frame) in the system player.
 pub fn open_rendered_video(output_path: &str) -> CoreResult<()> {
     let target = Path::new(output_path);
@@ -408,7 +188,7 @@ enum TemplateSource {
 
 // Parses a template id into its source namespace and sanitized filename.
 fn parse_template_id(template_id: &str) -> (TemplateSource, String) {
-    // Prefixes are part of the frontend template list API. Unprefixed ids keep
+    // Prefixes are part of the template list's ids. Unprefixed ids keep
     // backward compatibility by searching built-ins first, then user files.
     let (source, filename) = if let Some(filename) = template_id.strip_prefix("user:") {
         (TemplateSource::User, filename)
@@ -453,21 +233,21 @@ fn is_app_template(value: &Value) -> bool {
 }
 
 // Extracts the declared scene resolution from a template JSON document.
-fn read_template_resolution(value: &Value) -> Option<(u64, u64)> {
+fn read_template_resolution(value: &Value) -> Option<(u32, u32)> {
     let scene = value.get("config").and_then(|config| config.get("scene"))?;
-    let width = scene.get("width").and_then(Value::as_u64)?;
-    let height = scene.get("height").and_then(Value::as_u64)?;
+    let width = u32::try_from(scene.get("width")?.as_u64()?).ok()?;
+    let height = u32::try_from(scene.get("height")?.as_u64()?).ok()?;
 
     Some((width, height))
 }
 
-// Builds the frontend list descriptor for one valid template file.
+// Builds the list entry of one valid template file.
 fn template_descriptor(
     path: &Path,
     filename: &str,
-    template_type: &str,
+    kind: TemplateKind,
     id: &str,
-) -> Option<Value> {
+) -> Option<TemplateDescriptor> {
     // Invalid or non-OVRLEY JSON files are silently skipped so users can keep
     // unrelated notes in the same Documents/OVRLEY directory.
     let value = read_template_file(path)?;
@@ -476,17 +256,14 @@ fn template_descriptor(
     }
     let (width, height) = read_template_resolution(&value).unwrap_or((0, 0));
 
-    let mut descriptor = json!({
-        "id": id,
-        "name": filename.trim_end_matches(".json").replace('_', " ").to_uppercase(),
-        "type": template_type,
-        "width": width,
-        "height": height
-    });
-    if template_type == "user" {
-        descriptor["path"] = Value::String(path.to_string_lossy().into_owned());
-    }
-    Some(descriptor)
+    Some(TemplateDescriptor {
+        id: id.to_string(),
+        name: filename.trim_end_matches(".json").replace('_', " ").to_uppercase(),
+        kind,
+        width,
+        height,
+        path: (kind == TemplateKind::User).then(|| path.to_string_lossy().into_owned()),
+    })
 }
 
 // Opens a path with the operating system's default handler.
@@ -499,18 +276,8 @@ fn open_path_in_system(path: &Path) -> CoreResult<()> {
         .map_err(|error| CoreError::Encode(format!("Failed to open {}: {error}", path.display())))
 }
 
-/// Probes a video file and returns its metadata.
-pub fn backend_probe_video(paths: &AppPaths, file_path: &str) -> CoreResult<Value> {
-    let metadata = crate::media::prepared_video::probe_video_metadata(paths, file_path)?;
-    serde_json::to_value(&metadata).map_err(CoreError::Serialization)
-}
-
-/// Extracts embedded MP4 telemetry as a parsed activity payload.
-///
-/// This command is kept as frontend wiring for video imports. It deliberately
-/// returns the same [`ParsedActivity`] shape used by the rest of the import
-/// pipeline, not the old debug-only columnar telemetry JSON.
-pub fn backend_extract_video_telemetry(
+/// Extracts embedded MP4 telemetry as a parsed activity, the shape every import shares.
+pub fn extract_video_telemetry(
     paths: &AppPaths,
     file_path: &str,
 ) -> CoreResult<Option<FinalizeActivityResponse>> {
@@ -519,13 +286,6 @@ pub fn backend_extract_video_telemetry(
         response.debug_payload = None;
     }
     Ok(response)
-}
-
-/// Detects ffmpeg encoders and hardware acceleration methods available locally.
-pub fn backend_detect_codecs(paths: &AppPaths) -> CoreResult<Value> {
-    use crate::encode::ffmpeg::detect::detect_codecs;
-    let codecs = detect_codecs(&paths.repo_root)?;
-    serde_json::to_value(&codecs).map_err(CoreError::Serialization)
 }
 
 /// Validates template contents without exposing raw config types.

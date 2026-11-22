@@ -176,7 +176,7 @@ impl VideoTools for NativeVideoTools {
     }
 
     fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
-        ovrley_core::commands::backend_extract_video_telemetry(&self.paths, path).map_err(|error| error.to_string())
+        ovrley_core::commands::extract_video_telemetry(&self.paths, path).map_err(|error| error.to_string())
     }
 
     fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String> {

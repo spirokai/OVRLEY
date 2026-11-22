@@ -5,7 +5,6 @@ use chrono::{
 use ovrley_core::activity::csv::{parse_csv_activity_path, parse_csv_activity_reader};
 use ovrley_core::activity::interpolate::densify_activity;
 use ovrley_core::activity::trim::trim_activity;
-use ovrley_core::commands::backend_parse_csv_activity;
 use ovrley_core::normalize::RenderDataRequirements;
 use std::io::Cursor;
 
@@ -644,7 +643,7 @@ fn csv_command_returns_the_native_path_response() {
     let repo_root =
         std::env::temp_dir().join(format!("ovrley-csv-debug-test-{}", std::process::id()));
     let paths = ovrley_core::paths::AppPaths::from_repo_root(repo_root.clone());
-    let response = backend_parse_csv_activity(&paths, fixture.to_str().unwrap()).unwrap();
+    let response = ovrley_core::activity::csv::parse_csv_activity_path(&fixture, Some(&paths.repo_root)).unwrap();
     // debug_payload is Some only in debug builds
     if cfg!(not(debug_assertions)) {
         assert!(response.debug_payload.is_none());

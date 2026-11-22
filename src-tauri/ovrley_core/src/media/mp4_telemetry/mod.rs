@@ -13,9 +13,9 @@
 //!
 //! The [`ParsedActivity`] carries raw GPS course points and elevation -
 //! **not** the simplified widget geometries. Route polylines and elevation
-//! plots are computed separately by [`crate::commands::route_geometry`] and
-//! [`crate::commands::elevation_geometry`] (LTTB downsampling, RDP
-//! simplification, equirectangular projection).
+//! plots are computed separately by `ovrley_widgets`' route and elevation
+//! geometry (LTTB downsampling, RDP simplification, equirectangular
+//! projection).
 //!
 //! Owns: telemetry resolution, `probe_video_metadata()`, and
 //! [`extract_activity`].
@@ -456,8 +456,7 @@ fn dji_normalized_samples(
 ///
 /// The returned [`ParsedActivity`] carries raw course points and elevation.
 /// Route and elevation widget geometries are computed separately by
-/// [`crate::commands::route_geometry`] and
-/// [`crate::commands::elevation_geometry`].
+/// `ovrley_widgets`.
 pub fn extract_activity(
     repo_root: &Path,
     file_path: &str,

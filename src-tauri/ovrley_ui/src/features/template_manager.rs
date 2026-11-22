@@ -6,7 +6,8 @@ use crate::{AppWindow, Choice, ChoiceKind, TemplateManager, UnsavedAnswer};
 use ovrley_app::features::app_shell;
 use ovrley_app::features::template_manager::{self as manager, template_groups};
 use ovrley_app::i18n::catalog;
-use ovrley_app::store::slices::template::{TemplateKind, TemplateSource};
+use ovrley_app::store::slices::template::TemplateSource;
+use ovrley_core::commands::TemplateKind;
 use ovrley_app::store::{Dispatcher, Store};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
 

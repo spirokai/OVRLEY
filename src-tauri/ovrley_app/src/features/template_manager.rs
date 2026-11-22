@@ -13,9 +13,10 @@ use crate::lib::fonts::collect_font_ids;
 use crate::store::agent::{AgentReply, AgentResult};
 use crate::store::services::{DialogFilter, Services};
 use crate::store::slices::template::{
-    create_new_template, hydrate_template_state, TemplateDescriptor, TemplateKind, TemplateSource,
+    create_new_template, hydrate_template_state, TemplateSource,
 };
 use crate::store::{Action, Store};
+use ovrley_core::commands::{TemplateDescriptor, TemplateKind};
 use ovrley_core::normalize::template::{
     create_durable_template_state, load_template_document, template_file_payload,
     DurableTemplateState,
@@ -318,17 +319,9 @@ pub fn fetch_templates(
     store.template_manager.fetch_waiters = Some(then.into_iter().collect());
     let paths = Arc::clone(&services.paths);
     services.workers.spawn("template-list", move || {
-        let listed = ovrley_core::commands::backend_list_templates(&paths)
-            .map_err(|error| error.to_string())
-            .and_then(|value| {
-                serde_json::from_value::<Vec<TemplateDescriptor>>(value)
-                    .map_err(|error| error.to_string())
-            });
+        let templates = ovrley_core::commands::list_templates(&paths);
         Box::new(move |store: &mut Store, services: &mut Services| {
-            match listed {
-                Ok(templates) => store.template.set_templates(templates),
-                Err(error) => log::error!("Failed to fetch templates: {error}"),
-            }
+            store.template.set_templates(templates);
             let waiters = store
                 .template_manager
                 .fetch_waiters
@@ -465,9 +458,7 @@ fn load_listed_template(store: &mut Store, services: &mut Services, id: String, 
         store,
         services,
         move |paths| {
-            let text = ovrley_core::commands::backend_get_template(paths, &read_id)
-                .map_err(|error| error.to_string())?;
-            serde_json::from_str(&text).map_err(|error| error.to_string())
+            ovrley_core::commands::read_template(paths, &read_id).map_err(|error| error.to_string())
         },
         move |store, services, prepared, on_done| match prepared {
             Ok(prepared) => {

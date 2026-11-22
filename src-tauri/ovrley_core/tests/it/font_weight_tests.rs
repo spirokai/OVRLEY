@@ -1,6 +1,5 @@
 use crate::common;
 
-use ovrley_core::commands::backend_list_system_fonts;
 use ovrley_core::commands::validate_config_value;
 use ovrley_core::normalize::parse_template_value;
 use ovrley_core::paths::AppPaths;
@@ -82,7 +81,7 @@ fn label_config(weight: f32) -> serde_json::Value {
 #[test]
 fn catalog_reports_actual_per_face_weight_ranges_and_italics() {
     let paths = AppPaths::from_repo_root(common::test_config::repo_git_root());
-    let catalog = backend_list_system_fonts(&paths).unwrap();
+    let catalog = serde_json::to_value(ovrley_core::fonts::font_catalog(&paths.font_dirs).unwrap()).unwrap();
     for (id, min, max, italic) in [
         ("Inter.ttf", 100.0, 900.0, true),
         ("Teko.ttf", 300.0, 700.0, false),
@@ -144,7 +143,7 @@ fn canonical_render_rejects_missing_and_malformed_weights() {
 #[cfg(target_os = "windows")]
 fn system_faces_are_discovered_lazily_with_real_static_weights_and_italics() {
     let paths = AppPaths::from_repo_root(common::test_config::repo_git_root());
-    let catalog = backend_list_system_fonts(&paths).unwrap();
+    let catalog = serde_json::to_value(ovrley_core::fonts::font_catalog(&paths.font_dirs).unwrap()).unwrap();
     let identity = catalog["systemFonts"]
         .as_array()
         .unwrap()
@@ -152,7 +151,10 @@ fn system_faces_are_discovered_lazily_with_real_static_weights_and_italics() {
         .find(|font| font["id"] == "Arial")
         .unwrap();
     assert!(identity["faces"].is_null());
-    let font = ovrley_core::commands::backend_font_capabilities(&paths, "Arial").unwrap();
+    let font = serde_json::to_value(
+        ovrley_core::fonts::font_capabilities(&paths.font_dirs, "Arial").unwrap(),
+    )
+    .unwrap();
     let faces = font["faces"].as_array().unwrap();
     assert!(faces.iter().any(|face| face["style"] == "italic"));
     assert!(faces

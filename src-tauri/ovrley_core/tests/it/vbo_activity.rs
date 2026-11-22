@@ -1,5 +1,4 @@
 use ovrley_core::activity::vbo::{parse_vbo_activity_path, parse_vbo_activity_reader};
-use ovrley_core::commands::backend_parse_vbo_activity;
 use ovrley_core::paths::AppPaths;
 use std::io::Cursor;
 
@@ -318,8 +317,7 @@ fn vbo_path_and_command_use_the_native_columnar_pipeline() {
     assert_eq!(response.parsed_activity.elevation[0], Some(100.0));
 
     let paths = AppPaths::from_repo_root(debug_root.clone());
-    let response = backend_parse_vbo_activity(&paths, fixture.to_str().unwrap()).unwrap();
-    assert!(response.debug_payload.is_none());
+    let response = parse_vbo_activity_path(&fixture, Some(&paths.repo_root)).unwrap();
     assert_eq!(
         response.parsed_activity.file_name.as_deref(),
         fixture.file_name().unwrap().to_str()

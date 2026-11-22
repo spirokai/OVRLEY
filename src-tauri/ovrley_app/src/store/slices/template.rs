@@ -2,9 +2,9 @@
 //! aspect ratio.
 
 use super::editor::{default_config, EditorSlice};
+use ovrley_core::commands::TemplateDescriptor;
 use ovrley_core::normalize::template::{normalize_global_defaults, template_manifest, DurableTemplateState};
 use ovrley_widgets::model::document::{is_color_field_key, normalize_color_fields, LabelStyle, OverlayConfig};
-use serde::Deserialize;
 use serde_json::{Map, Value};
 use std::rc::Rc;
 
@@ -15,30 +15,6 @@ pub enum TemplateSource {
     Bundled { template_id: String },
     /// A template file: a user template, an import or a save target.
     File { path: String },
-}
-
-/// Whether a listed template is bundled or the user's.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-pub enum TemplateKind {
-    #[serde(rename = "built-in")]
-    BuiltIn,
-    #[serde(rename = "user")]
-    User,
-}
-
-/// One entry of `backend_list_templates`.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct TemplateDescriptor {
-    pub id: String,
-    pub name: String,
-    #[serde(rename = "type")]
-    pub kind: TemplateKind,
-    pub width: u32,
-    pub height: u32,
-    /// User templates only.
-    #[serde(default)]
-    pub path: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -171,17 +147,6 @@ pub fn set_aspect_ratio_preset(editor: &mut EditorSlice, template: &mut Template
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[test]
-    fn descriptors_parse_the_template_list() {
-        let list: Vec<TemplateDescriptor> = serde_json::from_value(json!([
-            {"id": "a.json", "name": "A", "type": "built-in", "width": 1920, "height": 1080},
-            {"id": "user:b.json", "name": "B", "type": "user", "width": 0, "height": 0, "path": "/t/b.json"}
-        ]))
-        .unwrap();
-        assert_eq!(list[0].kind, TemplateKind::BuiltIn);
-        assert_eq!(list[1].path.as_deref(), Some("/t/b.json"));
-    }
 
     #[test]
     fn a_new_template_resets_document_defaults_source_and_saved_state() {

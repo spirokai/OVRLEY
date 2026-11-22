@@ -13,7 +13,7 @@ use ovrley_app::features::overlay_editor::interaction::{resize_widget, rotate_wi
 use ovrley_app::store::agent::{describe_activity, describe_template, describe_widget, describe_widgets, AgentReply, AgentResult};
 use ovrley_app::store::services::Services;
 use ovrley_app::store::slices::layout::LeftDrawerTool;
-use ovrley_app::store::slices::template::TemplateKind;
+use ovrley_core::commands::TemplateKind;
 use ovrley_app::store::Store;
 use schemars::{JsonSchema, Schema};
 use serde::de::DeserializeOwned;
