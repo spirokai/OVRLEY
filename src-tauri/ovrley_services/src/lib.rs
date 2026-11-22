@@ -11,6 +11,8 @@ pub mod file_ops;
 pub mod filmstrip_cache;
 pub mod map_styles;
 pub mod map_tile_service;
+#[cfg(test)]
+mod map_tile_service_tests;
 pub mod project_file;
 pub mod raster_resources;
 pub mod runtime_paths;
