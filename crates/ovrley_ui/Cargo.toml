@@ -191,6 +191,7 @@ SectionEnd
 signingIdentity = "-"
 # The executable's, Skia's and MDK's minimum.
 minimumSystemVersion = "11.0"
+entitlements = "../../packaging/macos/OVRLEY.entitlements"
 
 [package.metadata.packager.linux]
 # scripts/package.mjs installs an entry named after the window's app id, which Wayland matches.

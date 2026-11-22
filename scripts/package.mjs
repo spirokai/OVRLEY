@@ -100,7 +100,6 @@ async function packagerConfig(formats) {
   } else if (process.platform === 'darwin') {
     config.resources.push({ src: installGuide.macos, target: 'INSTALL.txt' })
     config.macos.frameworks = [join(playerDir, 'mdk.framework')]
-    config.macos.infoPlistPath = await writeInfoPlist(version)
   } else {
     config.resources.push({ src: installGuide.linux, target: 'INSTALL.txt' }, { src: playerDir, target: 'lib' })
     config.deb.files = { [await writeDebianDesktopEntry()]: 'usr/share/applications/com.ovrley.desktop.desktop' }
@@ -115,25 +114,6 @@ function readPackage() {
   }
   const app = JSON.parse(result.stdout).packages.find((entry) => entry.name === 'ovrley_ui')
   return { version: app.version, config: app.metadata.packager }
-}
-
-// cargo-packager writes the build time as CFBundleVersion; Tauri's bundles had the version.
-async function writeInfoPlist(version) {
-  const path = join(packagingDir, 'Info.plist')
-  await writeFile(
-    path,
-    [
-      '<?xml version="1.0" encoding="UTF-8"?>',
-      '<plist version="1.0">',
-      '<dict>',
-      '  <key>CFBundleVersion</key>',
-      `  <string>${version}</string>`,
-      '</dict>',
-      '</plist>',
-      '',
-    ].join('\n'),
-  )
-  return path
 }
 
 // The AppImage's entry, with the icon name cargo-packager gives the deb's icons: the binary's.
