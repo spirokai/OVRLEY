@@ -4,28 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  picomatch@>=4.0.0 <4.0.4: '>=4.0.4'
-  undici@>=7.23.0 <7.28.0: '>=7.28.0'
-  undici@>=7.0.0 <7.28.0: '>=7.28.0'
-  undici@<6.27.0: '>=6.27.0'
-  js-yaml@>=4.0.0 <=4.1.1: '>=4.2.0'
-  js-yaml@>=4.0.0 <4.3.0: '>=4.3.0'
-  undici@>=7.0.0 <7.29.0: '>=7.29.0'
-  undici@<6.28.0: '>=6.28.0'
-  js-yaml@>=4.0.0 <4.3.1: '>=4.3.1'
-  js-yaml@>=4.0.0 <4.3.2: '>=4.3.2'
-  undici@>=6.25.0 <6.28.1: '>=6.28.1'
-  undici@>=7.11.0 <7.29.1: '>=7.29.1'
-  undici@>=7.0.0 <7.29.1: '>=7.29.1'
-  undici@<6.28.1: '>=6.28.1'
-  undici@>=6.7.0 <6.28.1: '>=6.28.1'
-  undici@>=7.15.0 <7.29.1: '>=7.29.1'
-  undici@>=7.1.0 <7.29.1: '>=7.29.1'
-  undici@>=7.24.1 <7.29.1: '>=7.29.1'
-  handlebars@>=4.0.0 <=4.7.9: '>=4.7.10'
-  handlebars@>=3.0.0 <=4.7.9: '>=4.7.10'
-
 importers:
 
   .:
@@ -204,8 +182,8 @@ packages:
   any-promise@1.3.0:
     resolution: {integrity: sha512-7UvmKalWRt1wgjL1RrGxoSJW/0QZFIegpeGvZG9kjp8vrRu55XTHbwnqq2GpXm9uLbcuhxm3IqX9OB4MZR1b2A==}
 
-  argparse@3.0.3:
-    resolution: {integrity: sha512-Sn98ftV3KfsO8xfLPHG6oT8y+b0yvbrLgZjgPDXsharNY15tTAjqIsIju4S32nl6/iEUNNE4v+yL2Zhm8ooP3w==}
+  argparse@2.0.1:
+    resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
   argv-formatter@1.0.0:
     resolution: {integrity: sha512-F2+Hkm9xFaRg+GkaNnbwXNDV5O6pnCFEmqyhvfC/Ic5LbgOWjJh3L+mN/s91rxVL3znE7DYVpW0GJFT+4YBgWw==}
@@ -399,7 +377,7 @@ packages:
     resolution: {integrity: sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==}
     engines: {node: '>=12.0.0'}
     peerDependencies:
-      picomatch: '>=4.0.4'
+      picomatch: ^3 || ^4
     peerDependenciesMeta:
       picomatch:
         optional: true
@@ -582,8 +560,8 @@ packages:
   js-tokens@4.0.0:
     resolution: {integrity: sha512-RdJUflcE3cUzKiMqQgsCu06FPu9UdIJO0beYbPhHN4k6apgJtifcoCtT9bcxOpYBtpD2kCM6Sbzg4CausW/PKQ==}
 
-  js-yaml@5.5.0:
-    resolution: {integrity: sha512-paNr4LFIFPjeeSmwNYdrb8FafLLG/Cr2Af3GjbsHJ5CxIjH4r0c2emlmRdAtpPAieP1gRVzk6buBbVP5gBMGAg==}
+  js-yaml@4.3.2:
+    resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
   json-parse-better-errors@1.0.2:
@@ -1112,9 +1090,13 @@ packages:
     engines: {node: '>=0.8.0'}
     hasBin: true
 
-  undici@8.12.2:
-    resolution: {integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg==}
-    engines: {node: '>=22.19.0'}
+  undici@6.29.1:
+    resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
+    engines: {node: '>=18.17'}
+
+  undici@7.30.2:
+    resolution: {integrity: sha512-mLyPQnHwUxaM/rideoK/+KL8DaAJLRl4aBCfmX444aCSLnIaomqPLtNRe2jdCYcsk5wZzXrDIQC8ZeYNRAYyIA==}
+    engines: {node: '>=20.18.1'}
 
   unicode-emoji-modifier-base@1.0.0:
     resolution: {integrity: sha512-yLSH4py7oFH3oG/9K+XWrz1pSi3dfUrWEnInbxMfArOfc1+33BlGPQtLsOYwvdMy11AwUBetYuaRxSPqgkq+8g==}
@@ -1214,7 +1196,7 @@ snapshots:
   '@actions/http-client@4.0.1':
     dependencies:
       tunnel: 0.0.6
-      undici: 8.12.2
+      undici: 6.29.1
 
   '@actions/io@3.0.2': {}
 
@@ -1337,7 +1319,7 @@ snapshots:
       p-filter: 4.1.0
       semantic-release: 25.0.3
       tinyglobby: 0.2.15
-      undici: 8.12.2
+      undici: 7.30.2
       url-join: 5.0.0
     transitivePeerDependencies:
       - supports-color
@@ -1410,7 +1392,7 @@ snapshots:
 
   any-promise@1.3.0: {}
 
-  argparse@3.0.3: {}
+  argparse@2.0.1: {}
 
   argv-formatter@1.0.0: {}
 
@@ -1521,7 +1503,7 @@ snapshots:
     dependencies:
       env-paths: 2.2.1
       import-fresh: 3.3.1
-      js-yaml: 5.5.0
+      js-yaml: 4.3.2
       parse-json: 5.2.0
 
   cross-spawn@7.0.6:
@@ -1764,9 +1746,9 @@ snapshots:
 
   js-tokens@4.0.0: {}
 
-  js-yaml@5.5.0:
+  js-yaml@4.3.2:
     dependencies:
-      argparse: 3.0.3
+      argparse: 2.0.1
 
   json-parse-better-errors@1.0.2: {}
 
@@ -2226,7 +2208,9 @@ snapshots:
   uglify-js@3.19.3:
     optional: true
 
-  undici@8.12.2: {}
+  undici@6.29.1: {}
+
+  undici@7.30.2: {}
 
   unicode-emoji-modifier-base@1.0.0: {}
 
