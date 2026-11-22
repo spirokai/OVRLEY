@@ -20,10 +20,6 @@ on:
         description: Commit SHA the release tag must point at
         required: true
         type: string
-      wasm_prebuilt:
-        description: The caller already uploaded the ovrley-wasm-bindings artifact in this run
-        required: true
-        type: boolean
     secrets:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
@@ -34,16 +30,7 @@ permissions:
   contents: write
 
 jobs:
-  wasm:
-    name: WASM bindings
-    if: ${{ !inputs.wasm_prebuilt }}
-    uses: ./.github/workflows/workflow_wasm.yml
-    with:
-      ref: ${{ inputs.release_ref }}
-
   build:
-    needs: wasm
-    if: ${{ !cancelled() && needs.wasm.result != 'failure' }}
     name: Build Linux x86_64 AppImage
     runs-on: ubuntu-22.04
     env:
@@ -122,12 +109,19 @@ jobs:
             build-essential \
             curl \
             file \
-            libayatana-appindicator3-dev \
+            libasound2-dev \
+            libdrm2 \
+            libfontconfig1-dev \
+            libfreetype-dev \
+            libfribidi0 \
             libfuse2 \
-            libgtk-3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
+            libgbm1 \
+            libgl1 \
+            libharfbuzz0b \
+            liblz4-1 \
+            libpulse0 \
+            libwayland-client0 \
+            libx11-xcb1 \
             patchelf \
             pkg-config \
             unzip \
@@ -142,38 +136,25 @@ jobs:
           key: appimage
           workspaces: '. -> target'
 
-      # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
-      - name: Download WASM bindings
-        uses: actions/download-artifact@v7
-        with:
-          name: ovrley-wasm-bindings
-          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          # The Tauri app has no native playback; Phase 9 packages the MDK SDK.
-          OVRLEY_SKIP_MDK_INSTALL: '1'
 
-      - name: Generate shared packaging resources
-        run: pnpm prepare:packaging
+      - name: Install cargo-packager
+        run: pnpm install:packager
 
       - name: Build Linux application binary
-        run: pnpm tauri build --no-bundle --verbose
-        env:
-          VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
-          OVRLEY_WASM_PREBUILT: '1'
+        run: pnpm build --no-bundle
 
       - name: Package and sign minimal Linux AppImage
         shell: bash
         env:
           RELEASE_VERSION: ${{ steps.release.outputs.tag }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
           version="$RELEASE_VERSION"
-          app_binary="target/release/app"
+          app_binary="target/packaging/bin/OVRLEY"
           app_dir="$RUNNER_TEMP/OVRLEY.AppDir"
           payload_dir="$app_dir/usr/lib/ovrley"
           appimage_name="OVRLEY-linux-$version.AppImage"
@@ -181,17 +162,18 @@ jobs:
           appimagetool="$RUNNER_TEMP/appimagetool-x86_64.AppImage"
 
           [[ -x "$app_binary" ]] || { echo 'Release application binary is missing or not executable.' >&2; exit 1; }
-          ldd_output="$(ldd "$app_binary")"
-          printf '%s\n' "$ldd_output"
-          ! grep -q 'not found' <<< "$ldd_output" || { echo 'Release application binary has unresolved host dependencies.' >&2; exit 1; }
-          grep -q 'libwebkit2gtk-4.1.so.0 =>' <<< "$ldd_output" || { echo 'Release application binary is not linked to host WebKitGTK 4.1.' >&2; exit 1; }
-          grep -q 'libgtk-3.so.0 =>' <<< "$ldd_output" || { echo 'Release application binary is not linked to host GTK 3.' >&2; exit 1; }
-          grep -q 'libgio-2.0.so.0 =>' <<< "$ldd_output" || { echo 'Release application binary is not linked to host GIO.' >&2; exit 1; }
-          [[ -z "$(patchelf --print-rpath "$app_binary")" ]] || { echo 'Release application binary must not have an embedded library search path.' >&2; exit 1; }
+          # The player's folder in each Linux package (crates/ovrley_ui/build.rs), and none of the build machine's.
+          expected_rpath='$ORIGIN/lib:$ORIGIN/../lib/OVRLEY/lib'
+          [[ "$(patchelf --print-rpath "$app_binary")" == "$expected_rpath" ]] || { echo 'Release application binary has the wrong library search path.' >&2; exit 1; }
 
           rm -rf "$app_dir" dist-release
           mkdir -p "$payload_dir/vendor" "$app_dir/usr/bin" "$app_dir/usr/share/applications" dist-release
           install -m 0755 "$app_binary" "$payload_dir/OVRLEY"
+          cp -a target/packaging/player "$payload_dir/lib"
+          ldd_output="$(ldd "$payload_dir/OVRLEY")"
+          printf '%s\n' "$ldd_output"
+          ! grep -q 'not found' <<< "$ldd_output" || { echo 'Release application binary has unresolved dependencies.' >&2; exit 1; }
+          grep -qF "$payload_dir/lib/libmdk.so.0" <<< "$ldd_output" || { echo 'Release application binary does not load the bundled player.' >&2; exit 1; }
           cp -a vendor/ffmpeg "$payload_dir/vendor/ffmpeg"
           cp -a fonts "$payload_dir/fonts"
           cp -a templates "$payload_dir/templates"
@@ -217,7 +199,7 @@ jobs:
           ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 VERSION="$version" \
             "$appimagetool" --no-appstream "$app_dir" "$appimage_path"
           chmod +x "$appimage_path"
-          pnpm tauri signer sign "$appimage_path"
+          cargo packager signer sign --app-version "$version" "$appimage_path"
 
       - name: Validate minimal Linux AppImage
         shell: bash
@@ -243,6 +225,7 @@ jobs:
           ffmpeg_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffmpeg' -print -quit)"
           ffprobe_path="$(find "$appimage_root" -type f -path '*/vendor/ffmpeg/bin/ffprobe' -print -quit)"
           [[ -x "$app_binary" ]] || { echo 'Extracted AppImage is missing the OVRLEY executable.' >&2; exit 1; }
+          [[ -s "$appimage_root/usr/lib/ovrley/lib/libmdk.so.0" ]] || { echo 'Extracted AppImage is missing the player.' >&2; exit 1; }
           [[ -n "$ffmpeg_path" && -x "$ffmpeg_path" ]] || { echo 'Extracted AppImage is missing executable FFmpeg.' >&2; exit 1; }
           [[ -n "$ffprobe_path" && -x "$ffprobe_path" ]] || { echo 'Extracted AppImage is missing executable FFprobe.' >&2; exit 1; }
           find "$appimage_root" -type d -path '*/fonts' -print -quit | grep -q . || { echo 'Extracted AppImage is missing fonts.' >&2; exit 1; }
@@ -255,26 +238,31 @@ jobs:
           desktop_file="$appimage_root/usr/share/applications/com.ovrley.desktop.desktop"
           [[ -f "$desktop_file" ]] || { echo 'Extracted AppImage is missing its desktop entry.' >&2; exit 1; }
           grep -Fxq 'Name=OVRLEY' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong application name.' >&2; exit 1; }
-          grep -Fxq 'StartupWMClass=com.ovrley.desktop' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong GTK application ID.' >&2; exit 1; }
+          grep -Fxq 'StartupWMClass=com.ovrley.desktop' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong application ID.' >&2; exit 1; }
           find "$appimage_root/usr/share/icons/hicolor" -type f -name '*.png' -print -quit | grep -q . || { echo 'Extracted AppImage is missing its application icon assets.' >&2; exit 1; }
 
           forbidden_payload="$(find "$appimage_root" \( -type f -o -type l \) \( \
-            -name 'libglib-2.0.so*' -o \
-            -name 'libgio-2.0.so*' -o \
-            -name 'libgobject-2.0.so*' -o \
-            -name 'libgmodule-2.0.so*' -o \
-            -name 'libgthread-2.0.so*' -o \
-            -name 'libgtk-3.so*' -o \
-            -name 'libgdk-3.so*' -o \
-            -name 'libwebkit2gtk-4.1.so*' -o \
-            -name 'libjavascriptcoregtk-4.1.so*' -o \
-            -name 'libgstreamer-1.0.so*' -o \
-            -name 'libgst*.so*' -o \
-            -name 'WebKitWebProcess' -o \
-            -name 'WebKitNetworkProcess' \
+            -name 'libc.so*' -o \
+            -name 'libstdc++.so*' -o \
+            -name 'libGL.so*' -o \
+            -name 'libEGL.so*' -o \
+            -name 'libgbm.so*' -o \
+            -name 'libdrm.so*' -o \
+            -name 'libva.so*' -o \
+            -name 'libvulkan.so*' -o \
+            -name 'libwayland-client.so*' -o \
+            -name 'libX11.so*' -o \
+            -name 'libxcb.so*' -o \
+            -name 'libxkbcommon.so*' -o \
+            -name 'libfontconfig.so*' -o \
+            -name 'libfreetype.so*' -o \
+            -name 'libharfbuzz.so*' -o \
+            -name 'libfribidi.so*' -o \
+            -name 'libasound.so*' -o \
+            -name 'libpulse.so*' \
           \) -print)"
           [[ -z "$forbidden_payload" ]] || { printf 'AppImage contains forbidden host-stack files:\n%s\n' "$forbidden_payload" >&2; exit 1; }
-          ! grep -Eq 'LD_LIBRARY_PATH|GIO_MODULE|GST_PLUGIN|WEBKIT_EXEC_PATH' "$appimage_root/AppRun" || { echo 'AppRun overrides host library or plugin resolution.' >&2; exit 1; }
+          ! grep -Eq 'LD_LIBRARY_PATH|LD_PRELOAD' "$appimage_root/AppRun" || { echo 'AppRun overrides host library resolution.' >&2; exit 1; }
 
           "$ffmpeg_path" -version
           "$ffprobe_path" -version >/dev/null

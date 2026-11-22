@@ -20,10 +20,6 @@ on:
         description: Commit SHA the release tag must point at
         required: true
         type: string
-      wasm_prebuilt:
-        description: The caller already uploaded the ovrley-wasm-bindings artifact in this run
-        required: true
-        type: boolean
     secrets:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
@@ -34,16 +30,7 @@ permissions:
   contents: write
 
 jobs:
-  wasm:
-    name: WASM bindings
-    if: ${{ !inputs.wasm_prebuilt }}
-    uses: ./.github/workflows/workflow_wasm.yml
-    with:
-      ref: ${{ inputs.release_ref }}
-
   build:
-    needs: wasm
-    if: ${{ !cancelled() && needs.wasm.result != 'failure' }}
     name: Build Windows x86_64
     runs-on: windows-latest
     env:
@@ -117,29 +104,17 @@ jobs:
           key: windows
           workspaces: '. -> target'
 
-      # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
-      - name: Download WASM bindings
-        uses: actions/download-artifact@v7
-        with:
-          name: ovrley-wasm-bindings
-          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          # The Tauri app has no native playback; Phase 9 packages the MDK SDK.
-          OVRLEY_SKIP_MDK_INSTALL: '1'
 
-      - name: Generate shared packaging resources
-        run: pnpm prepare:packaging
+      - name: Install cargo-packager
+        run: pnpm install:packager
 
       - name: Build signed NSIS installer
-        run: pnpm tauri build --bundles nsis
+        run: pnpm build --bundles nsis
         env:
-          VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
-          OVRLEY_WASM_PREBUILT: '1'
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Normalize and validate Windows artifacts
         id: artifacts
@@ -154,7 +129,7 @@ jobs:
           Remove-Item -LiteralPath $outputDirectory, $portableDirectory -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Path $outputDirectory | Out-Null
 
-          $setupCandidates = @(Get-ChildItem 'target' -Filter '*-setup.exe' -File -Recurse | Where-Object { $_.FullName -match '\\bundle\\nsis\\' })
+          $setupCandidates = @(Get-ChildItem 'target\packaging\out' -Filter '*-setup.exe' -File)
           if ($setupCandidates.Count -ne 1) { throw "Expected exactly one NSIS setup executable, found $($setupCandidates.Count)." }
           $setupSource = $setupCandidates[0]
           $signatureSource = Get-Item -LiteralPath "$($setupSource.FullName).sig"
@@ -167,7 +142,8 @@ jobs:
           Copy-Item -LiteralPath $setupSource.FullName -Destination $setupPath
           Copy-Item -LiteralPath $signatureSource.FullName -Destination $signaturePath
 
-          $nativeBinary = Get-Item -LiteralPath 'target\release\app.exe'
+          # The installer installs app.exe, the name every Tauri release installed. The other packages call it OVRLEY.exe.
+          $nativeBinary = Get-Item -LiteralPath 'target\packaging\bin\app.exe'
           if ($nativeBinary.Length -le 0) { throw 'The compiled application executable is missing or empty.' }
           $nativeVersion = $nativeBinary.VersionInfo.ProductVersion
           if ($nativeVersion -notmatch "^$([regex]::Escape($version))(\.0)?$") { throw "Native Windows version $nativeVersion does not match $version." }
@@ -184,11 +160,11 @@ jobs:
           Remove-Item -LiteralPath $extractDirectory -Recurse -Force -ErrorAction SilentlyContinue
           Expand-Archive -LiteralPath $portablePath -DestinationPath $extractDirectory
           $portableRoot = Join-Path $extractDirectory 'OVRLEY'
-          foreach ($requiredPath in @('OVRLEY.exe', '.ovrley-portable', 'fonts', 'templates', 'map-styles', 'vendor\ffmpeg\bin\ffmpeg.exe', 'vendor\ffmpeg\bin\ffprobe.exe', 'THIRD_PARTY_NOTICES.txt')) {
+          foreach ($requiredPath in @('OVRLEY.exe', '.ovrley-portable', 'fonts', 'templates', 'map-styles', 'mdk.dll', 'vendor\ffmpeg\bin\ffmpeg.exe', 'vendor\ffmpeg\bin\ffprobe.exe', 'THIRD_PARTY_NOTICES.txt')) {
             if (-not (Test-Path -LiteralPath (Join-Path $portableRoot $requiredPath))) { throw "Portable ZIP is missing $requiredPath." }
           }
 
-          $markersInInstallerInputs = @(Get-ChildItem 'target\release' -Filter '.ovrley-portable' -File -Recurse -Force -ErrorAction SilentlyContinue)
+          $markersInInstallerInputs = @(Get-ChildItem 'target\packaging' -Filter '.ovrley-portable' -File -Recurse -Force -ErrorAction SilentlyContinue)
           if ($markersInInstallerInputs.Count -ne 0) { throw 'Portable marker leaked into NSIS build inputs.' }
 
           $expected = @($setupName, "$setupName.sig", $portableName)

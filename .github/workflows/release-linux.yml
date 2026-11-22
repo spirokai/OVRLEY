@@ -7,14 +7,7 @@ permissions:
   contents: write
 
 jobs:
-  wasm:
-    name: WASM bindings
-    uses: ./.github/workflows/workflow_wasm.yml
-    with:
-      ref: ''
-
   build:
-    needs: wasm
     name: Build Debian package
     runs-on: ubuntu-latest
     env:
@@ -61,12 +54,18 @@ jobs:
             dpkg-dev \
             fakeroot \
             file \
-            libayatana-appindicator3-dev \
-            libgtk-3-dev \
-            librsvg2-dev \
-            libssl-dev \
-            libwebkit2gtk-4.1-dev \
-            patchelf \
+            libasound2-dev \
+            libdrm2 \
+            libfontconfig1-dev \
+            libfreetype-dev \
+            libfribidi0 \
+            libgbm1 \
+            libgl1 \
+            libharfbuzz0b \
+            liblz4-1 \
+            libpulse0 \
+            libwayland-client0 \
+            libx11-xcb1 \
             pkg-config \
             unzip \
             zip
@@ -91,25 +90,14 @@ jobs:
           key: deb
           workspaces: '. -> target'
 
-      # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
-      - name: Download WASM bindings
-        uses: actions/download-artifact@v7
-        with:
-          name: ovrley-wasm-bindings
-          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          # The Tauri app has no native playback; Phase 9 packages the MDK SDK.
-          OVRLEY_SKIP_MDK_INSTALL: '1'
 
-      - name: Generate shared packaging resources
-        run: pnpm prepare:packaging
+      - name: Install cargo-packager
+        run: pnpm install:packager
 
       - name: Set package version
-        run: |
-          node -e "const fs=require('fs');const version=process.env.RELEASE_VERSION;for (const file of ['package.json','src-tauri/tauri.conf.json']) { const json=JSON.parse(fs.readFileSync(file,'utf8')); json.version=version; fs.writeFileSync(file, JSON.stringify(json, null, 2) + '\n'); }"
+        run: node scripts/release/set-version.mjs "$RELEASE_VERSION"
         env:
           RELEASE_VERSION: ${{ steps.release_tag.outputs.version }}
 
@@ -122,19 +110,14 @@ jobs:
           vendor/ffmpeg/bin/ffmpeg -version
           vendor/ffmpeg/bin/ffprobe -version
 
-      - name: Build Tauri Debian package
-        run: pnpm tauri build --bundles deb
-        env:
-          VITE_OVRLEY_VERSION: ${{ steps.release_tag.outputs.tag }}
-          OVRLEY_WASM_PREBUILT: '1'
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      - name: Build Debian package
+        run: pnpm build --bundles deb
 
       - name: Add no-update marker to Debian package
         shell: bash
         run: |
           set -euo pipefail
-          deb="$(find target/release/bundle/deb -name '*.deb' -print -quit)"
+          deb="$(find target/packaging/out -maxdepth 1 -name '*.deb' -print -quit)"
           [[ -n "$deb" ]] || { echo 'No .deb package was produced.' >&2; exit 1; }
 
           package_root="$RUNNER_TEMP/ovrley-deb-root"
@@ -152,7 +135,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          DEB="$(find target/release/bundle/deb -name '*.deb' -print -quit)"
+          DEB="$(find target/packaging/out -maxdepth 1 -name '*.deb' -print -quit)"
           if [ -z "$DEB" ]; then
             echo "No .deb package was produced." >&2
             exit 1
@@ -160,6 +143,9 @@ jobs:
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffmpeg$'
           dpkg-deb -c "$DEB" | grep -E '/vendor/ffmpeg/bin/ffprobe$'
           dpkg-deb -c "$DEB" | grep -E '/usr/bin/\.ovrley-portable$'
+          dpkg-deb -c "$DEB" | grep -E '/usr/bin/OVRLEY$'
+          dpkg-deb -c "$DEB" | grep -E '/usr/lib/OVRLEY/lib/libmdk\.so\.0$'
+          dpkg-deb -c "$DEB" | grep -E '/usr/share/applications/com\.ovrley\.desktop\.desktop$'
 
       - name: Create Debian release archive
         shell: bash
@@ -169,7 +155,7 @@ jobs:
           set -euo pipefail
           version="$RELEASE_VERSION"
           mkdir -p dist-release
-          deb="$(find target/release/bundle/deb -name '*.deb' -print -quit)"
+          deb="$(find target/packaging/out -maxdepth 1 -name '*.deb' -print -quit)"
           if [ -z "$deb" ]; then
             echo "No .deb package was produced." >&2
             exit 1

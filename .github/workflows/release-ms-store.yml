@@ -74,7 +74,12 @@ jobs:
             --min-version "14.0.30704.0" `
             --publisher "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
             
-          # 4. Rename the manifest to match the expected name for MSIX packaging
+          # 4. An execution alias, so that agents can start `ovrley --mcp`: a Store app cannot be started by its path
+          winapp manifest add-alias `
+            --manifest ".\app-source\OVRLEY\Package.appxmanifest" `
+            --name "ovrley.exe"
+
+          # 5. Rename the manifest to match the expected name for MSIX packaging
           Rename-Item ".\app-source\OVRLEY\Package.appxmanifest" "AppxManifest.xml" -Force
 
       # --- STEP D: Check for .ovrley-portable flag ---

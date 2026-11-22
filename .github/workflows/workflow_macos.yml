@@ -20,10 +20,6 @@ on:
         description: Commit SHA the release tag must point at
         required: true
         type: string
-      wasm_prebuilt:
-        description: The caller already uploaded the ovrley-wasm-bindings artifact in this run
-        required: true
-        type: boolean
     secrets:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
@@ -34,16 +30,7 @@ permissions:
   contents: write
 
 jobs:
-  wasm:
-    name: WASM bindings
-    if: ${{ !inputs.wasm_prebuilt }}
-    uses: ./.github/workflows/workflow_wasm.yml
-    with:
-      ref: ${{ inputs.release_ref }}
-
   build:
-    needs: wasm
-    if: ${{ !cancelled() && needs.wasm.result != 'failure' }}
     name: Build macOS aarch64
     runs-on: macos-15
     env:
@@ -109,7 +96,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Setup Rust
-        run: rustup toolchain install && rustup target add aarch64-apple-darwin
+        run: rustup toolchain install
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -117,30 +104,17 @@ jobs:
           key: macos
           workspaces: '. -> target'
 
-      # After the Cargo cache restore: rust-cache prunes unknown target/ entries on a partial cache hit.
-      - name: Download WASM bindings
-        uses: actions/download-artifact@v7
-        with:
-          name: ovrley-wasm-bindings
-          path: target/wasm-bindings/wasm32-unknown-emscripten/wasm
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        env:
-          # The Tauri app has no native playback; Phase 9 packages the MDK SDK.
-          OVRLEY_SKIP_MDK_INSTALL: '1'
 
-      - name: Generate shared packaging resources
-        run: pnpm prepare:packaging
+      - name: Install cargo-packager
+        run: pnpm install:packager
 
-      - name: Build signed macOS DMG and updater archive
-        run: pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg
+      - name: Build signed macOS app and updater archive
+        run: pnpm build --bundles app
         env:
-          VITE_OVRLEY_VERSION: ${{ steps.release.outputs.tag }}
-          OVRLEY_WASM_PREBUILT: '1'
-          APPLE_SIGNING_IDENTITY: '-'
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       - name: Normalize and validate macOS artifacts
         shell: bash
@@ -152,13 +126,14 @@ jobs:
           rm -rf dist-release
           mkdir -p dist-release
 
-          app_bundle="$(find target -type d -path '*/bundle/macos/OVRLEY.app' -print -quit)"
-          [[ -n "$app_bundle" && -d "$app_bundle" ]] || { echo 'macOS app bundle was not produced.' >&2; exit 1; }
+          app_bundle="target/packaging/out/OVRLEY.app"
+          [[ -d "$app_bundle" ]] || { echo 'macOS app bundle was not produced.' >&2; exit 1; }
           app_binary="$(find "$app_bundle/Contents/MacOS" -type f -perm -111 -print -quit)"
           [[ -n "$app_binary" ]] || { echo 'macOS app executable was not found.' >&2; exit 1; }
           file "$app_binary" | grep -q 'arm64' || { echo 'macOS app executable is not aarch64.' >&2; exit 1; }
 
           for required_path in \
+            "$app_bundle/Contents/Frameworks/mdk.framework/mdk" \
             "$app_bundle/Contents/Resources/fonts" \
             "$app_bundle/Contents/Resources/templates" \
             "$app_bundle/Contents/Resources/map-styles" \
@@ -259,9 +234,9 @@ jobs:
           fi
           hdiutil detach "$dmg_mount" >/dev/null
 
-          updater_source="$(find target -type f -path '*/bundle/macos/*.app.tar.gz' -print -quit)"
+          updater_source="$app_bundle.tar.gz"
           [[ -n "$dmg_source" && -s "$dmg_source" ]] || { echo 'macOS DMG is missing or empty.' >&2; exit 1; }
-          [[ -n "$updater_source" && -s "$updater_source" ]] || { echo 'macOS updater archive is missing or empty.' >&2; exit 1; }
+          [[ -s "$updater_source" ]] || { echo 'macOS updater archive is missing or empty.' >&2; exit 1; }
           [[ -s "$updater_source.sig" ]] || { echo 'macOS updater signature is missing or empty.' >&2; exit 1; }
 
           dmg_name="OVRLEY-macos-$version.dmg"
@@ -271,6 +246,7 @@ jobs:
           cp "$updater_source.sig" "dist-release/$updater_name.sig"
 
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/vendor/ffmpeg/bin/ffmpeg' >/dev/null || { echo 'Updater archive is missing FFmpeg.' >&2; exit 1; }
+          tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Frameworks/mdk.framework/Versions/A/mdk$' >/dev/null || { echo 'Updater archive is missing the player.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/fonts/' >/dev/null || { echo 'Updater archive is missing fonts.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/templates/' >/dev/null || { echo 'Updater archive is missing templates.' >&2; exit 1; }
           tar -tzf "dist-release/$updater_name" | grep 'OVRLEY.app/Contents/Resources/map-styles/' >/dev/null || { echo 'Updater archive is missing map styles.' >&2; exit 1; }

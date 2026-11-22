@@ -90,51 +90,41 @@ jobs:
           release_id="$(jq -r '.id' "$release_file")"
           echo "id=$release_id" >> "$GITHUB_OUTPUT"
 
-  wasm:
-    name: WASM bindings
-    needs: resolve
-    uses: ./.github/workflows/workflow_wasm.yml
-    with:
-      ref: ${{ needs.resolve.outputs.commit }}
-
   windows:
     name: Windows build
-    needs: [resolve, wasm]
+    needs: resolve
     uses: ./.github/workflows/workflow_win.yml
     with:
       release_ref: ${{ needs.resolve.outputs.ref }}
       release_tag: ${{ needs.resolve.outputs.tag }}
       release_version: ${{ needs.resolve.outputs.version }}
       release_commit: ${{ needs.resolve.outputs.commit }}
-      wasm_prebuilt: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   macos:
     name: macOS Apple Silicon build
-    needs: [resolve, wasm]
+    needs: resolve
     uses: ./.github/workflows/workflow_macos.yml
     with:
       release_ref: ${{ needs.resolve.outputs.ref }}
       release_tag: ${{ needs.resolve.outputs.tag }}
       release_version: ${{ needs.resolve.outputs.version }}
       release_commit: ${{ needs.resolve.outputs.commit }}
-      wasm_prebuilt: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   linux:
     name: AppImage build
-    needs: [resolve, wasm]
+    needs: resolve
     uses: ./.github/workflows/workflow_linux.yml
     with:
       release_ref: ${{ needs.resolve.outputs.ref }}
       release_tag: ${{ needs.resolve.outputs.tag }}
       release_version: ${{ needs.resolve.outputs.version }}
       release_commit: ${{ needs.resolve.outputs.commit }}
-      wasm_prebuilt: true
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -336,4 +326,5 @@ jobs:
           base_url="https://github.com/$owner/$repo/releases/download/$RELEASE_TAG"
           jq -e --arg url "$base_url/OVRLEY-win-${RELEASE_VERSION}.exe" '.platforms["windows-x86_64"].url == $url' public-assets/latest.json >/dev/null
           jq -e --arg url "$base_url/OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" '.platforms["darwin-aarch64"].url == $url' public-assets/latest.json >/dev/null
+          jq -e --arg url "$base_url/OVRLEY-macos-${RELEASE_VERSION}.app.tar.gz" '.platforms["macos-aarch64"].url == $url' public-assets/latest.json >/dev/null
           jq -e --arg url "$base_url/OVRLEY-linux-${RELEASE_VERSION}.AppImage" '.platforms["linux-x86_64"].url == $url' public-assets/latest.json >/dev/null
