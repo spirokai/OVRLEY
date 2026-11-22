@@ -66,6 +66,9 @@ tmp/
 # Agent scratch files
 .agents/release-notes.md
 .agents/scratch/
+.agents/skills/rust-best-practices
+.agents/skills/rust-port
+.agents/skills/rust-review
 .claude/skills
 .claude/settings.local.json
 .agents/plans/
