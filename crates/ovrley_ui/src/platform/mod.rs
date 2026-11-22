@@ -204,10 +204,12 @@ pub fn agent_bridge_hooks() -> ovrley_mcp::link::BridgeHooks {
                 Deferred,
             }
             let (sender, receiver) = mpsc::channel::<Message>();
-            let reply_sender = sender.clone();
+            // The dispatch's answer and the reply are separate: a call that fails at once drops the
+            // reply it was given, which answers "cancelled", before the dispatch returns the reason.
+            let (reply_sender, reply_receiver) = mpsc::channel::<ToolOutcome>();
             let reply: catalog::Reply = Box::new(move |outcome| {
                 // The connection may be gone (the agent quit while it waited); nobody reads then.
-                let _ = reply_sender.send(Message::Outcome(outcome));
+                let _ = reply_sender.send(outcome);
             });
             let posted = slint::invoke_from_event_loop(move || {
                 let answer = UI_DISPATCH.with(|slot| {
@@ -229,10 +231,9 @@ pub fn agent_bridge_hooks() -> ovrley_mcp::link::BridgeHooks {
                 Ok(Message::Outcome(outcome)) => outcome,
                 // D15: a call that waits for a worker or the user has no timeout. It ends with the
                 // reply; a reply dropped unanswered answers that the call was cancelled.
-                Ok(Message::Deferred) => match receiver.recv() {
-                    Ok(Message::Outcome(outcome)) => outcome,
-                    Ok(Message::Deferred) | Err(_) => ToolOutcome::Failed(ovrley_app::store::agent::CANCELLED.into()),
-                },
+                Ok(Message::Deferred) => reply_receiver
+                    .recv()
+                    .unwrap_or_else(|_| ToolOutcome::Failed(ovrley_app::store::agent::CANCELLED.into())),
                 Err(_) => ToolOutcome::Failed("OVRLEY did not answer in time. The change may still be applied.".into()),
             }
         }),
