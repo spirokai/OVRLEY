@@ -138,6 +138,20 @@ pub fn backend_parse_srt_activity(
     Ok(response)
 }
 
+/// Parses and finalizes a native MISB ST 0601 KLV transport stream.
+#[cfg(feature = "misb-klv")]
+pub fn backend_parse_misb_activity(
+    paths: &AppPaths,
+    path: &str,
+) -> CoreResult<FinalizeActivityResponse> {
+    let mut response = crate::activity::parsers::misb::parse_misb_activity_path(
+        Path::new(path),
+        Some(&paths.repo_root),
+    )?;
+    response.debug_payload = None;
+    Ok(response)
+}
+
 /// Parses and finalizes a native UDDF dive.
 pub fn backend_parse_uddf_activity(
     paths: &AppPaths,

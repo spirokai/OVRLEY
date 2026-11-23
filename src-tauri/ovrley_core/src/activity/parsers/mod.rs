@@ -18,6 +18,9 @@ pub mod fit;
 pub mod gpx;
 /// Native IGC flight-log extraction.
 pub mod igc;
+/// Native MISB ST 0601 KLV extraction from STANAG 4609 transport streams.
+#[cfg(feature = "misb-klv")]
+pub mod misb;
 /// Native DJI SRT telemetry extraction.
 pub mod srt;
 /// Native Subsurface XML dive extraction.
