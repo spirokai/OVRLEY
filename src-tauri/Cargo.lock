@@ -2706,6 +2706,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "misb"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd6aa07956b8d300d0eefa981458984f6b717646df587bef9dfeb17b537c25ab"
+
+[[package]]
 name = "mp4parse-patched"
 version = "0.17.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3217,6 +3223,7 @@ dependencies = [
  "fitparser",
  "image",
  "log",
+ "misb",
  "objc2",
  "objc2-foundation",
  "open",

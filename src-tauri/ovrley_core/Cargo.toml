@@ -30,6 +30,7 @@ skia-safe = { git = "https://github.com/rust-skia/rust-skia", rev = "b7f043e0b1e
 tzf-rs = { version = "1.3.7", default-features = false, features = ["bundled"] }
 telemetry-parser = { git = "https://github.com/AdrianEddy/telemetry-parser.git", rev = "7743443" }
 fitparser = "0.12"
+misb = { version = "0.4.1", default-features = false, features = ["std"], optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6.3"
@@ -37,6 +38,8 @@ objc2-foundation = { version = "0.3.2", default-features = false, features = ["s
 
 [features]
 canvas-parity = []
+# MISB ST 0601 KLV telemetry overlay source for STANAG 4609 drone video.
+misb-klv = ["dep:misb"]
 
 [dev-dependencies]
 anyhow = "1.0"
