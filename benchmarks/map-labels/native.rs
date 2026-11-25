@@ -3,12 +3,12 @@
 //! `MapTileSizer` measures every tile (which lays labels out and rasterizes their glyphs), then
 //! `GpuMapRenderer` loads each frame's view and renders it with a blocking readback.
 use ovrley_map::gpu::labels::{Face, GlyphId, GlyphService};
-use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer};
+use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapDataSource, MapTileSizer};
 use ovrley_map::mercator::{lon_lat_to_world, world_to_lon_lat};
 use ovrley_map::{
-    frame_tiles, read_style_file, MapCamera, MapDataSource, MapLabelDraw, MapLayers, MapRouteDraw,
-    MapRouteLine, MapRoutePoint, MapRouteStyle, MapStyleBuildings, MapStyleId, MapStyleSpec,
-    MapViewport, TileId, LABEL_PLACEMENTS, TILE_SIZE,
+    frame_tiles, read_style_file, MapCamera, MapLabelDraw, MapLayers, MapRouteDraw, MapRouteLine,
+    MapRoutePoint, MapRouteStyle, MapStyleBuildings, MapStyleId, MapStyleSpec, MapViewport, TileId,
+    LABEL_PLACEMENTS, TILE_SIZE,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -397,25 +397,20 @@ fn run(plan_path: &Path, tiles_dir: &Path, out: &Path) -> Result<(), String> {
             fs::read(&path).map_err(|error| format!("{}: {error}; run --fetch", path.display()))?;
         tiles.insert(TileId::new(*z as u8, *x as i32, *y as i32), bytes);
     }
-    let fonts = root().join("fonts/map");
-    let style = style_bytes()?;
+    let inputs = Inputs {
+        plan: &plan,
+        style: style_bytes()?,
+        tiles,
+        fonts: root().join("fonts/map"),
+        out,
+    };
     let mut results = Vec::new();
     let mut adapter = String::new();
     for case in &plan.cases {
         // Labels off first, then on, for each case.
         for labels in [false, true] {
             eprintln!("[native] {} labels={labels}", case.id);
-            let result = run_case(
-                &plan,
-                case,
-                labels,
-                &style,
-                &tiles,
-                &fonts,
-                &mut adapter,
-                out,
-            )?;
-            results.push(result);
+            results.push(run_case(&inputs, case, labels, &mut adapter)?);
         }
     }
     let output = json!({
@@ -431,16 +426,28 @@ fn run(plan_path: &Path, tiles_dir: &Path, out: &Path) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
+/// What every case of a run replays against.
+struct Inputs<'a> {
+    plan: &'a Plan,
+    style: Vec<u8>,
+    tiles: HashMap<TileId, Vec<u8>>,
+    fonts: PathBuf,
+    out: &'a Path,
+}
+
 fn run_case(
-    plan: &Plan,
+    inputs: &Inputs<'_>,
     case: &Case,
     labels: bool,
-    style: &[u8],
-    tiles: &HashMap<TileId, Vec<u8>>,
-    fonts: &Path,
     adapter: &mut String,
-    out: &Path,
 ) -> Result<serde_json::Value, String> {
+    let Inputs {
+        plan,
+        style,
+        tiles,
+        fonts,
+        out,
+    } = inputs;
     let viewport = MapViewport::new(case.size, case.size, case.pixel_ratio)?;
     let spec = MapStyleSpec {
         style: MapStyleId::new(&plan.style)?,
