@@ -15,7 +15,7 @@ mod derive;
 
 use crate::activity::schema::{NumericSeries, ParsedActivity};
 use crate::error::{CoreError, CoreResult};
-use ovrley_widgets::widgets::lap_timer::sampling::lap_time_at;
+use ovrley_widgets::widgets::lap_timer::lap_time_at;
 
 pub(crate) use derive::derive_lap_timing;
 

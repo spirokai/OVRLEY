@@ -2,46 +2,22 @@
 
 use super::{config, raster, RenderConfig, ValidatedRenderConfig};
 use crate::error::{CoreError, CoreResult};
+use ovrley_widgets::model::catalog::LayoutMode;
 use ovrley_widgets::model::scene::ValidatedScenePresentation;
-use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
-use ovrley_widgets::model::types::{DisplayType, MetricKind};
-use ovrley_widgets::widgets::value::config::ValueConfig;
-use ovrley_widgets::widgets::{
-    backdrop::validation::validate_backdrop,
-    diving_profile::{
-        config::DivingProfileConfig,
-        validation::{validate_diving_profile, ValidatedDivingProfile},
-    },
-    elevation::{
-        config::ElevationPlotConfig,
-        validation::{validate_elevation_plot, ValidatedElevationPlot},
-    },
-    g_force::validation::validate_g_force,
-    gauges::validation::{validate_arc_gauge, validate_corner_gauge, validate_gt_gauge, validate_linear_gauge},
-    gradient::validation::validate_gradient_widget,
-    heading::validation::validate_heading,
-    heading_compass::validation::validate_heading_compass,
-    heart_zones::validation::validate_heart_zones,
-    altitude_tape::validation::validate_altitude_tape,
-    label::validation::validate_label,
-    lap_timer::validation::validate_lap_timer,
-    splits_run::validation::validate_splits_run,
-    lean_angle::validation::validate_lean_angle,
-    map::{
-        config::MapConfig,
-        validation::{validate_map_widget, ValidatedMapWidget},
-    },
-    rolling_chart::{
-        config::RollingChartConfig,
-        validation::{validate_rolling_chart, ValidatedRollingChart},
-    },
-    route::{
-        config::CoursePlotConfig,
-        validation::{validate_route_plot, ValidatedRoutePlot},
-    },
-    time::validation::validate_time_value,
-    value::validation::{validate_value_widget, ValidatedValue},
+use ovrley_widgets::widgets::backdrop::validate_backdrop;
+use ovrley_widgets::widgets::diving_profile::{
+    validate_diving_profile, DivingProfileConfig, ValidatedDivingProfile,
 };
+use ovrley_widgets::widgets::elevation::{
+    validate_elevation_plot, ElevationPlotConfig, ValidatedElevationPlot,
+};
+use ovrley_widgets::widgets::label::validate_label;
+use ovrley_widgets::widgets::map::{validate_map_widget, MapConfig, ValidatedMapWidget};
+use ovrley_widgets::widgets::rolling_chart::{
+    validate_rolling_chart, RollingChartConfig, ValidatedRollingChart,
+};
+use ovrley_widgets::widgets::route::{validate_route_plot, CoursePlotConfig, ValidatedRoutePlot};
+use ovrley_widgets::widgets::value::{ValidatedValue, ValueConfig, ValueFamily};
 
 pub(super) fn validate_render_contents(
     raw: RenderConfig<ValidatedScenePresentation>,
@@ -84,62 +60,16 @@ fn validate_render_value(
     index: usize,
     scene: &ValidatedScenePresentation,
 ) -> CoreResult<ValidatedValue> {
-    if display_type_layout_mode(value.display_type) == DisplayTypeLayoutMode::Boxed {
+    if value.display_type.layout_mode() == LayoutMode::Boxed {
         value = config::promote_value_variant(&value, value.display_type.as_str())?;
     }
-    // These arms select native implementations. Capabilities and data dependencies come from the manifests.
-    match (value.value, value.display_type) {
-        (MetricKind::GForce, DisplayType::GForce) => validate_g_force(value, index)
-            .map(ValidatedValue::GForce)
-            .map_err(Into::into),
-        (MetricKind::Heading, DisplayType::Tape) => {
-            if value.label_font.is_none() {
-                value.label_font = scene.font.clone();
-            }
-            validate_heading(value, index)
-                .map(ValidatedValue::HeadingTape)
-                .map_err(Into::into)
-        }
-        (MetricKind::Heading, DisplayType::HeadingCompass) => validate_heading_compass(value, index)
-            .map(ValidatedValue::HeadingCompass)
-            .map_err(Into::into),
-        (MetricKind::Heartrate, DisplayType::HeartZones) => validate_heart_zones(value, index)
-            .map(ValidatedValue::HeartZones)
-            .map_err(Into::into),
-        (MetricKind::Altitude | MetricKind::Depth, DisplayType::AltitudeTape) => validate_altitude_tape(value, index)
-            .map(ValidatedValue::AltitudeTape)
-            .map_err(Into::into),
-        (MetricKind::LeanAngle, DisplayType::LeanAngle) => validate_lean_angle(value, index)
-            .map(ValidatedValue::LeanAngle)
-            .map_err(Into::into),
-        (MetricKind::Gradient, _) => validate_gradient_widget(value, index)
-            .map(ValidatedValue::Gradient)
-            .map_err(Into::into),
-        (MetricKind::LapTimer, _) => validate_lap_timer(value, index)
-            .map(ValidatedValue::LapTimer)
-            .map_err(Into::into),
-        (MetricKind::SplitsRun, _) => validate_splits_run(value, index)
-            .map(ValidatedValue::SplitsRun)
-            .map_err(Into::into),
-        (MetricKind::Time, DisplayType::Text) => validate_time_value(value, index)
-            .map(ValidatedValue::TimeText)
-            .map_err(Into::into),
-        (_, DisplayType::Linear) => validate_linear_gauge(value, index)
-            .map(ValidatedValue::LinearGauge)
-            .map_err(Into::into),
-        (_, DisplayType::Arc) => validate_arc_gauge(value, index)
-            .map(ValidatedValue::ArcGauge)
-            .map_err(Into::into),
-        (_, DisplayType::Corner) => validate_corner_gauge(value, index)
-            .map(ValidatedValue::ArcGauge)
-            .map_err(Into::into),
-        (_, DisplayType::GtGauge) => validate_gt_gauge(value, index)
-            .map(ValidatedValue::ArcGauge)
-            .map_err(Into::into),
-        _ => validate_value_widget(value, index)
-            .map(ValidatedValue::StandardText)
-            .map_err(Into::into),
+    // Templates saved before heading tapes had their own label font use the scene's.
+    if ValueFamily::of(value.value, value.display_type) == ValueFamily::HeadingTape
+        && value.label_font.is_none()
+    {
+        value.label_font = scene.font.clone();
     }
+    Ok(ValidatedValue::validate(value, index)?)
 }
 
 pub fn validate_route_plots(plots: &serde_json::Value) -> CoreResult<Vec<ValidatedRoutePlot>> {

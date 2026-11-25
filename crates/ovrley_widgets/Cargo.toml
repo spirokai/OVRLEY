@@ -22,7 +22,7 @@ schemars = { version = "1", optional = true }
 chrono = { version = "0.4", default-features = false, features = ["std"] }
 chrono-tz = "0.10"
 serde = { version = "1", features = ["derive"] }
-# The compiled catalog keeps the manifests' key order, as JavaScript does.
+# The compiled catalog keeps the manifests' key order, which key lists follow.
 serde_json = { version = "1", features = ["preserve_order"] }
 thiserror = "2"
 unicode-segmentation = "=1.12.0"

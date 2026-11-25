@@ -6,9 +6,9 @@
 
 use crate::common;
 
-use ovrley_widgets::widgets::value::validation::ValidatedValue;
-use ovrley_widgets::model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode};
-use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
+use ovrley_widgets::widgets::value::ValidatedValue;
+use ovrley_widgets::model::catalog::LayoutMode;
+use ovrley_widgets::model::catalog::{DisplayType, TrackFillStyle};
 use serde_json::json;
 
 #[test]
@@ -19,7 +19,7 @@ fn recognized_display_type_strings_parse_to_expected_variants() {
         (r#""arc""#, DisplayType::Arc),
         (r#""corner""#, DisplayType::Corner),
         (r#""gt_gauge""#, DisplayType::GtGauge),
-        (r#""heading_tape""#, DisplayType::Tape),
+        (r#""heading_tape""#, DisplayType::HeadingTape),
         (r#""heading_compass""#, DisplayType::HeadingCompass),
         (r#""heart_zones""#, DisplayType::HeartZones),
         (r#""altitude_tape""#, DisplayType::AltitudeTape),
@@ -62,7 +62,7 @@ fn display_type_round_trips_each_variant() {
         (DisplayType::Arc, r#""arc""#),
         (DisplayType::Corner, r#""corner""#),
         (DisplayType::GtGauge, r#""gt_gauge""#),
-        (DisplayType::Tape, r#""heading_tape""#),
+        (DisplayType::HeadingTape, r#""heading_tape""#),
         (DisplayType::HeadingCompass, r#""heading_compass""#),
         (DisplayType::HeartZones, r#""heart_zones""#),
         (DisplayType::AltitudeTape, r#""altitude_tape""#),
@@ -186,7 +186,9 @@ fn complete_linear_display_type_validates_as_gauge() {
         "plots": []
     }));
 
-    let ValidatedValue::LinearGauge(value) = config.values.into_iter().next().unwrap() else {
+    let ValidatedValue::Gauge(ovrley_widgets::widgets::gauges::ValidatedGauge::Linear(value)) =
+        config.values.into_iter().next().unwrap()
+    else {
         panic!("linear display type should validate as a linear gauge prepared value");
     };
     assert_eq!(value.display_type, DisplayType::Linear);
@@ -243,51 +245,51 @@ fn complete_g_force_display_type_validates_with_canonical_marker_and_label_field
 #[test]
 fn display_type_is_intrinsic_only_for_text() {
     assert_eq!(
-        display_type_layout_mode(DisplayType::Text),
-        DisplayTypeLayoutMode::Intrinsic
+        DisplayType::Text.layout_mode(),
+        LayoutMode::Intrinsic
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::Linear),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::Linear.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::Arc),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::Arc.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::Corner),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::Corner.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::GtGauge),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::GtGauge.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::Tape),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::HeadingTape.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::HeadingCompass),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::HeadingCompass.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::HeartZones),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::HeartZones.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::AltitudeTape),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::AltitudeTape.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::LeanAngle),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::LeanAngle.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::GForce),
-        DisplayTypeLayoutMode::Boxed
+        DisplayType::GForce.layout_mode(),
+        LayoutMode::Boxed
     );
     assert_eq!(
-        display_type_layout_mode(DisplayType::SplitsRun),
-        DisplayTypeLayoutMode::Intrinsic
+        DisplayType::SplitsRun.layout_mode(),
+        LayoutMode::Intrinsic
     );
 }

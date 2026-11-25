@@ -2,7 +2,7 @@ use crate::common;
 
 use ovrley_core::commands::validate_config_value;
 use ovrley_core::normalize::parse_config_value;
-use ovrley_widgets::model::types::BackdropType;
+use ovrley_widgets::model::catalog::BackdropType;
 use serde_json::json;
 
 #[test]
@@ -378,8 +378,8 @@ fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
         let mut preview = PreviewSession::default(); // No font or activity resources.
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: serde_json::Value = serde_json::from_slice(widget.geometry()).unwrap();
-        let pixels = widget.pixels().clone();
+        let geometry: serde_json::Value = serde_json::to_value(widget.geometry()).unwrap();
+        let pixels = widget.pixels().to_vec();
         let revision = widget.revision();
         let pixel_storage = widget.pixels().as_ptr();
         let mut config = validate_config_value(&json!({"scene": scene, "backdrops": [backdrop], "labels": [], "values": [], "plots": []})).unwrap();
@@ -428,7 +428,7 @@ fn wasm_backdrop_resize_keeps_opposite_corners_and_fractional_dimensions() {
         let origin = json!({"type": "backdrop", "widget": backdrop, "scene": scene});
         let mut preview = PreviewSession::default();
         let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
-        let geometry: serde_json::Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: serde_json::Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
             let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
@@ -444,7 +444,7 @@ fn wasm_backdrop_resize_keeps_opposite_corners_and_fractional_dimensions() {
             let display_type = backdrop["display_type"].as_str().unwrap();
             committed["widget"]["display_variants"][display_type].as_object_mut().unwrap().extend(patch["display_variants"][display_type].as_object().unwrap().clone());
             preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
-            let resized: serde_json::Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let resized: serde_json::Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let actual = &resized["content"];
             assert_eq!(actual["width"], json!(37.875));
             assert_eq!(actual["height"], json!(if display_type == "circle" { 37.875 } else { 28.125 }));

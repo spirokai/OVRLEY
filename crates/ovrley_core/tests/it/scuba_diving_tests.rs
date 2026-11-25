@@ -5,13 +5,9 @@ use ovrley_core::activity::{
     csv::parse_csv_activity_reader, interpolate::densify_activity, schema::ParsedActivity,
     trim::trim_activity,
 };
-use ovrley_widgets::{
-    activity::ActivitySampler,
-    widgets::value::{
-        format::{format_metric_parts, format_number, MetricSample},
-        validation::{validate_value_widget, ValidatedValueWidget},
-    },
-};
+use ovrley_widgets::activity::ActivitySampler;
+use ovrley_widgets::widgets::value::format::{format_metric_parts, format_number, MetricSample};
+use ovrley_widgets::widgets::value::{validate_value_widget, ValidatedValueWidget};
 use serde_json::{json, Value};
 
 const TYPES: [&str; 7] = [
@@ -346,7 +342,7 @@ fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixe
         for index in [0, 1, 2, 3, 4, 1, 0] {
             preview.render(seconds[index]).unwrap();
             let rendered = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(rendered.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(rendered.geometry()).unwrap();
             let (width, height, left, top) = (
                 geometry["width"].as_u64().unwrap() as usize,
                 geometry["height"].as_u64().unwrap() as usize,

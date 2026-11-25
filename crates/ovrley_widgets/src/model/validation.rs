@@ -1,126 +1,111 @@
-//! Shared validation helpers used by all normalize submodules.
+//! Field validation shared by every widget's ingress.
 //!
-//! Every `require_*` function rejects `None` or out-of-range values with a
-//! descriptive error. The `rgba_from_hex` function converts a hex color string
-//! + opacity into a premultiplied `[u8; 4]` RGBA array.
+//! Each `require_*` function rejects an absent (`None`) or out-of-range value with an error naming
+//! the field, and returns the value it accepted.
 
-use crate::error::{WidgetError, WidgetResult};
+use crate::{WidgetError, WidgetResult};
 
-// ---------------------------------------------------------------------------
-// Option unwrappers — reject None
-// ---------------------------------------------------------------------------
-
-pub fn require_f32(v: Option<f32>, field: &str) -> WidgetResult<f32> {
-    v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))
-        .and_then(|v| {
-            if !v.is_finite() {
-                Err(WidgetError::Config(format!("{field}: must be finite")))
-            } else {
-                Ok(v)
-            }
-        })
+fn present<T>(value: Option<T>, field: &str) -> WidgetResult<T> {
+    value.ok_or_else(|| WidgetError::Config(format!("{field}: required")))
 }
 
-pub fn require_finite_f64(v: f64, field: &str) -> WidgetResult<f64> {
-    if !v.is_finite() {
-        Err(WidgetError::Config(format!(
-            "{field}: must be a finite number"
-        )))
-    } else {
-        Ok(v)
+pub fn require_f32(value: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let value = present(value, field)?;
+    if !value.is_finite() {
+        return Err(WidgetError::Config(format!("{field}: must be finite")));
     }
+    Ok(value)
 }
 
-pub fn require_bool(v: Option<bool>, field: &str) -> WidgetResult<bool> {
-    v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))
-}
-
-pub fn require_string(v: Option<String>, field: &str) -> WidgetResult<String> {
-    v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))
-}
-
-pub fn require_str<'a>(v: Option<&'a str>, field: &str) -> WidgetResult<&'a str> {
-    v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))
-}
-
-pub fn require_u32(v: Option<u32>, field: &str) -> WidgetResult<u32> {
-    match v {
-        Some(n) => Ok(n),
-        None => Err(WidgetError::Config(format!("{field}: required"))),
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Value range checkers
-// ---------------------------------------------------------------------------
-
-pub fn require_positive_f64(v: f64, field: &str) -> WidgetResult<f64> {
-    if v <= 0.0 || !v.is_finite() {
-        Err(WidgetError::Config(format!(
-            "{field}: must be a positive finite number"
-        )))
-    } else {
-        Ok(v)
-    }
-}
-
-pub fn require_positive_f32(v: Option<f32>, field: &str) -> WidgetResult<f32> {
-    let v = v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))?;
-    if v <= 0.0 || !v.is_finite() {
-        Err(WidgetError::Config(format!(
-            "{field}: must be a positive finite number"
-        )))
-    } else {
-        Ok(v)
-    }
-}
-
-pub fn require_positive_u32(v: Option<u32>, field: &str) -> WidgetResult<u32> {
-    match v {
-        Some(n) if n > 0 => Ok(n),
-        Some(n) => Err(WidgetError::Config(format!(
-            "{field}: must be > 0, got {n}"
-        ))),
-        None => Err(WidgetError::Config(format!("{field}: required"))),
-    }
-}
-
-/// Integer-framed presentations retain their contract when raw metric dimensions are fractional.
-pub fn require_integer_frame_dimension(v: Option<f32>, field: &str) -> WidgetResult<u32> {
-    let v = require_positive_f32(v, field)?;
-    if v.fract() != 0.0 || f64::from(v) > f64::from(u32::MAX) {
+pub fn require_finite_f64(value: f64, field: &str) -> WidgetResult<f64> {
+    if !value.is_finite() {
         return Err(WidgetError::Config(format!(
-            "{field}: must be a positive u32 integer"
+            "{field}: must be a finite number"
         )));
     }
-    Ok(v as u32)
+    Ok(value)
 }
 
-pub fn require_non_negative_f32(v: f32, field: &str) -> WidgetResult<f32> {
-    if v < 0.0 || !v.is_finite() {
-        Err(WidgetError::Config(format!("{field}: must be >= 0")))
-    } else {
-        Ok(v)
+pub fn require_bool(value: Option<bool>, field: &str) -> WidgetResult<bool> {
+    present(value, field)
+}
+
+pub fn require_string(value: Option<String>, field: &str) -> WidgetResult<String> {
+    present(value, field)
+}
+
+pub fn require_str<'a>(value: Option<&'a str>, field: &str) -> WidgetResult<&'a str> {
+    present(value, field)
+}
+
+pub fn require_u32(value: Option<u32>, field: &str) -> WidgetResult<u32> {
+    present(value, field)
+}
+
+pub fn require_positive_f64(value: f64, field: &str) -> WidgetResult<f64> {
+    if value <= 0.0 || !value.is_finite() {
+        return Err(WidgetError::Config(format!(
+            "{field}: must be a positive finite number"
+        )));
+    }
+    Ok(value)
+}
+
+pub fn require_positive_f32(value: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let value = present(value, field)?;
+    if value <= 0.0 || !value.is_finite() {
+        return Err(WidgetError::Config(format!(
+            "{field}: must be a positive finite number"
+        )));
+    }
+    Ok(value)
+}
+
+pub fn require_positive_u32(value: Option<u32>, field: &str) -> WidgetResult<u32> {
+    match present(value, field)? {
+        0 => Err(WidgetError::Config(format!("{field}: must be > 0, got 0"))),
+        value => Ok(value),
     }
 }
 
-pub fn require_percentage(v: f32, field: &str) -> WidgetResult<f32> {
-    if !(0.0..=100.0).contains(&v) || !v.is_finite() {
-        Err(WidgetError::Config(format!("{field}: must be 0.0–100.0")))
-    } else {
-        Ok(v)
+pub fn require_non_negative_f32(value: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let value = require_f32(value, field)?;
+    if value < 0.0 {
+        return Err(WidgetError::Config(format!("{field}: must be >= 0")));
     }
+    Ok(value)
 }
 
-/// Requires a strict 0.0..=1.0 opacity value.
-pub fn require_unit_opacity(v: Option<f32>, field: &str) -> WidgetResult<f32> {
-    let opacity = require_f32(v, field)?;
+pub fn require_percentage(value: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let value = require_f32(value, field)?;
+    if !(0.0..=100.0).contains(&value) {
+        return Err(WidgetError::Config(format!("{field}: must be 0.0–100.0")));
+    }
+    Ok(value)
+}
+
+/// An opacity in `0.0..=1.0`.
+pub fn require_unit_opacity(value: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let opacity = require_f32(value, field)?;
     if !(0.0..=1.0).contains(&opacity) {
         return Err(WidgetError::Config(format!(
             "{field}: must be 0.0..=1.0, got {opacity}"
         )));
     }
     Ok(opacity)
+}
+
+/// An opacity in `0.0..=1.0`, or a percentage above 1, normalized to `0.0..=1.0`. Plot templates
+/// store either.
+pub fn require_opacity(value: Option<f32>, field: &str) -> WidgetResult<f32> {
+    let value = require_f32(value, field)?;
+    let normalized = if value > 1.0 { value / 100.0 } else { value };
+    if !(0.0..=1.0).contains(&normalized) {
+        return Err(WidgetError::Config(format!(
+            "{field}: must be between 0.0 and 1.0 (or 0-100)"
+        )));
+    }
+    Ok(normalized)
 }
 
 pub fn require_border_fits_dimension(
@@ -136,29 +121,9 @@ pub fn require_border_fits_dimension(
     Ok(())
 }
 
-/// Accepts 0.0..=1.0 or 0..=100 (percentage), normalizes to 0.0..=1.0.
-pub fn require_opacity(v: Option<f32>, field: &str) -> WidgetResult<f32> {
-    let v = v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))?;
-    if !v.is_finite() {
-        return Err(WidgetError::Config(format!("{field}: must be finite")));
-    }
-    let normalized = if v > 1.0 { v / 100.0 } else { v };
-    if !(0.0..=1.0).contains(&normalized) {
-        return Err(WidgetError::Config(format!(
-            "{field}: must be between 0.0 and 1.0 (or 0-100)"
-        )));
-    }
-    Ok(normalized)
-}
-
-// ---------------------------------------------------------------------------
-// Hex color
-// ---------------------------------------------------------------------------
-
-/// Validates a hex color string (`#rrggbb` or `#rrggbbaa`) and returns it.
-pub fn require_hex_color(v: Option<&str>, field: &str) -> WidgetResult<String> {
-    let s = v.ok_or_else(|| WidgetError::Config(format!("{field}: required")))?;
-    let trimmed = s.trim();
+/// A `#rrggbb` or `#rrggbbaa` colour, trimmed.
+pub fn require_hex_color(value: Option<&str>, field: &str) -> WidgetResult<String> {
+    let trimmed = present(value, field)?.trim();
     if trimmed.is_empty() {
         return Err(WidgetError::Config(format!("{field}: required")));
     }
@@ -173,27 +138,64 @@ pub fn require_hex_color(v: Option<&str>, field: &str) -> WidgetResult<String> {
     Ok(trimmed.to_string())
 }
 
-/// Converts a hex color string + opacity into a premultiplied `[u8; 4]` RGBA array.
+/// A required hex colour as straight RGBA, its alpha scaled by `opacity`.
+pub fn require_rgba(value: Option<&str>, field: &str, opacity: f32) -> WidgetResult<[u8; 4]> {
+    rgba_from_hex(require_str(value, field)?, field, opacity)
+}
+
+/// A 6- or 8-digit hex colour, with or without `#`, as straight RGBA whose alpha is scaled by
+/// `opacity`.
 pub fn rgba_from_hex(hex: &str, field: &str, opacity: f32) -> WidgetResult<[u8; 4]> {
-    let trimmed = hex.trim().trim_start_matches('#');
-    if (trimmed.len() != 6 && trimmed.len() != 8) || !trimmed.bytes().all(|b| b.is_ascii_hexdigit())
-    {
+    let digits = hex.trim().trim_start_matches('#');
+    if (digits.len() != 6 && digits.len() != 8) || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err(WidgetError::Config(format!(
             "{field}: expected 6-digit or 8-digit hex, got '{hex}'"
         )));
     }
-    let r = u8::from_str_radix(&trimmed[0..2], 16)
-        .map_err(|_| WidgetError::Config(format!("{field}: invalid hex color '{hex}'")))?;
-    let g = u8::from_str_radix(&trimmed[2..4], 16)
-        .map_err(|_| WidgetError::Config(format!("{field}: invalid hex color '{hex}'")))?;
-    let b = u8::from_str_radix(&trimmed[4..6], 16)
-        .map_err(|_| WidgetError::Config(format!("{field}: invalid hex color '{hex}'")))?;
-    let source_alpha = if trimmed.len() == 8 {
-        u8::from_str_radix(&trimmed[6..8], 16)
-            .map_err(|_| WidgetError::Config(format!("{field}: invalid hex color '{hex}'")))?
-    } else {
-        255
+    let channel = |index: usize| {
+        u8::from_str_radix(&digits[index..index + 2], 16)
+            .expect("validated hex digits parse as a byte")
     };
-    let a = ((source_alpha as f32) * opacity.clamp(0.0, 1.0)).round() as u8;
-    Ok([r, g, b, a])
+    let source_alpha = if digits.len() == 8 { channel(6) } else { 255 };
+    let alpha = (f32::from(source_alpha) * opacity.clamp(0.0, 1.0)).round() as u8;
+    Ok([channel(0), channel(2), channel(4), alpha])
+}
+
+/// Decimal places, configured directly or as the scene's rounding.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Precision {
+    Decimals(usize),
+    /// Negative rounding shows no decimals.
+    Rounding(i32),
+}
+
+impl Precision {
+    pub fn decimals(self) -> usize {
+        match self {
+            Self::Decimals(decimals) => decimals,
+            Self::Rounding(rounding) => usize::try_from(rounding).unwrap_or(0),
+        }
+    }
+}
+
+/// Exactly one of `decimals` and `decimal_rounding`; `path` names a field.
+pub fn require_precision(
+    decimals: Option<usize>,
+    decimal_rounding: Option<i32>,
+    path: impl Fn(&str) -> String,
+) -> WidgetResult<Precision> {
+    match (decimals, decimal_rounding) {
+        (Some(decimals), None) => Ok(Precision::Decimals(decimals)),
+        (None, Some(rounding)) => Ok(Precision::Rounding(rounding)),
+        (Some(_), Some(_)) => Err(WidgetError::Config(format!(
+            "{} and {}: provide exactly one precision field",
+            path("decimals"),
+            path("decimal_rounding")
+        ))),
+        (None, None) => Err(WidgetError::Config(format!(
+            "{} or {}: one precision field must be explicit",
+            path("decimals"),
+            path("decimal_rounding")
+        ))),
+    }
 }

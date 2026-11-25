@@ -9,7 +9,7 @@
 //!   family's capabilities and apply only if the document is still the same.
 
 use ovrley_core::normalize::template::template_manifest;
-use ovrley_widgets::model::document::{is_color_field_key, js_round, normalize_hex_color, number};
+use ovrley_widgets::model::document::{is_color_field_key, round_half_up, normalize_hex_color, number};
 use serde_json::{Map, Value};
 use crate::features::widgets::{font_options, request_font_capabilities};
 use crate::features::widgets::blocks::{flatten, full, grid, grid_gap, scene_heading, stack, when, Block, Cell, CellKind, Node, OptionView, Rule, SwitchRowStyle};
@@ -256,7 +256,7 @@ fn overlay_section(store: &Store, locale: Locale) -> Node {
                 text: translations().t_with(
                     locale,
                     "scene-settings.lockedToFps",
-                    &[("fps", &js_round(video_fps).to_string())],
+                    &[("fps", &round_half_up(video_fps).to_string())],
                 ),
             },
         )
@@ -514,7 +514,7 @@ fn global_section(store: &Store, locale: Locale) -> Node {
                             t(locale, "scene-settings.transparency", "Transparency"),
                             opacity,
                             range("opacity"),
-                            js_round(opacity * 100.0).to_string(),
+                            round_half_up(opacity * 100.0).to_string(),
                             "%",
                         );
                         if let CellKind::Slider { scale, .. } = &mut cell.kind {

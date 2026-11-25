@@ -1,19 +1,10 @@
-//! The activity's GPS track for one window as a smooth line in Mercator, with travelled distance.
-//! Built once, so every frame is a pure function of the activity second. The route, marker and
-//! camera all read this one line, so the marker stays on the stroke.
-//!
-//! The route line is the track's smoothed line, reduced once at the widget's constant view zoom.
-//! Reduction only drops vertices, so the smoothing comes from [`MapTrack`]. A chase camera's renderer
-//! draws it under the buildings. A top-down widget strokes it over the frame in Skia, projected once.
-use crate::{
-    error::{WidgetError, WidgetResult},
-    rdp::simplify_rdp_indices_f64,
-    widgets::route::{geometry::ProgressLine, sampling::TrackSample},
-};
-use ovrley_map::{
-    mercator::lon_lat_to_world, MapCamera, MapRouteLine, MapRoutePoint, MapViewport, ViewState,
-    TILE_SIZE,
-};
+//! The map's GPS track: smoothed positions, bearings and the route line the renderer draws.
+use crate::series::simplify_rdp_indices_f64;
+use crate::widgets::route::geometry::ProgressLine;
+use crate::widgets::route::TrackSample;
+use crate::{WidgetError, WidgetResult};
+use ovrley_map::mercator::lon_lat_to_world;
+use ovrley_map::{MapCamera, MapRouteLine, MapRoutePoint, MapViewport, ViewState, TILE_SIZE};
 
 const EARTH_RADIUS_METERS: f64 = 6_371_000.0;
 /// GPS wanders while stationary. Movement under this doesn't shape the line, and can only carry the
@@ -246,7 +237,7 @@ fn world_bearing(start: (f64, f64), end: (f64, f64)) -> f64 {
     (end.0 - start.0).atan2(start.1 - end.1).to_degrees()
 }
 
-/// Haversine, as `coordinateDistanceMeters` in `mapPreviewGeometry.js`.
+/// Great-circle distance by the haversine formula.
 fn distance_meters(a: (f64, f64), b: (f64, f64)) -> f64 {
     let (a_lat, b_lat) = (a.1.to_radians(), b.1.to_radians());
     let half_lat = (b_lat - a_lat) / 2.0;

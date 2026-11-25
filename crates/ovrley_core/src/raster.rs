@@ -1,9 +1,6 @@
 //! Validates a selected bitmap once and prepares its oriented editor preview.
-use ovrley_widgets::{
-    error::{WidgetError, WidgetResult},
-    render::image::{ImageSource, RasterImage},
-    widgets::raster::error::RasterError,
-};
+use ovrley_widgets::{WidgetError, WidgetResult};
+use ovrley_widgets::widgets::raster::{ImageSource, RasterImage, RasterError};
 
 use image::{metadata::Orientation, ImageDecoder, ImageFormat, ImageReader};
 use std::fs::File;

@@ -3,10 +3,10 @@
 //! named rules are the edits that patch more than their own field, each beside the renderer's own
 //! geometry where it has one.
 
-use ovrley_widgets::model::document::{build_display_mode_update, build_display_type_change_update, build_frame_geometry_update, build_metric_unit_update, build_uniform_resize_update, js_round, number, UnitSystem};
-use ovrley_widgets::model::standard_metrics::heart_zone_model;
-use ovrley_widgets::widgets::gauges::bar_geometry;
-use ovrley_widgets::widgets::heart_zones::zones::lthr_from_max_heartrate;
+use ovrley_widgets::model::document::{build_display_mode_update, build_display_type_change_update, build_frame_geometry_update, build_metric_unit_update, build_uniform_resize_update, round_half_up, number, UnitSystem};
+use ovrley_widgets::model::catalog::heart_zone_model;
+use ovrley_widgets::widgets::gauges::track;
+use ovrley_widgets::widgets::heart_zones::lthr_from_max_heartrate;
 use serde_json::{Map, Value};
 use crate::features::widgets::blocks::{Cell, CellKind, Rule};
 
@@ -585,12 +585,12 @@ fn field(map: &Map<String, Value>, key: &str) -> f64 {
     map.get(key).and_then(Value::as_f64).unwrap_or_default()
 }
 
-fn bars(map: &Map<String, Value>, span: f32) -> Result<Option<bar_geometry::ResolvedBarGeometry>, String> {
+fn bars(map: &Map<String, Value>, span: f32) -> Result<Option<track::ResolvedBarGeometry>, String> {
     if map.get("track_fill_style").and_then(Value::as_str) != Some("bars") {
         return Ok(None);
     }
     let count = field(map, "bar_count") as u32;
-    bar_geometry::resolve_bar_geometry(span, count, field(map, "bar_gap") as f32, "bars").map(Some).map_err(|error| error.to_string())
+    track::resolve_bar_geometry(span, count, field(map, "bar_gap") as f32, "bars").map(Some).map_err(|error| error.to_string())
 }
 
 fn linear_span(map: &Map<String, Value>) -> (f32, f32) {
@@ -604,7 +604,7 @@ fn linear_span(map: &Map<String, Value>) -> (f32, f32) {
 
 /// The track's radius and sweep.
 fn arc_dimensions(map: &Map<String, Value>, display: &str) -> (f32, f32) {
-    bar_geometry::arc_track_dimensions(
+    track::arc_track_dimensions(
         field(map, "width").min(field(map, "height")) as f32,
         field(map, "track_thickness") as f32,
         field(map, "track_corner_radius") as f32,
@@ -619,12 +619,12 @@ pub fn corner_radius_max(track: &Track, map: &Map<String, Value>) -> Result<f64,
     Ok(f64::from(match track {
         Track::Linear => {
             let (span, cross) = linear_span(map);
-            bar_geometry::track_corner_radius_max(cross, span, bars(map, span)?.as_ref())
+            track::track_corner_radius_max(cross, span, bars(map, span)?.as_ref())
         }
         Track::Arc(display) => {
             let (radius, sweep) = arc_dimensions(map, display);
             let thickness = field(map, "track_thickness") as f32;
-            bar_geometry::track_corner_radius_max(thickness, thickness, bars(map, bar_geometry::arc_span(radius, sweep))?.as_ref())
+            track::track_corner_radius_max(thickness, thickness, bars(map, track::arc_span(radius, sweep))?.as_ref())
         }
     }))
 }
@@ -635,10 +635,10 @@ pub fn bar_gap_max(track: &Track, map: &Map<String, Value>) -> Result<f64, Strin
         Track::Linear => linear_span(map).0,
         Track::Arc(display) => {
             let (radius, sweep) = arc_dimensions(map, display);
-            bar_geometry::arc_span(radius, sweep)
+            track::arc_span(radius, sweep)
         }
     };
-    bar_geometry::bar_gap_max(span, field(map, "bar_count") as u32).map(f64::from).map_err(|error| error.to_string())
+    track::bar_gap_max(span, field(map, "bar_count") as u32).map(f64::from).map_err(|error| error.to_string())
 }
 
 /// Switching to bars suggests a bar count and gap, and keeps the corner
@@ -652,11 +652,11 @@ fn fill_style_update(track: &Track, map: &Map<String, Value>, style: &str) -> Re
     let suggestion = match track {
         Track::Linear => {
             let (span, cross) = linear_span(map);
-            bar_geometry::suggested_bar_geometry(span, cross, bar_geometry::SUGGESTED_LINEAR_BAR_COUNT)
+            track::suggested_bar_geometry(span, cross, track::SUGGESTED_LINEAR_BAR_COUNT)
         }
         Track::Arc(display) => {
             let (radius, sweep) = arc_dimensions(map, display);
-            bar_geometry::suggested_arc_bar_geometry(radius, sweep, field(map, "track_thickness") as f32, display == "corner")
+            track::suggested_arc_bar_geometry(radius, sweep, field(map, "track_thickness") as f32, display == "corner")
         }
     }
     .map_err(|error| error.to_string())?;
@@ -683,7 +683,7 @@ pub fn derive_lthr_zones(lthr: f64) -> Vec<Value> {
     let mut boundaries: Vec<f64> = Vec::new();
     for share in heart_zone_model().lthr_boundaries {
         let previous = boundaries.last().copied().unwrap_or(-1.0);
-        boundaries.push(js_round(lthr * f64::from(share)).max(previous + 1.0));
+        boundaries.push(round_half_up(lthr * f64::from(share)).max(previous + 1.0));
     }
     boundaries.windows(2).map(|pair| serde_json::json!({"from": number(pair[0]), "to": number(pair[1])})).collect()
 }
@@ -776,7 +776,7 @@ pub fn chart_limits() -> &'static ovrley_widgets::model::catalog::ChartLimits {
 }
 
 fn chart_palette() -> Vec<String> {
-    chart_definition().series_palette.as_ref().and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_str).map(str::to_string).collect()
+    chart_definition().series_palette.clone()
 }
 
 fn chart_series(data: &Map<String, Value>) -> Vec<Value> {

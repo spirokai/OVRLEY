@@ -1,29 +1,19 @@
 //! Original-density metric sampling. Columns and bridge/hold indices are prepared once.
+use crate::model::catalog::MetricKind;
+use crate::model::telemetry::{
+    metric_interpolation, numeric_metrics, ActivitySeries, InterpolationKind, NumericActivity,
+};
+use crate::series::{
+    collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
+    interpolate_points, MissingSamplePolicy,
+};
 use crate::widgets::g_force::{
-    format::{percentile_max_g, sorted_magnitudes, GForceSample},
-    validation::ValidatedGForceWidget,
+    percentile_max_g, sorted_magnitudes, GForceSample, ValidatedGForceWidget,
 };
-use crate::{
-    error::{WidgetError, WidgetResult},
-    interpolation::{
-        collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
-        interpolate_points, MissingSamplePolicy,
-    },
-    model::{
-        telemetry::{
-            metric_interpolation, numeric_metrics, ActivitySeries, InterpolationKind,
-            NumericActivity,
-        },
-        types::MetricKind,
-    },
-    widgets::{
-        splits_run::table::{SplitLength, SplitTable},
-        value::{
-            format::{resolve_metric_display_value, MetricSample},
-            validation::ValidatedValueWidget,
-        },
-    },
-};
+use crate::widgets::splits_run::{SplitLength, SplitTable};
+use crate::widgets::value::format::{resolve_metric_display_value, MetricSample};
+use crate::widgets::value::ValidatedValueWidget;
+use crate::{WidgetError, WidgetResult};
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -43,7 +33,7 @@ macro_rules! activity_columns {
             #[serde(default)] course: Vec<(Option<f64>, Option<f64>)>,
             #[serde(default)] sample_course_points: Vec<(Option<f64>, Option<f64>)>,
             #[serde(default)] sample_distance_progress: Vec<f64>,
-            #[serde(flatten)] lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
+            #[serde(flatten)] lap_timing: crate::widgets::lap_timer::LapTiming,
         }
         impl NumericActivity for PreviewActivity {
             fn numeric_series(&self, series: ActivitySeries) -> &[Option<f64>] {
@@ -117,10 +107,10 @@ impl NumericColumn {
 }
 
 pub struct ActivitySampler {
-    pub(crate) diving: crate::widgets::diving_profile::sampling::DivingActivity,
-    pub(crate) elevation: crate::widgets::elevation::sampling::ElevationActivity,
-    pub(crate) route: crate::widgets::route::sampling::RouteActivity,
-    pub(crate) time: crate::widgets::time::sampling::TimeSampler,
+    pub(crate) diving: crate::widgets::diving_profile::DivingActivity,
+    pub(crate) elevation: crate::widgets::elevation::ElevationActivity,
+    pub(crate) route: crate::widgets::route::RouteActivity,
+    pub(crate) time: crate::widgets::time::TimeSampler,
     pub(crate) timezone: Option<chrono_tz::Tz>,
     times: Vec<f64>,
     end: f64,
@@ -135,7 +125,7 @@ pub struct ActivitySampler {
     g_force_magnitudes: [Vec<f64>; 3],
     full_activity_distance: Option<f64>,
     full_activity_total_ascent: Option<f64>,
-    lap_timing: crate::widgets::lap_timer::sampling::LapTiming,
+    lap_timing: crate::widgets::lap_timer::LapTiming,
     /// Split tables the host derived from this activity, one per configured split length.
     split_tables: Vec<SplitTable>,
 }
@@ -176,15 +166,15 @@ impl ActivitySampler {
             }
         }
         activity.lap_timing.validate(times)?;
-        let profile = crate::widgets::elevation::sampling::elevation_profile_series(
+        let profile = crate::widgets::elevation::elevation_profile_series(
             &activity.sample_elevations,
             &activity.elevation,
         );
-        let preferred = crate::widgets::elevation::sampling::preferred_elevation_series(
+        let preferred = crate::widgets::elevation::preferred_elevation_series(
             &activity.barometric_altitude,
             &activity.elevation,
         );
-        let elevation = crate::widgets::elevation::sampling::ElevationActivity::new(
+        let elevation = crate::widgets::elevation::ElevationActivity::new(
             times,
             profile,
             preferred,
@@ -204,7 +194,7 @@ impl ActivitySampler {
             }
             columns.insert(metric, values);
         }
-        let time = crate::widgets::time::sampling::TimeSampler::new(
+        let time = crate::widgets::time::TimeSampler::new(
             activity.sync_time.as_deref(),
             &activity.sample_elapsed_seconds,
             &activity.time,
@@ -225,8 +215,11 @@ impl ActivitySampler {
                     .map_err(|e| WidgetError::Config(format!("activity timezone: {e}")))
             })
             .transpose()?;
-        let diving = crate::widgets::diving_profile::sampling::DivingActivity::new(
-            times, &activity.depth, &activity.first_stop_depth, activity.trim_end_seconds,
+        let diving = crate::widgets::diving_profile::DivingActivity::new(
+            times,
+            &activity.depth,
+            &activity.first_stop_depth,
+            activity.trim_end_seconds,
         );
         let times = activity.sample_elapsed_seconds;
         let fraction_he = NumericColumn::new(
@@ -274,7 +267,7 @@ impl ActivitySampler {
             .zip(activity.gear_position)
             .filter_map(|(time, value)| value.map(|value| (time, value)))
             .collect();
-        let route = crate::widgets::route::sampling::RouteActivity::new(
+        let route = crate::widgets::route::RouteActivity::new(
             &times,
             &activity.sample_course_points,
             &activity.sample_distance_progress,
@@ -307,7 +300,7 @@ impl ActivitySampler {
     }
 
     pub fn gauge_range(&self, metric: MetricKind) -> (f64, f64) {
-        crate::widgets::gauges::metric::metric_range(self.numeric[&metric].range)
+        crate::widgets::gauges::metric_range(self.numeric[&metric].range)
     }
 
     pub fn gauge_altitude_offset(&self, target: Option<f64>) -> f64 {
@@ -350,21 +343,24 @@ impl ActivitySampler {
 
     /// Adds or replaces the table for its split length.
     pub fn insert_split_table(&mut self, table: SplitTable) {
-        self.split_tables.retain(|existing| existing.length != table.length);
+        self.split_tables
+            .retain(|existing| existing.length != table.length);
         self.split_tables.push(table);
     }
 
     pub fn split_table(&self, length: SplitLength) -> Option<&SplitTable> {
-        self.split_tables.iter().find(|table| table.length == length)
+        self.split_tables
+            .iter()
+            .find(|table| table.length == length)
     }
 
-    pub fn lap_history(&self) -> crate::widgets::lap_timer::format::LapHistory<'_> {
+    pub fn lap_history(&self) -> crate::widgets::lap_timer::LapHistory<'_> {
         self.lap_timing.history(self.end)
     }
 
-    pub fn lap_timer_at(&self, second: f64) -> crate::widgets::lap_timer::format::LapSample {
+    pub fn lap_timer_at(&self, second: f64) -> crate::widgets::lap_timer::LapSample {
         if second < 0.0 || second > self.end {
-            return crate::widgets::lap_timer::format::LapSample::default();
+            return crate::widgets::lap_timer::LapSample::default();
         }
         self.lap_timing.at(&self.times, second)
     }
@@ -402,7 +398,9 @@ impl ActivitySampler {
             starting_altitude_m,
             column.points.first().map(|point| point.1),
         );
-        column.at(&self.times, second).map(|altitude| altitude + offset)
+        column
+            .at(&self.times, second)
+            .map(|altitude| altitude + offset)
     }
 
     pub fn depth_at(&self, second: f64) -> Option<f64> {
@@ -442,7 +440,13 @@ impl ActivitySampler {
     /// Recorded samples strictly inside `(start, end)`: the corners `plot_value` joins with
     /// straight segments. None for angular and stepped columns, which never round, or when
     /// more than `limit` samples fall inside.
-    pub fn plot_knots(&self, metric: MetricKind, start: f64, end: f64, limit: usize) -> Option<Vec<(f64, f64)>> {
+    pub fn plot_knots(
+        &self,
+        metric: MetricKind,
+        start: f64,
+        end: f64,
+        limit: usize,
+    ) -> Option<Vec<(f64, f64)>> {
         let column = &self.numeric[&metric];
         let inside = |count: usize, time: &dyn Fn(usize) -> f64| {
             let first = partition(count, |i| time(i) <= start + 1e-9);
@@ -456,7 +460,11 @@ impl ActivitySampler {
             // Missing samples between observed ones read as zero, as in `at`.
             InterpolationKind::Preserve => {
                 let knots = inside(self.times.len(), &|i| self.times[i]);
-                (knots.len() <= limit).then(|| knots.map(|i| (self.times[i], column.values[i].unwrap_or(0.0))).collect())
+                (knots.len() <= limit).then(|| {
+                    knots
+                        .map(|i| (self.times[i], column.values[i].unwrap_or(0.0)))
+                        .collect()
+                })
             }
             InterpolationKind::Angular | InterpolationKind::Hold => None,
         }

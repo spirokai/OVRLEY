@@ -4,11 +4,7 @@ use ovrley_core::activity::interpolate::densify_activity;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::activity::trim::trim_activity;
 use ovrley_core::normalize::{RenderDataRequirements, ValidatedSceneConfig};
-use ovrley_widgets::widgets::g_force::{
-    format::{derive_max_g, g_force_frame_state, GForceSample},
-    layout::{prepare_g_force_cache as prepare_g_force_cache_layout, GForceCache},
-    validation::{GForceAxis, ValidatedGForceWidget},
-};
+use ovrley_widgets::widgets::g_force::{derive_max_g, g_force_frame_state, GForceSample, prepare_g_force_cache as prepare_g_force_cache_layout, GForceCache, GForceAxis, ValidatedGForceWidget};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -275,7 +271,7 @@ fn prepare_g_force_cache(
     let horizontal = dense.g_force_axis(widget.axis_horizontal);
     let vertical = dense.g_force_axis(widget.axis_vertical);
     GForceFrames {
-        layout: prepare_g_force_cache_layout(widget, &scene.presentation, ovrley_widgets::render::preview::PreviewRasterScale::NATIVE).unwrap(),
+        layout: prepare_g_force_cache_layout(widget, &scene.presentation, ovrley_widgets::render::tile::PreviewRasterScale::NATIVE).unwrap(),
         samples: (0..dense.frame_count)
             .map(|index| {
                 GForceSample::new(

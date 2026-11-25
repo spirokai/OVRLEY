@@ -2,17 +2,13 @@
 use crate::common;
 
 use ovrley_core::fonts::{preview_font_resource, NativeFonts};
-use ovrley_widgets::{
-    model::scene::validate_scene_presentation,
-    preview::PreviewSession,
-    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::validated_value_style},
-    widgets::value::preview::WidgetRequest,
-    widgets::value::{
-        format::{format_metric_parts, MetricSample},
-        layout::{draw_metric_parts, draw_static_metric_parts_for_value},
-        validation::validate_value_widget,
-    },
-};
+use ovrley_widgets::model::scene::validate_scene_presentation;
+use ovrley_widgets::preview::PreviewSession;
+use ovrley_widgets::render::tile::{read_surface_rgba, PreviewRasterScale};
+use ovrley_widgets::render::text::validated_value_style;
+use ovrley_widgets::widgets::value::validate_value_widget;
+use ovrley_widgets::widgets::value::format::{format_metric_parts, MetricSample};
+use ovrley_widgets::widgets::value::layout::{draw_metric_parts, draw_static_metric_parts_for_value};
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ColorType, ImageInfo};
 
@@ -67,13 +63,13 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
     let frames = render_full_frames(&paths.font_dirs, &config, &activity, &dense, &(0..dense.frame_count).collect::<Vec<_>>(), None, &mut RenderProfiler::default()).unwrap();
     let (mut preview, id) = elevation_preview(&request, &serde_json::to_vec(&activity).unwrap());
-    let mut placement = None;
+    let mut placement: Option<Option<ovrley_widgets::render::tile::WidgetGeometry>> = None;
     for index in [0, 1, 2, 0] {
         preview.render(0.25 + dense.frame_elapsed_seconds[index]).unwrap();
         let widget = &preview.widgets[&id];
-        if let Some(previous) = &placement { assert_eq!(widget.geometry(), previous); }
-        else { placement = Some(widget.geometry().clone()); }
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        if let Some(previous) = &placement { assert_eq!(widget.geometry(), previous.as_ref()); }
+        else { placement = Some(widget.geometry().cloned()); }
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize,
             geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
         let native = &frames[index];
@@ -91,7 +87,7 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
         assert_eq!(preview.widgets[&id].revision(), revision);
     }
     // Playback changes the completed line and marker while reusing static presentation.
-    let pixels = preview.widgets[&id].pixels().clone();
+    let pixels = preview.widgets[&id].pixels().to_vec();
     preview.render(2.0).unwrap();
     assert_ne!(preview.widgets[&id].pixels(), &pixels);
 }
@@ -120,7 +116,7 @@ fn elevation_preview(request: &Value, activity: &[u8]) -> (PreviewSession, u32) 
 }
 
 fn prepared_elevation(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_widgets::widgets::elevation::geometry::ElevationGeometry> {
-    let ovrley_widgets::preview_widget::PreviewWidget::Elevation(widget) = &preview.widgets[&id].widget else { panic!("expected elevation handle"); };
+    let ovrley_widgets::preview::PreviewWidget::Elevation(widget) = &preview.widgets[&id].widget else { panic!("expected elevation handle"); };
     widget.prepared_geometry.as_ref().unwrap().clone()
 }
 
@@ -185,10 +181,10 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
         let kind = request["type"].as_str().unwrap().to_owned();
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(1.5).unwrap();
-        let pixels = preview.widgets[&id].pixels().clone();
+        let pixels = preview.widgets[&id].pixels().to_vec();
         let storage = preview.widgets[&id].pixels().as_ptr();
         let pixels_revision = preview.widgets[&id].pixels_revision();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let (x, y) = (request["widget"]["x"].as_f64().unwrap(), request["widget"]["y"].as_f64().unwrap());
         request["transient"] = json!(true);
         for (dx, dy) in [(12.0, -8.0), (12.125, -8.375), (-5.5, 7.25)] {
@@ -202,7 +198,7 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
             assert_eq!(widget.pixels_revision(), pixels_revision, "{kind} must retain its pixels revision");
             assert_eq!(widget.pixels().as_ptr(), storage, "{kind} must retain its surface storage");
             assert_eq!(widget.pixels(), &pixels, "{kind} must not redraw during dragging");
-            let moved: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let moved: Value = serde_json::to_value(widget.geometry()).unwrap();
             for (field, delta) in [("left", dx), ("top", dy)] {
                 assert!((moved["content"][field].as_f64().unwrap() - geometry["content"][field].as_f64().unwrap() - delta).abs() < 0.001, "{kind} content placement");
                 assert!((moved[field].as_f64().unwrap() - geometry[field].as_f64().unwrap() - delta).abs() < 0.001, "{kind} shadow placement");
@@ -215,8 +211,8 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
         let fresh = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(1.5).unwrap();
         assert_eq!(preview.widgets[&id].pixels(), preview.widgets[&fresh].pixels(), "{kind} settled pixels must match a fresh render");
-        let settled: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
-        let fresh_geometry: Value = serde_json::from_slice(preview.widgets[&fresh].geometry()).unwrap();
+        let settled: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
+        let fresh_geometry: Value = serde_json::to_value(preview.widgets[&fresh].geometry()).unwrap();
         assert_eq!(settled, fresh_geometry, "{kind} settled geometry must match a fresh render");
     }
 }
@@ -230,8 +226,8 @@ fn every_preview_family_rerasterizes_at_a_new_session_scale_like_a_fresh_widget(
         preview.set_raster_scale(PreviewRasterScale::new(0.5).unwrap()).unwrap();
         let fresh = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
         preview.render(1.5).unwrap();
-        let rescaled: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
-        let fresh_geometry: Value = serde_json::from_slice(preview.widgets[&fresh].geometry()).unwrap();
+        let rescaled: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
+        let fresh_geometry: Value = serde_json::to_value(preview.widgets[&fresh].geometry()).unwrap();
         assert_eq!(rescaled["preview_raster_scale"], json!(0.5), "{kind} must rasterize at the session scale");
         let bounds = preview.widgets[&id].bounds().unwrap();
         let size = (rescaled["width"].as_u64().unwrap() as u32, rescaled["height"].as_u64().unwrap() as u32);
@@ -250,7 +246,7 @@ fn every_preview_family_derives_serialized_geometry_from_typed_tile_bounds() {
         let assert_derived = |preview: &PreviewSession, stage: &str| {
             let widget = &preview.widgets[&id];
             let bounds = widget.bounds().unwrap_or_else(|| panic!("{kind} {stage}: rendered tile must report bounds"));
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let field = |name: &str| geometry[name].as_f64().unwrap() as f32;
             assert_eq!((field("left"), field("top")), (bounds.left, bounds.top), "{kind} {stage}: tile origin");
             let size = (geometry["width"].as_u64().unwrap() as u32, geometry["height"].as_u64().unwrap() as u32);
@@ -265,28 +261,6 @@ fn every_preview_family_derives_serialized_geometry_from_typed_tile_bounds() {
         preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(1.5).unwrap();
         assert_derived(&preview, "dragged");
-    }
-}
-
-#[test]
-fn every_preview_family_presents_typed_geometry_equal_to_its_serialized_geometry() {
-    for (mut preview, mut request) in every_family_preview() {
-        let kind = request["type"].as_str().unwrap().to_owned();
-        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
-        preview.render(1.5).unwrap();
-        let assert_equal = |preview: &PreviewSession, stage: &str| {
-            let widget = &preview.widgets[&id];
-            let typed = widget.presented_geometry().unwrap().unwrap_or_else(|| panic!("{kind} {stage}: geometry"));
-            let serialized: ovrley_widgets::preview_instance::PresentedGeometry = serde_json::from_slice(widget.geometry()).unwrap();
-            assert_eq!(typed, serialized, "{kind} {stage}");
-            assert_eq!(serde_json::to_vec(&typed).unwrap(), *widget.geometry(), "{kind} {stage}: the bytes are this struct");
-        };
-        assert_equal(&preview, "rendered");
-        request["transient"] = json!(true);
-        request["widget"]["x"] = json!(request["widget"]["x"].as_f64().unwrap() + 12.125);
-        preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
-        preview.render(1.5).unwrap();
-        assert_equal(&preview, "dragged");
     }
 }
 
@@ -363,11 +337,9 @@ fn bounds_variants(request: &Value) -> Vec<(String, Value)> {
 
 #[test]
 fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
-    use ovrley_widgets::{
-        activity::ActivitySampler,
-        preview_widget::PreviewWidget,
-        widgets::value::preview::{allocated_surfaces, TileBounds},
-    };
+    use ovrley_widgets::activity::ActivitySampler;
+    use ovrley_widgets::preview::PreviewWidget;
+    use ovrley_widgets::render::tile::{allocated_surfaces, TileBounds};
     const MARGIN: i32 = 48;
     let activity = every_family_activity();
     let sampler = ActivitySampler::from_json(&activity).unwrap();
@@ -762,7 +734,7 @@ fn atlas_frames_reassemble_overlapping_rotated_widgets_of_every_family_into_the_
 #[test]
 fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
     use ovrley_core::raster::{load_embedded_raster, RasterResourceResolver, SelectedRaster};
-    use ovrley_widgets::preview_widget::PreviewWidget;
+    use ovrley_widgets::preview::PreviewWidget;
     use std::sync::Arc;
     struct Resources(Arc<SelectedRaster>);
     impl RasterResourceResolver for Resources {
@@ -789,9 +761,9 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
         let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, &ovrley_widgets::widgets::map::preview::PreviewMaps::default()).unwrap();
         let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
         let session = &preview.widgets[&id];
-        assert_eq!(native.pixels(), session.pixels(), "{kind} pixels must not depend on the host");
-        assert_eq!(native.geometry(), session.geometry(), "{kind} geometry must not depend on the host");
-        assert_eq!(native.bounds(), session.bounds(), "{kind} bounds must not depend on the host");
+        assert_eq!(native.tile().pixels, session.pixels(), "{kind} pixels must not depend on the host");
+        assert_eq!(native.tile().geometry.as_ref(), session.geometry(), "{kind} geometry must not depend on the host");
+        assert_eq!(native.tile().bounds, session.bounds(), "{kind} bounds must not depend on the host");
     }
     let missing = json!({ "type":"raster", "widget": { "id":"raster", "x":0, "y":0, "width":1, "height":1, "rotation":0, "opacity":1, "path":"/image.png", "resourceId":"missing" }, "scene": request_scene });
     assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, &ovrley_widgets::widgets::map::preview::PreviewMaps::default()).is_err(), "unresolved native rasters must fail loudly");
@@ -820,15 +792,15 @@ fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacemen
         let (mut preview, id) = elevation_preview(&request, &bytes);
         let raw = serde_json::from_value(request["widget"].clone()).unwrap();
         let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
-        assert_eq!(config.elevation_plots[0], ovrley_widgets::widgets::elevation::validation::validate_elevation_plot(&raw, 0, &scene).unwrap());
-        let mut placement = None;
+        assert_eq!(config.elevation_plots[0], ovrley_widgets::widgets::elevation::validate_elevation_plot(&raw, 0, &scene).unwrap());
+        let mut placement: Option<Option<ovrley_widgets::render::tile::WidgetGeometry>> = None;
         for index in [0, 1, 2, 3, 4, 2, 0] {
             let second = 0.25 + seconds[index];
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            if let Some(placement) = &placement { assert_eq!(widget.geometry(), placement, "playback must retain raster and selection bounds"); }
-            else { placement = Some(widget.geometry().clone()); }
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
+            if let Some(placement) = &placement { assert_eq!(widget.geometry(), placement.as_ref(), "playback must retain raster and selection bounds"); }
+            else { placement = Some(widget.geometry().cloned()); }
             let (w, h, left, top) = (geometry["width"].as_u64().unwrap() as usize, geometry["height"].as_u64().unwrap() as usize, geometry["left"].as_f64().unwrap() as usize, geometry["top"].as_f64().unwrap() as usize);
             let native = &frames[index];
             let mut difference = 0;
@@ -852,7 +824,7 @@ fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacemen
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision, "identical config must retain cached presentation");
         }
-        let pixels = preview.widgets[&id].pixels().clone();
+        let pixels = preview.widgets[&id].pixels().to_vec();
         preview.replace_activity(&[]).unwrap();
         preview.render(0.25).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &pixels);
@@ -873,12 +845,12 @@ fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacemen
     for (field, value) in [("width", json!(0)), ("height", json!("145")), ("marker_variant", json!("unknown")), ("show_full_activity", json!("true")), ("y_scale", json!(9)), ("starting_altitude", json!("bad"))] {
         let mut invalid = request.clone();
         invalid["widget"][field] = value;
-        let decoded = serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(invalid);
+        let decoded = serde_json::from_value::<ovrley_widgets::preview::WidgetRequest>(invalid);
         assert!(decoded.is_err() || preview.create_widget(decoded.unwrap()).is_err(), "malformed {field} must fail");
     }
     let mut missing = request;
     missing["widget"].as_object_mut().unwrap().remove("remaining_line_width");
-    assert!(serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(missing).is_err());
+    assert!(serde_json::from_value::<ovrley_widgets::preview::WidgetRequest>(missing).is_err());
 }
 
 #[test]
@@ -903,7 +875,7 @@ fn elevation_areas_stop_at_the_inner_stroke_edge() {
         let (mut preview, id) = elevation_preview(&request, &bytes);
         preview.render(second).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let left = geometry["left"].as_f64().unwrap() as usize;
         let top = geometry["top"].as_f64().unwrap() as usize;
         let raster_width = geometry["width"].as_u64().unwrap() as usize;
@@ -938,7 +910,7 @@ fn elevation_area_gradient_fades_both_areas_from_plot_top_to_transparent_bottom(
         let (mut preview, id) = elevation_preview(&request, &bytes);
         preview.render(second).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let left = geometry["left"].as_f64().unwrap() as usize;
         let top = geometry["top"].as_f64().unwrap() as usize;
         let raster_width = geometry["width"].as_u64().unwrap() as usize;
@@ -974,8 +946,8 @@ fn elevation_resize_updates_size_reuses_geometry_until_commit_and_preserves_fixe
         let (mut preview, id) = elevation_preview(&request, &bytes);
         preview.render(0.75).unwrap();
         let original = prepared_elevation(&preview, id);
-        let original_pixels = preview.widgets[&id].pixels().clone();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let original_pixels = preview.widgets[&id].pixels().to_vec();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let point = opposite(&geometry, fixed);
         let resize_request = |size, second, commit| {
             let mut resize = request.clone();
@@ -990,7 +962,7 @@ fn elevation_resize_updates_size_reuses_geometry_until_commit_and_preserves_fixe
             preview.update_widget(id, serde_json::from_value(live).unwrap()).unwrap();
             preview.render(second).unwrap();
             assert!(Arc::ptr_eq(&original, &prepared_elevation(&preview, id)), "live resizing must retain prepared vectors");
-            let live: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let live: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let anchored = opposite(&live, fixed);
             assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
             assert!((live["content"]["width"].as_f64().unwrap() - size[0]).abs() < 0.001);
@@ -1010,7 +982,7 @@ fn elevation_resize_updates_size_reuses_geometry_until_commit_and_preserves_fixe
         preview.update_widget(id, serde_json::from_value(committed.clone()).unwrap()).unwrap();
         preview.render(2.15).unwrap();
         assert!(Arc::ptr_eq(&prepared, &prepared_elevation(&preview, id)), "committed snapshot must reuse the final preparation");
-        let live: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let live: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let anchored = opposite(&live, fixed);
         assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
         let (mut reloaded, reloaded_id) = elevation_preview(&committed, &bytes);
@@ -1056,7 +1028,7 @@ fn route_activity() -> ovrley_core::activity::schema::ParsedActivity {
 }
 
 fn prepared_route(preview: &PreviewSession, id: u32) -> std::sync::Arc<ovrley_widgets::widgets::route::geometry::RouteGeometry> {
-    let ovrley_widgets::preview_widget::PreviewWidget::Route(route) = &preview.widgets[&id].widget else { panic!("expected route handle"); };
+    let ovrley_widgets::preview::PreviewWidget::Route(route) = &preview.widgets[&id].widget else { panic!("expected route handle"); };
     route.prepared_geometry.as_ref().unwrap().clone()
 }
 
@@ -1095,7 +1067,7 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
             let second = 0.25 + seconds[index];
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             if let Some(selection) = &selection { assert_eq!(&geometry["content"], selection, "marker movement must not resize selection"); }
             else { selection = Some(geometry["content"].clone()); }
             let width = geometry["width"].as_u64().unwrap() as usize;
@@ -1124,7 +1096,7 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision);
         }
-        let pixels = preview.widgets[&id].pixels().clone();
+        let pixels = preview.widgets[&id].pixels().to_vec();
         preview.replace_activity(&[]).unwrap();
         preview.render(0.25).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &pixels);
@@ -1139,12 +1111,12 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
         for (field, value) in [("width", json!(0)), ("width", json!("300")), ("marker_variant", json!("unknown")), ("show_full_activity", json!("true"))] {
             let mut invalid = request.clone();
             invalid["widget"][field] = value;
-            let request = serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(invalid);
+            let request = serde_json::from_value::<ovrley_widgets::preview::WidgetRequest>(invalid);
             assert!(request.is_err() || preview.create_widget(request.unwrap()).is_err());
         }
         let mut missing = request.clone();
         missing["widget"].as_object_mut().unwrap().remove("width");
-        assert!(serde_json::from_value::<ovrley_widgets::preview_widget::WidgetRequest>(missing).is_err());
+        assert!(serde_json::from_value::<ovrley_widgets::preview::WidgetRequest>(missing).is_err());
     }
 }
 
@@ -1155,8 +1127,8 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
     let opposite = |geometry: &Value, fixed: [f64; 2]| {
         let content = &geometry["content"];
         let radians = geometry["rotation"].as_f64().unwrap().to_radians();
-        let ox = geometry["rotation_origin"][0].as_f64().unwrap();
-        let oy = geometry["rotation_origin"][1].as_f64().unwrap();
+        let ox = content["width"].as_f64().unwrap() * 0.5;
+        let oy = content["height"].as_f64().unwrap() * 0.5;
         let dx = content["width"].as_f64().unwrap() * fixed[0] - ox;
         let dy = content["height"].as_f64().unwrap() * fixed[1] - oy;
         [content["left"].as_f64().unwrap() + ox + dx * radians.cos() - dy * radians.sin(), content["top"].as_f64().unwrap() + oy + dx * radians.sin() + dy * radians.cos()]
@@ -1170,15 +1142,15 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
         let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(0.75).unwrap();
         let original = prepared_route(&preview, id);
-        let original_pixels = preview.widgets[&id].pixels().clone();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let original_pixels = preview.widgets[&id].pixels().to_vec();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let point = opposite(&geometry, fixed);
         for rotation in [-125.75, 0.0, 90.0] {
             let mut rotated = request.clone();
             rotated["widget"]["rotation"] = json!(rotation);
             preview.update_widget(id, serde_json::from_value(rotated).unwrap()).unwrap();
             preview.render(0.75).unwrap();
-            let rotated_geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let rotated_geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             assert_eq!(geometry["content"]["width"], rotated_geometry["content"]["width"]);
             assert_eq!(geometry["content"]["height"], rotated_geometry["content"]["height"]);
             assert!(Arc::ptr_eq(&original, &prepared_route(&preview, id)), "rotation must not rebuild curves");
@@ -1201,7 +1173,7 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
             preview.update_widget(id, serde_json::from_value(live).unwrap()).unwrap();
             preview.render(second).unwrap();
             assert!(Arc::ptr_eq(&original, &prepared_route(&preview, id)), "live resize must scale existing vectors");
-            let live_geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let live_geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let anchored = opposite(&live_geometry, fixed);
             assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
             assert_eq!(patch["width"].as_f64().unwrap(), request["widget"]["width"].as_f64().unwrap() * factor);
@@ -1221,7 +1193,7 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
         preview.update_widget(id, serde_json::from_value(committed.clone()).unwrap()).unwrap();
         preview.render(2.35).unwrap();
         assert!(Arc::ptr_eq(&committed_geometry, &prepared_route(&preview, id)), "committed snapshot reuses the final preparation");
-        let final_geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let final_geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let anchored = opposite(&final_geometry, fixed);
         assert!((anchored[0] - point[0]).abs() < 0.001 && (anchored[1] - point[1]).abs() < 0.001);
         let mut reloaded = PreviewSession::default();
@@ -1368,7 +1340,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
                     "fill changes below the formatted integer"
                 );
             }
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], frame_width, &geometry, widget.pixels());
             assert!(
                 difference <= EXPORT_TILE_TOLERANCE,
@@ -1381,7 +1353,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
             assert_eq!(preview.widgets[&id].revision(), revision);
         }
         preview.render(2.25).unwrap();
-        let pixels = preview.widgets[&id].pixels().clone();
+        let pixels = preview.widgets[&id].pixels().to_vec();
         preview.replace_activity(&[]).unwrap();
         preview.render(2.25).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &pixels);
@@ -1390,7 +1362,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
         assert_eq!(preview.widgets[&id].pixels(), &pixels);
         if metric == "speed" {
             preview.render(0.5).unwrap();
-            let pixels = preview.widgets[&id].pixels().clone();
+            let pixels = preview.widgets[&id].pixels().to_vec();
             let revision = preview.widgets[&id].revision();
             let mut replacement = activity.clone();
             replacement.speed[4] = Some(100.0);
@@ -1442,9 +1414,7 @@ fn gauges_match_export_pixels_sampling_cache_revisions_and_activity_replacement(
 
 #[test]
 fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_during_playback() {
-    use ovrley_widgets::widgets::gauges::{
-        frame::GaugeLayout, metric::sample_gauge, validation::ValidatedGauge,
-    };
+    use ovrley_widgets::widgets::gauges::{GaugeLayout, sample_gauge};
     let bytes =
         br#"{"sample_elapsed_seconds":[0,1,2,3],"speed":[10,40,null,20],"trim_end_seconds":3}"#;
     let sampler = ovrley_widgets::activity::ActivitySampler::from_json(bytes).unwrap();
@@ -1466,7 +1436,7 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                 .create_widget(serde_json::from_value(origin.clone()).unwrap())
                 .unwrap();
             preview.render(0.75).unwrap();
-            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let bounds = &geometry["content"];
             for fixed in [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
                 let point = [
@@ -1521,7 +1491,7 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                         .unwrap();
                     preview.render(second).unwrap();
                     let geometry: Value =
-                        serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                        serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
                     let actual = &geometry["content"];
                     for (axis, (position, extent)) in [("left", "width"), ("top", "height")]
                         .into_iter()
@@ -1543,14 +1513,8 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                     let config = common::seam::validated_config_from_value(
                         json!({"scene": origin["scene"], "values": [committed], "labels": [], "plots": []}),
                     );
-                    let widget = match &config.values[0] {
-                        ovrley_widgets::widgets::value::validation::ValidatedValue::LinearGauge(widget) => {
-                            ValidatedGauge::Linear(widget.clone())
-                        }
-                        ovrley_widgets::widgets::value::validation::ValidatedValue::ArcGauge(widget) => {
-                            ValidatedGauge::Arc(widget.clone())
-                        }
-                        _ => panic!("gauge dispatch"),
+                    let ovrley_widgets::widgets::value::ValidatedValue::Gauge(widget) = config.values[0].clone() else {
+                        panic!("gauge dispatch");
                     };
                     let layout = GaugeLayout::new(
                         &widget,
@@ -1558,7 +1522,7 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                         sampler.gauge_range(widget.metric()),
                         0.0,
                         &NativeFonts(&font_dirs),
-                        ovrley_widgets::render::preview::PreviewRasterScale::NATIVE,
+                        ovrley_widgets::render::tile::PreviewRasterScale::NATIVE,
                     )
                     .unwrap();
                     let frame = layout
@@ -1567,13 +1531,8 @@ fn gauge_resize_preserves_opposite_corners_and_commits_fractional_geometry_durin
                             &NativeFonts(&font_dirs),
                         )
                         .unwrap();
-                    let expected: Value = serde_json::from_slice(
-                        &serde_json::to_vec(
-                            &ovrley_widgets::widgets::value::preview::ContentBounds::from(
-                                frame.content_bounds,
-                            ),
-                        )
-                        .unwrap(),
+                    let expected = serde_json::to_value(
+                        ovrley_widgets::render::tile::ContentBounds::from(frame.content_bounds),
                     )
                     .unwrap();
                     assert_eq!(actual, &expected, "live and committed gauge bounds");
@@ -1637,14 +1596,14 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
             let second = seconds[index];
             assert_eq!(sampler.heading_at(second), dense.series.heading[index]);
             let previous = preview.widgets[&id].revision();
-            let previous_pixels = (index == 2).then(|| preview.widgets[&id].pixels().clone());
+            let previous_pixels = (index == 2).then(|| preview.widgets[&id].pixels().to_vec());
             preview.render(second).unwrap();
             if index == 2 { assert_ne!(preview.widgets[&id].revision(), previous, "sub-degree tape offset changes the revision"); }
             let widget = &preview.widgets[&id];
             if let Some(previous_pixels) = previous_pixels {
                 assert!(widget.pixels() != &previous_pixels, "fractional movement must change the raster below one degree and one pixel");
             }
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             assert_eq!(geometry["content"]["left"], request["widget"]["x"], "tape frame does not travel horizontally");
             let frame_width = request["widget"]["width"].as_f64().unwrap() * request["scene"]["scale"].as_f64().unwrap();
             assert!((geometry["content"]["width"].as_f64().unwrap() - frame_width).abs() < 0.001, "tape width stays fixed as ticks and gaps cross its edges");
@@ -1656,8 +1615,8 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
             assert_eq!(preview.widgets[&id].revision(), revision);
         }
         preview.render(1.25).unwrap();
-        let original = preview.widgets[&id].pixels().clone();
-        let geometry = preview.widgets[&id].geometry().clone();
+        let original = preview.widgets[&id].pixels().to_vec();
+        let geometry = preview.widgets[&id].geometry().cloned();
         preview.replace_activity(&[]).unwrap();
         preview.render(1.25).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &original);
@@ -1667,7 +1626,7 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
         request["scene"]["shadow_strength"] = json!(0);
         preview.update_widget(id, serde_json::from_value(request.clone()).unwrap()).unwrap();
         preview.render(1.25).unwrap();
-        assert_eq!(preview.widgets[&id].geometry(), &geometry, "shadows do not change selection bounds");
+        assert_eq!(preview.widgets[&id].geometry(), geometry.as_ref(), "shadows do not change selection bounds");
         request["scene"]["shadow_strength"] = json!(3);
         preview.widgets.remove(&id);
     }
@@ -1687,8 +1646,8 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
     assert!(alpha(399) < alpha(392) && alpha(392) < alpha(375), "right edge fades inward");
     assert_eq!((alpha(100), alpha(200), alpha(300)), (255, 255, 255), "interior remains opaque");
     let config = common::seam::validated_config_from_value(json!({ "scene": request["scene"], "values": [request["widget"]], "labels": [], "plots": [] }));
-    let ovrley_widgets::widgets::value::validation::ValidatedValue::HeadingTape(widget) = &config.values[0] else { panic!("heading dispatch"); };
-    let cache = ovrley_widgets::widgets::heading::layout::prepare_heading_cache(widget, &config.scene.presentation, &NativeFonts(&paths.font_dirs)).unwrap();
+    let ovrley_widgets::widgets::value::ValidatedValue::HeadingTape(widget) = &config.values[0] else { panic!("heading dispatch"); };
+    let cache = ovrley_widgets::widgets::heading::prepare_heading_cache(widget, &config.scene.presentation, &NativeFonts(&paths.font_dirs)).unwrap();
     let info = ImageInfo::new((400, 80), ColorType::RGBA8888, AlphaType::Premul, None);
     let mut surface = surfaces::raster(&info, None, None).unwrap();
     surface.canvas().clear(Color::BLUE);
@@ -1708,7 +1667,7 @@ fn heading_tape_matches_export_pixels_sampling_revisions_and_activity_replacemen
 
 #[test]
 fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional_dimensions() {
-    use ovrley_widgets::widgets::heading::{geometry::heading_tape_layout, validation::validate_heading};
+    use ovrley_widgets::widgets::heading::{heading_tape_layout, validate_heading};
     let (mut preview, mut origin) = heading_preview();
     let bytes = br#"{"sample_elapsed_seconds":[0,1,2,3],"heading":[350,null,10,45],"trim_end_seconds":3}"#;
     preview.replace_activity(bytes).unwrap();
@@ -1720,7 +1679,7 @@ fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional
             origin["widget"]["indicator_placement"] = json!(placement);
             let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
             preview.render(0.25).unwrap();
-            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let bounds = &geometry["content"];
             assert!(bounds["height"].as_f64().unwrap() <= origin["widget"]["height"].as_f64().unwrap() * scale + 0.001);
             for fixed in [[0.0,0.0], [1.0,0.0], [0.0,1.0], [1.0,1.0]] {
@@ -1743,8 +1702,8 @@ fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional
                     live["widget"]["display_variants"] = patch["display_variants"].clone();
                     preview.update_widget(id, serde_json::from_value(live.clone()).unwrap()).unwrap();
                     preview.render(second).unwrap();
-                    let geometry = preview.widgets[&id].geometry().clone();
-                    let actual: Value = serde_json::from_slice(&geometry).unwrap();
+                    let geometry = preview.widgets[&id].geometry().cloned();
+                    let actual: Value = serde_json::to_value(&geometry).unwrap();
                     for axis in 0..2 {
                         let (start, extent) = if axis == 0 { ("left", "width") } else { ("top", "height") };
                         let corner = actual["content"][start].as_f64().unwrap() + actual["content"][extent].as_f64().unwrap() * fixed[axis];
@@ -1752,15 +1711,15 @@ fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional
                     }
                     // Native ingress consumes the same fractional variant after committing.
                     let config = common::seam::validated_config_from_value(json!({ "scene": live["scene"], "values": [live["widget"]], "labels": [], "plots": [] }));
-                    let ovrley_widgets::widgets::value::validation::ValidatedValue::HeadingTape(committed) = &config.values[0] else { panic!("heading dispatch"); };
+                    let ovrley_widgets::widgets::value::ValidatedValue::HeadingTape(committed) = &config.values[0] else { panic!("heading dispatch"); };
                     let scene = validate_scene_presentation(serde_json::from_value(live["scene"].clone()).unwrap()).unwrap();
-                    let cache = ovrley_widgets::widgets::heading::layout::prepare_heading_cache(committed, &scene, &preview.fonts).unwrap();
+                    let cache = ovrley_widgets::widgets::heading::prepare_heading_cache(committed, &scene, &preview.fonts).unwrap();
                     let frame = cache.prepare_frame(sampler.heading_at(second));
-                    let content: Value = serde_json::from_slice(&serde_json::to_vec(&ovrley_widgets::widgets::value::preview::ContentBounds::from(frame.content_bounds)).unwrap()).unwrap();
+                    let content = serde_json::to_value(ovrley_widgets::render::tile::ContentBounds::from(frame.content_bounds)).unwrap();
                     assert_eq!(content, actual["content"]);
                     preview.update_widget(id, serde_json::from_value(live).unwrap()).unwrap();
                     preview.render(second).unwrap();
-                    assert_eq!(preview.widgets[&id].geometry(), &geometry);
+                    assert_eq!(preview.widgets[&id].geometry(), geometry.as_ref());
                 }
             }
             preview.widgets.remove(&id);
@@ -1770,7 +1729,7 @@ fn heading_tape_resize_preserves_opposite_corners_reflows_and_commits_fractional
         origin["widget"]["indicator_style"] = json!(style);
         origin["widget"]["show_indicator"] = json!(visible);
         let original = validate_heading(serde_json::from_value(origin["widget"].clone()).unwrap(), 0).unwrap();
-        let layout = |config: &ovrley_widgets::widgets::heading::validation::ValidatedHeading| heading_tape_layout(
+        let layout = |config: &ovrley_widgets::widgets::heading::ValidatedHeading| heading_tape_layout(
             config.height, config.show_indicator, &config.indicator_style, &config.indicator_placement,
             config.indicator_size, config.major_tick_length_pct, config.label_offset, config.label_font_size,
         );
@@ -1809,7 +1768,7 @@ fn lap_timer_activity() -> ovrley_core::activity::schema::ParsedActivity {
 fn lap_timer_preview() -> (PreviewSession, Value) {
     let (mut preview, mut request) = lean_angle_preview();
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
-    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    let weight = ovrley_widgets::model::catalog::widget_font_weight();
     preview.fonts.register(
         ovrley_widgets::preview::FontRequest { font: "Teko.ttf".into(), font_weight: weight, italic: false },
         &preview_font_resource(&font_dirs, "Teko.ttf", weight, false).unwrap(),
@@ -1856,7 +1815,7 @@ fn lap_timer_modes_match_export_pixels_sampling_and_resource_replacement() {
             let second = seconds[index];
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{mode} differs from export by {difference} at {second}");
             assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
@@ -1873,7 +1832,7 @@ fn lap_timer_modes_match_export_pixels_sampling_and_resource_replacement() {
     // The current row and completed count stay equal, but replaced lap history must repaint.
     let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
     preview.render(4.0).unwrap();
-    let original = preview.widgets[&id].pixels().clone();
+    let original = preview.widgets[&id].pixels().to_vec();
     activity.lap_start_elapsed_seconds[0] = 0.0;
     activity.lap_number[0] = 0;
     for index in 0..4 { activity.lap_time_seconds[index] = Some(activity.sample_elapsed_seconds[index]); }
@@ -1910,7 +1869,7 @@ fn lap_timer_resize_keeps_all_opposite_corners_fixed_across_modes_and_playhead_c
             origin["widget"]["show_label"] = json!(show_label);
             preview.update_widget(id, serde_json::from_value(origin.clone()).unwrap()).unwrap();
             preview.render(1.125).unwrap();
-            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let bounds = &geometry["content"];
             assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
             for fixed in [[0.0,0.0], [1.0,0.0], [0.0,1.0], [1.0,1.0]] {
@@ -1925,15 +1884,15 @@ fn lap_timer_resize_keeps_all_opposite_corners_fixed_across_modes_and_playhead_c
                     committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
                     preview.update_widget(id, serde_json::from_value(committed.clone()).unwrap()).unwrap();
                     preview.render(second).unwrap();
-                    let live = preview.widgets[&id].geometry().clone();
-                    let actual: Value = serde_json::from_slice(&live).unwrap();
+                    let live = preview.widgets[&id].geometry().cloned();
+                    let actual: Value = serde_json::to_value(&live).unwrap();
                     for (axis, start, size) in [(0,"left","width"), (1,"top","height")] {
                         let corner = actual["content"][start].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
                         assert!((corner - point[axis]).abs() < 0.003, "{mode} at {second}");
                     }
                     preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
                     preview.render(second).unwrap();
-                    assert_eq!(preview.widgets[&id].geometry(), &live, "live and committed {mode}");
+                    assert_eq!(preview.widgets[&id].geometry(), live.as_ref(), "live and committed {mode}");
                 }
             }
         }
@@ -1943,7 +1902,7 @@ fn lap_timer_resize_keeps_all_opposite_corners_fixed_across_modes_and_playhead_c
 fn splits_run_preview() -> (PreviewSession, Value) {
     let (mut preview, mut request) = lean_angle_preview();
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
-    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    let weight = ovrley_widgets::model::catalog::widget_font_weight();
     preview.fonts.register(
         ovrley_widgets::preview::FontRequest { font: "Teko.ttf".into(), font_weight: weight, italic: false },
         &preview_font_resource(&font_dirs, "Teko.ttf", weight, false).unwrap(),
@@ -1962,10 +1921,10 @@ fn splits_run_preview() -> (PreviewSession, Value) {
     (preview, request)
 }
 
-fn splits_run_table(activity: &ovrley_core::activity::schema::ParsedActivity) -> Vec<u8> {
-    use ovrley_widgets::widgets::splits_run::table::{SplitLength, SplitUnit};
+fn splits_run_table(activity: &ovrley_core::activity::schema::ParsedActivity) -> ovrley_widgets::widgets::splits_run::SplitTable {
+    use ovrley_widgets::widgets::splits_run::{SplitLength, SplitUnit};
     let length = SplitLength { distance: 10.0, unit: SplitUnit::M };
-    serde_json::to_vec(&ovrley_core::activity::splits::derive_split_table(activity, length)).unwrap()
+    ovrley_core::activity::splits::derive_split_table(activity, length)
 }
 
 #[test]
@@ -1984,8 +1943,8 @@ fn splits_run_matches_export_pixels_skips_unchanged_samples_and_rejects_malforme
             request["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
             let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
             preview.render(0.0).unwrap();
-            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
-            let pixels = preview.widgets[&id].pixels().clone();
+            let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
+            let pixels = preview.widgets[&id].pixels().to_vec();
             preview.widgets.remove(&id);
             (geometry["content_width"].as_f64().unwrap(), pixels)
         };
@@ -1998,10 +1957,9 @@ fn splits_run_matches_export_pixels_skips_unchanged_samples_and_rejects_malforme
     }
     let activity = every_family_parsed_activity();
     let table = splits_run_table(&activity);
-    assert!(preview.replace_split_table(&table).is_err(), "split tables belong to a loaded activity");
+    assert!(preview.replace_split_table(table.clone()).is_err(), "split tables belong to a loaded activity");
     preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
-    assert!(preview.replace_split_table(b"{}").is_err(), "malformed split tables fail at ingress");
-    preview.replace_split_table(&table).unwrap();
+    preview.replace_split_table(table).unwrap();
     let root = common::test_config::repo_git_root();
     let paths = AppPaths::from_runtime_roots(root.clone(), root, std::env::temp_dir());
     let seconds = vec![0.0, 0.25, 0.75, 1.0, 1.6, 2.2, 2.75, 3.1, 3.6, 4.0];
@@ -2029,10 +1987,10 @@ fn splits_run_matches_export_pixels_skips_unchanged_samples_and_rejects_malforme
             let second = seconds[index];
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{variant} differs from export by {difference} at {second}");
-            distinct.insert(widget.pixels().clone());
+            distinct.insert(widget.pixels().to_vec());
             let revision = widget.revision();
             preview.render(second).unwrap();
             assert_eq!(preview.widgets[&id].revision(), revision, "{variant}: an unchanged sample must not redraw");
@@ -2056,13 +2014,13 @@ fn splits_run_resize_scales_every_dimension_and_keeps_opposite_corners_fixed() {
     let (mut preview, mut origin) = splits_run_preview();
     let activity = every_family_parsed_activity();
     preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
-    preview.replace_split_table(&splits_run_table(&activity)).unwrap();
+    preview.replace_split_table(splits_run_table(&activity)).unwrap();
     let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
     for scale in [1.7, 0.8] {
         origin["scene"]["scale"] = json!(scale);
         preview.update_widget(id, serde_json::from_value(origin.clone()).unwrap()).unwrap();
         preview.render(2.2).unwrap();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         for fixed in [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
             let point = [bounds["left"].as_f64().unwrap() + bounds["width"].as_f64().unwrap() * fixed[0], bounds["top"].as_f64().unwrap() + bounds["height"].as_f64().unwrap() * fixed[1]];
@@ -2079,7 +2037,7 @@ fn splits_run_resize_scales_every_dimension_and_keeps_opposite_corners_fixed() {
                 committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
                 preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
                 preview.render(second).unwrap();
-                let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                let actual: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
                 for (axis, start, size) in [(0, "left", "width"), (1, "top", "height")] {
                     let corner = actual["content"][start].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
                     assert!((corner - point[axis]).abs() < 0.003, "scale {scale} factor {factor} at {second}");
@@ -2132,14 +2090,14 @@ fn g_force_preview_matches_export_pixels_and_tracks_marker_and_percentile_change
     for index in [0, 1, 2, 0] {
         preview.render(seconds[index]).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
         assert!(difference <= EXPORT_TILE_TOLERANCE, "G-force differs from export by {difference} at {}", seconds[index]);
     }
     let revision = preview.widgets[&id].revision();
     preview.render(1.0).unwrap();
     assert_eq!(preview.widgets[&id].revision(), revision);
-    let pixels = preview.widgets[&id].pixels().clone();
+    let pixels = preview.widgets[&id].pixels().to_vec();
     activity.g_force_y[2] = Some(120.0); // Same current axes, different whole-activity clipping scale.
     preview.replace_activity(&serde_json::to_vec(&activity).unwrap()).unwrap();
     preview.render(1.0).unwrap();
@@ -2153,7 +2111,7 @@ fn g_force_resize_keeps_visible_corners_fixed_and_commits_fractional_variant_geo
     preview.replace_activity(&serde_json::to_vec(&fixture["activity"]).unwrap()).unwrap();
     let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
     preview.render(1.0).unwrap();
-    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     let bounds = &geometry["content"];
     for fixed in [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]] {
         let point = [
@@ -2178,7 +2136,7 @@ fn g_force_resize_keeps_visible_corners_fixed_and_commits_fractional_variant_geo
             for (field, value) in variant.as_object().unwrap() { committed["widget"][field] = value.clone(); }
             preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
             preview.render(second).unwrap();
-            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             for (axis, start, size) in [(0, "left", "width"), (1, "top", "height")] {
                 let actual = geometry["content"][start].as_f64().unwrap() + geometry["content"][size].as_f64().unwrap() * fixed[axis];
                 assert!((actual - point[axis]).abs() < 0.003);
@@ -2192,7 +2150,7 @@ fn lean_angle_preview() -> (PreviewSession, Value) {
     let mut preview = PreviewSession::default();
     // Compared against native export, which grid-fits text.
     preview.fonts.set_grid_fit(true);
-    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    let weight = ovrley_widgets::model::catalog::widget_font_weight();
     preview
         .fonts
         .register(
@@ -2276,7 +2234,7 @@ fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_valida
         );
         preview.render(second).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
         assert!(difference <= EXPORT_TILE_TOLERANCE, "lean-angle differs from export by {difference} at {second}");
         assert!(widget.pixels().as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
@@ -2285,7 +2243,7 @@ fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_valida
         assert_eq!(preview.widgets[&id].revision(), revision);
     }
     preview.render(1.0).unwrap();
-    let previous = preview.widgets[&id].pixels().clone();
+    let previous = preview.widgets[&id].pixels().to_vec();
     let revision = preview.widgets[&id].revision();
     preview.render(1.002).unwrap();
     assert_ne!(
@@ -2294,7 +2252,7 @@ fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_valida
         "fill changes within the same integer label"
     );
     assert_ne!(preview.widgets[&id].pixels(), &previous);
-    let original = preview.widgets[&id].pixels().clone();
+    let original = preview.widgets[&id].pixels().to_vec();
     preview.replace_activity(&[]).unwrap();
     preview.render(1.002).unwrap();
     assert_ne!(preview.widgets[&id].pixels(), &original);
@@ -2337,7 +2295,7 @@ fn lean_angle_preview_matches_export_and_tracks_signed_fill_resources_and_valida
     let mut changed = request;
     changed["widget"]["track_filled_color"] = json!("#123456");
     let revision = preview.widgets[&id].revision();
-    let pixels = preview.widgets[&id].pixels().clone();
+    let pixels = preview.widgets[&id].pixels().to_vec();
     preview
         .update_widget(id, serde_json::from_value(changed).unwrap())
         .unwrap();
@@ -2366,7 +2324,7 @@ fn lean_angle_resize_preserves_visible_corners_across_playback_and_commits_diame
             .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
             .unwrap();
         preview.render(0.5).unwrap();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
         assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
@@ -2418,8 +2376,8 @@ fn lean_angle_resize_preserves_visible_corners_across_playback_and_commits_diame
                         .update_widget(id, serde_json::from_value(committed.clone()).unwrap())
                         .unwrap();
                     preview.render(second).unwrap();
-                    let live_geometry = preview.widgets[&id].geometry().clone();
-                    let actual: Value = serde_json::from_slice(&live_geometry).unwrap();
+                    let live_geometry = preview.widgets[&id].geometry().cloned();
+                    let actual: Value = serde_json::to_value(&live_geometry).unwrap();
                     for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
                         let corner = actual["content"][position].as_f64().unwrap()
                             + actual["content"][size].as_f64().unwrap() * fixed[axis];
@@ -2432,7 +2390,7 @@ fn lean_angle_resize_preserves_visible_corners_across_playback_and_commits_diame
                         .update_widget(id, serde_json::from_value(committed).unwrap())
                         .unwrap();
                     preview.render(second).unwrap();
-                    assert_eq!(preview.widgets[&id].geometry(), &live_geometry);
+                    assert_eq!(preview.widgets[&id].geometry(), live_geometry.as_ref());
                 }
             }
         }
@@ -2444,7 +2402,7 @@ fn gradient_preview() -> (PreviewSession, Value) {
     let mut preview = PreviewSession::default();
     // Compared against native export, which grid-fits text.
     preview.fonts.set_grid_fit(true);
-    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    let weight = ovrley_widgets::model::catalog::widget_font_weight();
     preview
         .fonts
         .register(
@@ -2482,14 +2440,8 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
     use ovrley_core::activity::{
         interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity,
     };
-    use ovrley_widgets::{
-        activity::ActivitySampler,
-        widgets::gradient::{
-            format::format_validated_gradient,
-            frame::{prepare_gradient_frame, validated_gradient_style},
-            validation::validate_gradient_widget,
-        },
-    };
+    use ovrley_widgets::activity::ActivitySampler;
+    use ovrley_widgets::widgets::gradient::{format_validated_gradient, prepare_gradient_frame, validated_gradient_style, validate_gradient_widget};
     let (mut preview, mut request) = gradient_preview();
     request["scene"]["opacity"] = json!(0.5);
     let parsed: ParsedActivity = serde_json::from_value(json!({
@@ -2528,13 +2480,13 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         assert_eq!(sampler.gradient_at(second), dense.series.gradient[index]);
         preview.render(second).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let info = ImageInfo::new(
             (
                 geometry["width"].as_i64().unwrap() as i32,
                 geometry["height"].as_i64().unwrap() as i32,
             ),
-            ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
+            ovrley_widgets::render::tile::TEXT_COLOR_TYPE,
             AlphaType::Premul,
             None,
         );
@@ -2576,11 +2528,11 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         revision,
         "triangle changes even when the text does not"
     );
-    let original = preview.widgets[&id].pixels().clone();
+    let original = preview.widgets[&id].pixels().to_vec();
     preview.replace_activity(&[]).unwrap();
     preview.render(1.002).unwrap();
     assert_ne!(preview.widgets[&id].pixels(), &original);
-    let missing = preview.widgets[&id].pixels().clone();
+    let missing = preview.widgets[&id].pixels().to_vec();
     preview.render(3.0).unwrap();
     assert_eq!(preview.widgets[&id].pixels(), &missing);
     preview.replace_activity(&bytes).unwrap();
@@ -2646,7 +2598,7 @@ fn gradient_resize_preserves_all_opposite_corners_during_playback_and_commits_fr
             .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
             .unwrap();
         preview.render(0.5).unwrap();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
         assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
@@ -2693,8 +2645,8 @@ fn gradient_resize_preserves_all_opposite_corners_during_playback_and_commits_fr
                         .update_widget(id, serde_json::from_value(committed.clone()).unwrap())
                         .unwrap();
                     preview.render(second).unwrap();
-                    let live_geometry = preview.widgets[&id].geometry().clone();
-                    let actual: Value = serde_json::from_slice(&live_geometry).unwrap();
+                    let live_geometry = preview.widgets[&id].geometry().cloned();
+                    let actual: Value = serde_json::to_value(&live_geometry).unwrap();
                     let actual = &actual["content"];
                     for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
                         let corner = actual[position].as_f64().unwrap()
@@ -2705,7 +2657,7 @@ fn gradient_resize_preserves_all_opposite_corners_during_playback_and_commits_fr
                         .update_widget(id, serde_json::from_value(committed).unwrap())
                         .unwrap();
                     preview.render(second).unwrap();
-                    assert_eq!(preview.widgets[&id].geometry(), &live_geometry);
+                    assert_eq!(preview.widgets[&id].geometry(), live_geometry.as_ref());
                 }
             }
         }
@@ -2714,15 +2666,12 @@ fn gradient_resize_preserves_all_opposite_corners_during_playback_and_commits_fr
 
 #[test]
 fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
-    use ovrley_widgets::widgets::time::{
-        format::{format_validated_time_parts, ElapsedTimeValues},
-        validation::validate_time_value,
-    };
+    use ovrley_widgets::widgets::time::{format_validated_time_parts, ElapsedTimeValues, validate_time_value};
     let font_dirs = vec![common::test_config::repo_git_root().join("fonts")];
     let mut preview = PreviewSession::default();
     // Compared against native export, which grid-fits text.
     preview.fonts.set_grid_fit(true);
-    let weight = ovrley_widgets::model::standard_widgets::widget_font_weight();
+    let weight = ovrley_widgets::model::catalog::widget_font_weight();
     preview
         .fonts
         .register(
@@ -2775,7 +2724,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
             ] {
                 preview.render(second).unwrap();
                 let widget = &preview.widgets[&id];
-                let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+                let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
                 let validated = validate_time_value(
                     serde_json::from_value(request["widget"].clone()).unwrap(),
                     0,
@@ -2800,7 +2749,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                         geometry["width"].as_i64().unwrap() as i32,
                         geometry["height"].as_i64().unwrap() as i32,
                     ),
-                    ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
+                    ovrley_widgets::render::tile::TEXT_COLOR_TYPE,
                     AlphaType::Premul,
                     None,
                 );
@@ -2842,7 +2791,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                 preview.render(second).unwrap();
                 assert_eq!(preview.widgets[&id].revision(), revision);
             }
-            let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
             let bounds = &geometry["content"];
             for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
                 let point = [
@@ -2872,7 +2821,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                     .unwrap();
                 preview.render(1.75).unwrap();
                 let resized: Value =
-                    serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                    serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
                 let actual = &resized["content"];
                 assert!(
                     (actual["left"].as_f64().unwrap()
@@ -2896,7 +2845,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
         .update_widget(id, serde_json::from_value(request.clone()).unwrap())
         .unwrap();
     preview.render(0.5).unwrap();
-    let original = preview.widgets[&id].pixels().clone();
+    let original = preview.widgets[&id].pixels().to_vec();
     preview.replace_activity(&[]).unwrap();
     preview.render(0.5).unwrap();
     assert_ne!(preview.widgets[&id].pixels(), &original);
@@ -2956,11 +2905,11 @@ fn label_preview() -> (PreviewSession, Value) {
 
 #[test]
 fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revision() {
-    use ovrley_widgets::widgets::label::{style::validated_label_style, validation::validate_label};
+    use ovrley_widgets::widgets::label::{validated_label_style, validate_label};
     let (mut preview, mut request) = label_preview();
     let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
     let widget = &preview.widgets[&id];
-    let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+    let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
     let label = validate_label(&serde_json::from_value(request["widget"].clone()).unwrap(), 0).unwrap();
     let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
     let info = ImageInfo::new(
@@ -2980,13 +2929,13 @@ fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revis
     assert_eq!(&pixels, widget.pixels());
     assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
     let revision = widget.revision();
-    let original_geometry = widget.geometry().clone();
+    let original_geometry = widget.geometry().cloned();
     preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
     for second in [0.0, 1.0, 0.25, 50.0] {
         preview.render(second).unwrap();
         assert_eq!(preview.widgets[&id].revision(), revision);
         assert_eq!(preview.widgets[&id].pixels(), &pixels);
-        assert_eq!(preview.widgets[&id].geometry(), &original_geometry);
+        assert_eq!(preview.widgets[&id].geometry(), original_geometry.as_ref());
     }
     preview.replace_activity(&[]).unwrap();
     preview.render(0.0).unwrap();
@@ -3003,7 +2952,7 @@ fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revis
 fn label_intrinsic_resize_preserves_every_opposite_corner_and_fractional_size() {
     let (mut preview, origin) = label_preview();
     let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
-    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     let bounds = &geometry["content"];
     assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
     for fixed in [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]] {
@@ -3022,7 +2971,7 @@ fn label_intrinsic_resize_preserves_every_opposite_corner_and_fractional_size() 
         let mut committed = origin.clone();
         committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
         preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
-        let resized: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let resized: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let actual = &resized["content"];
         let corner = [
             actual["left"].as_f64().unwrap() + actual["width"].as_f64().unwrap() * fixed[0],
@@ -3058,8 +3007,8 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     preview
         .fonts
         .register(
-            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::standard_widgets::widget_font_weight(), italic: false },
-            &preview_font_resource(&font_dirs, "Inter.ttf", ovrley_widgets::model::standard_widgets::widget_font_weight(), false).unwrap(),
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::catalog::widget_font_weight(), italic: false },
+            &preview_font_resource(&font_dirs, "Inter.ttf", ovrley_widgets::model::catalog::widget_font_weight(), false).unwrap(),
         )
         .unwrap();
     preview
@@ -3083,10 +3032,9 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
         ] {
             preview.render(second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
-            let input: WidgetRequest = serde_json::from_value(request.clone()).unwrap();
-            let validated = validate_value_widget(input.widget, 0).unwrap();
-            let scene = validate_scene_presentation(input.scene).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
+            let validated = validate_value_widget(serde_json::from_value(request["widget"].clone()).unwrap(), 0).unwrap();
+            let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
             let style = validated_value_style(&validated, &scene, scene.scale);
             assert_eq!(style.opacity, 0.4);
             assert_eq!(style.color.a(), 102);
@@ -3095,7 +3043,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
                     geometry["width"].as_i64().unwrap() as i32,
                     geometry["height"].as_i64().unwrap() as i32,
                 ),
-                ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
+                ovrley_widgets::render::tile::TEXT_COLOR_TYPE,
                 AlphaType::Premul,
                 None,
             );
@@ -3140,7 +3088,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
     }
     preview.replace_activity(&[]).unwrap();
     preview.render(0.5).unwrap();
-    let empty = preview.widgets[&id].pixels().clone();
+    let empty = preview.widgets[&id].pixels().to_vec();
     preview.render(1.5).unwrap();
     assert_eq!(preview.widgets[&id].pixels(), &empty);
     request["scene"]["opacity"] = json!(0);
@@ -3176,8 +3124,8 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
     preview
         .fonts
         .register(
-            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::standard_widgets::widget_font_weight(), italic: false },
-            &preview_font_resource(&[root.join("fonts")], "Inter.ttf", ovrley_widgets::model::standard_widgets::widget_font_weight(), false).unwrap(),
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::catalog::widget_font_weight(), italic: false },
+            &preview_font_resource(&[root.join("fonts")], "Inter.ttf", ovrley_widgets::model::catalog::widget_font_weight(), false).unwrap(),
         )
         .unwrap();
     preview
@@ -3194,7 +3142,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
             .update_widget(id, serde_json::from_value(origin.clone()).unwrap())
             .unwrap();
         preview.render(0.5).unwrap();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         assert!(bounds["width"].as_f64().unwrap() < geometry["width"].as_f64().unwrap());
         assert!(bounds["height"].as_f64().unwrap() < geometry["height"].as_f64().unwrap());
@@ -3225,7 +3173,7 @@ fn live_resize_keeps_the_opposite_content_corner_fixed_and_commits_the_same_geom
                     .unwrap();
                 preview.render(1.5).unwrap();
                 let resized: Value =
-                    serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+                    serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
                 let actual = &resized["content"];
                 let corner = [
                     actual["left"].as_f64().unwrap() + actual["width"].as_f64().unwrap() * fixed[0],
@@ -3291,7 +3239,7 @@ fn heading_compass_matches_export_pixels_rotates_continuously_and_validates_at_i
         for (index, second) in seconds.iter().enumerate() {
             preview.render(*second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{mode} heading compass differs from export by {difference} at {second}");
             let revision = widget.revision();
@@ -3300,11 +3248,11 @@ fn heading_compass_matches_export_pixels_rotates_continuously_and_validates_at_i
         }
         // Sub-degree changes keep the readout but still turn the dial.
         preview.render(0.5).unwrap();
-        let previous = preview.widgets[&id].pixels().clone();
+        let previous = preview.widgets[&id].pixels().to_vec();
         preview.render(0.501).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &previous, "{mode} dial turns between whole degrees");
         preview.render(2.0).unwrap();
-        mode_pixels.push(preview.widgets[&id].pixels().clone());
+        mode_pixels.push(preview.widgets[&id].pixels().to_vec());
         for (field, malformed) in [
             ("diameter", Value::Null),
             ("width", json!(200)),
@@ -3335,7 +3283,7 @@ fn heading_compass_resize_preserves_the_fixed_corner_and_scales_pixel_fields() {
     preview.replace_activity(br#"{"sample_elapsed_seconds":[0,3],"heading":[20,200],"trim_end_seconds":3}"#).unwrap();
     let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
     preview.render(1.0).unwrap();
-    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     let bounds = &geometry["content"];
     let fixed = [1.0, 1.0];
     let point = [
@@ -3359,7 +3307,7 @@ fn heading_compass_resize_preserves_the_fixed_corner_and_scales_pixel_fields() {
     committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
     preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
     preview.render(1.0).unwrap();
-    let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let actual: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
         let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
         assert!((corner - point[axis]).abs() < 0.002, "heading compass corner moved on axis {axis}");
@@ -3420,7 +3368,7 @@ fn heart_zones_matches_export_pixels_moves_continuously_and_validates_at_ingress
         for (index, second) in seconds.iter().enumerate() {
             preview.render(*second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{style} heart zones differs from export by {difference} at {second}");
             let revision = widget.revision();
@@ -3429,7 +3377,7 @@ fn heart_zones_matches_export_pixels_moves_continuously_and_validates_at_ingress
         }
         // Sub-bpm changes still move the indicator.
         preview.render(1.0).unwrap();
-        let previous = preview.widgets[&id].pixels().clone();
+        let previous = preview.widgets[&id].pixels().to_vec();
         preview.render(1.001).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &previous, "{style} indicator moves between whole bpm");
         let mut manual = request.clone();
@@ -3544,7 +3492,7 @@ fn altitude_tape_matches_export_pixels_scrolls_continuously_and_validates_at_ing
         for (index, second) in seconds.iter().enumerate() {
             preview.render(*second).unwrap();
             let widget = &preview.widgets[&id];
-            let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+            let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
             let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
             assert!(difference <= EXPORT_TILE_TOLERANCE, "{unit} altitude tape differs from export by {difference} at {second}");
             let revision = widget.revision();
@@ -3553,7 +3501,7 @@ fn altitude_tape_matches_export_pixels_scrolls_continuously_and_validates_at_ing
         }
         // The tape scrolls in whole pixels; 1.28 m between these samples moves it about 4 px.
         preview.render(1.0).unwrap();
-        let previous = preview.widgets[&id].pixels().clone();
+        let previous = preview.widgets[&id].pixels().to_vec();
         preview.render(1.05).unwrap();
         assert_ne!(preview.widgets[&id].pixels(), &previous, "{unit} tape scrolls between whole units");
         for (field, malformed) in [
@@ -3610,7 +3558,7 @@ fn framed_track_resize_reflows_the_frame_and_preserves_the_fixed_corner() {
         preview.replace_activity(activity).unwrap();
         let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
         preview.render(1.0).unwrap();
-        let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         let bounds = &geometry["content"];
         // The fixture scene renders at scale 1.7; the content rectangle is the scaled frame.
         assert!((bounds["width"].as_f64().unwrap() - intrinsic[0] * 1.7).abs() < 0.01, "{display} width");
@@ -3634,7 +3582,7 @@ fn framed_track_resize_reflows_the_frame_and_preserves_the_fixed_corner() {
         committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
         preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
         preview.render(1.0).unwrap();
-        let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let actual: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
         for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
             let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
             assert!((corner - point[axis]).abs() < 0.002, "{display} corner moved on axis {axis}");
@@ -3685,7 +3633,7 @@ fn rolling_chart_matches_export_pixels_slides_with_the_playhead_and_validates_at
     for (index, second) in seconds.iter().enumerate() {
         preview.render(*second).unwrap();
         let widget = &preview.widgets[&id];
-        let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+        let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
         let difference = export_tile_difference(&frames[index], scene_width, &geometry, widget.pixels());
         assert!(difference <= EXPORT_TILE_TOLERANCE, "rolling chart differs from export by {difference} at {second}");
         let revision = widget.revision();
@@ -3694,7 +3642,7 @@ fn rolling_chart_matches_export_pixels_slides_with_the_playhead_and_validates_at
     }
     // The window slides continuously with the playhead.
     preview.render(1.0).unwrap();
-    let previous = preview.widgets[&id].pixels().clone();
+    let previous = preview.widgets[&id].pixels().to_vec();
     preview.render(1.05).unwrap();
     assert_ne!(preview.widgets[&id].pixels(), &previous, "lines slide between samples");
     let six: Vec<Value> = ["speed", "heartrate", "cadence", "power", "temperature", "altitude"]
@@ -3737,7 +3685,7 @@ fn rolling_chart_resize_reflows_the_plot_and_preserves_the_fixed_corner() {
     preview.replace_activity(&every_family_activity()).unwrap();
     let id = preview.create_widget(serde_json::from_value(origin.clone()).unwrap()).unwrap();
     preview.render(1.0).unwrap();
-    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     let bounds = &geometry["content"];
     // The fixture scene renders at scale 1.7; the legend row adds 1.6 legend font sizes below the plot.
     let legend = 14.0 * 1.6;
@@ -3760,7 +3708,7 @@ fn rolling_chart_resize_reflows_the_plot_and_preserves_the_fixed_corner() {
     committed["widget"].as_object_mut().unwrap().extend(patch.as_object().unwrap().clone());
     preview.update_widget(id, serde_json::from_value(committed).unwrap()).unwrap();
     preview.render(1.0).unwrap();
-    let actual: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let actual: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     for (axis, position, size) in [(0, "left", "width"), (1, "top", "height")] {
         let corner = actual["content"][position].as_f64().unwrap() + actual["content"][size].as_f64().unwrap() * fixed[axis];
         assert!((corner - point[axis]).abs() < 0.002, "rolling chart corner moved on axis {axis}");
@@ -3779,14 +3727,14 @@ fn rolling_chart_resize_reflows_the_plot_and_preserves_the_fixed_corner() {
     }
     preview.update_widget(id, serde_json::from_value(narrow).unwrap()).unwrap();
     preview.render(1.0).unwrap();
-    let wrapped: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let wrapped: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     assert!((wrapped["content"]["height"].as_f64().unwrap() - (120.25 + legend) * 1.7).abs() < 0.01);
 }
 
 /// The request a test last committed to `id`, rebuilt from the fixture with its committed frame.
 fn committed_request(preview: &PreviewSession, id: u32) -> Value {
     let (_, mut request) = rolling_chart_preview();
-    let geometry: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+    let geometry: Value = serde_json::to_value(preview.widgets[&id].geometry()).unwrap();
     let scale = 1.7;
     let legend = 14.0 * 1.6;
     request["widget"].as_object_mut().unwrap().extend(json!({

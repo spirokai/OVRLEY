@@ -21,12 +21,9 @@ use ovrley_core::normalize::{
 };
 use ovrley_core::render::surface::{create_surface, native_n32_image_info};
 use ovrley_widgets::render::text::resolve_font;
-use ovrley_widgets::widgets::heading::layout::prepare_heading_cache;
-use ovrley_widgets::widgets::heading::geometry::{
-    chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position,
-    visible_labels, visible_ticks, TapeTick,
-};
-use ovrley_widgets::widgets::heading::{layout::HeadingCache, validation::ValidatedHeading};
+use ovrley_widgets::widgets::heading::prepare_heading_cache;
+use ovrley_widgets::widgets::heading::{chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position, visible_labels, visible_ticks, TapeTick};
+use ovrley_widgets::widgets::heading::{HeadingCache, ValidatedHeading};
 use ovrley_widgets::render::text::origin_x_for_centered_text;
 use std::collections::BTreeMap;
 

@@ -1,13 +1,15 @@
-//! The compiled widget and display catalog (Phase 3, D2): the one Rust reader of
-//! `assets/standard-widgets.json` and `assets/standard-metrics.json`.
+//! The compiled widget and display catalog: the one reader of `assets/standard-widgets.json`
+//! and `assets/standard-metrics.json`, and the metric and display enums they define.
 //!
-//! Compiling resolves the manifests' inheritance once, as `widget-catalog.js` does: widget and
-//! display defaults layered over the manifest-wide defaults, data presets, mode defaults, config
-//! keys, variant keys and drawer groups. Both template normalization (`ovrley_core`) and the
-//! native editor read it. Insertion order of the manifests' objects is kept (serde_json's
-//! `preserve_order`), because key lists such as `variant_keys` follow it, as in JavaScript.
-
-use serde::Deserialize;
+//! Compiling resolves the manifests' inheritance once: widget and display defaults layered over
+//! the manifest-wide defaults, data presets, mode defaults, config keys, variant keys, drawer
+//! groups and widget telemetry. Template normalization, export and the editor all read it.
+//! Insertion order of the manifests' objects is kept (serde_json's `preserve_order`), because
+//! key lists such as `variant_keys` follow it.
+use crate::model::telemetry::{ActivitySeries, WidgetTelemetry};
+use crate::widgets::heart_zones::HeartZoneModel;
+use ovrley_map::MapStyleId;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -128,21 +130,73 @@ pub struct ChartLimits {
 
 /// A labelled choice in the manifest (time modes, elapsed origins).
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ManifestChoice {
     pub value: String,
     pub label_key: String,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
+    #[serde(default)]
+    pub default_label: Option<String>,
+    /// Extra telemetry the choice needs.
+    #[serde(default)]
+    pub activity: Vec<ActivitySeries>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RawMode {
+    value: String,
+    label_key: String,
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    icon: Option<IconRef>,
+    #[serde(default)]
+    activity: Vec<ActivitySeries>,
+    #[serde(default)]
+    defaults: Map<String, Value>,
 }
 
 /// A display mode (the lap timer's), with its compiled defaults.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DisplayMode {
     pub value: String,
+    pub label_key: String,
+    pub label: Option<String>,
+    pub icon: Option<IconRef>,
+    /// Extra telemetry the mode needs.
+    pub activity: Vec<ActivitySeries>,
     /// The display's mode defaults, the mode's own defaults, and the fields the mode sets.
     pub defaults: Map<String, Value>,
-    pub raw: Map<String, Value>,
+}
+
+/// How a standard metric formats its value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MetricFormatter {
+    Speed,
+    Temperature,
+    Pace,
+    Integer,
+    Decimal,
+    Balance,
+    Shutter,
+    Aperture,
+    Ev,
+    Gear,
+    GasMix,
+    Coordinates,
+    Distance,
+    Elevation,
+    LapTimer,
+    Splits,
+}
+
+/// Whether a metric offers a unit choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UnitsMode {
+    Selectable,
+    Hidden,
 }
 
 #[derive(Deserialize)]
@@ -174,9 +228,9 @@ struct RawDisplay {
     forbidden_frame_fields: Vec<String>,
     required_positive_fields: Vec<String>,
     #[serde(default)]
-    zone_model: Option<Value>,
+    zone_model: Option<HeartZoneModel>,
     #[serde(default)]
-    major_tick_intervals: Option<Value>,
+    major_tick_intervals: Option<Vec<u32>>,
 }
 
 /// A display type: defaults, geometry, modes and optional fields.
@@ -205,12 +259,13 @@ pub struct DisplayDefinition {
     pub variant_keys: Vec<String>,
     /// The geometry bindings' targets.
     pub geometry_keys: Vec<String>,
-    pub zone_model: Option<Value>,
-    pub major_tick_intervals: Option<Value>,
+    /// Coggan zone shares; declared only by `heart_zones`.
+    pub zone_model: Option<HeartZoneModel>,
+    /// Tape units between major ticks; declared only by `altitude_tape`.
+    pub major_tick_intervals: Option<Vec<u32>>,
 }
 
 impl DisplayDefinition {
-    /// `requireDisplayMode`.
     pub fn require_mode(&self, value: &str) -> Result<&DisplayMode, String> {
         self.modes
             .iter()
@@ -253,9 +308,9 @@ struct RawWidget {
     #[serde(default)]
     supported_display_units: Vec<UnitOption>,
     #[serde(default)]
-    formatter: Option<String>,
+    formatter: Option<MetricFormatter>,
     #[serde(default)]
-    units_mode: Option<String>,
+    units_mode: Option<UnitsMode>,
     #[serde(default)]
     max_decimals: Option<u32>,
     #[serde(default)]
@@ -265,13 +320,15 @@ struct RawWidget {
     #[serde(default)]
     chart_limits: Option<ChartLimits>,
     #[serde(default)]
-    activity: Option<Value>,
+    activity: Option<WidgetTelemetry>,
+    /// Read by the build script's activity schema only.
+    #[serde(default, rename = "interpolation")]
+    _interpolation: serde::de::IgnoredAny,
     #[serde(default)]
-    interpolation: Option<Value>,
-    #[serde(default)]
-    series_palette: Option<Value>,
-    #[serde(default)]
-    data_source: Option<Value>,
+    series_palette: Vec<String>,
+    /// Read by the build script's activity schema only.
+    #[serde(default, rename = "dataSource")]
+    _data_source: serde::de::IgnoredAny,
 }
 
 /// A widget type: canonical defaults and capabilities.
@@ -305,8 +362,8 @@ pub struct WidgetDefinition {
     pub optional_fields: Vec<String>,
     pub initializers: Vec<String>,
     pub supported_display_units: Vec<UnitOption>,
-    pub formatter: Option<String>,
-    pub units_mode: Option<String>,
+    pub formatter: Option<MetricFormatter>,
+    pub units_mode: Option<UnitsMode>,
     /// `id`, the defaults' keys, the optional fields, and every mode field of its displays.
     pub config_keys: Vec<String>,
     pub has_decimal_control: bool,
@@ -314,14 +371,19 @@ pub struct WidgetDefinition {
     pub modes: Vec<ManifestChoice>,
     pub elapsed_origins: Vec<ManifestChoice>,
     pub chart_limits: Option<ChartLimits>,
-    pub activity: Option<Value>,
-    pub interpolation: Option<Value>,
-    pub series_palette: Option<Value>,
-    pub data_source: Option<Value>,
+    /// Telemetry the widget reads; absent for static widgets.
+    pub activity: Option<WidgetTelemetry>,
+    /// Rolling-chart series colours.
+    pub series_palette: Vec<String>,
 }
 
 impl WidgetDefinition {
-    /// `getDisplayTypeLabelKey`: a widget may name a shared display after its own metric.
+    /// The unit a new widget of this metric shows.
+    pub fn default_display_unit(&self) -> Option<&str> {
+        self.defaults.get("display_unit")?.as_str()
+    }
+
+    /// A widget may name a shared display after its own metric.
     pub fn display_type_label_key<'a>(
         &'a self,
         catalog: &'a Catalog,
@@ -441,36 +503,29 @@ fn layered(layers: &[&Map<String, Value>]) -> Map<String, Value> {
 fn compile_display(kind: &str, merged: Map<String, Value>) -> Result<DisplayDefinition, String> {
     let raw: RawDisplay = serde_json::from_value(Value::Object(merged))
         .map_err(|error| format!("display {kind}: {error}"))?;
-    let modes =
-        raw.modes
-            .iter()
-            .map(|mode| {
-                let value = mode
-                    .get("value")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| format!("display {kind}: a mode has no value"))?
-                    .to_string();
-                let own = match mode.get("defaults") {
-                    Some(Value::Object(defaults)) => defaults.clone(),
-                    None => Map::new(),
-                    Some(other) => return Err(format!(
-                        "display {kind} mode {value}: defaults must be an object, found {other}"
-                    )),
-                };
-                let mut defaults = layered(&[&raw.mode_defaults, &own]);
-                for (target, source) in &raw.mode_fields {
-                    defaults.insert(
-                        target.clone(),
-                        mode.get(source).cloned().unwrap_or(Value::Null),
-                    );
-                }
-                Ok(DisplayMode {
-                    value,
-                    defaults,
-                    raw: mode.clone(),
-                })
+    let modes = raw
+        .modes
+        .iter()
+        .map(|fields| {
+            let mode: RawMode = serde_json::from_value(Value::Object(fields.clone()))
+                .map_err(|error| format!("display {kind} mode: {error}"))?;
+            let mut defaults = layered(&[&raw.mode_defaults, &mode.defaults]);
+            for (target, source) in &raw.mode_fields {
+                defaults.insert(
+                    target.clone(),
+                    fields.get(source).cloned().unwrap_or(Value::Null),
+                );
+            }
+            Ok(DisplayMode {
+                value: mode.value,
+                label_key: mode.label_key,
+                label: mode.label,
+                icon: mode.icon,
+                activity: mode.activity,
+                defaults,
             })
-            .collect::<Result<Vec<_>, String>>()?;
+        })
+        .collect::<Result<Vec<_>, String>>()?;
     let mut variant_keys: Vec<String> = raw.variant_defaults.keys().cloned().collect();
     variant_keys.extend(raw.conditional_keys.iter().cloned());
     Ok(DisplayDefinition {
@@ -611,11 +666,24 @@ impl Catalog {
                         })?;
                     display.mode_fields.iter().for_each(|(field, _)| add(field));
                 }
-                let formatter = raw.formatter.as_deref();
+                if let Some(activity) = &raw.activity {
+                    if !activity.sources.iter().all(|source| source.is_numeric()) {
+                        return Err(format!(
+                            "widget {kind}: sources must be numeric activity columns"
+                        ));
+                    }
+                    if raw.plottable && activity.sources.is_empty() {
+                        return Err(format!(
+                            "widget {kind}: plottable metrics need numeric sources"
+                        ));
+                    }
+                }
                 widgets.push(WidgetDefinition {
                     has_decimal_control: raw.max_decimals.is_some()
-                        || formatter == Some("decimal")
-                        || formatter == Some("temperature"),
+                        || matches!(
+                            raw.formatter,
+                            Some(MetricFormatter::Decimal | MetricFormatter::Temperature)
+                        ),
                     max_decimals: raw.max_decimals.unwrap_or(1),
                     kind: raw.kind,
                     name_key: raw.name_key,
@@ -650,9 +718,7 @@ impl Catalog {
                     elapsed_origins: raw.elapsed_origins,
                     chart_limits: raw.chart_limits,
                     activity: raw.activity,
-                    interpolation: raw.interpolation,
                     series_palette: raw.series_palette,
-                    data_source: raw.data_source,
                 });
             }
         }
@@ -693,8 +759,8 @@ impl Catalog {
         Ok(catalog)
     }
 
-    /// `compileDrawerGroups`: each group's options must offer its member widgets and preset only
-    /// their defaults, or the manifest fails to load.
+    /// Each drawer group's options must offer its member widgets and preset only their defaults,
+    /// or the manifest fails to load.
     fn compile_drawer_groups(
         &self,
         raw_groups: &Map<String, Value>,
@@ -772,7 +838,6 @@ impl Catalog {
             .find(|definition| definition.kind == kind)
     }
 
-    /// `requireWidgetTypeDefinition`.
     pub fn require_widget(&self, kind: &str) -> Result<&WidgetDefinition, String> {
         self.widget(kind)
             .ok_or_else(|| format!("Unknown widget type: {kind}"))
@@ -805,7 +870,7 @@ impl Catalog {
             .map(|(_, scale)| *scale)
     }
 
-    /// `isFramedWidget`: whether a widget's active presentation has a bounded frame.
+    /// Whether a widget's active presentation has a bounded frame.
     pub fn is_framed(&self, kind: &str, display_type: Option<&str>) -> bool {
         let layout = match display_type {
             Some(display) => self.require_display(display).layout_mode,
@@ -820,7 +885,7 @@ impl Catalog {
 static CATALOG: OnceLock<Catalog> = OnceLock::new();
 
 /// The catalog compiled from the bundled manifests. A broken manifest is a build defect and
-/// panics, as the JavaScript module fails to load.
+/// panics.
 pub fn catalog() -> &'static Catalog {
     CATALOG.get_or_init(|| {
         Catalog::compile(
@@ -834,6 +899,234 @@ pub fn catalog() -> &'static Catalog {
             )),
         )
         .unwrap_or_else(|error| panic!("the widget manifests do not compile: {error}"))
+    })
+}
+
+include!(concat!(env!("OUT_DIR"), "/metric_kinds.rs"));
+
+/// How a value widget presents its metric.
+///
+/// Templates that omit the field, or carry `null` or an unknown key, present as `Text`.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum DisplayType {
+    #[default]
+    Text,
+    Linear,
+    Arc,
+    Corner,
+    GtGauge,
+    HeadingTape,
+    HeadingCompass,
+    HeartZones,
+    AltitudeTape,
+    LeanAngle,
+    GForce,
+    LapTimer,
+    SplitsRun,
+}
+
+impl DisplayType {
+    pub const ALL: [Self; 13] = [
+        Self::Text,
+        Self::Linear,
+        Self::Arc,
+        Self::Corner,
+        Self::GtGauge,
+        Self::HeadingTape,
+        Self::HeadingCompass,
+        Self::HeartZones,
+        Self::AltitudeTape,
+        Self::LeanAngle,
+        Self::GForce,
+        Self::LapTimer,
+        Self::SplitsRun,
+    ];
+
+    /// The display's manifest key.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Text => "text",
+            Self::Linear => "linear",
+            Self::Arc => "arc",
+            Self::Corner => "corner",
+            Self::GtGauge => "gt_gauge",
+            Self::HeadingTape => "heading_tape",
+            Self::HeadingCompass => "heading_compass",
+            Self::HeartZones => "heart_zones",
+            Self::AltitudeTape => "altitude_tape",
+            Self::LeanAngle => "lean_angle",
+            Self::GForce => "g_force",
+            Self::LapTimer => "lap_timer",
+            Self::SplitsRun => "splits_run",
+        }
+    }
+
+    /// Every value display is declared by the manifests.
+    pub fn layout_mode(self) -> LayoutMode {
+        catalog().require_display(self.as_str()).layout_mode
+    }
+}
+
+impl Serialize for DisplayType {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for DisplayType {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let key = Value::deserialize(deserializer)?;
+        Ok(Self::ALL
+            .into_iter()
+            .find(|display| key.as_str() == Some(display.as_str()))
+            .unwrap_or_default())
+    }
+}
+
+/// Visual representation mode for a backdrop widget; unknown keys and `null` are rejected.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackdropType {
+    Circle,
+    #[default]
+    Rectangle,
+}
+
+impl BackdropType {
+    /// The display's manifest key.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            BackdropType::Circle => "circle",
+            BackdropType::Rectangle => "rectangle",
+        }
+    }
+}
+
+/// Rectangle edge that carries a coloured backdrop strip.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BackdropEdge {
+    Top,
+    Right,
+    Bottom,
+    Left,
+}
+
+/// Geometry/paint mode used by gauge tracks.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TrackFillStyle {
+    #[default]
+    Fill,
+    Bars,
+}
+
+impl TrackFillStyle {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fill => "fill",
+            Self::Bars => "bars",
+        }
+    }
+}
+
+impl Catalog {
+    /// A current standard metric: one with a formatter, display units and an icon. Specialized
+    /// values (time, gradient) and plots have none.
+    pub fn standard_metric(&self, kind: MetricKind) -> Option<&WidgetDefinition> {
+        self.widget(kind.as_str())
+            .filter(|definition| definition.metric && definition.current)
+    }
+
+    /// The rendered label of a standard metric's display unit (its default when `None`).
+    pub fn unit_label(&self, kind: MetricKind, display_unit: Option<&str>) -> &str {
+        let Some(definition) = self.standard_metric(kind) else {
+            return "";
+        };
+        let unit = display_unit.or_else(|| definition.default_display_unit());
+        definition
+            .supported_display_units
+            .iter()
+            .find(|option| Some(option.value.as_str()) == unit)
+            .and_then(|option| {
+                option
+                    .render_label
+                    .as_deref()
+                    .or(option.label.as_deref())
+                    .or(option.default_label.as_deref())
+            })
+            .unwrap_or("")
+    }
+
+    /// Whether a metric may present as `display`: one of its displays, or its only default.
+    pub fn supports_display(&self, kind: MetricKind, display: DisplayType) -> bool {
+        self.widget(kind.as_str()).is_some_and(|definition| {
+            if definition.display_types.is_empty() {
+                definition
+                    .defaults
+                    .get("display_type")
+                    .and_then(Value::as_str)
+                    == Some(display.as_str())
+            } else {
+                definition
+                    .display_types
+                    .iter()
+                    .any(|key| key == display.as_str())
+            }
+        })
+    }
+}
+
+/// Coggan zone shares of the heart-zones display.
+pub fn heart_zone_model() -> &'static HeartZoneModel {
+    catalog()
+        .require_display(DisplayType::HeartZones.as_str())
+        .zone_model
+        .as_ref()
+        .expect("heart_zones display must declare zoneModel")
+}
+
+/// Tape units between major ticks the altitude tape offers.
+pub fn altitude_tape_major_tick_intervals() -> &'static [u32] {
+    catalog()
+        .require_display(DisplayType::AltitudeTape.as_str())
+        .major_tick_intervals
+        .as_deref()
+        .expect("altitude_tape display must declare majorTickIntervals")
+}
+
+/// Shared weight for text outside label widgets.
+pub fn widget_font_weight() -> f32 {
+    catalog().widget_font_weight
+}
+
+pub fn time_icon_asset_file() -> &'static str {
+    catalog()
+        .require_widget("time")
+        .expect("the catalog defines time")
+        .icon
+        .asset_file
+        .as_deref()
+        .expect("time icon must declare assetFile")
+}
+
+pub fn chart_limits() -> ChartLimits {
+    catalog()
+        .require_widget("rolling_chart")
+        .expect("the catalog defines rolling_chart")
+        .chart_limits
+        .expect("rolling_chart must declare chartLimits")
+}
+
+/// The style a new map widget draws, which every build must install.
+pub fn default_map_style() -> &'static MapStyleId {
+    static STYLE: OnceLock<MapStyleId> = OnceLock::new();
+    STYLE.get_or_init(|| {
+        let map = catalog()
+            .require_widget("map")
+            .expect("the catalog defines map");
+        serde_json::from_value(map.defaults["map_style"].clone())
+            .expect("map defaults must name a map style")
     })
 }
 
@@ -979,5 +1272,41 @@ mod tests {
         assert!(catalog.is_framed("speed", Some("linear")));
         assert!(!catalog.is_framed("speed", Some("text")));
         assert!(catalog.is_framed("raster", None));
+    }
+
+    #[test]
+    fn manifest_modes_have_native_renderers() {
+        use crate::widgets::lap_timer::LapTimerMode;
+        use crate::widgets::time::{ElapsedTimeOrigin, TimeMode};
+        let time = catalog().require_widget("time").unwrap();
+        assert!(time
+            .modes
+            .iter()
+            .all(|mode| TimeMode::parse(&mode.value).is_some()));
+        assert!(time
+            .elapsed_origins
+            .iter()
+            .all(|origin| ElapsedTimeOrigin::parse(&origin.value).is_some()));
+        assert!(catalog()
+            .require_display("lap_timer")
+            .modes
+            .iter()
+            .all(|mode| LapTimerMode::parse(&mode.value).is_some()));
+    }
+
+    #[test]
+    fn metadata_matches_the_manifest() {
+        assert_eq!(widget_font_weight(), 700.0);
+        assert_eq!(time_icon_asset_file(), "widget-time.svg");
+        let limits = chart_limits();
+        assert_eq!(
+            (
+                limits.max_series,
+                limits.min_window_seconds,
+                limits.max_window_seconds
+            ),
+            (5, 5.0, 300.0)
+        );
+        assert_eq!(default_map_style(), &MapStyleId::new("liberty").unwrap());
     }
 }

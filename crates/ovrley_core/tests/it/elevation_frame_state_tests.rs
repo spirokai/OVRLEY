@@ -13,10 +13,8 @@
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity};
 use ovrley_core::normalize::ValidatedSceneConfig;
-use ovrley_widgets::widgets::elevation::{
-    geometry::{build_elevation_completed_points, ElevationGeometry},
-    validation::ValidatedElevationPlot,
-};
+use ovrley_widgets::widgets::elevation::geometry::{build_elevation_completed_points, ElevationGeometry};
+use ovrley_widgets::widgets::elevation::ValidatedElevationPlot;
 use std::collections::BTreeMap;
 
 fn minimal_scene() -> ValidatedSceneConfig {

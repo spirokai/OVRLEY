@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use ovrley_core::media::video_edits::TimezoneMode;
-use ovrley_widgets::model::document::js_round;
-use ovrley_widgets::widgets::lap_timer::format::format_lap_duration;
+use ovrley_widgets::model::document::round_half_up;
+use ovrley_widgets::widgets::lap_timer::format_lap_duration;
 use serde::{Deserialize, Serialize};
 use crate::dialogs::{filename_from_selected_path, open_single_path, DialogOptions};
 use crate::features::import::{probe_video, queue_telemetry_extraction, LAST_VIDEO_IMPORT_DIR_KEY, VIDEO_EXTENSIONS};
@@ -145,7 +145,7 @@ pub fn activity_drawer_view(store: &Store) -> Option<ActivityDrawerView> {
     let distance = if meters >= 1000.0 {
         format!("{} km", format_locale_number(meters / 1000.0, 2))
     } else {
-        format!("{} m", format_locale_number(js_round(meters), 3))
+        format!("{} m", format_locale_number(round_half_up(meters), 3))
     };
     let mut metadata = vec![
         ActivityRow { label: t("toolbar.startTime"), value: start_time },

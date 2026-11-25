@@ -1,7 +1,9 @@
-use crate::error::{WidgetError, WidgetResult};
+//! Scene presentation shared by every widget, validated once per scene.
 use crate::model::validation::{
-    require_f32, require_non_negative_f32, require_positive_f32, require_positive_u32,
+    require_f32, require_hex_color, require_non_negative_f32, require_positive_f32,
+    require_positive_u32,
 };
+use crate::{WidgetError, WidgetResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -89,20 +91,12 @@ pub fn validate_scene_presentation(
         ));
     }
 
-    let shadow_strength = require_f32(raw.shadow_strength, "scene.shadow_strength")?;
-    require_non_negative_f32(shadow_strength, "scene.shadow_strength")?;
-    let shadow_distance = require_f32(raw.shadow_distance, "scene.shadow_distance")?;
-    require_non_negative_f32(shadow_distance, "scene.shadow_distance")?;
-    let shadow_color = crate::model::validation::require_hex_color(
-        raw.shadow_color.as_deref(),
-        "scene.shadow_color",
-    )?;
-    let border_thickness = require_f32(raw.border_thickness, "scene.border_thickness")?;
-    require_non_negative_f32(border_thickness, "scene.border_thickness")?;
-    let border_color = crate::model::validation::require_hex_color(
-        raw.border_color.as_deref(),
-        "scene.border_color",
-    )?;
+    let shadow_strength = require_non_negative_f32(raw.shadow_strength, "scene.shadow_strength")?;
+    let shadow_distance = require_non_negative_f32(raw.shadow_distance, "scene.shadow_distance")?;
+    let shadow_color = require_hex_color(raw.shadow_color.as_deref(), "scene.shadow_color")?;
+    let border_thickness =
+        require_non_negative_f32(raw.border_thickness, "scene.border_thickness")?;
+    let border_color = require_hex_color(raw.border_color.as_deref(), "scene.border_color")?;
 
     Ok(ValidatedScenePresentation {
         width,

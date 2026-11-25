@@ -4,7 +4,7 @@ use ovrley_core::commands::validate_config_value;
 use ovrley_core::normalize::parse_template_value;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::render::text::measure_text;
-use ovrley_widgets::widgets::label::style::validated_label_style;
+use ovrley_widgets::widgets::label::validated_label_style;
 use serde_json::json;
 
 #[test]

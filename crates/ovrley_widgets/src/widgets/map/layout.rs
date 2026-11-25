@@ -1,39 +1,20 @@
-//! What the widget draws itself: the flat placeholder, the marker, the attribution and the border.
-//! The map and the route arrive inside the frame.
-//!
-//! The renderer crops the map to the shape, so preview and export crop it the same way. This clips
-//! what the widget draws over it to that shape.
-//!
-//! The caret on a real map is a small extruded solid with a flat top, standing on the road at the
-//! rider, seen through the map's own camera and lit by the buildings' light, with a soft shadow on the
-//! ground beneath it. It draws in Skia over the finished frame, so preview and export share it and
-//! buildings never hide it.
-use super::validation::{MapShape, ValidatedMapWidget};
-use crate::{
-    error::{WidgetError, WidgetResult},
-    model::scene::ValidatedScenePresentation,
-    render::{
-        preview::PreviewRasterScale,
-        text::{parse_color, resolve_font, FontResolver},
-    },
-    widgets::{
-        plot_marker::{plot_marker_radius, MarkerVariant, PlotMarker},
-        route::{
-            geometry::ProgressLine,
-            layout::{stroke_paint, SplitStroke},
-        },
-    },
-};
+//! Map widget layout: frame shape, marker pose, attribution, border and the top-down route.
+use crate::model::scene::ValidatedScenePresentation;
+use crate::render::text::{parse_color, resolve_font, FontResolver};
+use crate::render::tile::PreviewRasterScale;
+use crate::widgets::map::{MapShape, ValidatedMapWidget};
+use crate::widgets::plot_marker::{plot_marker_radius, MarkerVariant, PlotMarker};
+use crate::widgets::route::geometry::{stroke_paint, ProgressLine, SplitStroke};
+use crate::{WidgetError, WidgetResult};
 use ovrley_map::{MapCamera, MapRouteStyle, MapStyleInfo, MapViewport, ViewState, LIGHT_XY};
+use skia_safe::paint::Style;
 use skia_safe::{
-    paint::Style, AlphaType, BlurStyle, Canvas, Color, ContourMeasure, ContourMeasureIter,
-    FilterMode, Font, IRect, Image, MaskFilter, Paint, PaintJoin, PaintStyle, Path, PathBuilder,
-    Point, RRect, RSXform, Rect, TextBlob,
+    AlphaType, BlurStyle, Canvas, Color, ContourMeasure, ContourMeasureIter, FilterMode, Font,
+    IRect, Image, MaskFilter, Paint, PaintJoin, PaintStyle, Path, PathBuilder, Point, RRect,
+    RSXform, Rect, TextBlob,
 };
-use std::{
-    f32::consts::FRAC_1_SQRT_2,
-    sync::{Arc, LazyLock},
-};
+use std::f32::consts::FRAC_1_SQRT_2;
+use std::sync::{Arc, LazyLock};
 
 /// The map's sources by name: the tile host, the tile schema and the data.
 pub const ATTRIBUTION: &str = "OpenFreeMap \u{a9} OpenMapTiles \u{a9} OpenStreetMap";
@@ -47,11 +28,22 @@ const ATTRIBUTION_MAX_EDGE_SHARE: f32 = 0.9;
 /// `frame` with `lines` stroked over it, in its output pixels: round caps and joins, `width_px`
 /// wide, in `color`. Each line is stroked on its own, so a gap between lines stays open. Sync
 /// Doctor's top-down map strokes its course into each frame once, so playback never redraws it.
-pub fn stroke_lines_over_frame(frame: &super::preview::MapFramePixels, lines: &[Vec<(f32, f32)>], color: [u8; 3], width_px: f32) -> WidgetResult<super::preview::MapFramePixels> {
+pub fn stroke_lines_over_frame(
+    frame: &crate::widgets::map::preview::MapFramePixels,
+    lines: &[Vec<(f32, f32)>],
+    color: [u8; 3],
+    width_px: f32,
+) -> WidgetResult<crate::widgets::map::preview::MapFramePixels> {
     let image = frame.image();
     let (width, height) = (image.width(), image.height());
-    let info = skia_safe::ImageInfo::new((width, height), skia_safe::ColorType::RGBA8888, AlphaType::Premul, None);
-    let mut surface = skia_safe::surfaces::raster(&info, None, None).ok_or_else(|| WidgetError::Render("unable to create a course surface".into()))?;
+    let info = skia_safe::ImageInfo::new(
+        (width, height),
+        skia_safe::ColorType::RGBA8888,
+        AlphaType::Premul,
+        None,
+    );
+    let mut surface = skia_safe::surfaces::raster(&info, None, None)
+        .ok_or_else(|| WidgetError::Render("unable to create a course surface".into()))?;
     let canvas = surface.canvas();
     canvas.draw_image(image, (0, 0), None);
     let mut paint = Paint::default();
@@ -71,9 +63,11 @@ pub fn stroke_lines_over_frame(frame: &super::preview::MapFramePixels, lines: &[
     }
     let mut pixels = vec![0_u8; width as usize * height as usize * 4];
     if !surface.read_pixels(&info, &mut pixels, width as usize * 4, (0, 0)) {
-        return Err(WidgetError::Render("unable to read the course surface".into()));
+        return Err(WidgetError::Render(
+            "unable to read the course surface".into(),
+        ));
     }
-    super::preview::MapFramePixels::new(width as u32, height as u32, pixels)
+    crate::widgets::map::preview::MapFramePixels::new(width as u32, height as u32, pixels)
 }
 
 fn color_floats(color: &str, opacity: f32) -> [f32; 4] {

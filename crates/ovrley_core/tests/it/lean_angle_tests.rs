@@ -2,8 +2,8 @@ use crate::common;
 
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_widgets::render::preview::PreviewRasterScale;
-use ovrley_widgets::widgets::lean_angle::layout::prepare_lean_angle_cache;
+use ovrley_widgets::render::tile::PreviewRasterScale;
+use ovrley_widgets::widgets::lean_angle::prepare_lean_angle_cache;
 use std::collections::BTreeMap;
 
 #[test]
@@ -19,7 +19,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
     })
     .unwrap();
 
-    let ovrley_widgets::widgets::value::validation::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
+    let ovrley_widgets::widgets::value::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
         panic!("lean_angle display type must use the dedicated prepared value");
     };
     assert_eq!(widget.diameter, 180.0);
@@ -101,7 +101,7 @@ fn gradient_fill_mirrors_from_upright_to_either_lean_direction() {
         { "offset": 1, "color": "#0000ff" },
     ]);
     let config = validate_render_config(render_config_with_lean_angle(value)).unwrap();
-    let ovrley_widgets::widgets::value::validation::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
+    let ovrley_widgets::widgets::value::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
         panic!("lean_angle display type must use the dedicated prepared value");
     };
     let cache = prepare_lean_angle_cache(widget, &config.scene.presentation, PreviewRasterScale::NATIVE).unwrap();

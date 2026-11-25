@@ -6,7 +6,7 @@ use blocks::Block;
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::fonts::FontFamily;
 use ovrley_widgets::model::catalog::{catalog, AltitudeSource, IconRef};
-use ovrley_widgets::model::document::{convert_altitude_value, create_widget_defaults, font_family_name, js_round, merge_widget_data, number, resolve_active_widget_data, widget_id, Collection, OverlayConfig, WidgetCreationOptions, WidgetData, WidgetSelection};
+use ovrley_widgets::model::document::{convert_altitude_value, create_widget_defaults, font_family_name, round_half_up, merge_widget_data, number, resolve_active_widget_data, widget_id, Collection, OverlayConfig, WidgetCreationOptions, WidgetData, WidgetSelection};
 use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
 use rules::{parse_integer, parse_number_text, Input, Patch, RuleContext};
 use sections::Ctx;
@@ -377,7 +377,7 @@ pub fn set_numeric_field(store: &mut Store, widget_id: &str, key: &str, raw: &st
     }
     let mut parsed = if options.integer { parse_integer(raw, options.fallback)? } else { parse_number_text(raw) };
     if options.round {
-        parsed = js_round(parse_number_text(raw));
+        parsed = round_half_up(parse_number_text(raw));
     }
     if !parsed.is_finite() {
         return Err(format!("Invalid numeric value for {key}"));
@@ -1085,7 +1085,7 @@ pub fn starting_altitude_placeholder(widget: &ConfigWidget, activity: Option<&Pa
     }
     let meters = starting_altitude(activity, source)?;
     let unit = widget.data.get(&source.unit_field).and_then(Value::as_str).unwrap_or("m");
-    Some(js_round(convert_altitude_value(meters, "m", unit)))
+    Some(round_half_up(convert_altitude_value(meters, "m", unit)))
 }
 
 /// One option of the font select.

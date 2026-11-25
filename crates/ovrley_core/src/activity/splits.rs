@@ -6,7 +6,7 @@
 
 use super::finalize::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
 use super::schema::ParsedActivity;
-use ovrley_widgets::widgets::splits_run::table::{CompletedSplit, SplitLength, SplitTable};
+use ovrley_widgets::widgets::splits_run::{CompletedSplit, SplitLength, SplitTable};
 
 /// Zero-phase smoothing horizon of the running split's average pace.
 const LIVE_PACE_SMOOTHING_SECONDS: f64 = 5.0;
@@ -98,7 +98,7 @@ fn derive_splits(elapsed: &[f64], distance: &[Option<f64>], length: SplitLength)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ovrley_widgets::widgets::splits_run::table::SplitUnit;
+    use ovrley_widgets::widgets::splits_run::SplitUnit;
 
     const KILOMETER: SplitLength = SplitLength { distance: 1.0, unit: SplitUnit::Km };
 

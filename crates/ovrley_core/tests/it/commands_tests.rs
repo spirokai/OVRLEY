@@ -40,7 +40,7 @@ use ovrley_core::paths::AppPaths;
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
 use ovrley_core::render_jobs::execution::RenderExecutionService;
 use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
-use ovrley_widgets::widgets::raster::config::RasterConfig;
+use ovrley_widgets::widgets::raster::RasterConfig;
 
 struct EmptyRasterResources;
 

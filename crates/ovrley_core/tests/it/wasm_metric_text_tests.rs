@@ -5,18 +5,15 @@ use ovrley_core::{
     activity::{interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity},
     fonts::{preview_font_resource, NativeFonts},
 };
-use ovrley_widgets::{
-    activity::ActivitySampler,
-    model::{scene::validate_scene_presentation, standard_metrics::is_display_type_supported},
-    preview::PreviewSession,
-    render::{pixels::read_surface_rgba, text::validated_value_style},
-    widgets::value::{
-        format::format_metric_parts,
-        layout::{draw_metric_parts, draw_static_metric_parts_for_value},
-        preview::WidgetRequest,
-        validation::validate_value_widget,
-    },
-};
+use ovrley_widgets::activity::ActivitySampler;
+use ovrley_widgets::model::scene::validate_scene_presentation;
+use ovrley_widgets::model::catalog::{catalog, DisplayType};
+use ovrley_widgets::preview::PreviewSession;
+use ovrley_widgets::render::tile::read_surface_rgba;
+use ovrley_widgets::render::text::validated_value_style;
+use ovrley_widgets::widgets::value::format::format_metric_parts;
+use ovrley_widgets::widgets::value::layout::{draw_metric_parts, draw_static_metric_parts_for_value};
+use ovrley_widgets::widgets::value::validate_value_widget;
 use serde_json::{json, Value};
 use skia_safe::{surfaces, AlphaType, Color, ImageInfo};
 
@@ -61,13 +58,13 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
     preview
         .fonts
         .register(
-            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::standard_widgets::widget_font_weight(), italic: false },
-            &preview_font_resource(&font_dirs, "Inter.ttf", ovrley_widgets::model::standard_widgets::widget_font_weight(), false).unwrap(),
+            ovrley_widgets::preview::FontRequest { font: "Inter.ttf".into(), font_weight: ovrley_widgets::model::catalog::widget_font_weight(), italic: false },
+            &preview_font_resource(&font_dirs, "Inter.ttf", ovrley_widgets::model::catalog::widget_font_weight(), false).unwrap(),
         )
         .unwrap();
     for definition in manifest()["definitions"].as_array().unwrap() {
         let kind = serde_json::from_value(definition["type"].clone()).unwrap();
-        if !is_display_type_supported(kind, "text") {
+        if !catalog().supports_display(kind, DisplayType::Text) {
             continue;
         }
         let metric = definition["type"].as_str().unwrap();
@@ -98,9 +95,8 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                 let id = preview
                     .create_widget(serde_json::from_value(request.clone()).unwrap())
                     .unwrap();
-                let input: WidgetRequest = serde_json::from_value(request.clone()).unwrap();
-                let validated = validate_value_widget(input.widget, 0).unwrap();
-                let scene = validate_scene_presentation(input.scene).unwrap();
+                let validated = validate_value_widget(serde_json::from_value(request["widget"].clone()).unwrap(), 0).unwrap();
+                let scene = validate_scene_presentation(serde_json::from_value(request["scene"].clone()).unwrap()).unwrap();
                 let style = validated_value_style(&validated, &scene, scene.scale);
                 // Include backward seeks after sequential playback.
                 for index in [0, 1, 2, 3, 4, 1] {
@@ -112,13 +108,13 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                     assert_eq!(sampled, expected, "{metric}/{unit:?} at {second}");
                     preview.render(second).unwrap();
                     let widget = &preview.widgets[&id];
-                    let geometry: Value = serde_json::from_slice(widget.geometry()).unwrap();
+                    let geometry: Value = serde_json::to_value(widget.geometry()).unwrap();
                     let info = ImageInfo::new(
                         (
                             geometry["width"].as_i64().unwrap() as i32,
                             geometry["height"].as_i64().unwrap() as i32,
                         ),
-                        ovrley_widgets::widgets::value::preview::TEXT_COLOR_TYPE,
+                        ovrley_widgets::render::tile::TEXT_COLOR_TYPE,
                         AlphaType::Premul,
                         None,
                     );

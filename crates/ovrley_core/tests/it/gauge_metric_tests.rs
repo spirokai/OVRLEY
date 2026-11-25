@@ -4,7 +4,7 @@
 //! Label formatting is intentionally omitted because it is a thin formatting
 //! expression with no meaningful branching contract.
 
-use ovrley_widgets::widgets::gauges::metric::{bar_fill_count, fill_percentage, metric_range};
+use ovrley_widgets::widgets::gauges::{bar_fill_count, fill_percentage, metric_range};
 
 #[test]
 fn gauge_bounds_preserve_source_extrema_outside_export_window() {
@@ -12,7 +12,7 @@ fn gauge_bounds_preserve_source_extrema_outside_export_window() {
     use ovrley_core::activity::schema::ParsedActivity;
     use ovrley_core::activity::trim::trim_activity;
     use ovrley_core::normalize::RenderDataRequirements;
-    use ovrley_widgets::model::types::MetricKind;
+    use ovrley_widgets::model::catalog::MetricKind;
 
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({
         "sample_elapsed_seconds": [0, 1, 2, 3, 4],

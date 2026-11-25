@@ -4,8 +4,8 @@
 use ovrley_core::fonts::NativeFonts;
 use ovrley_map::{MapStyleBuildings, MapStyleCatalog, MapStyleId, MapStyleInfo};
 use ovrley_widgets::activity::ActivitySampler;
-use ovrley_widgets::error::WidgetResult;
-use ovrley_widgets::render::preview::PreviewRasterScale;
+use ovrley_widgets::WidgetResult;
+use ovrley_widgets::render::tile::PreviewRasterScale;
 use ovrley_widgets::widgets::map::preview::{
     MapFrameFactory, MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest, PreviewMap, PreviewMaps,
 };
@@ -96,16 +96,16 @@ fn streamed_frames_never_block_and_keep_the_last_frame_on_show() {
     let activity = activity();
 
     map.render(Some(&activity), 1.0).unwrap();
-    let placeholder = (map.revision, map.pixels.clone());
+    let placeholder = (map.tile.revision, map.tile.pixels.clone());
     assert_eq!(frames.requests.lock().unwrap().len(), 1, "the first frame is asked for, and the placeholder shows meanwhile");
     map.render(Some(&activity), 1.0).unwrap();
-    assert_eq!(map.revision, placeholder.0, "nothing arrived, so nothing redraws");
+    assert_eq!(map.tile.revision, placeholder.0, "nothing arrived, so nothing redraws");
 
     answer(&frames, 0, |request| Ok(solid(request)));
     map.render(Some(&activity), 1.0).unwrap();
-    assert_ne!(map.revision, placeholder.0, "an arriving frame redraws the same state");
-    assert_ne!(map.pixels, placeholder.1);
-    let shown = map.pixels.clone();
+    assert_ne!(map.tile.revision, placeholder.0, "an arriving frame redraws the same state");
+    assert_ne!(map.tile.pixels, placeholder.1);
+    let shown = map.tile.pixels.clone();
 
     map.render(Some(&activity), 2.0).unwrap();
     map.render(Some(&activity), 3.0).unwrap();
@@ -117,7 +117,7 @@ fn streamed_frames_never_block_and_keep_the_last_frame_on_show() {
     answer(&frames, 1, |request| Ok(solid(request)));
     map.render(Some(&activity), 3.0).unwrap();
     assert_eq!(frames.requests.lock().unwrap().len(), 3, "the newest state follows once the previous frame is in");
-    assert_eq!(map.pixels.len(), shown.len());
+    assert_eq!(map.tile.pixels.len(), shown.len());
 
     answer(&frames, 2, |request| Ok(solid(request)));
     map.render(Some(&activity), 3.0).unwrap();
@@ -128,7 +128,7 @@ fn streamed_frames_never_block_and_keep_the_last_frame_on_show() {
 
     answer(&frames, 3, |_| Err("tile unavailable".into()));
     map.render(Some(&activity), 3.0).unwrap();
-    assert_eq!(map.pixels, placeholder.1, "a failed frame shows the placeholder");
+    assert_eq!(map.tile.pixels, placeholder.1, "a failed frame shows the placeholder");
     map.render(Some(&activity), 3.0).unwrap();
     assert_eq!(frames.requests.lock().unwrap().len(), 4, "and is not asked for again");
 }

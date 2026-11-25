@@ -31,8 +31,8 @@ impl ovrley_widgets::render::text::FontResolver for NativeFonts<'_> {
         name: Option<&str>,
         weight: f32,
         italic: bool,
-    ) -> ovrley_widgets::error::WidgetResult<Typeface> {
-        use ovrley_widgets::error::WidgetError;
+    ) -> ovrley_widgets::WidgetResult<Typeface> {
+        use ovrley_widgets::WidgetError;
         match name {
             Some(name) => resolve_typeface(self.0, name, weight, italic)
                 .map_err(|error| WidgetError::Render(error.to_string())),

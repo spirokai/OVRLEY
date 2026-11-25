@@ -239,7 +239,7 @@ pub fn hydrate_unit_system_preference(store: &mut Store, preferences: &Preferenc
     match preferences.get(UNIT_SYSTEM_PREFERENCE_KEY) {
         None | Some(Value::Null) => Ok(()),
         Some(Value::String(system)) => {
-            store.editor.initialize_unit_system(UnitSystem::require(system)?);
+            store.editor.initialize_unit_system(system.parse::<UnitSystem>()?);
             Ok(())
         }
         Some(other) => Err(format!("Unknown unit system: {other}")),

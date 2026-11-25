@@ -3,7 +3,6 @@
 
 use ovrley_widgets::model::catalog::{catalog, IconRef, WidgetDefinition};
 use ovrley_widgets::model::document::WidgetSelection;
-use serde_json::Value;
 use crate::activity::resolve_available_metrics;
 use crate::i18n::catalog as translations;
 use crate::store::Store;
@@ -78,14 +77,8 @@ fn menu_options(
             continue;
         }
         for mode in &display.modes {
-            let label_key = mode
-                .raw
-                .get("labelKey")
-                .and_then(Value::as_str)
-                .unwrap_or_else(|| panic!("mode {} has no labelKey", mode.value));
-            let icon: IconRef =
-                serde_json::from_value(mode.raw.get("icon").cloned().unwrap_or(Value::Null))
-                    .unwrap_or_else(|error| panic!("mode {} has no icon: {error}", mode.value));
+            let label_key = &mode.label_key;
+            let icon = mode.icon.clone().unwrap_or_else(|| panic!("mode {} has no icon", mode.value));
             let selection = WidgetSelection {
                 mode: Some(mode.value.clone()),
                 ..selection(&definition.kind)

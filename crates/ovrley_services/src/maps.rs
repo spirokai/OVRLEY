@@ -21,16 +21,16 @@ use ovrley_core::CoreError;
 use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapDataSource, MapSource};
 use ovrley_map::{read_style_file, MapStyleBuildings, MapStyleId};
 use ovrley_widgets::activity::ActivitySampler;
-use ovrley_widgets::error::WidgetResult;
-use ovrley_widgets::host::WidgetHost;
+use ovrley_widgets::WidgetResult;
+use ovrley_widgets::preview::WidgetHost;
 use ovrley_widgets::model::scene::{validate_scene_presentation, ScenePresentationConfig};
-use ovrley_widgets::model::standard_widgets::default_map_style;
-use ovrley_widgets::render::preview::PreviewRasterScale;
-use ovrley_widgets::widgets::map::config::MapConfig;
+use ovrley_widgets::model::catalog::default_map_style;
+use ovrley_widgets::render::tile::PreviewRasterScale;
+use ovrley_widgets::widgets::map::MapConfig;
 use ovrley_widgets::widgets::map::preview::{
     MapFrameFactory, MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest,
 };
-use ovrley_widgets::widgets::map::validation::validate_map_widget;
+use ovrley_widgets::widgets::map::validate_map_widget;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};

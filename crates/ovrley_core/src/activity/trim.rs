@@ -14,12 +14,9 @@ use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
 use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
-use ovrley_widgets::interpolation::{
-    collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
-    MissingSamplePolicy,
-};
+use ovrley_widgets::series::{collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value, MissingSamplePolicy};
 use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
-use ovrley_widgets::model::types::MetricKind;
+use ovrley_widgets::model::catalog::MetricKind;
 use ovrley_widgets::widgets::value::format::resolve_metric_display_value;
 use serde::{Deserialize, Serialize};
 
@@ -288,7 +285,7 @@ pub fn trim_activity(
             .iter()
             .zip(&lap_number)
             .map(|(elapsed, lap_number)| {
-                ovrley_widgets::widgets::lap_timer::sampling::lap_time_at(
+                ovrley_widgets::widgets::lap_timer::lap_time_at(
                     &lap_start_elapsed_seconds,
                     *lap_number,
                     *elapsed,

@@ -1,9 +1,7 @@
 //! The current-position marker shared by every plot family: one variant list, one footprint,
 //! one drawing.
-use crate::{
-    error::{WidgetError, WidgetResult},
-    render::text::parse_color,
-};
+use crate::render::text::parse_color;
+use crate::{WidgetError, WidgetResult};
 use skia_safe::{paint::Style, Canvas, Paint, Path, PathBuilder, Point};
 
 /// Ring strokes keep a hairline width at every scene scale.
@@ -36,7 +34,10 @@ fn caret_path(radius: f32) -> Path {
     };
     let (last, first) = (corner(CARET_CORNERS.len() - 1), corner(0));
     let mut path = PathBuilder::new();
-    path.move_to(Point::new((last.x + first.x) / 2.0, (last.y + first.y) / 2.0));
+    path.move_to(Point::new(
+        (last.x + first.x) / 2.0,
+        (last.y + first.y) / 2.0,
+    ));
     for (index, (_, rounding)) in CARET_CORNERS.iter().enumerate() {
         path.arc_to_tangent(corner(index), corner(index + 1), rounding * radius);
     }

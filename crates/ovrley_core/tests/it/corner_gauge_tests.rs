@@ -3,13 +3,13 @@ use crate::common;
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_widgets::widgets::gauges::validation::ValidatedCornerGaugeOrientation;
+use ovrley_widgets::widgets::gauges::arc::CornerOrientation;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
     arc_point, corner_gauge_geometry, corner_start_end_angles,
 };
-use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
-use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::model::catalog::{DisplayType, TrackFillStyle};
+use ovrley_widgets::widgets::value::ValueConfig;
 use std::collections::BTreeMap;
 
 #[test]
@@ -30,18 +30,18 @@ fn value_config_deserializes_corner_orientation() {
 #[test]
 fn corner_geometry_places_the_track_opposite_the_gauge_corner() {
     assert_eq!(
-        corner_start_end_angles(ValidatedCornerGaugeOrientation::BottomLeft),
+        corner_start_end_angles(CornerOrientation::BottomLeft),
         (0.0, -90.0)
     );
     assert_eq!(
-        corner_start_end_angles(ValidatedCornerGaugeOrientation::BottomRight),
+        corner_start_end_angles(CornerOrientation::BottomRight),
         (180.0, 270.0)
     );
 
     let bottom_left = corner_gauge_geometry(
         160.0,
         160.0,
-        ValidatedCornerGaugeOrientation::BottomLeft,
+        CornerOrientation::BottomLeft,
         12.0,
         6.0,
         2.0,
@@ -49,7 +49,7 @@ fn corner_geometry_places_the_track_opposite_the_gauge_corner() {
     let bottom_right = corner_gauge_geometry(
         160.0,
         160.0,
-        ValidatedCornerGaugeOrientation::BottomRight,
+        CornerOrientation::BottomRight,
         12.0,
         6.0,
         2.0,
@@ -116,7 +116,7 @@ fn corner_gauge_lays_out_the_shared_arc_gauge() {
     let dense = dense_speed_activity(vec![Some(0.0), Some(50.0), Some(100.0)]);
 
     let (layout, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("corner layout"); };
+    let ovrley_widgets::widgets::gauges::GaugeLayout::Arc(layout) = &layout else { panic!("corner layout"); };
     assert_eq!(layout.geometry.start_angle, 180.0);
     assert_eq!(layout.geometry.sweep_angle, 90.0);
     assert_eq!(frame_states[1].fill01, 0.5);
@@ -132,7 +132,9 @@ fn corner_bars_keep_the_configured_segment_count() {
     let config = validate_single_corner(value).unwrap();
 
     let gauge = match &config.values[0] {
-        ovrley_widgets::widgets::value::validation::ValidatedValue::ArcGauge(gauge) => gauge,
+        ovrley_widgets::widgets::value::ValidatedValue::Gauge(
+            ovrley_widgets::widgets::gauges::ValidatedGauge::Arc(gauge),
+        ) => gauge,
         _ => panic!("corner should validate as an arc gauge"),
     };
     assert_eq!(gauge.track_fill_style, TrackFillStyle::Bars);
@@ -206,7 +208,7 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
             &series.speed,
         )
-        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
+        .map(|range| (ovrley_widgets::model::catalog::MetricKind::Speed, range))
         .into_iter()
         .collect(),
         series,

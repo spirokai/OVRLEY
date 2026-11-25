@@ -10,8 +10,8 @@ use std::sync::Arc;
 use ovrley_core::normalize::template::normalize_global_defaults;
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
-use ovrley_widgets::preview_instance::PresentedGeometry;
-use ovrley_widgets::render::preview::PreviewRasterScale;
+use ovrley_widgets::render::tile::WidgetGeometry;
+use ovrley_widgets::render::tile::PreviewRasterScale;
 use serde_json::{json, Map, Value};
 use crate::features::widgets::preview::{widget_fonts, FontKey};
 use crate::store::Store;
@@ -31,7 +31,7 @@ enum FontState {
 /// What the readout shows: its pixels (straight-alpha RGBA) and where they sit on the screen.
 pub struct SpeedFrame<'a> {
     pub pixels: &'a [u8],
-    pub geometry: &'a PresentedGeometry,
+    pub geometry: &'a WidgetGeometry,
     pub revision: u32,
 }
 
@@ -45,7 +45,7 @@ pub struct SpeedReadout {
     activity: Option<Arc<Vec<u8>>>,
     raster_scale: Option<f64>,
     rendered: Option<(f64, u32)>,
-    presented: Option<PresentedGeometry>,
+    presented: Option<WidgetGeometry>,
     /// A load or render failure, shown in its place.
     pub error: Option<String>,
 }
@@ -271,9 +271,7 @@ impl SpeedReadout {
             .render(second)
             .map_err(|error| error.to_string())?;
         let widget = &self.session.widgets[&handle];
-        self.presented = widget
-            .presented_geometry()
-            .map_err(|error| error.to_string())?;
+        self.presented = widget.geometry().cloned();
         self.rendered = Some((second, widget.revision()));
         Ok(())
     }

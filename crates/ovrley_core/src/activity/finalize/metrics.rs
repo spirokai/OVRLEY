@@ -13,7 +13,7 @@ use super::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
 use crate::activity::schema::{ActivityColumns, GearSeries, NumericSeries};
 use crate::media::telemetry_math::{bearing_degrees, finite_f64, haversine_distance, round_f64};
 use ovrley_widgets::model::telemetry::ZERO_AVAILABLE_ACTIVITY_SERIES;
-use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
+use ovrley_widgets::widgets::elevation::preferred_elevation_series;
 use serde::Serialize;
 use std::collections::BTreeMap;
 

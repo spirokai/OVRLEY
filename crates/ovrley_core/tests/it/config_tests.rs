@@ -10,9 +10,9 @@ use crate::common;
 use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
 use ovrley_core::normalize::parse_config_value;
 use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
-use ovrley_widgets::widgets::value::validation::ValidatedValue;
+use ovrley_widgets::widgets::value::ValidatedValue;
 use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
-use ovrley_widgets::widgets::value::validation::ContentAlignment;
+use ovrley_widgets::widgets::value::ContentAlignment;
 use serde_json::json;
 
 #[test]
@@ -320,7 +320,7 @@ fn time_requires_its_canonical_formatting_fields() {
         Ok(_) => panic!("legacy time_format field should fail validation"),
         Err(error) => error,
     };
-    assert!(error.to_string().contains("legacy field"));
+    assert!(error.to_string().contains("time_format: is not supported"));
 }
 
 #[test]

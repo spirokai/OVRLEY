@@ -3,11 +3,11 @@
 //! The gradient is anchored to the track, not to the current fill: offset 0 is
 //! the track start and offset 1 its end, so the fill reveals a static gradient.
 
-use crate::error::{WidgetError, WidgetResult};
 use crate::model::validation::{require_bool, require_hex_color};
-use crate::render::preview::{PreviewRasterScale, StaticRaster};
 use crate::render::text::parse_color;
-use crate::widgets::value::preview::SHAPE_COLOR_TYPE;
+use crate::render::tile::SHAPE_COLOR_TYPE;
+use crate::render::tile::{PreviewRasterScale, StaticRaster};
+use crate::{WidgetError, WidgetResult};
 use serde::{Deserialize, Serialize};
 use skia_safe::{
     gradient, paint::Style, Canvas, ClipOp, Color4f, Matrix, Paint, Path, Point, RRect, Rect,
@@ -167,8 +167,8 @@ impl TrackFillColor {
     }
 }
 
-/// A prepared track fill. Shading a gradient every frame is slow in the WASM build,
-/// so a gradient fill is rasterized once at its full extent and frames only clip it.
+/// A prepared track fill. Shading a gradient every frame is slow, so a gradient fill is
+/// rasterized once at its full extent and frames only clip it.
 #[derive(Clone, Debug)]
 pub enum TrackFill {
     Paint(Paint),

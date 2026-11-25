@@ -15,7 +15,7 @@ use apply::{apply_new_project, apply_project, create_project_manual_video_sync, 
 use ovrley_core::normalize::template::create_durable_template_state;
 use ovrley_services::project::{default_project_directory, list_project_files, read_project, write_project, OpenedProject, ProjectEditor, ProjectError, ProjectFileSummary};
 use ovrley_widgets::model::document::{canonical_numbers, OverlayConfig};
-use ovrley_widgets::widgets::raster::error::RasterError;
+use ovrley_widgets::widgets::raster::RasterError;
 use serde_json::{json, Map, Value};
 use snapshot::{create_project_snapshot, project_content, project_timeline, LAST_PROJECT_DIRECTORY_KEY, ProjectBaseline};
 use crate::dialogs::{filename_from_selected_path, open_single_path, path_in_directory, save_single_path, DialogOptions};

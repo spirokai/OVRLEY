@@ -10,13 +10,10 @@ use chrono::DateTime;
 use serde_json::json;
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport};
-use ovrley_widgets::widgets::time::format::{
-    format_elapsed_time, format_time_key,
-    format_validated_time_parts, ElapsedTimeValues,
-};
-use ovrley_widgets::widgets::value::validation::ValidatedValue;
+use ovrley_widgets::widgets::time::{format_elapsed_time, format_time_key, format_validated_time_parts, ElapsedTimeValues};
+use ovrley_widgets::widgets::value::ValidatedValue;
 use ovrley_widgets::widgets::value::format::MetricDisplayContent;
-use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
+use ovrley_widgets::widgets::value::ValidatedValueWidget;
 
 #[test]
 fn formats_time_key_variants() {

@@ -11,14 +11,16 @@ use ovrley_widgets::model::scene::{
     validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
 };
 use ovrley_widgets::model::telemetry::{mode_activity, widget_telemetry, ActivitySeries};
-use ovrley_widgets::widgets::{
-    altitude_tape::validation::TapeSource, backdrop::validation::ValidatedBackdrop, elevation::validation::ValidatedElevationPlot,
-    diving_profile::validation::ValidatedDivingProfile,
-    rolling_chart::validation::ValidatedRollingChart,
-    g_force::validation::GForceAxis, label::validation::ValidatedLabel,
-    map::validation::ValidatedMapWidget,
-    route::validation::ValidatedRoutePlot, value::validation::ValidatedValue,
-};
+use ovrley_widgets::widgets::altitude_tape::TapeSource;
+use ovrley_widgets::widgets::backdrop::ValidatedBackdrop;
+use ovrley_widgets::widgets::elevation::ValidatedElevationPlot;
+use ovrley_widgets::widgets::diving_profile::ValidatedDivingProfile;
+use ovrley_widgets::widgets::rolling_chart::ValidatedRollingChart;
+use ovrley_widgets::widgets::g_force::GForceAxis;
+use ovrley_widgets::widgets::label::ValidatedLabel;
+use ovrley_widgets::widgets::map::ValidatedMapWidget;
+use ovrley_widgets::widgets::route::ValidatedRoutePlot;
+use ovrley_widgets::widgets::value::ValidatedValue;
 use widgets::validate_render_contents;
 
 pub(crate) use config::deserialize_render_presentation;
@@ -82,7 +84,7 @@ impl ValidatedRenderConfig {
             match value {
                 ValidatedValue::TimeText(widget) => {
                     requirements.extend(
-                        mode_activity("time", widget.formatting.mode())
+                        mode_activity("time", widget.formatting.mode().as_str())
                             .iter()
                             .copied(),
                     );

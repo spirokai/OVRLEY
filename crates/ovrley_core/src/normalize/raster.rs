@@ -2,8 +2,8 @@
 
 use crate::error::{CoreError, CoreResult};
 use crate::raster::{RasterResourceResolver, SelectedRaster};
-use ovrley_widgets::widgets::raster::config::RasterConfig;
-use ovrley_widgets::widgets::raster::validation::{validate_raster_geometry, RasterGeometry};
+use ovrley_widgets::widgets::raster::RasterConfig;
+use ovrley_widgets::widgets::raster::{validate_raster_geometry, RasterGeometry};
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -39,17 +39,13 @@ use crate::{
     normalize::{RasterSource, ValidatedRaster, ValidatedRenderConfig},
     raster::load_selected_raster,
 };
-use ovrley_widgets::{
-    activity::ActivitySampler,
-    host::WidgetHost,
-    model::standard_metrics::{display_type_layout_mode, DisplayTypeLayoutMode},
-    preview_widget::{FrameKey, PreviewWidget, ValidatedWidget},
-    render::{image::RasterImage, text::FontResolver},
-    widgets::{
-        raster::image::downsample_raster,
-        value::{preview::TileBounds, validation::ValidatedValue},
-    },
-};
+use ovrley_widgets::activity::ActivitySampler;
+use ovrley_widgets::preview::{WidgetHost, FrameKey, PreviewWidget, ValidatedWidget};
+use ovrley_widgets::model::catalog::LayoutMode;
+use ovrley_widgets::widgets::raster::{RasterImage, downsample_raster};
+use ovrley_widgets::render::text::FontResolver;
+use ovrley_widgets::render::tile::TileBounds;
+use ovrley_widgets::widgets::value::ValidatedValue;
 use skia_safe::{AlphaType, ColorType, Data, IRect, Image};
 use std::{num::NonZeroUsize, path::PathBuf, sync::Arc, thread, time::Instant};
 
@@ -348,12 +344,12 @@ impl<'a> ExportWidgets<'a> {
             let layer = if *over_map { Layer::Dynamic } else { Layer::Static };
             (ValidatedWidget::Label(widget), layer)
         }));
-        for mode in [DisplayTypeLayoutMode::Intrinsic, DisplayTypeLayoutMode::Boxed] {
+        for mode in [LayoutMode::Intrinsic, LayoutMode::Boxed] {
             layers.extend(
                 config
                     .values
                     .iter()
-                    .filter(|value| display_type_layout_mode(value.display_type()) == mode)
+                    .filter(|value| value.display_type().layout_mode() == mode)
                     .map(|value| (ValidatedWidget::Value(value), Layer::Dynamic)),
             );
         }

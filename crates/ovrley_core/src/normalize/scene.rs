@@ -9,7 +9,7 @@ use super::config::SceneConfig;
 use crate::encode::ffmpeg::catalog::{CodecSelection, TransparentCodecId};
 use crate::error::{CoreError, CoreResult};
 use ovrley_widgets::model::validation::{require_finite_f64, require_positive_f64, require_u32};
-use ovrley_widgets::widgets::route::sampling::RouteWindow;
+use ovrley_widgets::widgets::route::RouteWindow;
 use serde_json::{Map, Value};
 use std::num::NonZeroU32;
 

@@ -115,7 +115,7 @@ impl Projection {
             self.speed_image.clear();
             return;
         };
-        let geometry = &frame.geometry.widget;
+        let geometry = &frame.geometry;
         if let Some(image) = self.speed_image.fresh(frame.revision.into(), || rgba_image(frame.pixels, geometry.width, geometry.height)) {
             global.set_speed_image(image);
         }

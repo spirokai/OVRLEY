@@ -1,7 +1,7 @@
 //! Scene geometry of presented widgets: rotated content boxes, their corners and hit tests, the
 //! resize anchor, group bounds and resize geometry, and snapping to guidelines.
 
-use ovrley_widgets::preview_instance::PresentedGeometry;
+use ovrley_widgets::render::tile::WidgetGeometry;
 use serde_json::{json, Map, Value};
 
 /// An axis-aligned rectangle in scene pixels.
@@ -77,9 +77,9 @@ pub struct ContentBox {
 }
 
 impl ContentBox {
-    pub fn of(geometry: &PresentedGeometry) -> Self {
-        let content = &geometry.widget.content;
-        let origin = geometry.rotation_origin.unwrap_or([0.0, 0.0]);
+    pub fn of(geometry: &WidgetGeometry) -> Self {
+        let content = &geometry.content;
+        let origin = geometry.rotation_origin().unwrap_or([0.0, 0.0]);
         Self {
             rect: Rect {
                 left: f64::from(content.left),
@@ -212,7 +212,7 @@ pub fn rotation_patch(
     let number = |key: &str| data.get(key).and_then(Value::as_f64).unwrap_or_default();
     let centered = kind == "course" || kind == "raster";
     let rotation = normalize_rotation(if centered {
-        ovrley_widgets::model::document::js_round(rotation)
+        ovrley_widgets::model::document::round_half_up(rotation)
     } else {
         rotation
     });

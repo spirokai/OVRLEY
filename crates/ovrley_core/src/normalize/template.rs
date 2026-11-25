@@ -18,7 +18,10 @@ use ovrley_widgets::model::document::{
     init_display_variant, normalize_color_fields, pick_defined, Collection, OverlayConfig,
     UnitSystem, WidgetData,
 };
-use ovrley_widgets::widgets::raster::config::RasterConfig;
+use ovrley_widgets::widgets::gauges::linear::LinearOrientation;
+use ovrley_widgets::widgets::raster::RasterConfig;
+use ovrley_widgets::widgets::time::{ElapsedTimeOrigin, TimeMode};
+use ovrley_widgets::widgets::value::ContentAlignment;
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use std::collections::HashSet;
@@ -283,25 +286,21 @@ fn validate_display_geometry(value: &WidgetData, kind: &str) -> CoreResult<()> {
     Ok(())
 }
 
+/// A linear gauge's orientation, horizontal unless it is vertical, and a label position that
+/// orientation offers, its default otherwise.
 fn normalize_linear_gauge_label_position(variant: &mut Map<String, Value>) {
-    let vertical = variant.get("orientation").and_then(Value::as_str) == Some("vertical");
-    let (orientation, allowed, fallback) = if vertical {
-        ("vertical", ["left", "right"], "left")
-    } else {
-        ("horizontal", ["bottom", "top"], "bottom")
-    };
+    let orientation = variant
+        .get("orientation")
+        .and_then(Value::as_str)
+        .and_then(LinearOrientation::parse)
+        .unwrap_or(LinearOrientation::Horizontal);
     let position = variant
         .get("min_max_label_position")
         .and_then(Value::as_str)
-        .unwrap_or(fallback)
-        .to_string();
-    let position = if allowed.contains(&position.as_str()) {
-        position
-    } else {
-        fallback.to_string()
-    };
-    variant.insert("orientation".into(), Value::from(orientation));
-    variant.insert("min_max_label_position".into(), Value::from(position));
+        .and_then(|key| orientation.label_position(key))
+        .unwrap_or(orientation.label_positions()[0]);
+    variant.insert("orientation".into(), Value::from(orientation.as_str()));
+    variant.insert("min_max_label_position".into(), Value::from(position.as_str()));
 }
 
 fn normalize_value(
@@ -326,18 +325,17 @@ fn normalize_value(
         with_defaults.insert(key.clone(), field.clone());
     }
     if kind == "time" {
-        let has = |choices: &[ovrley_widgets::model::catalog::ManifestChoice], field: &str| {
-            choices.iter().any(|choice| {
-                with_defaults.get(field).and_then(Value::as_str) == Some(choice.value.as_str())
-            })
-        };
-        if !has(&definition.modes, "time_mode") {
+        let key = |field: &str| with_defaults.get(field).and_then(Value::as_str);
+        if key("time_mode").and_then(TimeMode::parse).is_none() {
             return Err(invalid(format!(
                 "Invalid time_mode: {}",
                 js_string(with_defaults.get("time_mode"))
             )));
         }
-        if !has(&definition.elapsed_origins, "elapsed_origin") {
+        if key("elapsed_origin")
+            .and_then(ElapsedTimeOrigin::parse)
+            .is_none()
+        {
             return Err(invalid(format!(
                 "Invalid elapsed_origin: {}",
                 js_string(with_defaults.get("elapsed_origin"))
@@ -355,12 +353,11 @@ fn normalize_value(
     }
     let supports_alignment = definition.content_alignment;
     if supports_alignment
-        && !matches!(
-            with_defaults
-                .get("content_alignment")
-                .and_then(Value::as_str),
-            Some("left" | "center" | "right")
-        )
+        && with_defaults
+            .get("content_alignment")
+            .and_then(Value::as_str)
+            .and_then(ContentAlignment::parse)
+            .is_none()
     {
         return Err(invalid(format!(
             "Invalid content_alignment: {}",

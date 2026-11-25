@@ -1,13 +1,13 @@
-use super::{
-    digit_cells::{place_digits, PlacedGlyphs},
-    shadow::shadow_paint,
-};
-use crate::error::WidgetResult;
-use crate::model::{scene::Numerals, standard_widgets::widget_font_weight};
+//! Text layout and drawing: font resolution, measurement, fixed-width digit cells, shadows and
+//! the widget text style.
+use crate::model::catalog::widget_font_weight;
+use crate::model::scene::{Numerals, ValidatedScenePresentation};
+use crate::widgets::value::ValidatedValueWidget;
+use crate::WidgetResult;
+use skia_safe::paint::{Join, Style};
 use skia_safe::{
-    paint::{Join, Style},
-    Canvas, Color, Font, Paint, Path, PathBuilder, Point, Rect, TextBlob, TextBlobBuilder,
-    Typeface,
+    BlurStyle, Canvas, Color, Font, GlyphId, MaskFilter, Paint, Path, PathBuilder, Point, Rect,
+    TextBlob, TextBlobBuilder, Typeface,
 };
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -23,6 +23,9 @@ pub trait FontResolver {
     /// text crisp; a preview re-rendered while resizing would instead grow and move in pixel steps.
     fn grid_fit(&self) -> bool;
 }
+
+/// Line box height of widget text, as a share of its font size.
+pub const LINE_HEIGHT_RATIO: f32 = 0.92;
 
 /// Fully resolved text style ready for Skia drawing.
 #[derive(Clone, Debug)]
@@ -121,7 +124,7 @@ pub fn draw_text_with_vertical_metrics_text(
     let layout = layout_text(text, &font, style.letter_spacing, style.numerals);
     let blob = layout
         .blob
-        .ok_or_else(|| crate::error::WidgetError::Render("Failed to lay out label text".into()))?;
+        .ok_or_else(|| crate::WidgetError::Render("Failed to lay out label text".into()))?;
     let vertical_measurement = if metrics_text == text {
         layout.measurement
     } else {
@@ -463,33 +466,169 @@ fn text_paint(color: Color) -> Paint {
     paint
 }
 
-/// Canonical metric styling, independent of export timing.
+impl ResolvedTextStyle {
+    /// Widget text at the origin: `font_size` and the scene's shadow and border scaled by
+    /// `scale`, the shared weight and line box, and the scene's numerals. Callers place it.
+    pub(crate) fn widget(
+        scene: &ValidatedScenePresentation,
+        scale: f32,
+        font_name: Option<String>,
+        font_size: f32,
+        color: Color,
+        opacity: f32,
+    ) -> Self {
+        let font_size = font_size * scale;
+        Self {
+            x: 0.0,
+            y: 0.0,
+            font_name,
+            font_size,
+            font_weight: widget_font_weight(),
+            italic: false,
+            letter_spacing: 0.0,
+            line_height: font_size * LINE_HEIGHT_RATIO,
+            color,
+            opacity,
+            shadow_color: Some(parse_color(&scene.shadow_color, opacity)),
+            shadow_strength: scene.shadow_strength * scale,
+            shadow_distance: scene.shadow_distance * scale,
+            border_color: Some(parse_color(&scene.border_color, opacity)),
+            border_thickness: scene.border_thickness * scale,
+            numerals: scene.numerals,
+        }
+    }
+}
+
+/// A metric value widget's text style.
 pub fn validated_value_style(
-    validated: &crate::widgets::value::validation::ValidatedValueWidget,
-    scene: &crate::model::scene::ValidatedScenePresentation,
+    validated: &ValidatedValueWidget,
+    scene: &ValidatedScenePresentation,
     scale: f32,
 ) -> ResolvedTextStyle {
-    let opacity = validated.opacity * scene.opacity;
-    let color = rgba_color(validated.color, scene.opacity);
-
     ResolvedTextStyle {
         x: validated.x,
         y: validated.y,
-        font_name: Some(validated.font_name.clone()),
-        font_size: validated.font_size * scale,
-        font_weight: widget_font_weight(),
-        italic: false,
-        letter_spacing: 0.0,
-        line_height: validated.font_size * scale * 0.92,
-        color,
-        opacity,
-        shadow_color: (!scene.shadow_color.is_empty())
-            .then(|| parse_color(&scene.shadow_color, opacity)),
-        shadow_strength: scene.shadow_strength * scale,
-        shadow_distance: scene.shadow_distance * scale,
-        border_color: (!scene.border_color.is_empty())
-            .then(|| parse_color(&scene.border_color, opacity)),
-        border_thickness: scene.border_thickness * scale,
-        numerals: scene.numerals,
+        ..ResolvedTextStyle::widget(
+            scene,
+            scale,
+            Some(validated.font_name.clone()),
+            validated.font_size,
+            rgba_color(validated.color, scene.opacity),
+            validated.opacity * scene.opacity,
+        )
+    }
+}
+
+/// Glyphs with explicit x positions on one baseline.
+pub(crate) struct PlacedGlyphs {
+    pub glyphs: Vec<GlyphId>,
+    pub xs: Vec<f32>,
+    pub width: f32,
+    pub ink: Rect,
+}
+
+/// Cell placement for `text`, or `None` when no digit would move.
+pub(crate) fn place_digits(text: &str, font: &Font, letter_spacing: f32) -> Option<PlacedGlyphs> {
+    if !text.bytes().any(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let digits: [GlyphId; 10] =
+        std::array::from_fn(|digit| font.unichar_to_glyph(i32::from(b'0') + digit as i32));
+    let mut digit_widths = [0.0; 10];
+    font.get_widths(&digits, &mut digit_widths);
+    let cell = digit_widths.iter().copied().fold(0.0, f32::max);
+    if digit_widths.iter().all(|width| *width == cell) {
+        return None;
+    }
+
+    let mut placed = PlacedGlyphs {
+        glyphs: Vec::with_capacity(text.len()),
+        xs: Vec::with_capacity(text.len()),
+        width: 0.0,
+        ink: Rect::new_empty(),
+    };
+    // Tracking separates extended grapheme clusters, matching the default layout.
+    for (index, cluster) in text.graphemes(true).enumerate() {
+        if index > 0 {
+            placed.width += letter_spacing;
+        }
+        let glyphs = font.str_to_glyphs_vec(cluster);
+        let mut advances = vec![0.0; glyphs.len()];
+        let mut bounds = vec![Rect::default(); glyphs.len()];
+        font.get_widths_bounds(&glyphs, Some(&mut advances), Some(&mut bounds), None);
+        let digit = cluster.len() == 1 && cluster.as_bytes()[0].is_ascii_digit();
+        let (mut x, advance) = if digit && !bounds[0].is_empty() {
+            let ink = bounds[0];
+            (placed.width + (cell - ink.width()) * 0.5 - ink.left, cell)
+        } else if digit {
+            (placed.width + (cell - advances[0]) * 0.5, cell)
+        } else {
+            (placed.width, advances.iter().sum())
+        };
+        for ((glyph, glyph_advance), glyph_bounds) in glyphs.into_iter().zip(advances).zip(bounds) {
+            if !glyph_bounds.is_empty() {
+                placed.ink.join(glyph_bounds.with_offset((x, 0.0)));
+            }
+            placed.glyphs.push(glyph);
+            placed.xs.push(x);
+            x += glyph_advance;
+        }
+        placed.width += advance;
+    }
+    if placed.ink.is_empty() {
+        placed.ink = Rect::default();
+    }
+    Some(placed)
+}
+
+/// Retains the source geometry/style and its alpha, replacing its color with the shadow color.
+/// Callers draw at the shadow offset before drawing the original foreground.
+pub fn shadow_paint(source: &Paint, color: Color, sigma: f32) -> Option<Paint> {
+    if sigma <= 0.0 {
+        return None;
+    }
+    let mut paint = source.clone();
+    paint.set_color(color);
+    // The previous image filter colored the source's alpha, including its paint opacity.
+    paint.set_alpha_f(source.alpha_f() * f32::from(color.a()) / 255.0);
+    paint.set_mask_filter(
+        MaskFilter::blur(BlurStyle::Normal, sigma, true).expect("positive shadow sigma"),
+    );
+    Some(paint)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use skia_safe::{Data, FontMgr, Typeface};
+
+    fn font(file: &str) -> Font {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fonts")
+            .join(file);
+        let typeface: Typeface = FontMgr::default()
+            .new_from_data(
+                Data::new_copy(&std::fs::read(path).expect("bundled font")),
+                None,
+            )
+            .expect("bundled font face");
+        Font::from_typeface(typeface, 100.0)
+    }
+
+    #[test]
+    fn proportional_digits_share_one_cell_with_centered_ink() {
+        let font = font("Rajdhani.ttf");
+        let ones = place_digits("11", &font, 0.0).expect("proportional digits move");
+        let zeros = place_digits("00", &font, 0.0).expect("proportional digits move");
+        assert_eq!(ones.width, zeros.width);
+        for placed in [ones, zeros] {
+            let (left, right) = (placed.ink.left, placed.width - placed.ink.right);
+            assert!((left - right).abs() < 0.01, "{left} vs {right}");
+        }
+    }
+
+    #[test]
+    fn faces_with_uniform_digits_keep_default_layout() {
+        assert!(place_digits("10", &font("JetBrainsMono-variable.ttf"), 0.0).is_none());
     }
 }

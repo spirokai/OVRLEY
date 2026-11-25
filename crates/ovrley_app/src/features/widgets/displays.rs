@@ -1,7 +1,7 @@
 //! The metric widget's editor and its display sections, as descriptions.
 
-use ovrley_widgets::model::catalog::{catalog, UnitOption, WidgetDefinition};
-use ovrley_widgets::model::document::js_round;
+use ovrley_widgets::model::catalog::{catalog, MetricFormatter, UnitOption, UnitsMode, WidgetDefinition};
+use ovrley_widgets::model::document::round_half_up;
 use serde_json::Value;
 use crate::features::widgets::{starting_altitude_placeholder, NumericFieldOptions};
 use crate::features::widgets::blocks::{full, grid, grid_end, heading, stack, when, Cell, CellKind, Node, OptionView, Rule, StopView, SwitchRowStyle};
@@ -113,7 +113,7 @@ pub fn metric_widget_editor(ctx: &Ctx) -> Vec<Node> {
 pub fn text_display_section(ctx: &Ctx) -> Vec<Node> {
     let definition = definition(ctx);
     let kind = ctx.widget.kind.as_str();
-    let hidden_units = definition.units_mode.as_deref().unwrap_or("hidden") == "hidden";
+    let hidden_units = definition.units_mode != Some(UnitsMode::Selectable);
     let supports_selection = definition.supported_display_units.len() > 1;
     let is_coordinates = kind == "gps_coordinates";
     let mut nodes = vec![font_section(
@@ -134,7 +134,7 @@ pub fn text_display_section(ctx: &Ctx) -> Vec<Node> {
             )],
         ));
     }
-    if definition.formatter.as_deref() == Some("balance") {
+    if definition.formatter == Some(MetricFormatter::Balance) {
         let options = [
             ("percent_label", "52%/48%"),
             ("plain", "52/48"),
@@ -348,7 +348,7 @@ fn decimals_row(ctx: &Ctx, definition: &WidgetDefinition) -> Node {
 
 /// The gauges' units row: always titled "Unit".
 fn gauge_units(ctx: &Ctx, definition: &WidgetDefinition) -> Node {
-    if definition.units_mode.as_deref().unwrap_or("hidden") == "hidden" {
+    if definition.units_mode != Some(UnitsMode::Selectable) {
         return Node::Empty;
     }
     let supports_selection = definition.supported_display_units.len() > 1;
@@ -464,7 +464,7 @@ fn size_slider(ctx: &Ctx, size: f64, min: f64, max: f64) -> Cell {
     Cell::new(
         "size",
         ctx.t("widget-editor.size", "Size"),
-        CellKind::Slider { editable: true, value: size, min, max, step: 1.0, scale: 1.0, readout: crate::format::plain_number(js_round(size)), suffix: "px".into() },
+        CellKind::Slider { editable: true, value: size, min, max, step: 1.0, scale: 1.0, readout: crate::format::plain_number(round_half_up(size)), suffix: "px".into() },
     )
     .rule(Rule::Named(Named::UniformSize))
 }
@@ -474,7 +474,7 @@ fn altitude_tape_section(ctx: &Ctx, definition: &WidgetDefinition) -> Vec<Node> 
     let d = "altitude_tape";
     let unit = ctx.text("display_unit");
     let show_speed = ctx.flag(&v(d, "show_vertical_speed"));
-    let intervals: Vec<f64> = catalog().require_display(d).major_tick_intervals.as_ref().and_then(Value::as_array).into_iter().flatten().filter_map(Value::as_f64).collect();
+    let intervals: Vec<f64> = catalog().require_display(d).major_tick_intervals.iter().flatten().map(|interval| f64::from(*interval)).collect();
     let interval = ctx.num(&v(d, "major_tick_interval"));
     let index = intervals.iter().position(|value| *value == interval).map_or(-1.0, |index| index as f64);
     let interval_cell = Cell::new(
@@ -691,7 +691,7 @@ fn heading_compass_section(ctx: &Ctx) -> Vec<Node> {
                 grid(
                     2,
                     [
-                        ctx.slider(v(d, "indicator_size"), ctx.t("widget-editor.indicatorSize", "Indicator Size"), 8.0, js_round(diameter)).int().px(),
+                        ctx.slider(v(d, "indicator_size"), ctx.t("widget-editor.indicatorSize", "Indicator Size"), 8.0, round_half_up(diameter)).int().px(),
                         ctx.slider(v(d, "indicator_corner_radius"), ctx.t("widget-editor.cornerRadius", "Corner Radius"), 0.0, 100.0).int().suffix("%"),
                     ],
                 ),
@@ -764,7 +764,7 @@ fn g_force_editor(ctx: &Ctx) -> Vec<Node> {
     let size = Cell::new(
         v(d, "diameter"),
         ctx.t("widget-editor.size", "Size"),
-        CellKind::Slider { editable: true, value: diameter, min: 20.0, max: 600.0, step: 1.0, scale: 1.0, readout: crate::format::plain_number(js_round(diameter)), suffix: "px".into() },
+        CellKind::Slider { editable: true, value: diameter, min: 20.0, max: 600.0, step: 1.0, scale: 1.0, readout: crate::format::plain_number(round_half_up(diameter)), suffix: "px".into() },
     )
     .rule(Rule::Named(Named::GForceDiameter));
     let axis = |key: &str, invert: &str, horizontal: bool, label: String| {
@@ -917,9 +917,7 @@ fn lap_timer_section(ctx: &Ctx) -> Vec<Node> {
         .modes
         .iter()
         .map(|mode| {
-            let key = mode.raw.get("labelKey").and_then(Value::as_str).unwrap_or_default();
-            let label = mode.raw.get("label").and_then(Value::as_str).unwrap_or_default();
-            OptionView::new(mode.value.clone(), ctx.t(key, label))
+            OptionView::new(mode.value.clone(), ctx.t(&mode.label_key, mode.label.as_deref().unwrap_or_default()))
         })
         .collect();
     vec![

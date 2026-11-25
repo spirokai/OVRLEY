@@ -269,7 +269,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     shell.on_change_unit_system(move |system| {
         // The select lists only the two systems, so another value is a bug, not user input.
         let system =
-            UnitSystem::require(&system).expect("the units select offers the unit systems");
+            system.parse::<UnitSystem>().expect("the units select offers the unit systems");
         d.dispatch(move |store, services| change_unit_system_preference(store, services, system));
     });
 

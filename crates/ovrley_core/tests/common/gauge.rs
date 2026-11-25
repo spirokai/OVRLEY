@@ -2,17 +2,12 @@
 #![allow(dead_code)]
 
 use ovrley_core::{activity::schema::DenseActivityReport, normalize::ValidatedRenderConfig};
-use ovrley_widgets::{
-    render::{preview::PreviewRasterScale, text::FontResolver},
-    widgets::{
-        gauges::{
-            frame::GaugeLayout,
-            metric::{gauge_frame_state, metric_range, GaugeFrameState},
-            validation::ValidatedGauge,
-        },
-        value::{format::altitude_offset_m, validation::ValidatedValue},
-    },
-};
+use ovrley_widgets::render::tile::PreviewRasterScale;
+use ovrley_widgets::render::text::FontResolver;
+use ovrley_widgets::widgets::gauges::GaugeLayout;
+use ovrley_widgets::widgets::gauges::{gauge_frame_state, metric_range, GaugeFrameState};
+use ovrley_widgets::widgets::value::format::altitude_offset_m;
+use ovrley_widgets::widgets::value::ValidatedValue;
 
 /// The gauge at value index 0, laid out for the scene, with its state at every dense frame.
 pub fn gauge_layout(
@@ -21,8 +16,7 @@ pub fn gauge_layout(
     fonts: &dyn FontResolver,
 ) -> (GaugeLayout, Vec<GaugeFrameState>) {
     let gauge = match &config.values[0] {
-        ValidatedValue::LinearGauge(widget) => ValidatedGauge::Linear(widget.clone()),
-        ValidatedValue::ArcGauge(widget) => ValidatedGauge::Arc(widget.clone()),
+        ValidatedValue::Gauge(gauge) => gauge.clone(),
         other => panic!("value 0 must be a gauge, got {:?}", other.display_type()),
     };
     let metric = gauge.metric();

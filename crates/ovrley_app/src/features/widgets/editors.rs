@@ -3,7 +3,7 @@
 //! descriptions.
 
 use ovrley_widgets::model::catalog::catalog;
-use ovrley_widgets::model::document::js_round;
+use ovrley_widgets::model::document::round_half_up;
 use serde_json::Value;
 use crate::features::widgets::{starting_altitude_placeholder, NumericFieldOptions};
 use crate::features::widgets::blocks::{full, grid, grid_end, heading, stack, when, Cell, CellKind, Node, OptionView, Rule, ShapeToggle, SwitchRowStyle};
@@ -130,11 +130,7 @@ fn choices(
                 choice.value.clone(),
                 ctx.t(
                     &choice.label_key,
-                    choice
-                        .extra
-                        .get("defaultLabel")
-                        .and_then(Value::as_str)
-                        .unwrap_or(&choice.value),
+                    choice.default_label.as_deref().unwrap_or(&choice.value),
                 ),
             )
         })
@@ -690,7 +686,7 @@ pub fn plot_marker_section(
                         ctx.slider(
                             "marker_variant_diameter",
                             label,
-                            js_round(size * 2.0).max(4.0),
+                            round_half_up(size * 2.0).max(4.0),
                             120.0,
                         )
                         .int()
@@ -987,7 +983,7 @@ fn map_editor(ctx: &Ctx) -> Vec<Node> {
                         let radius = ctx.num("corner_radius").min(radius_max);
                         ctx.slider("corner_radius", ctx.t("widget-editor.cornerRadius", "Corner Radius"), 0.0, radius_max)
                             .shown(radius)
-                            .readout(crate::format::plain_number(js_round(radius)))
+                            .readout(crate::format::plain_number(round_half_up(radius)))
                             .px()
                     }),
                 ],
@@ -1313,7 +1309,7 @@ fn profile_editor(ctx: &Ctx, diving: bool) -> Vec<Node> {
                     max: 50.0,
                     step: 1.0,
                     scale: 1.0,
-                    readout: crate::format::plain_number(js_round(label_size)),
+                    readout: crate::format::plain_number(round_half_up(label_size)),
                     suffix: "px".into(),
                 },
             )

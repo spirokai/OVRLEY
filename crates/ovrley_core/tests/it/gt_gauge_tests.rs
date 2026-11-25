@@ -3,12 +3,12 @@ use crate::common;
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::fonts::NativeFonts;
 use ovrley_core::normalize::{validate_render_config, RenderConfig};
-use ovrley_widgets::model::types::{DisplayType, MetricKind, TrackFillStyle};
+use ovrley_widgets::model::catalog::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::gauges::arc::{arc_point, gt_gauge_geometry, gt_start_end_angles};
-use ovrley_widgets::widgets::gauges::frame::GaugeLayout;
-use ovrley_widgets::widgets::gauges::validation::ValidatedGtGaugeStyle;
-use ovrley_widgets::widgets::value::config::ValueConfig;
-use ovrley_widgets::widgets::value::validation::ValidatedValue;
+use ovrley_widgets::widgets::gauges::GaugeLayout;
+use ovrley_widgets::widgets::gauges::arc::GtStyle;
+use ovrley_widgets::widgets::value::ValueConfig;
+use ovrley_widgets::widgets::value::ValidatedValue;
 use skia_safe::{surfaces, Color};
 use std::collections::BTreeMap;
 
@@ -39,13 +39,15 @@ fn gt_track_opens_its_gap_on_the_right() {
 #[test]
 fn gt_style_is_validated_at_ingress() {
     let config = validate_single(full_gt_gauge_config()).unwrap();
-    let ValidatedValue::ArcGauge(gauge) = &config.values[0] else {
+    let ValidatedValue::Gauge(ovrley_widgets::widgets::gauges::ValidatedGauge::Arc(gauge)) =
+        &config.values[0]
+    else {
         panic!("gt gauge should validate as an arc gauge");
     };
     assert_eq!(gauge.display_type, DisplayType::GtGauge);
     assert_eq!(
         gauge.gt_style,
-        Some(ValidatedGtGaugeStyle {
+        Some(GtStyle {
             tick_count: 11,
             tick_length: 14.0,
             tick_color: "#8c8c8c".into(),
@@ -58,7 +60,7 @@ fn gt_style_is_validated_at_ingress() {
         ("tick_count", serde_json::json!(1), ">= 2"),
         ("tick_length", serde_json::json!(-1), ">= 0"),
         ("tick_color", serde_json::json!("grey"), "tick_color"),
-        ("glow", serde_json::json!(1.5), "0.0..1.0"),
+        ("glow", serde_json::json!(1.5), "0.0..=1.0"),
         ("glow", serde_json::Value::Null, "required"),
         ("arc_angle", serde_json::json!(400), "arc_angle"),
     ] {
@@ -150,7 +152,7 @@ fn rendered_layout(
     value: serde_json::Value,
 ) -> (
     GaugeLayout,
-    ovrley_widgets::widgets::gauges::metric::GaugeFrameState,
+    ovrley_widgets::widgets::gauges::GaugeFrameState,
     Vec<std::path::PathBuf>,
 ) {
     let config = validate_single(value).unwrap();

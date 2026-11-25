@@ -20,8 +20,8 @@ use ovrley_core::normalize::template::normalize_global_defaults;
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::model::document::{merge_widget_data, number, resolve_active_widget_data, OverlayConfig};
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
-use ovrley_widgets::preview_instance::PresentedGeometry;
-use ovrley_widgets::render::preview::PreviewRasterScale;
+use ovrley_widgets::render::tile::WidgetGeometry;
+use ovrley_widgets::render::tile::PreviewRasterScale;
 use serde_json::{json, Map, Value};
 use crate::activity::{has_activity_coverage, resolve_activity_context, ActivityContext};
 use crate::features::canvas::{raster_scale, scene_size};
@@ -318,7 +318,7 @@ pub struct Presented {
     pub kind: String,
     pub revision: u32,
     pub pixels_revision: u32,
-    pub geometry: PresentedGeometry,
+    pub geometry: WidgetGeometry,
 }
 
 struct Instance {
@@ -566,15 +566,10 @@ fn load_split_tables(store: &mut Store, services: &mut Services, widgets: &[Prev
         let bytes_identity = Arc::clone(&imported.preview_bytes);
         services.workers.spawn("preview-splits", move || {
             let table = serde_json::from_value::<
-                ovrley_widgets::widgets::splits_run::table::SplitLength,
+                ovrley_widgets::widgets::splits_run::SplitLength,
             >(length)
             .map_err(|error| error.to_string())
-            .and_then(|length| {
-                serde_json::to_vec(&ovrley_core::activity::splits::derive_split_table(
-                    &activity, length,
-                ))
-                .map_err(|error| error.to_string())
-            });
+            .map(|length| ovrley_core::activity::splits::derive_split_table(&activity, length));
             Box::new(move |store: &mut Store, _: &mut Services| {
                 let current = store
                     .preview
@@ -584,11 +579,11 @@ fn load_split_tables(store: &mut Store, services: &mut Services, widgets: &[Prev
                 if !current {
                     return;
                 }
-                match table.and_then(|bytes| {
+                match table.and_then(|table| {
                     store
                         .preview
                         .session
-                        .replace_split_table(&bytes)
+                        .replace_split_table(table)
                         .map_err(|error| error.to_string())
                 }) {
                     Ok(()) => {
@@ -840,10 +835,7 @@ fn sync(
             continue;
         }
         instance.revision = Some(revision);
-        match widget
-            .presented_geometry()
-            .map_err(|error| error.to_string())?
-        {
+        match widget.geometry().cloned() {
             Some(geometry) => {
                 presented.insert(
                     id.clone(),
@@ -1023,10 +1015,10 @@ mod tests {
         dispatcher.with_store(|store| {
             assert_eq!(store.preview.error, None);
             let title = &store.preview.presented()["title"];
-            assert!(title.geometry.widget.content.width > 0.0);
+            assert!(title.geometry.content.width > 0.0);
             assert_eq!(
                 store.preview.pixels(title.handle).len() as u32,
-                title.geometry.widget.width * title.geometry.widget.height * 4
+                title.geometry.width * title.geometry.height * 4
             );
             assert!(store.preview.presented().contains_key("box"));
         });
@@ -1078,14 +1070,14 @@ mod tests {
             json!({"scene": {"width": 1920, "height": 1080}, "labels": [{"id": "t", "text": "A", "x": 0, "y": 0, "font_size": 40, "font": "Inter.ttf", "font_weight": 400, "italic": false, "letter_spacing": 0}]}),
         );
         settle(&dispatcher, &fakes);
-        let before = dispatcher.with_store(|store| store.preview.presented()["t"].geometry.widget.content.left);
+        let before = dispatcher.with_store(|store| store.preview.presented()["t"].geometry.content.left);
         let after = dispatcher
             .dispatch_with_result(|store, services| {
                 store
                     .editor
                     .edit_config(|config| config.labels[0].insert("x".into(), json!(40)));
                 present_pending_frame(store, services);
-                store.preview.presented()["t"].geometry.widget.content.left
+                store.preview.presented()["t"].geometry.content.left
             })
             .unwrap();
         assert_eq!(after - before, 40.0);

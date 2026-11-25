@@ -961,7 +961,7 @@ pub(crate) fn plan_batch_item(
             update_rate
         },
         export_start_seconds: piece_offset,
-        export_window: Some(ovrley_widgets::widgets::route::sampling::RouteWindow {
+        export_window: Some(ovrley_widgets::widgets::route::RouteWindow {
             start: coverage.start,
             end: coverage.end,
         }),

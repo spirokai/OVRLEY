@@ -2,7 +2,7 @@
 //! resource id, immutable, and shared by editor history and render jobs.
 
 use ovrley_core::raster::{RasterResourceResolver, SelectedRaster};
-use ovrley_widgets::widgets::raster::error::RasterError;
+use ovrley_widgets::widgets::raster::RasterError;
 use std::collections::HashMap;
 use std::hash::BuildHasher;
 use std::path::Path;

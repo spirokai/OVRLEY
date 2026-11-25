@@ -14,10 +14,7 @@ use crate::normalize::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ovrley_widgets::model::telemetry::{ActivitySeries, InterpolationKind, NumericActivity};
 
-use ovrley_widgets::interpolation::{
-    collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value,
-    interpolate_points, MissingSamplePolicy,
-};
+use ovrley_widgets::series::{collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value, interpolate_points, MissingSamplePolicy};
 
 #[derive(Clone, Copy)]
 pub(crate) enum InterpolationStrategy {
@@ -277,7 +274,7 @@ fn interpolate_time_series(
     target_x_values: &[f64],
 ) -> Vec<Option<String>> {
     let sampler =
-        ovrley_widgets::widgets::time::sampling::TimeSampler::new(sync_time, x_values, y_values);
+        ovrley_widgets::widgets::time::TimeSampler::new(sync_time, x_values, y_values);
     target_x_values
         .iter()
         .map(|second| sampler.at(*second))
@@ -362,7 +359,7 @@ pub fn densify_activity(
             .zip(&dense_lap_number)
             .map(|(elapsed, lap_number)| {
                 lap_number.and_then(|lap_number| {
-                    ovrley_widgets::widgets::lap_timer::sampling::lap_time_at(
+                    ovrley_widgets::widgets::lap_timer::lap_time_at(
                         &trimmed.lap_start_elapsed_seconds,
                         lap_number,
                         *elapsed,

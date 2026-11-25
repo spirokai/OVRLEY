@@ -685,7 +685,7 @@ pub mod fakes {
             &self,
             _request: &ovrley_widgets::widgets::map::preview::MapFrameRequest,
             _spare: Option<Vec<u8>>,
-        ) -> ovrley_widgets::error::WidgetResult<ovrley_widgets::widgets::map::preview::MapFrameReply> {
+        ) -> ovrley_widgets::WidgetResult<ovrley_widgets::widgets::map::preview::MapFrameReply> {
             let (reply, answer) = std::sync::mpsc::channel();
             reply.send(Err("test maps draw no frames".into())).expect("the answer is held");
             Ok(answer)

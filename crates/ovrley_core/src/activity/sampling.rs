@@ -2,19 +2,13 @@
 
 use super::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity, TrimmedActivity};
 use ovrley_widgets::model::telemetry::{numeric_metrics, ActivitySeries, NumericActivity};
-use ovrley_widgets::{
-    model::types::MetricKind,
-    widgets::{
-        diving_profile::sampling::DivingActivity,
-        elevation::sampling::{
-            elevation_profile_series, preferred_elevation_series, ElevationActivity,
-        },
-        g_force::validation::GForceAxis,
-        lap_timer::format::{LapHistory, LapSample},
-        route::sampling::RouteActivity,
-        value::format::MetricSample,
-    },
-};
+use ovrley_widgets::model::catalog::MetricKind;
+use ovrley_widgets::widgets::diving_profile::DivingActivity;
+use ovrley_widgets::widgets::elevation::{elevation_profile_series, preferred_elevation_series, ElevationActivity};
+use ovrley_widgets::widgets::g_force::GForceAxis;
+use ovrley_widgets::widgets::lap_timer::{LapHistory, LapSample};
+use ovrley_widgets::widgets::route::RouteActivity;
+use ovrley_widgets::widgets::value::format::MetricSample;
 
 use std::collections::HashMap;
 

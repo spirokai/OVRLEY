@@ -3,11 +3,11 @@ use crate::common;
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::normalize::RenderConfig;
 use ovrley_core::normalize::validate_render_config;
-use ovrley_widgets::widgets::gauges::validation::ValidatedLinearGaugeOrientation;
+use ovrley_widgets::widgets::gauges::linear::LinearOrientation;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
-use ovrley_widgets::model::types::TrackFillStyle;
-use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::model::catalog::TrackFillStyle;
+use ovrley_widgets::widgets::value::ValueConfig;
 use std::collections::BTreeMap;
 
 #[test]
@@ -92,7 +92,7 @@ fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
         200.0,
         40.0,
         0.25,
-        ValidatedLinearGaugeOrientation::Horizontal,
+        LinearOrientation::Horizontal,
     );
     assert_eq!(horizontal, (10.0, 20.0, 50.0, 40.0));
 
@@ -102,7 +102,7 @@ fn linear_fill_rect_respects_horizontal_and_vertical_orientation() {
         200.0,
         40.0,
         0.25,
-        ValidatedLinearGaugeOrientation::Vertical,
+        LinearOrientation::Vertical,
     );
     assert_eq!(vertical, (10.0, 50.0, 200.0, 10.0));
 }
@@ -115,7 +115,7 @@ fn linear_fill_rect_stays_inside_track_border() {
         200.0,
         40.0,
         0.25,
-        ValidatedLinearGaugeOrientation::Horizontal,
+        LinearOrientation::Horizontal,
         2.0,
     );
     assert_eq!(horizontal, (12.0, 22.0, 49.0, 36.0));
@@ -126,7 +126,7 @@ fn linear_fill_rect_stays_inside_track_border() {
         200.0,
         40.0,
         0.25,
-        ValidatedLinearGaugeOrientation::Vertical,
+        LinearOrientation::Vertical,
         2.0,
     );
     assert_eq!(vertical, (12.0, 49.0, 196.0, 9.0));
@@ -170,7 +170,7 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
     let paths = test_paths();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
     let (layout, _) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Linear(layout) = &layout else { panic!("gauge layout"); };
+    let ovrley_widgets::widgets::gauges::GaugeLayout::Linear(layout) = &layout else { panic!("gauge layout"); };
     assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(layout.bar_geometry.unwrap().count, 8);
 }
@@ -216,7 +216,7 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
             &series.speed,
         )
-        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
+        .map(|range| (ovrley_widgets::model::catalog::MetricKind::Speed, range))
         .into_iter()
         .collect(),
         series,

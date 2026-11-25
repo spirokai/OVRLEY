@@ -13,7 +13,7 @@ use crate::error::{CoreError, CoreResult};
 pub const TEMPLATE_FILE_FORMAT: &str = "ovrley-template";
 pub const TEMPLATE_FILE_VERSION: u32 = 3;
 
-use ovrley_widgets::widgets::label::config::{LabelConfig, LabelTypography};
+use ovrley_widgets::widgets::label::{LabelConfig, LabelTypography};
 
 /// Global render settings shared by labels, metric values, plots, and ffmpeg.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -56,9 +56,9 @@ pub struct SceneConfig {
 
 use ovrley_widgets::model::scene::ScenePresentationConfig;
 
-use ovrley_widgets::widgets::backdrop::config::BackdropConfig;
+use ovrley_widgets::widgets::backdrop::BackdropConfig;
 
-use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::widgets::value::ValueConfig;
 
 /// Promotes nested display variant fields to the top level so validators
 /// can consume them as flat fields. Used when a JS-normalized config stores
@@ -102,7 +102,7 @@ fn promote_variant_keys(raw: &mut serde_json::Value, variant_key: &str) {
     }
 }
 
-use ovrley_widgets::widgets::raster::config::RasterConfig;
+use ovrley_widgets::widgets::raster::RasterConfig;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RenderConfig<S = SceneConfig> {

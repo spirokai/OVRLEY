@@ -1,42 +1,27 @@
-//! A map handle retains the track and the last frame across config edits. Every edit draws at its own
-//! size and camera straight away, so a resize shows more or less of the map and never stretches it.
-//!
-//! Export's frames reach the widget through a [`MapFrameProvider`] its host implements:
-//! `ovrley_widgets` never depends on the renderer. The editor preview streams frames from a
-//! [`MapFrameFactory`]: it never waits for one, and keeps showing the last frame until the next
-//! arrives.
-use super::{
-    config::MapConfig,
-    content::{ContentKey, MapContent, RouteExtent},
-    layout::{MapLayout, MarkerPose, ScreenRoute},
-    validation::{validate_map_widget, ValidatedMapWidget},
+//! Map frames from the host's renderer, and the map widget's preview.
+use crate::activity::ActivitySampler;
+use crate::model::scene::{
+    validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
 };
-use crate::{
-    activity::ActivitySampler,
-    error::{WidgetError, WidgetResult},
-    host::WidgetHost,
-    model::scene::{
-        validate_scene_presentation, ScenePresentationConfig, ValidatedScenePresentation,
-    },
-    render::{
-        preview::{render_tile, PreviewRasterScale},
-        text::FontResolver,
-    },
-    widgets::{
-        route::{layout::outward, sampling::RouteWindow},
-        value::preview::{ContentBounds, TileBounds, WidgetGeometry, SHAPE_COLOR_TYPE},
-    },
+use crate::preview::WidgetHost;
+use crate::render::text::FontResolver;
+use crate::render::tile::PreviewRasterScale;
+use crate::render::tile::{Presented, Tile};
+use crate::render::tile::{TileBounds, SHAPE_COLOR_TYPE};
+use crate::widgets::map::layout::{MapLayout, MarkerPose, ScreenRoute};
+use crate::widgets::map::{
+    validate_map_widget, ContentKey, MapConfig, MapContent, RouteExtent, ValidatedMapWidget,
 };
+use crate::widgets::route::geometry::outward;
+use crate::widgets::route::RouteWindow;
+use crate::{WidgetError, WidgetResult};
 use ovrley_map::{
-    frame_tiles, MapCamera, MapLabelDraw, MapRouteDraw, MapRouteLine, MapStyleCatalog,
-    MapStyleInfo, MapStyleSpec, MapViewport, TileId,
+    frame_tiles, MapCamera, MapLabelDraw, MapRouteDraw, MapStyleCatalog, MapStyleInfo,
+    MapStyleSpec, MapViewport, TileId,
 };
-use serde_json::json;
-use skia_safe::{images, AlphaType, Canvas, ColorType, Data, Image, ImageInfo, Rect, Surface};
-use std::sync::{
-    mpsc::{Receiver, TryRecvError},
-    Arc,
-};
+use skia_safe::{images, AlphaType, Canvas, ColorType, Data, Image, ImageInfo};
+use std::sync::mpsc::{Receiver, TryRecvError};
+use std::sync::Arc;
 
 /// Everything a frame's pixels depend on.
 #[derive(Clone, Debug, PartialEq)]
@@ -150,8 +135,6 @@ type StreamKey = (ovrley_map::MapStyleId, u32);
 /// What is behind the marker and attribution.
 enum MapBacking {
     Image(MapFramePixels),
-    /// The host's map canvas shows through, so the widget leaves the frame clear.
-    Layer,
     Placeholder,
 }
 
@@ -180,7 +163,7 @@ fn resolve_style(
 }
 
 /// One map's frames from a [`MapFrameProvider`]: the frame on show, the one being drawn and the
-/// one that failed (Phase 8 D7). The editor's maps and Sync Doctor's maps share its rules:
+/// one that failed. The editor's maps and Sync Doctor's maps share its rules:
 ///
 /// - a request is asked for once, and never again while its frame is held, being drawn or failed;
 /// - a streamed stream draws one frame at a time and keeps showing the last frame until the next
@@ -216,7 +199,15 @@ impl MapFrameStream {
     }
 
     fn new(provider: Arc<dyn MapFrameProvider>, streamed: bool) -> Self {
-        Self { provider, streamed, shown: None, held: None, drawing: None, failed: None, serial: 0 }
+        Self {
+            provider,
+            streamed,
+            shown: None,
+            held: None,
+            drawing: None,
+            failed: None,
+            serial: 0,
+        }
     }
 
     /// Another renderer (another style or sample count): the frame on show stays until the new one
@@ -279,14 +270,22 @@ impl MapFrameStream {
         let generation = self.provider.generation();
         if self.streamed {
             if self.drawing.is_none() {
-                self.drawing = Some((request.clone(), generation, self.provider.frame(request, None)?));
+                self.drawing = Some((
+                    request.clone(),
+                    generation,
+                    self.provider.frame(request, None)?,
+                ));
             }
             return Ok(());
         }
         // Performance: the previous frame's buffer is reused, so a frame allocates nothing.
         self.held = None;
         let spare = self.shown.take().and_then(MapFramePixels::into_pixels);
-        self.drawing = Some((request.clone(), generation, self.provider.frame(request, spare)?));
+        self.drawing = Some((
+            request.clone(),
+            generation,
+            self.provider.frame(request, spare)?,
+        ));
         Ok(())
     }
 
@@ -346,8 +345,7 @@ pub struct PreviewMap {
     window: Option<RouteWindow>,
     preview_duration: f64,
     raster_scale: PreviewRasterScale,
-    /// Export's frames, or a native preview's. The WASM preview has none: its map is the host's
-    /// canvas.
+    /// Export's frames, or the editor's when the host streams them.
     frames: Option<MapFrameStream>,
     /// What a native preview's provider was made for. Some when frames stream: then the widget
     /// never waits for a frame.
@@ -360,26 +358,11 @@ pub struct PreviewMap {
     /// [`Self::frame_request`] brings it up to date, so it is current for any frame with a request.
     screen_route: Option<ScreenRoute>,
     last_render: Option<(MapFrameState, bool, u64)>,
-    /// Whether the host's map canvas is showing under this widget.
-    layer_ready: bool,
-    /// JSON of what the map canvas should draw. Empty when it should draw nothing.
-    pub view: Vec<u8>,
-    view_line: Option<Arc<MapRouteLine>>,
-    /// `world_x, world_y, along_metres` per vertex of `view_line`. `route_id` changes with it.
-    pub route_points: Vec<f64>,
-    route_id: u32,
-    geometry_stale: bool,
-    surface: Option<Surface>,
-    pub pixels: Vec<u8>,
-    pub geometry: Vec<u8>,
-    /// Scene bounds of the last rendered tile; absent until the first render.
-    pub bounds: Option<TileBounds>,
-    pub revision: u32,
+    pub tile: Tile,
 }
 
 impl PreviewMap {
-    /// The editor preview's map: drawn by the host's map canvas (WASM), or from frames streamed
-    /// by the host's factory (native).
+    /// The editor preview's map, drawn from frames streamed by the host's factory.
     pub fn new(
         widget: MapConfig,
         scene: ScenePresentationConfig,
@@ -390,11 +373,15 @@ impl PreviewMap {
         let config = validate_map_widget(&widget, 0)?;
         let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let style = resolve_style(maps.styles.as_ref(), &config)?;
-        let streamed = maps
-            .frames
-            .as_ref()
-            .map(|factory| (factory.provider(&style, config.msaa_samples), (style.id.clone(), config.msaa_samples)));
-        let (frames, streamed) = streamed.map_or((None, None), |(frames, key)| (Some(MapFrameStream::streamed(frames)), Some(key)));
+        let streamed = maps.frames.as_ref().map(|factory| {
+            (
+                factory.provider(&style, config.msaa_samples),
+                (style.id.clone(), config.msaa_samples),
+            )
+        });
+        let (frames, streamed) = streamed.map_or((None, None), |(frames, key)| {
+            (Some(MapFrameStream::streamed(frames)), Some(key))
+        });
         let mut map = Self::with_content(
             style,
             config,
@@ -454,17 +441,7 @@ impl PreviewMap {
             content,
             screen_route: None,
             last_render: None,
-            layer_ready: false,
-            view: Vec::new(),
-            view_line: None,
-            route_points: Vec::new(),
-            route_id: 0,
-            geometry_stale: true,
-            surface: None,
-            pixels: Vec::new(),
-            geometry: Vec::new(),
-            bounds: None,
-            revision: 0,
+            tile: Tile::default(),
         })
     }
 
@@ -501,7 +478,10 @@ impl PreviewMap {
         if let (Some(factory), Some(key)) = (&maps.frames, &self.streamed) {
             let wanted = (style.id.clone(), config.msaa_samples);
             if *key != wanted {
-                self.frames.as_mut().expect("a streamed map has frames").replace_provider(factory.provider(&style, config.msaa_samples));
+                self.frames
+                    .as_mut()
+                    .expect("a streamed map has frames")
+                    .replace_provider(factory.provider(&style, config.msaa_samples));
                 self.streamed = Some(wanted);
             }
         }
@@ -514,7 +494,6 @@ impl PreviewMap {
         self.preview_duration = preview_duration;
         self.raster_scale = raster_scale;
         self.last_render = None;
-        self.geometry_stale = true;
         Ok(())
     }
 
@@ -568,86 +547,6 @@ impl PreviewMap {
                 progress: (second / self.preview_duration.max(1e-9)).clamp(0.0, 1.0) as f32,
             }),
         }
-    }
-
-    /// Tells the widget whether the host's map canvas is showing. Until it is, the placeholder shows.
-    pub fn set_layer_ready(&mut self, ready: bool) {
-        if self.layer_ready != ready {
-            self.layer_ready = ready;
-            self.last_render = None;
-        }
-    }
-
-    /// Publishes what the host's map canvas should draw for `request`. A top-down request has no
-    /// route, since the tile strokes it, so the canvas draws only the map. Its view then holds still
-    /// through playback, and the canvas draws again only for an edit or a tile.
-    fn publish_view(&mut self, request: Option<&MapFrameRequest>) -> WidgetResult<()> {
-        let Some(request) = request else {
-            self.view.clear();
-            return Ok(());
-        };
-        let route = match &request.route {
-            None => serde_json::Value::Null,
-            Some(route) => {
-                if !self
-                    .view_line
-                    .as_ref()
-                    .is_some_and(|line| Arc::ptr_eq(line, &route.line))
-                {
-                    self.route_points = route
-                        .line
-                        .points()
-                        .iter()
-                        .flat_map(|point| {
-                            [point.world_x, point.world_y, f64::from(point.along_metres)]
-                        })
-                        .collect();
-                    self.route_id = self.route_id.wrapping_add(1);
-                    self.view_line = Some(route.line.clone());
-                }
-                let style = route.style;
-                let [c0, c1, c2, c3] = style.completed_color;
-                let [r0, r1, r2, r3] = style.remaining_color;
-                json!({
-                    "id": self.route_id,
-                    "style": [c0, c1, c2, c3, r0, r1, r2, r3, style.width_px],
-                    "travelled_metres": route.travelled_metres,
-                })
-            }
-        };
-        let (camera, viewport) = (request.camera, request.viewport);
-        // The placement cameras, then the blend; empty when the frame draws no labels.
-        let labels: Vec<f64> = request.labels.map_or_else(Vec::new, |draw| {
-            let mut values: Vec<f64> = draw
-                .cameras()
-                .into_iter()
-                .flat_map(MapCamera::values)
-                .collect();
-            values.push(f64::from(draw.blend()));
-            values
-        });
-        self.view = serde_json::to_vec(&json!({
-            "renderer": {
-                "style": self.style.id,
-                "style_buildings": self.style.buildings,
-                "buildings": self.config.layers.buildings,
-                "labels": self.config.layers.labels,
-                "paths": self.config.layers.paths,
-                "local_names": self.config.layers.local_names,
-                "pixel_ratio": viewport.pixel_ratio(),
-                "msaa_samples": self.config.msaa_samples,
-            },
-            "width": viewport.width_px(),
-            "height": viewport.height_px(),
-            "style_zoom": camera.zoom(),
-            "opacity": self.layout.opacity,
-            "corner_radius_px": request.corner_radius_px,
-            "camera": camera.values(),
-            "labels": labels,
-            "route": route,
-        }))
-        .map_err(|error| WidgetError::Render(error.to_string()))?;
-        Ok(())
     }
 
     /// What the renderer must draw at this state; none without a camera over the activity. This is
@@ -705,8 +604,8 @@ impl PreviewMap {
     ) -> WidgetResult<()> {
         let state = self.frame_state(activity, second)?;
         match self.frame_request(&state) {
-            Some(request) if !self.layer_ready => self.start_request(&request),
-            _ => Ok(()),
+            Some(request) => self.start_request(&request),
+            None => Ok(()),
         }
     }
 
@@ -719,9 +618,6 @@ impl PreviewMap {
             return Ok(None);
         };
         let camera = request.camera;
-        if self.layer_ready {
-            return Ok(Some((camera, MapBacking::Layer)));
-        }
         if let Some(frames) = &mut self.frames {
             frames.resolve(&request)?;
         }
@@ -765,7 +661,6 @@ impl PreviewMap {
             Some((_, backing)) => {
                 match backing {
                     MapBacking::Image(frame) => layout.draw_image(canvas, frame.image()),
-                    MapBacking::Layer => {}
                     MapBacking::Placeholder => layout.draw_placeholder(canvas),
                 }
                 if let Some(route) = screen_route {
@@ -821,7 +716,6 @@ impl PreviewMap {
     pub fn render(&mut self, activity: Option<&ActivitySampler>, second: f64) -> WidgetResult<()> {
         let state = self.frame_state(activity, second)?;
         let request = self.frame_request(&state);
-        self.publish_view(request.as_ref())?;
         let resolved = self.resolve_frame(request)?;
         let has_frame = resolved
             .as_ref()
@@ -835,13 +729,11 @@ impl PreviewMap {
             .and_then(|(camera, _)| self.marker_pose(camera, second));
         let layout = &self.layout;
         let screen_route = self.screen_route.as_ref();
-        let bounds: Rect = outward(layout.frame);
-        let (width, height, bounds) = render_tile(
-            &mut self.surface,
-            &mut self.pixels,
-            SHAPE_COLOR_TYPE,
+        self.tile.render(
             self.raster_scale,
-            bounds,
+            SHAPE_COLOR_TYPE,
+            outward(layout.frame),
+            Presented::content(layout.frame),
             |canvas| {
                 Self::paint(
                     layout,
@@ -854,21 +746,6 @@ impl PreviewMap {
                 Ok(())
             },
         )?;
-        if self.geometry_stale {
-            let tile = TileBounds::from(bounds);
-            let content = ContentBounds::from(layout.frame);
-            self.geometry = serde_json::to_vec(&WidgetGeometry::new(
-                tile,
-                (width, height),
-                self.raster_scale.value(),
-                content.width,
-                content,
-            ))
-            .map_err(|error| WidgetError::Render(error.to_string()))?;
-            self.bounds = Some(tile);
-            self.geometry_stale = false;
-        }
-        self.revision = self.revision.wrapping_add(1);
         self.last_render = Some((state, has_frame, self.frame_serial()));
         Ok(())
     }

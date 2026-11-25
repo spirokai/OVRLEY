@@ -1,8 +1,7 @@
-//! The overlay document and its catalog-driven edits: the one home of what `lib/widget`
-//! (`widget-config`, `widget-resolver`, `widget-defaults`, `unit-system`, `altitude`) and
-//! `lib/color-utils` do to widget data (Phase 3, D1 and D3).
+//! The overlay document and its catalog-driven edits: widget configuration, resolution of
+//! display variants, defaults for new widgets, unit systems, altitude units and colour fields.
 //!
-//! The document is JSON with a typed outer shape (D1): a scene object and five ordered
+//! The document is JSON with a typed outer shape: a scene object and five ordered
 //! collections of widget objects. Template ingress (`ovrley_core`) and the native editor
 //! (`ovrley_app`) both edit it through these functions; nothing re-implements them.
 
@@ -13,7 +12,7 @@ use serde_json::{Map, Value};
 /// One widget's data: a JSON object whose `id` is a non-empty string, validated at ingress.
 pub type WidgetData = Map<String, Value>;
 
-/// The editor's document (D1).
+/// The editor's document.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct OverlayConfig {
     pub scene: Map<String, Value>,
@@ -121,7 +120,7 @@ impl OverlayConfig {
             .collect()
     }
 
-    /// `ensureWidgetIdsInConfig`: document ingress. Absent collections become empty and absent
+    /// Document ingress. Absent collections become empty and absent
     /// ids are assigned; present collections and ids must be valid, and duplicates are rejected.
     pub fn from_value(value: &Value) -> Result<Self, String> {
         let object = value.as_object().ok_or("Widget config must be an object")?;
@@ -207,7 +206,7 @@ impl OverlayConfig {
         Ok(&self.collection(collection)[index])
     }
 
-    /// `updateWidgetsInConfig`: merges each patch into its widget atomically; colour fields of
+    /// Merges each patch into its widget atomically; colour fields of
     /// the patch are normalized and the id is kept.
     pub fn update_widgets(
         &mut self,
@@ -227,7 +226,7 @@ impl OverlayConfig {
         Ok(())
     }
 
-    /// `replaceWidgetInConfig`: replaces a widget's data, keeping its id.
+    /// Replaces a widget's data, keeping its id.
     pub fn replace_widget(
         &mut self,
         widget_id: &str,
@@ -239,8 +238,6 @@ impl OverlayConfig {
         self.collection_mut(collection)[index] = data;
         Ok(())
     }
-
-    /// `deleteWidgetsInConfig`.
     pub fn delete_widgets(&mut self, widget_ids: &[String]) {
         for collection in Collection::ALL {
             self.collection_mut(collection).retain(|widget| {
@@ -249,8 +246,7 @@ impl OverlayConfig {
         }
     }
 
-    /// `addWidget`'s append: the new widget at the end of its collection with a generated id
-    /// (`ensureWidgetIdsInConfig`), which it returns.
+    /// Appends a widget to its collection with a generated id, which it returns.
     pub fn add_widget(&mut self, collection: Collection, mut data: WidgetData) -> String {
         let id = format!("widget-{}", self.next_generated_id());
         data.insert("id".into(), Value::String(id.clone()));
@@ -258,7 +254,7 @@ impl OverlayConfig {
         id
     }
 
-    /// `duplicateWidgetsInConfig`: appends copies with new ids, offset by (24, 24) unless given,
+    /// Appends copies with new ids, offset by (24, 24) unless given,
     /// and returns the new ids in document order.
     pub fn duplicate_widgets(
         &mut self,
@@ -290,7 +286,7 @@ impl OverlayConfig {
             .collect()
     }
 
-    /// `scaleWidgetPositions`: scales every position about `origin` (left, top).
+    /// Scales every position about `origin` (left, top).
     pub fn scale_widget_positions(&mut self, factor: f64, origin: (f64, f64)) {
         if factor == 1.0 {
             return;
@@ -322,7 +318,7 @@ pub fn widget_id(widget: &WidgetData) -> &str {
     widget_id_of(widget).expect("ingress assigns every widget an id")
 }
 
-/// `normalizeSelectionIds`: the requested ids that exist, in document order.
+/// The requested ids that exist, in document order.
 pub fn normalize_selection_ids(widget_ids: &[String], ordered_ids: &[String]) -> Vec<String> {
     ordered_ids
         .iter()
@@ -331,7 +327,7 @@ pub fn normalize_selection_ids(widget_ids: &[String], ordered_ids: &[String]) ->
         .collect()
 }
 
-/// `getPrimarySelectionId`: the preferred id when selected, else the last selected.
+/// The preferred id when selected, else the last selected.
 pub fn primary_selection_id(widget_ids: &[String], preferred: Option<&str>) -> Option<String> {
     match preferred {
         Some(preferred) if widget_ids.iter().any(|id| id == preferred) => {
@@ -341,7 +337,7 @@ pub fn primary_selection_id(widget_ids: &[String], preferred: Option<&str>) -> O
     }
 }
 
-/// A JSON number that stays an integer when the value is whole, as JavaScript writes it.
+/// A JSON number that stays an integer when the value is whole.
 pub fn number(value: f64) -> Value {
     if value.fract() == 0.0 && value.abs() < 9.007_199_254_740_992e15 {
         Value::from(value as i64)
@@ -350,7 +346,7 @@ pub fn number(value: f64) -> Value {
     }
 }
 
-/// Whole floating-point numbers as integers, recursively: JavaScript has one number type, so a
+/// Whole floating-point numbers as integers, recursively: the document has one number type, so a
 /// patch from a Rust struct (`100.0`) must equal the document's `100`.
 pub fn canonical_numbers(map: &mut Map<String, Value>) {
     fn visit(value: &mut Value) {
@@ -368,12 +364,12 @@ pub fn canonical_numbers(map: &mut Map<String, Value>) {
     map.values_mut().for_each(visit);
 }
 
-/// `Math.round`: halves round towards positive infinity.
-pub fn js_round(value: f64) -> f64 {
+/// Rounds to the nearest integer; halves round towards positive infinity.
+pub fn round_half_up(value: f64) -> f64 {
     (value + 0.5).floor()
 }
 
-/// `pickDefined`: the present keys of `source` (null counts as present), in `keys` order.
+/// The present keys of `source` (null counts as present), in `keys` order.
 pub fn pick_defined(source: Option<&Map<String, Value>>, keys: &[String]) -> Map<String, Value> {
     let mut picked = Map::new();
     if let Some(source) = source {
@@ -398,7 +394,7 @@ fn expand_short(digits: &str) -> String {
         .to_lowercase()
 }
 
-/// `normalizeHexColor`: 3, 4, 6 and 8 digits (with or without `#`) become `#rrggbb`, any alpha
+/// 3, 4, 6 and 8 digits (with or without `#`) become `#rrggbb`, any alpha
 /// is dropped, and anything else yields `fallback`.
 pub fn normalize_hex_color(value: &str, fallback: &str) -> String {
     let trimmed = value.trim();
@@ -421,7 +417,7 @@ pub fn is_color_field_key(key: &str) -> bool {
     key == "color" || key.ends_with("_color") || key.starts_with("color_")
 }
 
-/// `normalizeColorFields`: every colour field of an object as `#rrggbb` (`#000000` when it is not
+/// Every colour field of an object as `#rrggbb` (`#000000` when it is not
 /// a colour).
 pub fn normalize_color_fields(record: &Map<String, Value>) -> Map<String, Value> {
     record
@@ -441,7 +437,7 @@ fn object(value: Option<&Value>) -> Option<&Map<String, Value>> {
     value.and_then(Value::as_object)
 }
 
-/// `mergeWidgetData`: a patch over data, with display variants merged per display type.
+/// A patch over data, with display variants merged per display type.
 pub fn merge_widget_data(
     data: Option<&Map<String, Value>>,
     updates: &Map<String, Value>,
@@ -474,7 +470,7 @@ fn display_type(data: &Map<String, Value>) -> Option<&str> {
     data.get("display_type").and_then(Value::as_str)
 }
 
-/// `resolveActiveWidgetData`: the active display's variant flattened over the shared data, with
+/// The active display's variant flattened over the shared data, with
 /// the display's resolved frame (a circle's diameter as width and height).
 pub fn resolve_active_widget_data(data: &Map<String, Value>) -> Map<String, Value> {
     let Some(kind) = display_type(data) else {
@@ -502,7 +498,7 @@ pub fn resolve_active_widget_data(data: &Map<String, Value>) -> Map<String, Valu
 
 const FONT_EXTENSIONS: [&str; 6] = ["ttf", "otf", "ttc", "woff", "woff2", "fon"];
 
-/// `getFontFamilyName`: a font identity without its font-file extension.
+/// A font identity without its font-file extension.
 pub fn font_family_name(value: &str) -> String {
     let trimmed = value.trim();
     if let Some((stem, extension)) = trimmed.rsplit_once('.') {
@@ -516,7 +512,7 @@ pub fn font_family_name(value: &str) -> String {
     trimmed.to_string()
 }
 
-/// `createFontSelection`: `font` and its `font_family`.
+/// `font` and its `font_family`.
 pub fn font_selection(value: &str) -> Map<String, Value> {
     let mut selection = Map::new();
     selection.insert("font".into(), Value::String(value.to_string()));
@@ -524,13 +520,13 @@ pub fn font_selection(value: &str) -> Map<String, Value> {
     selection
 }
 
-/// A label's italic and weight as a family supports them (`createLabelFontSelection`'s style),
-/// from the requested italic and weight. The caller resolves it with the family's prepared
+/// A label's italic and weight as its family supports them, from the requested italic and
+/// weight. The caller resolves it with the family's prepared
 /// capabilities.
 pub type LabelStyle<'a> = &'a dyn Fn(bool, f64) -> Result<(bool, f64), String>;
 
 impl OverlayConfig {
-    /// `syncGlobalDefaultsToConfig`: applies the global defaults to the existing widgets, all of
+    /// Applies the global defaults to the existing widgets, all of
     /// them, or only `changed_keys`. Applying `font_text` re-resolves each label's italic and
     /// weight in the new family through `label_style`.
     pub fn sync_global_defaults(
@@ -541,12 +537,24 @@ impl OverlayConfig {
     ) -> Result<OverlayConfig, String> {
         let apply = |key: &str| changed_keys.is_none_or(|keys| keys.contains(&key));
         let global = |key: &str| globals.get(key).cloned().unwrap_or(Value::Null);
-        let text = |key: &str| globals.get(key).and_then(Value::as_str).unwrap_or_default().to_string();
+        let text = |key: &str| {
+            globals
+                .get(key)
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string()
+        };
         let mut next = self.clone();
         for label in &mut next.labels {
             if apply("font_text") {
-                let italic = label.get("italic").and_then(Value::as_bool).unwrap_or_default();
-                let weight = label.get("font_weight").and_then(Value::as_f64).unwrap_or_default();
+                let italic = label
+                    .get("italic")
+                    .and_then(Value::as_bool)
+                    .unwrap_or_default();
+                let weight = label
+                    .get("font_weight")
+                    .and_then(Value::as_f64)
+                    .unwrap_or_default();
                 let (italic, weight) = label_style(italic, weight)?;
                 label.extend(font_selection(&text("font_text")));
                 label.insert("italic".into(), Value::Bool(italic));
@@ -557,7 +565,11 @@ impl OverlayConfig {
             }
         }
         for value in &mut next.values {
-            let kind = value.get("value").and_then(Value::as_str).unwrap_or_default().to_string();
+            let kind = value
+                .get("value")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
             let has_labels = kind == "lap_timer" || kind == "splits_run";
             if apply("font_values") {
                 value.extend(font_selection(&text("font_values")));
@@ -594,9 +606,17 @@ impl OverlayConfig {
             }
         }
         for plot in &mut next.plots {
-            let kind = plot.get("value").and_then(Value::as_str).unwrap_or_default().to_string();
+            let kind = plot
+                .get("value")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
             if (kind == "elevation" || kind == "diving_profile") && apply("font_values") {
-                let mut point_label = plot.get("point_label").and_then(Value::as_object).cloned().unwrap_or_default();
+                let mut point_label = plot
+                    .get("point_label")
+                    .and_then(Value::as_object)
+                    .cloned()
+                    .unwrap_or_default();
                 point_label.extend(font_selection(&text("font_values")));
                 plot.insert("point_label".into(), Value::Object(point_label));
             }
@@ -616,25 +636,43 @@ impl OverlayConfig {
     }
 }
 
-/// `scaleNumber`: `Math.round(value * factor)` clamped to the field's range.
+/// `value * factor`, rounded half up and clamped to the field's range.
 fn scale_number(value: f64, factor: f64, min: f64, max: f64) -> f64 {
-    js_round(value * factor).max(min).min(max)
+    round_half_up(value * factor).max(min).min(max)
 }
 
-fn scale_fields(data: &Map<String, Value>, factor: f64, fields: &[(&str, f64, f64)], patch: &mut Map<String, Value>) {
+fn scale_fields(
+    data: &Map<String, Value>,
+    factor: f64,
+    fields: &[(&str, f64, f64)],
+    patch: &mut Map<String, Value>,
+) {
     for (key, min, max) in fields {
         let value = data.get(*key).and_then(Value::as_f64).unwrap_or_default();
-        patch.insert((*key).into(), number(scale_number(value, factor, *min, *max)));
+        patch.insert(
+            (*key).into(),
+            number(scale_number(value, factor, *min, *max)),
+        );
     }
 }
 
-/// `buildUniformResizeUpdate`: the inspector's Size slider for gauges, lean angle, the heading
+/// The inspector's Size slider for gauges, lean angle, the heading
 /// compass and G-force. Unlike the canvas's resize policy it keeps the widget's position, rounds
 /// every scaled field to whole pixels, and scales the editable content with the frame.
-pub fn build_uniform_resize_update(data: &Map<String, Value>, size: f64) -> Result<Map<String, Value>, String> {
-    let display = display_type(data).ok_or("a sized widget has a display type")?.to_string();
+pub fn build_uniform_resize_update(
+    data: &Map<String, Value>,
+    size: f64,
+) -> Result<Map<String, Value>, String> {
+    let display = display_type(data)
+        .ok_or("a sized widget has a display type")?
+        .to_string();
     let resolved = resolve_active_widget_data(data);
-    let field = |key: &str| resolved.get(key).and_then(Value::as_f64).unwrap_or_default();
+    let field = |key: &str| {
+        resolved
+            .get(key)
+            .and_then(Value::as_f64)
+            .unwrap_or_default()
+    };
     let mut variant = object(data.get("display_variants"))
         .and_then(|variants| object(variants.get(&display)))
         .cloned()
@@ -646,35 +684,104 @@ pub fn build_uniform_resize_update(data: &Map<String, Value>, size: f64) -> Resu
         patch.insert("x".into(), data.get("x").cloned().unwrap_or(Value::Null));
         patch.insert("y".into(), data.get("y").cloned().unwrap_or(Value::Null));
         let min_font = if display == "lean_angle" { 8.0 } else { 6.0 };
-        patch.insert("font_size".into(), number(scale_number(field("font_size"), factor, min_font, 400.0)));
+        patch.insert(
+            "font_size".into(),
+            number(scale_number(field("font_size"), factor, min_font, 400.0)),
+        );
         let diameter = scale_number(field("diameter"), factor, 8.0, 10_000.0);
         content.insert("diameter".into(), number(diameter));
         if display == "lean_angle" {
-            scale_fields(&resolved, factor, &[("value_offset_x", -10_000.0, 10_000.0), ("value_offset_y", -10_000.0, 10_000.0)], &mut content);
-            let thickness = scale_number(field("track_thickness"), factor, 1.0, diameter * 0.5 - f64::EPSILON);
+            scale_fields(
+                &resolved,
+                factor,
+                &[
+                    ("value_offset_x", -10_000.0, 10_000.0),
+                    ("value_offset_y", -10_000.0, 10_000.0),
+                ],
+                &mut content,
+            );
+            let thickness = scale_number(
+                field("track_thickness"),
+                factor,
+                1.0,
+                diameter * 0.5 - f64::EPSILON,
+            );
             content.insert("track_thickness".into(), number(thickness));
             let border_max = (thickness * 0.5 - f64::EPSILON).max(0.0);
-            content.insert("track_border_thickness".into(), number(scale_number(field("track_border_thickness"), factor, 0.0, border_max)));
+            content.insert(
+                "track_border_thickness".into(),
+                number(scale_number(
+                    field("track_border_thickness"),
+                    factor,
+                    0.0,
+                    border_max,
+                )),
+            );
         } else {
             scale_fields(
                 &resolved,
                 factor,
-                &[("cardinal_font_size", 4.0, 400.0), ("indicator_size", 1.0, 10_000.0), ("value_offset_x", -10_000.0, 10_000.0), ("value_offset_y", -10_000.0, 10_000.0)],
+                &[
+                    ("cardinal_font_size", 4.0, 400.0),
+                    ("indicator_size", 1.0, 10_000.0),
+                    ("value_offset_x", -10_000.0, 10_000.0),
+                    ("value_offset_y", -10_000.0, 10_000.0),
+                ],
                 &mut content,
             );
-            content.insert("track_thickness".into(), number(scale_number(field("track_thickness"), factor, 1.0, 10_000.0)));
-            content.insert("track_corner_radius".into(), number(scale_number(field("track_corner_radius"), factor, 0.0, 10_000.0)));
+            content.insert(
+                "track_thickness".into(),
+                number(scale_number(
+                    field("track_thickness"),
+                    factor,
+                    1.0,
+                    10_000.0,
+                )),
+            );
+            content.insert(
+                "track_corner_radius".into(),
+                number(scale_number(
+                    field("track_corner_radius"),
+                    factor,
+                    0.0,
+                    10_000.0,
+                )),
+            );
         }
     } else {
-        let width = js_round(size);
-        let height = if display == "g_force" { width } else { js_round(field("height") * (size / field("width"))) };
+        let width = round_half_up(size);
+        let height = if display == "g_force" {
+            width
+        } else {
+            round_half_up(field("height") * (size / field("width")))
+        };
         let factor = (width / field("width") + height / field("height")) * 0.5;
         if display == "g_force" {
             let diameter = scale_number(field("diameter"), factor, 8.0, 10_000.0);
-            scale_fields(&resolved, factor, &[("label_font_size", 8.0, 400.0), ("label_offset_x", -10_000.0, 10_000.0), ("label_offset_y", -10_000.0, 10_000.0)], &mut content);
+            scale_fields(
+                &resolved,
+                factor,
+                &[
+                    ("label_font_size", 8.0, 400.0),
+                    ("label_offset_x", -10_000.0, 10_000.0),
+                    ("label_offset_y", -10_000.0, 10_000.0),
+                ],
+                &mut content,
+            );
             content.insert("diameter".into(), number(diameter));
-            content.insert("border_thickness".into(), number(scale_number(field("border_thickness"), factor, 0.0, (diameter - 1.0) * 0.5)));
-            content.insert("marker_size".into(), number(scale_number(field("marker_size"), factor, 1.0, diameter)));
+            content.insert(
+                "border_thickness".into(),
+                number(scale_number(
+                    field("border_thickness"),
+                    factor,
+                    0.0,
+                    (diameter - 1.0) * 0.5,
+                )),
+            );
+            content.insert(
+                "marker_size".into(),
+                number(scale_number(field("marker_size"), factor, 1.0, diameter)),
+            );
         } else if ["arc", "corner", "gt_gauge"].contains(&display.as_str()) {
             scale_fields(
                 &resolved,
@@ -688,12 +795,26 @@ pub fn build_uniform_resize_update(data: &Map<String, Value>, size: f64) -> Resu
                 &mut content,
             );
             if display == "gt_gauge" {
-                content.insert("tick_length".into(), number(scale_number(field("tick_length"), factor, 0.0, 100.0)));
+                content.insert(
+                    "tick_length".into(),
+                    number(scale_number(field("tick_length"), factor, 0.0, 100.0)),
+                );
             }
             let thickness = scale_number(field("track_thickness"), factor, 1.0, 100.0);
             content.insert("track_thickness".into(), number(thickness));
-            content.insert("track_corner_radius".into(), number(scale_number(field("track_corner_radius"), factor, 0.0, thickness * 0.5)));
-            patch.insert("font_size".into(), number(scale_number(field("font_size"), factor, 8.0, 400.0)));
+            content.insert(
+                "track_corner_radius".into(),
+                number(scale_number(
+                    field("track_corner_radius"),
+                    factor,
+                    0.0,
+                    thickness * 0.5,
+                )),
+            );
+            patch.insert(
+                "font_size".into(),
+                number(scale_number(field("font_size"), factor, 8.0, 400.0)),
+            );
         } else {
             return Err(format!("Unsupported inspector size policy: {display}"));
         }
@@ -703,7 +824,9 @@ pub fn build_uniform_resize_update(data: &Map<String, Value>, size: f64) -> Resu
         content.insert("height".into(), number(height));
     }
     variant.extend(content);
-    let mut variants = object(data.get("display_variants")).cloned().unwrap_or_default();
+    let mut variants = object(data.get("display_variants"))
+        .cloned()
+        .unwrap_or_default();
     variants.insert(display, Value::Object(variant));
     patch.insert("display_variants".into(), Value::Object(variants));
     Ok(patch)
@@ -719,16 +842,19 @@ pub enum UnitSystem {
     Imperial,
 }
 
-impl UnitSystem {
-    /// `requireUnitSystem`.
-    pub fn require(value: &str) -> Result<Self, String> {
+impl std::str::FromStr for UnitSystem {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, String> {
         match value {
             "metric" => Ok(Self::Metric),
             "imperial" => Ok(Self::Imperial),
             other => Err(format!("Unknown unit system: {other}")),
         }
     }
+}
 
+impl UnitSystem {
     pub fn name(self) -> &'static str {
         match self {
             Self::Metric => "metric",
@@ -737,7 +863,7 @@ impl UnitSystem {
     }
 }
 
-/// `initDisplayVariant`: initializes a boxed display's variant at creation, ingress or display
+/// Initializes a boxed display's variant at creation, ingress or display
 /// selection. `frame_fallback` is the document geometry (`None` uses the manifest's), and the
 /// manifest defaults are read in `unit_system`.
 pub fn init_display_variant(
@@ -774,7 +900,7 @@ pub fn init_display_variant(
     next
 }
 
-/// `buildFrameGeometryUpdate`: a gesture's or the inspector's geometry as a patch that follows the
+/// A gesture's or the inspector's geometry as a patch that follows the
 /// display's geometry contract.
 pub fn build_frame_geometry_update(
     data: &Map<String, Value>,
@@ -806,7 +932,7 @@ pub fn build_frame_geometry_update(
     patch
 }
 
-/// `buildDisplayTypeChangeUpdate`: the patch that selects a display, restoring its geometry and
+/// The patch that selects a display, restoring its geometry and
 /// shared defaults.
 pub fn build_display_type_change_update(
     data: &Map<String, Value>,
@@ -831,7 +957,7 @@ pub fn build_display_type_change_update(
     patch
 }
 
-/// `buildDisplayModeUpdate`: a mode's labels and typography defaults.
+/// A mode's labels and typography defaults.
 pub fn build_display_mode_update(kind: &str, value: &str) -> Result<Map<String, Value>, String> {
     Ok(catalog()
         .require_display(kind)
@@ -839,8 +965,6 @@ pub fn build_display_mode_update(kind: &str, value: &str) -> Result<Map<String, 
         .defaults
         .clone())
 }
-
-/// `convertAltitudeValue`.
 pub fn convert_altitude_value(value: f64, from_unit: &str, to_unit: &str) -> f64 {
     if from_unit == to_unit {
         return value;
@@ -854,11 +978,11 @@ pub fn convert_altitude_value(value: f64, from_unit: &str, to_unit: &str) -> f64
     value / scale(from_unit) * scale(to_unit)
 }
 
-/// `convertAltitudeInputValue`: an absent or empty altitude stays as it is; a number converts and
+/// An absent or empty altitude stays as it is; a number converts and
 /// rounds to a whole unit.
 pub fn convert_altitude_input_value(value: &Value, from_unit: &str, to_unit: &str) -> Value {
     match value.as_f64() {
-        Some(number_value) => number(js_round(convert_altitude_value(
+        Some(number_value) => number(round_half_up(convert_altitude_value(
             number_value,
             from_unit,
             to_unit,
@@ -867,7 +991,7 @@ pub fn convert_altitude_input_value(value: &Value, from_unit: &str, to_unit: &st
     }
 }
 
-/// `buildMetricUnitUpdate`: a unit change; altitude widgets convert their starting altitude.
+/// A unit change; altitude widgets convert their starting altitude.
 pub fn build_metric_unit_update(
     metric_type: &str,
     starting_altitude: &Value,
@@ -919,7 +1043,7 @@ fn convert_unit(data: &Map<String, Value>, field: &str, system: UnitSystem) -> V
         .map_or_else(|| current.clone(), |pair| Value::String(pair[to].clone()))
 }
 
-/// `convertUnits`: converts whichever unit fields and label toggles an object carries (widget
+/// Converts whichever unit fields and label toggles an object carries (widget
 /// data, a display variant, or display defaults).
 pub fn convert_units(data: &Map<String, Value>, system: UnitSystem) -> Map<String, Value> {
     let catalog = catalog();
@@ -976,7 +1100,7 @@ pub fn convert_units(data: &Map<String, Value>, system: UnitSystem) -> Map<Strin
     next
 }
 
-/// `convertConfigUnits`: every widget in the target system.
+/// Every widget in the target system.
 pub fn convert_config_units(config: &OverlayConfig, system: UnitSystem) -> OverlayConfig {
     let mut next = config.clone();
     for collection in Collection::ALL {
@@ -987,8 +1111,7 @@ pub fn convert_config_units(config: &OverlayConfig, system: UnitSystem) -> Overl
     next
 }
 
-/// `getCourseWidgetDimensions`: a route's frame, or `None` when fewer than two points can be
-/// measured.
+/// A route's frame, or `None` when fewer than two points can be measured.
 pub fn course_widget_dimensions(
     points: &[(Option<f64>, Option<f64>)],
     max_dimension: f64,
@@ -1021,8 +1144,8 @@ pub fn course_widget_dimensions(
     let (span_x, span_y) = (span(&xs), span(&ys));
     let factor = max_dimension / span_x.max(span_y);
     Some((
-        js_round(span_x * factor).max(min_dimension),
-        js_round(span_y * factor).max(min_dimension),
+        round_half_up(span_x * factor).max(min_dimension),
+        round_half_up(span_y * factor).max(min_dimension),
     ))
 }
 
@@ -1074,7 +1197,7 @@ fn apply_global_bindings(
     }
 }
 
-/// `createWidgetDefaults`: new widget data from the catalog's defaults, the global defaults and
+/// New widget data from the catalog's defaults, the global defaults and
 /// the activity, in the requested unit system. The document assigns its id.
 pub fn create_widget_defaults(
     selection: &WidgetSelection,
@@ -1186,23 +1309,40 @@ mod tests {
     fn family_names_drop_font_extensions() {
         assert_eq!(font_family_name(" Inter.TTF "), "Inter");
         assert_eq!(font_family_name("Roboto Mono"), "Roboto Mono");
-        assert_eq!(font_selection("Teko.otf"), map(json!({"font": "Teko.otf", "font_family": "Teko"})));
+        assert_eq!(
+            font_selection("Teko.otf"),
+            map(json!({"font": "Teko.otf", "font_family": "Teko"}))
+        );
     }
 
     fn gauge(display: &str) -> Map<String, Value> {
-        map(json!({"display_type": display, "font_size": 60, "display_variants": {display: {
+        map(
+            json!({"display_type": display, "font_size": 60, "display_variants": {display: {
             "width": 220, "height": 220, "arc_angle": 225, "track_thickness": 24, "track_corner_radius": 15,
             "track_border_thickness": 2, "inner_widget_offset_x": 5, "inner_widget_offset_y": -3,
-            "min_max_label_font_size": 12, "track_empty_color": "#222222"}}}))
+            "min_max_label_font_size": 12, "track_empty_color": "#222222"}}}),
+        )
     }
 
     #[test]
     fn the_size_slider_scales_gauges_and_keeps_their_configuration() {
         for display in ["arc", "corner"] {
             let update = build_uniform_resize_update(&gauge(display), 440.0).unwrap();
-            assert_eq!((update["width"].clone(), update["height"].clone(), update["font_size"].clone()), (json!(440), json!(440), json!(120)));
+            assert_eq!(
+                (
+                    update["width"].clone(),
+                    update["height"].clone(),
+                    update["font_size"].clone()
+                ),
+                (json!(440), json!(440), json!(120))
+            );
             let variant = &update["display_variants"][display];
-            for (key, value) in [("width", json!(440)), ("arc_angle", json!(225)), ("track_thickness", json!(48)), ("track_empty_color", json!("#222222"))] {
+            for (key, value) in [
+                ("width", json!(440)),
+                ("arc_angle", json!(225)),
+                ("track_thickness", json!(48)),
+                ("track_empty_color", json!("#222222")),
+            ] {
                 assert_eq!(variant[key], value, "{display} {key}");
             }
         }
@@ -1210,24 +1350,38 @@ mod tests {
 
     #[test]
     fn the_size_slider_changes_a_lean_angle_diameter_only() {
-        let data = map(json!({"display_type": "lean_angle", "font_size": 60, "x": 1, "y": 2, "display_variants": {"lean_angle": {
-            "diameter": 180, "track_thickness": 24, "track_border_thickness": 2, "value_offset_x": 5, "value_offset_y": -3}}}));
+        let data = map(
+            json!({"display_type": "lean_angle", "font_size": 60, "x": 1, "y": 2, "display_variants": {"lean_angle": {
+            "diameter": 180, "track_thickness": 24, "track_border_thickness": 2, "value_offset_x": 5, "value_offset_y": -3}}}),
+        );
         let update = build_uniform_resize_update(&data, 360.0).unwrap();
         let variant = &update["display_variants"]["lean_angle"];
-        assert_eq!((variant["diameter"].clone(), variant["track_thickness"].clone(), variant["track_border_thickness"].clone()), (json!(360), json!(48), json!(4)));
+        assert_eq!(
+            (
+                variant["diameter"].clone(),
+                variant["track_thickness"].clone(),
+                variant["track_border_thickness"].clone()
+            ),
+            (json!(360), json!(48), json!(4))
+        );
         assert!(!update.contains_key("width") && !update.contains_key("height"));
     }
 
     fn g_force() -> Map<String, Value> {
-        map(json!({"display_type": "g_force", "display_variants": {"g_force": {
+        map(
+            json!({"display_type": "g_force", "display_variants": {"g_force": {
             "width": 220, "height": 220, "diameter": 200, "border_thickness": 2, "marker_size": 12,
-            "label_font_size": 14, "label_offset_x": 4, "label_offset_y": -6, "fill_color": "#212121", "invert_vertical": true}}}))
+            "label_font_size": 14, "label_offset_x": 4, "label_offset_y": -6, "fill_color": "#212121", "invert_vertical": true}}}),
+        )
     }
 
     #[test]
     fn the_size_slider_scales_every_g_force_dimension_within_its_minimums() {
         let update = build_uniform_resize_update(&g_force(), 330.0).unwrap();
-        assert_eq!((update["width"].clone(), update["height"].clone()), (json!(330), json!(330)));
+        assert_eq!(
+            (update["width"].clone(), update["height"].clone()),
+            (json!(330), json!(330))
+        );
         assert_eq!(
             update["display_variants"]["g_force"],
             json!({"width": 330, "height": 330, "diameter": 300, "border_thickness": 3, "marker_size": 18, "label_font_size": 21,
@@ -1237,7 +1391,12 @@ mod tests {
         let small = build_uniform_resize_update(&g_force(), 1.0).unwrap();
         let variant = &small["display_variants"]["g_force"];
         assert_eq!(
-            (variant["diameter"].clone(), variant["border_thickness"].clone(), variant["marker_size"].clone(), variant["label_font_size"].clone()),
+            (
+                variant["diameter"].clone(),
+                variant["border_thickness"].clone(),
+                variant["marker_size"].clone(),
+                variant["label_font_size"].clone()
+            ),
             (json!(8), json!(0), json!(1), json!(8))
         );
     }
@@ -1254,7 +1413,9 @@ mod tests {
         .unwrap();
         let globals = map(json!({"font_text": "LabelFont.ttf", "color_text": "#0000ff"}));
         // A family with one upright 700 face: the label loses its italic and takes that weight.
-        let synced = config.sync_global_defaults(&globals, None, &|_, _| Ok((false, 700.0))).unwrap();
+        let synced = config
+            .sync_global_defaults(&globals, None, &|_, _| Ok((false, 700.0)))
+            .unwrap();
         assert_eq!(
             Value::Object(synced.labels[0].clone()),
             json!({"id": "label-1", "text": "Hello", "color": "#0000ff", "font_weight": 700, "italic": false, "letter_spacing": -1.25,
@@ -1270,15 +1431,36 @@ mod tests {
             "plots": [{"id": "plot-1", "value": "speed", "color": "#111111"}],
         }))
         .unwrap();
-        let globals = map(json!({"font_values": "ValueFont.ttf", "color_values": "#ff0000", "font_text": "LabelFont.ttf", "color_text": "#123456"}));
-        let synced = config.sync_global_defaults(&globals, None, &no_labels).unwrap();
-        assert_eq!((synced.values[0]["font"].clone(), synced.values[0]["color"].clone()), (json!("ValueFont.ttf"), json!("#ff0000")));
-        assert_eq!((synced.values[1]["label_font"].clone(), synced.values[1]["label_color"].clone()), (json!("LabelFont.ttf"), json!("#123456")));
-        assert_eq!(synced.values[2]["display_variants"]["g_force"]["label_font"], "ValueFont.ttf");
+        let globals = map(
+            json!({"font_values": "ValueFont.ttf", "color_values": "#ff0000", "font_text": "LabelFont.ttf", "color_text": "#123456"}),
+        );
+        let synced = config
+            .sync_global_defaults(&globals, None, &no_labels)
+            .unwrap();
+        assert_eq!(
+            (
+                synced.values[0]["font"].clone(),
+                synced.values[0]["color"].clone()
+            ),
+            (json!("ValueFont.ttf"), json!("#ff0000"))
+        );
+        assert_eq!(
+            (
+                synced.values[1]["label_font"].clone(),
+                synced.values[1]["label_color"].clone()
+            ),
+            (json!("LabelFont.ttf"), json!("#123456"))
+        );
+        assert_eq!(
+            synced.values[2]["display_variants"]["g_force"]["label_font"],
+            "ValueFont.ttf"
+        );
         assert_eq!(synced.plots[0]["color"], "#ff0000");
 
         // Only the changed keys apply.
-        let synced = config.sync_global_defaults(&globals, Some(&["color_values"]), &no_labels).unwrap();
+        let synced = config
+            .sync_global_defaults(&globals, Some(&["color_values"]), &no_labels)
+            .unwrap();
         assert_eq!(synced.values[0]["color"], "#ff0000");
         assert!(synced.values[0].get("font").is_none());
         assert_eq!(synced.values[1]["label_color"], "#ffffff");
@@ -1553,7 +1735,12 @@ mod tests {
     #[test]
     fn edits_store_whole_numbers_as_integers() {
         let mut document = config(json!({"labels": [{"id": "a", "x": 1}]}));
-        document.update_widgets(&[("a".into(), map(json!({"x": 100.0, "nested": {"y": 2.5, "z": 3.0}})))]).unwrap();
+        document
+            .update_widgets(&[(
+                "a".into(),
+                map(json!({"x": 100.0, "nested": {"y": 2.5, "z": 3.0}})),
+            )])
+            .unwrap();
         assert_eq!(document.labels[0]["x"], json!(100));
         assert_eq!(document.labels[0]["nested"], json!({"y": 2.5, "z": 3}));
     }
@@ -1562,8 +1749,8 @@ mod tests {
     fn numbers_stay_integers_when_whole() {
         assert_eq!(number(12.0), json!(12));
         assert_eq!(number(12.5), json!(12.5));
-        assert_eq!(js_round(-2.5), -2.0);
-        assert_eq!(js_round(2.5), 3.0);
+        assert_eq!(round_half_up(-2.5), -2.0);
+        assert_eq!(round_half_up(2.5), 3.0);
     }
 
     #[test]

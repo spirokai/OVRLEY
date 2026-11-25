@@ -1,9 +1,7 @@
-use crate::model::standard_metrics::{
-    standard_metric_formatter, standard_metric_unit_label, StandardMetricFormatterKind,
-};
+//! Metric value formatting: units, decimals and the per-formatter text of standard metrics.
+use crate::model::catalog::{catalog, MetricFormatter, MetricKind};
 use crate::model::telemetry::{metric_interpolation, InterpolationKind};
-use crate::model::types::MetricKind;
-use crate::widgets::value::validation::{ValidatedValueFormatting, ValidatedValueWidget};
+use crate::widgets::value::{BalanceFormat, ValidatedValueWidget};
 
 /// Starting-altitude presentation adjustment, independent of host storage.
 pub fn altitude_offset_m(target: Option<f64>, first: Option<f64>) -> f64 {
@@ -112,7 +110,7 @@ pub fn resolve_metric_display_value(
     }
 }
 
-/// Formats a validated metric identically in native export and WASM preview.
+/// Formats a validated metric's value and unit.
 pub fn format_metric_parts(
     validated: &ValidatedValueWidget,
     sample: &MetricSample<'_>,
@@ -171,16 +169,19 @@ fn format_validated_standard_metric_parts(
     let kind = validated.metric;
     let raw = resolve_metric_display_value(kind, sample.numeric, sample.available);
     let display_unit = Some(validated.display_unit.as_str());
-    let decimals = validated_decimals(&validated.formatting);
+    let decimals = validated.precision.decimals();
     let show_units = validated.show_units;
-    let unit_text = show_units.then(|| standard_metric_unit_label(kind, display_unit).to_string());
+    let unit_text = show_units.then(|| catalog().unit_label(kind, display_unit).to_string());
 
-    let value_text = match standard_metric_formatter(kind) {
-        Some(StandardMetricFormatterKind::GasMix) => raw
+    let value_text = match catalog()
+        .standard_metric(kind)
+        .and_then(|definition| definition.formatter)
+    {
+        Some(MetricFormatter::GasMix) => raw
             .zip(sample.fraction_he)
             .map(|(o2, he)| format!("{:02.0}/{:02.0}", o2 * 100.0, he * 100.0))
             .unwrap_or_else(|| "--/--".to_string()),
-        Some(StandardMetricFormatterKind::Speed) => raw
+        Some(MetricFormatter::Speed) => raw
             .map(|speed_mps| {
                 format_number(
                     convert_standard_metric_value(kind, display_unit, speed_mps),
@@ -188,7 +189,7 @@ fn format_validated_standard_metric_parts(
                 )
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Temperature) => raw
+        Some(MetricFormatter::Temperature) => raw
             .map(|temp_c| {
                 let resolved = convert_standard_metric_value(kind, display_unit, temp_c);
                 if decimals > 0 {
@@ -198,14 +199,14 @@ fn format_validated_standard_metric_parts(
                 }
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Pace) => raw
+        Some(MetricFormatter::Pace) => raw
             .map(|seconds_per_km| {
                 let total_seconds =
                     convert_standard_metric_value(kind, display_unit, seconds_per_km);
                 format_pace_value(total_seconds)
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Integer) => raw
+        Some(MetricFormatter::Integer) => raw
             .map(|value| {
                 format_number(
                     convert_standard_metric_value(kind, display_unit, value),
@@ -213,12 +214,8 @@ fn format_validated_standard_metric_parts(
                 )
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(
-            StandardMetricFormatterKind::Decimal
-            | StandardMetricFormatterKind::Distance
-            | StandardMetricFormatterKind::Elevation,
-        ) => raw
-            .map(|value| {
+        Some(MetricFormatter::Decimal | MetricFormatter::Distance | MetricFormatter::Elevation) => {
+            raw.map(|value| {
                 if matches!(kind, MetricKind::Distance | MetricKind::DistanceToHome) {
                     let current = format_number(
                         convert_standard_metric_value(kind, display_unit, value),
@@ -257,19 +254,22 @@ fn format_validated_standard_metric_parts(
                     }
                 }
             })
-            .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Balance) => {
-            let balance_format = validated.formatting.balance_format();
+            .unwrap_or_else(|| "--".to_string())
+        }
+        Some(MetricFormatter::Balance) => {
+            let balance_format = validated
+                .balance_format
+                .expect("balance format validated at ingress");
             raw.map(|left_value| format_balance_value(left_value, decimals, balance_format))
                 .unwrap_or_else(|| "--".to_string())
         }
-        Some(StandardMetricFormatterKind::Shutter) => raw
+        Some(MetricFormatter::Shutter) => raw
             .map(format_shutter_value)
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Aperture) => raw
+        Some(MetricFormatter::Aperture) => raw
             .map(|fnum| format_aperture_value(fnum, decimals))
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Ev) => raw
+        Some(MetricFormatter::Ev) => raw
             .map(|ev| {
                 let d = if ev == 0.0 { 1 } else { decimals };
                 if d > 0 {
@@ -279,37 +279,24 @@ fn format_validated_standard_metric_parts(
                 }
             })
             .unwrap_or_else(|| "--".to_string()),
-        Some(StandardMetricFormatterKind::Gear) => match gear {
+        Some(MetricFormatter::Gear) => match gear {
             Some("0") => "N".to_string(),
             Some(value) => value.to_string(),
             None => "--".to_string(),
         },
-        Some(StandardMetricFormatterKind::Coordinates) => {
+        Some(MetricFormatter::Coordinates) => {
             unreachable!("planned metric formatter reached the active renderer")
         }
-        Some(StandardMetricFormatterKind::LapTimer) => {
+        Some(MetricFormatter::LapTimer) => {
             unreachable!("lap_timer must use the dedicated lap timer renderer")
         }
-        Some(StandardMetricFormatterKind::Splits) => {
+        Some(MetricFormatter::Splits) => {
             unreachable!("splits_run must use the dedicated splits renderer")
         }
         None => "--".to_string(),
     };
 
     (value_text, unit_text)
-}
-
-fn validated_decimals(formatting: &ValidatedValueFormatting) -> usize {
-    match formatting {
-        ValidatedValueFormatting::DecimalPlaces { decimals } => *decimals,
-        ValidatedValueFormatting::DecimalRounding { decimal_rounding } => {
-            (*decimal_rounding).max(0) as usize
-        }
-        ValidatedValueFormatting::Balance { decimals, .. } => *decimals,
-        ValidatedValueFormatting::BalanceRounded {
-            decimal_rounding, ..
-        } => (*decimal_rounding).max(0) as usize,
-    }
 }
 
 fn format_coordinates(
@@ -550,7 +537,7 @@ fn format_aperture_value(fnum: f64, _decimals: usize) -> String {
     format!("F/{formatted}")
 }
 
-fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option<&str>) -> String {
+fn format_balance_value(left_value: f64, decimals: usize, balance_format: BalanceFormat) -> String {
     // FIT's missing-balance sentinel can decode as 127; show degenerate values as neutral.
     let normalized_left = if left_value >= 100.0 {
         50.0
@@ -559,12 +546,11 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
     };
     let left = format_number(normalized_left, decimals);
     let right = format_number(100.0 - normalized_left, decimals);
-    match balance_format.expect("balance format validated at ingress") {
-        "percent_label" => format!("{left}%/{right}%"),
-        "plain" => format!("{left}/{right}"),
-        "l_prefix" => format!("L{left}/R{right}"),
-        "l_suffix" => format!("{left}L/{right}R"),
-        _ => unreachable!("balance format validated at ingress"),
+    match balance_format {
+        BalanceFormat::PercentLabel => format!("{left}%/{right}%"),
+        BalanceFormat::Plain => format!("{left}/{right}"),
+        BalanceFormat::LPrefix => format!("L{left}/R{right}"),
+        BalanceFormat::LSuffix => format!("{left}L/{right}R"),
     }
 }
 
@@ -572,8 +558,9 @@ fn format_balance_value(left_value: f64, decimals: usize, balance_format: Option
 mod tests {
     use super::{
         convert_standard_metric_value, format_balance_value, format_coordinates, format_number,
+        BalanceFormat,
     };
-    use crate::model::types::MetricKind;
+    use crate::model::catalog::MetricKind;
 
     #[test]
     fn boost_pressure_converts_from_kilopascals() {
@@ -595,24 +582,33 @@ mod tests {
     #[test]
     fn balance_percent_label_omits_spaces_around_slash() {
         assert_eq!(
-            format_balance_value(52.0, 0, Some("percent_label")),
+            format_balance_value(52.0, 0, BalanceFormat::PercentLabel),
             "52%/48%"
         );
     }
 
     #[test]
     fn balance_variants_omit_spaces_around_slash() {
-        assert_eq!(format_balance_value(0.0, 0, Some("plain")), "0/100");
-        assert_eq!(format_balance_value(60.0, 0, Some("plain")), "60/40");
-        assert_eq!(format_balance_value(48.0, 0, Some("l_prefix")), "L48/R52");
-        assert_eq!(format_balance_value(70.0, 0, Some("l_suffix")), "70L/30R");
+        assert_eq!(format_balance_value(0.0, 0, BalanceFormat::Plain), "0/100");
+        assert_eq!(format_balance_value(60.0, 0, BalanceFormat::Plain), "60/40");
+        assert_eq!(
+            format_balance_value(48.0, 0, BalanceFormat::LPrefix),
+            "L48/R52"
+        );
+        assert_eq!(
+            format_balance_value(70.0, 0, BalanceFormat::LSuffix),
+            "70L/30R"
+        );
     }
 
     #[test]
     fn invalid_or_degenerate_balance_is_displayed_as_neutral() {
-        assert_eq!(format_balance_value(100.0, 0, Some("plain")), "50/50");
         assert_eq!(
-            format_balance_value(127.0, 0, Some("percent_label")),
+            format_balance_value(100.0, 0, BalanceFormat::Plain),
+            "50/50"
+        );
+        assert_eq!(
+            format_balance_value(127.0, 0, BalanceFormat::PercentLabel),
             "50%/50%"
         );
     }

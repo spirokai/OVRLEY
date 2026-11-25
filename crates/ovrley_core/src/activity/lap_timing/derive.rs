@@ -7,7 +7,7 @@
 use super::boundaries::resolve_laps;
 use super::LapTimingResult;
 use crate::activity::schema::{LapMarkers, NumericSeries};
-use ovrley_widgets::widgets::lap_timer::delta::compute_delta_to_best;
+use ovrley_widgets::widgets::lap_timer::compute_delta_to_best;
 
 /// Derives canonical lap timing from one authoritative boundary source.
 ///

@@ -7,8 +7,8 @@ use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
 };
-use ovrley_widgets::model::types::{DisplayType, TrackFillStyle};
-use ovrley_widgets::widgets::value::config::ValueConfig;
+use ovrley_widgets::model::catalog::{DisplayType, TrackFillStyle};
+use ovrley_widgets::widgets::value::ValueConfig;
 use std::collections::BTreeMap;
 
 #[test]
@@ -102,7 +102,7 @@ fn arc_gauge_layout_keeps_its_unit_and_samples_frame_values() {
     let (layout, frame_states) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
     assert_eq!(frame_states[1].fill01, 0.5);
     assert_eq!(frame_states[1].value_text, "108");
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("arc layout"); };
+    let ovrley_widgets::widgets::gauges::GaugeLayout::Arc(layout) = &layout else { panic!("arc layout"); };
     assert!(
         layout.has_unit,
         "the unit belongs to the cached static layer"
@@ -121,7 +121,7 @@ fn bars_style_resolves_configured_arc_geometry_into_the_cache() {
     let paths = test_paths();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);
     let (layout, _) = common::gauge::gauge_layout(&config, &dense, &ovrley_core::fonts::NativeFonts(&paths.font_dirs));
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(layout) = &layout else { panic!("gauge layout"); };
+    let ovrley_widgets::widgets::gauges::GaugeLayout::Arc(layout) = &layout else { panic!("gauge layout"); };
     assert_eq!(layout.track_fill_style, TrackFillStyle::Bars);
     assert_eq!(layout.bar_geometry.unwrap().count, 8);
 }
@@ -143,7 +143,7 @@ fn gradient_fill_follows_the_arc_from_its_start_to_its_end() {
     let mut surface = skia_safe::surfaces::raster_n32_premul((300, 300)).unwrap();
     surface.canvas().clear(skia_safe::Color::TRANSPARENT);
     frame.draw(surface.canvas(), &layout);
-    let ovrley_widgets::widgets::gauges::frame::GaugeLayout::Arc(arc) = &layout else { panic!("arc layout"); };
+    let ovrley_widgets::widgets::gauges::GaugeLayout::Arc(arc) = &layout else { panic!("arc layout"); };
     let geometry = arc.geometry;
     let mut color_at = |fraction: f32| {
         let angle = geometry.start_angle + geometry.sweep_angle * fraction;
@@ -223,7 +223,7 @@ fn dense_speed_activity(speed: Vec<Option<f64>>) -> DenseActivityReport {
         full_activity_metric_ranges: ovrley_core::activity::sampling::calculate_metric_range(
             &series.speed,
         )
-        .map(|range| (ovrley_widgets::model::types::MetricKind::Speed, range))
+        .map(|range| (ovrley_widgets::model::catalog::MetricKind::Speed, range))
         .into_iter()
         .collect(),
         series,

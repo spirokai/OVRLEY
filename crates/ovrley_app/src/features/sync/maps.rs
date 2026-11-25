@@ -1163,8 +1163,8 @@ impl NavigationMap {
         track: &MapTrack,
         second: f64,
     ) -> Result<Option<MapFrameRequest>, String> {
-        use ovrley_widgets::widgets::map::content::WidgetCamera;
-        use ovrley_widgets::widgets::map::validation::MapOrientation;
+        use ovrley_widgets::widgets::map::WidgetCamera;
+        use ovrley_widgets::widgets::map::MapOrientation;
         let Some(side) = self.side else {
             return Ok(None);
         };
@@ -1544,7 +1544,7 @@ pub fn map_view(store: &crate::store::Store) -> Option<MapView<'_>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ovrley_widgets::error::WidgetResult;
+    use ovrley_widgets::WidgetResult;
     use ovrley_widgets::widgets::map::preview::{MapFrameProvider, MapFrameReply};
     use std::sync::mpsc::{channel, Sender};
     use std::sync::Mutex;

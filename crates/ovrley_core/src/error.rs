@@ -29,11 +29,11 @@ use thiserror::Error;
 
 pub type CoreResult<T> = Result<T, CoreError>;
 
-impl From<ovrley_widgets::error::WidgetError> for CoreError {
-    fn from(error: ovrley_widgets::error::WidgetError) -> Self {
+impl From<ovrley_widgets::WidgetError> for CoreError {
+    fn from(error: ovrley_widgets::WidgetError) -> Self {
         match error {
-            ovrley_widgets::error::WidgetError::Config(message) => Self::Config(message),
-            ovrley_widgets::error::WidgetError::Render(message) => Self::Render(message),
+            ovrley_widgets::WidgetError::Config(message) => Self::Config(message),
+            ovrley_widgets::WidgetError::Render(message) => Self::Render(message),
         }
     }
 }

@@ -37,7 +37,7 @@ use ovrley_widgets::model::telemetry::{
     ActivitySeries, ACTIVITY_COVERAGE_SOURCES, CORE_ACTIVITY_ATTRIBUTES,
     EXTENDED_ACTIVITY_ATTRIBUTES,
 };
-use ovrley_widgets::widgets::elevation::sampling::preferred_elevation_series;
+use ovrley_widgets::widgets::elevation::preferred_elevation_series;
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::collections::BTreeMap;

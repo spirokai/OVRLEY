@@ -21,18 +21,12 @@ use ovrley_map::gpu::{
     GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapDataSource, MapSource, MapTileSizer, MeasuredTile,
 };
 use ovrley_map::{MapStyleId, MapStyleInfo, TileId};
-use ovrley_widgets::{
-    activity::ActivitySampler,
-    error::{WidgetError, WidgetResult},
-    host::WidgetHost,
-    model::scene::ValidatedScenePresentation,
-    preview_widget::ValidatedWidget,
-    widgets::map::{
-        content::{ActivityMap, MapContent},
-        preview::{MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest},
-        validation::ValidatedMapWidget,
-    },
-};
+use ovrley_widgets::activity::ActivitySampler;
+use ovrley_widgets::{WidgetError, WidgetResult};
+use ovrley_widgets::preview::{WidgetHost, ValidatedWidget};
+use ovrley_widgets::model::scene::ValidatedScenePresentation;
+use ovrley_widgets::widgets::map::{ActivityMap, MapContent, ValidatedMapWidget};
+use ovrley_widgets::widgets::map::preview::{MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest};
 use std::{
     collections::{hash_map::Entry, BTreeSet, HashMap},
     num::NonZeroUsize,

@@ -23,11 +23,11 @@ use ovrley_core::media::video_edits::{
     VideoMetadataSnapshot,
 };
 use ovrley_core::normalize::validate_template_rasters;
-use ovrley_widgets::widgets::raster::config::RasterConfig;
+use ovrley_widgets::widgets::raster::RasterConfig;
 use ovrley_core::raster::{
     is_canonical_extension, load_embedded_raster, SelectedRaster, MAX_ENCODED_BYTES,
 };
-use ovrley_widgets::widgets::raster::error::RasterError;
+use ovrley_widgets::widgets::raster::RasterError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap, HashSet};

@@ -212,7 +212,7 @@ impl Projection {
             if !store.preview.activity_coverage && widget.kind != "raster" {
                 continue;
             }
-            let geometry = &widget.geometry.widget;
+            let geometry = &widget.geometry;
             let image = match images.get(id) {
                 Some(cached)
                     if cached.revision == widget.pixels_revision

@@ -5,8 +5,8 @@ use ovrley_core::error::CoreResult;
 use ovrley_core::normalize::{
     validate_ffmpeg_config, ValidatedFfmpegConfig, ValidatedRenderConfig,
 };
-use ovrley_widgets::widgets::value::validation::ValidatedValue;
-use ovrley_widgets::widgets::value::validation::ValidatedValueWidget;
+use ovrley_widgets::widgets::value::ValidatedValue;
+use ovrley_widgets::widgets::value::ValidatedValueWidget;
 use serde_json::{json, Value};
 
 pub fn explicit_scene_json() -> Value {
