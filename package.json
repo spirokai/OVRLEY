@@ -12,7 +12,6 @@
     "release": "semantic-release",
     "dev:native": "cargo run -p ovrley_ui --bin ovrley",
     "dev:native:live": "SLINT_LIVE_PREVIEW=1 cargo run -p ovrley_ui --bin ovrley --features live-preview",
-    "showcase:native": "cargo run -p ovrley_ui --features dev-windows --example showcase",
     "test:native-ui": "cargo test -p ovrley_app -p ovrley_ui -p ovrley_services -p ovrley_mcp --features ovrley_ui/dev-windows",
     "benchmark:transparent": "cargo run -p ovrley_core --bin benchmark_transparent --",
     "benchmark:composite": "cargo run -p ovrley_core --bin benchmark_composite --",

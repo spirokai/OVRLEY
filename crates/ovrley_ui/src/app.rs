@@ -1,102 +1,95 @@
-//! The composition root (`useAppShellComposition`): creates the window and the dispatcher, binds
-//! the callbacks, installs the projections and runs the event loop.
+//! The composition root: creates the window and the dispatcher, binds the callbacks, installs the
+//! projections and runs the event loop.
 
+use crate::features::{documents, editor, import, playback, player, render, shell, sync, toolbar, transitions, widgets};
 use crate::platform::gpu::GpuDevice;
 use crate::platform::{self, NativeDialogs, SlintUiPost, SlintWindowControl, SystemClipboard};
-use crate::{features, AppWindow};
+use crate::{AppWindow, Theme};
 use ovrley_app::features::app_shell;
+use ovrley_app::features::video_sync::maps::WheelDevice;
 use ovrley_app::i18n::Locale;
 use ovrley_app::lib::preferences_store::PreferencesStore;
-use ovrley_app::store::services::ServiceParts;
-use ovrley_app::store::{Dispatcher, Store};
+use ovrley_app::lib::template::ThemeColors;
+use ovrley_app::store::services::{MapServices, NativeRenderService, NativeUpdateService, NativeVideoTools, ServiceParts, UiPost};
+use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
+use ovrley_core::paths::AppPaths;
+use ovrley_mcp::link::SocketLocation;
+use ovrley_services::runtime::Distribution;
 use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
 use slint::ComponentHandle;
 use std::cell::Cell;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Runs every feature's projection after each dispatch, and switches Slint's bundled translation
 /// when the language changed (every `@tr` then re-evaluates).
 struct Projections {
     window: slint::Weak<AppWindow>,
-    overlay: features::overlay_editor::Projection,
-    player: features::player::Projection,
-    transitions: features::transitions::Projection,
-    widget_editor: features::widget_editor::Projection,
-    widget_drawer: features::widget_drawer::Projection,
-    maps: features::maps::Projection,
-    scene_settings: features::scene_settings::Projection,
-    language: Cell<Locale>,
-    /// The first run writes what depends on the language even though it has not changed.
-    first: Cell<bool>,
+    documents: documents::Projection,
+    editor: editor::Projection,
+    player: player::Projection,
+    sync: sync::Projection,
+    toolbar: toolbar::Projection,
+    transitions: transitions::Projection,
+    widgets: widgets::Projection,
+    /// The language last written; `None` until the first projection.
+    language: Cell<Option<Locale>>,
 }
 
 impl Projections {
     fn run(&self, store: &Store) {
         let Some(window) = self.window.upgrade() else { return };
-        let language_changed = self.language.replace(store.i18n.language) != store.i18n.language || self.first.replace(false);
-        if language_changed {
-            select_language(store.i18n.language);
+        let language = store.i18n.language;
+        if self.language.replace(Some(language)) != Some(language) {
+            select_language(language);
+            shell::project_language(&window, language);
         }
-        features::app_shell::project(&window, store, language_changed);
-        features::app_update::project(&window, store);
-        features::toolbar::project(&window, store);
-        features::template_manager::project(&window, store);
-        features::projects::project(&window, store);
-        features::render_video::project(&window, store);
-        features::video_preview::project(&window, store);
-        features::video_sync::project(&window, store);
-        features::undo_redo::project(&window, store);
-        self.overlay.project(&window, store);
+        shell::project(&window, store);
+        self.toolbar.project(&window, store);
+        self.documents.project(&window, store);
+        render::project(&window, store);
+        import::project(&window, store);
+        self.sync.project(&window, store);
+        self.editor.project(&window, store);
         self.player.project(&window, store);
         self.transitions.project(&window, store);
-        self.widget_editor.project(&window, store);
-        self.widget_drawer.project(&window, store);
-        self.maps.project(store);
-        self.scene_settings.project(&window, store);
-        features::video_playback::project(&window, store);
+        self.widgets.project(&window, store);
+        playback::project(&window, store);
     }
 }
 
-/// Wires `window` to a dispatcher over `store` and `services`: the component logic, the language,
-/// the features' callbacks and projections, and a first projection. The app and the window tests
-/// both start here; the tests pass fake services.
+/// Wires `window` to a dispatcher over `store` and `services`: the component logic, the features'
+/// callbacks and projections, and a first projection. The app and the window tests both start
+/// here; the tests pass fake services.
 pub fn compose(window: &AppWindow, mut store: Store, services: ServiceParts) -> Dispatcher {
     crate::install_component_logic(window);
     store.theme = Some(theme_colors(window));
-    let language = store.i18n.language;
-    select_language(language);
     let dispatcher = Dispatcher::new(store, services);
     let projections = Projections {
         window: window.as_weak(),
-        overlay: features::overlay_editor::Projection::new(dispatcher.handle()),
-        player: features::player::Projection::new(dispatcher.handle()),
-        transitions: features::transitions::Projection::default(),
-        widget_editor: features::widget_editor::Projection::default(),
-        widget_drawer: features::widget_drawer::Projection::default(),
-        maps: features::maps::Projection::new(dispatcher.handle()),
-        scene_settings: features::scene_settings::Projection::default(),
-        language: Cell::new(language),
-        first: Cell::new(true),
+        documents: documents::Projection::default(),
+        editor: editor::Projection::new(dispatcher.handle()),
+        player: player::Projection::new(dispatcher.handle()),
+        sync: sync::Projection::default(),
+        toolbar: toolbar::Projection::default(),
+        transitions: transitions::Projection::default(),
+        widgets: widgets::Projection::default(),
+        language: Cell::new(None),
     };
-    features::app_shell::initialize(window);
-    features::transitions::initialize(window);
-    features::app_update::initialize(window);
-    features::transitions::bind(window, &dispatcher);
-    features::app_shell::bind(window, &dispatcher);
-    features::app_update::bind(window, &dispatcher);
-    features::toolbar::bind(window, &dispatcher);
-    features::template_manager::bind(window, &dispatcher);
-    features::projects::bind(window, &dispatcher);
-    features::render_video::bind(window, &dispatcher);
-    features::overlay_editor::bind(window, &dispatcher);
-    features::player::bind(window, &dispatcher);
-    features::undo_redo::bind(window, &dispatcher);
-    features::widget_editor::bind(window, &dispatcher);
-    features::widget_drawer::bind(window, &dispatcher);
-    features::scene_settings::bind(window, &dispatcher);
-    features::video_preview::bind(window, &dispatcher);
-    features::video_sync::bind(window, &dispatcher);
+    shell::initialize(window);
+    transitions::initialize(window);
+    shell::bind(window, &dispatcher);
+    toolbar::bind(window, &dispatcher);
+    documents::bind(window, &dispatcher);
+    render::bind(window, &dispatcher);
+    import::bind(window, &dispatcher);
+    sync::bind(window, &dispatcher);
+    editor::bind(window, &dispatcher);
+    player::bind(window, &dispatcher);
+    transitions::bind(window, &dispatcher);
+    widgets::bind(window, &dispatcher);
     dispatcher.set_ui_hook(Rc::new(move |store: &Store| projections.run(store)));
     dispatcher.reproject();
     dispatcher
@@ -111,29 +104,36 @@ pub enum Exit {
     Relaunch,
 }
 
-/// Opens the window over `store` and runs until it closes. `gpu` is the shared device, which the
-/// video players draw on. Agents reach the window through `agent_socket`.
-#[allow(clippy::too_many_arguments)]
-pub fn run(
-    store: Store,
-    distribution: ovrley_services::runtime::Distribution,
-    paths: ovrley_core::paths::AppPaths,
-    app_cache_dir: &std::path::Path,
-    preferences: PreferencesStore,
-    maps: Arc<dyn ovrley_app::store::services::MapServices>,
-    gpu: Option<GpuDevice>,
-    agent_socket: ovrley_mcp::link::SocketLocation,
-) -> Result<Exit, String> {
+/// What the window starts with, from `main`.
+pub struct Startup {
+    pub store: Store,
+    pub distribution: Distribution,
+    pub paths: AppPaths,
+    pub app_cache_dir: PathBuf,
+    pub preferences: PreferencesStore,
+    pub maps: Arc<dyn MapServices>,
+    /// The shared device the video players draw on, when there is one.
+    pub gpu: Option<GpuDevice>,
+    /// Where agents reach the window.
+    pub agent_socket: SocketLocation,
+}
+
+/// Opens the window and runs until it closes.
+///
+/// # Errors
+///
+/// When the window, the scratch folder or the video tools cannot be set up, or the event loop fails.
+pub fn run(startup: Startup) -> Result<Exit, String> {
+    let Startup { store, distribution, paths, app_cache_dir, preferences, maps, gpu, agent_socket } = startup;
     let window = AppWindow::new().map_err(|error| format!("Could not create the window: {error}"))?;
     // Window chrome, not app state: written to the global directly, like the maximised state.
     #[cfg(windows)]
     window.global::<crate::AppShell>().set_windows_10(platform::is_windows_10());
     let paths = Arc::new(paths);
-    // The blends of earlier sessions.
-    ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(&paths)
-        .map_err(|error| format!("Could not clear the transition previews: {error}"))?;
-    let video_tools = Arc::new(ovrley_app::store::services::NativeVideoTools::open(Arc::clone(&paths), app_cache_dir, &preferences)?);
-    let ui_post: Arc<dyn ovrley_app::store::services::UiPost> = Arc::new(SlintUiPost);
+    // The transition blends of earlier sessions.
+    ovrley_core::encode::ffmpeg::transition_proxy::clear_transition_proxies(&paths).map_err(|error| format!("Could not clear the transition previews: {error}"))?;
+    let video_tools = Arc::new(NativeVideoTools::open(Arc::clone(&paths), &app_cache_dir, &preferences)?);
+    let ui_post: Arc<dyn UiPost> = Arc::new(SlintUiPost);
     let dispatcher = compose(
         &window,
         store,
@@ -145,21 +145,18 @@ pub fn run(
             clipboard: Box::new(SystemClipboard::default()),
             window: Box::new(SlintWindowControl { window: window.as_weak() }),
             video_tools,
-            render: Arc::new(ovrley_app::store::services::NativeRenderService::new(Arc::clone(&paths), maps.map_source(), ui_post)),
+            render: Arc::new(NativeRenderService::new(Arc::clone(&paths), maps.map_source(), ui_post)),
             maps,
-            updates: Arc::new(ovrley_app::store::services::NativeUpdateService),
+            updates: Arc::new(NativeUpdateService),
         },
     );
     platform::install_ui_dispatch(dispatcher.handle(), window.as_weak());
 
     // The first window serves agents; a later one logs that it does not.
-    let _agent_link = match ovrley_mcp::link::serve(agent_socket, platform::AgentWindow) {
-        Ok(server) => server,
-        Err(error) => {
-            log::warn!("agents cannot reach this window: {error}");
-            None
-        }
-    };
+    let _agent_link = ovrley_mcp::link::serve(agent_socket, platform::AgentWindow).unwrap_or_else(|error| {
+        log::warn!("agents cannot reach this window: {error}");
+        None
+    });
 
     // The close guard decides; the window stays until it does.
     let close = dispatcher.handle();
@@ -168,26 +165,85 @@ pub fn run(
         slint::CloseRequestResponse::KeepWindowShown
     });
 
-    // On every resize: a restored window fits its screen, and on macOS the traffic lights return
-    // to their inset (AppKit puts them back in the corner).
+    follow_window_events(&window);
+    let startup = dispatcher.handle();
+    let shown = window.as_weak();
+    slint::Timer::single_shot(Duration::ZERO, move || {
+        if let Some(window) = shown.upgrade() {
+            when_winit_window_exists(&window, startup.clone());
+        }
+        startup.dispatch(move |store, services| bootstrap(store, services, distribution));
+    });
+
+    // Live preview: Slint gives no reload notification, so the projections run on a short timer. A
+    // reload resets the globals to their defaults; the projections compare with the current values
+    // and restore the store's state.
+    #[cfg(feature = "live-preview")]
+    let _live_preview = {
+        let timer = slint::Timer::default();
+        let dispatcher = dispatcher.clone();
+        timer.start(slint::TimerMode::Repeated, Duration::from_millis(500), move || dispatcher.reproject());
+        timer
+    };
+
+    #[cfg(debug_assertions)]
+    crate::snapshot::start_if_requested(&window, &dispatcher);
+
+    let _frame_rate = std::env::var_os("OVRLEY_FRAME_RATE").map(|_| count_frames(&window));
+
+    playback::start(&window, gpu.as_ref(), &dispatcher.handle());
+    let result = window.run().map_err(|error| format!("The window failed: {error}"));
+    playback::shutdown();
+    // The players are gone; the device may go now.
+    drop(gpu);
+    dispatcher.flush_preferences();
+    let relaunch = dispatcher.with_store(|store| store.app_update.relaunch);
+    result.map(|()| if relaunch { Exit::Relaunch } else { Exit::Closed })
+}
+
+/// What starts on the first event-loop turn: the update check, the template list, the font
+/// catalog, the codecs, the maps, and the last template's restore. The startup screen shows until
+/// the restore has finished, then the startup projects dialog lists the project folder.
+fn bootstrap(store: &mut Store, services: &mut ovrley_app::store::services::Services, distribution: Distribution) {
+    use ovrley_app::features::{app_update, maps, projects, template_manager, video_preview, widget_editor};
+    app_update::check_at_startup(store, services, distribution, cfg!(debug_assertions));
+    template_manager::fetch_templates(store, services, None);
+    widget_editor::load_font_catalog(store, services);
+    video_preview::filmstrips::fetch_available_codecs(store, services);
+    maps::initialize(store, services);
+    template_manager::restore_last_loaded_template(
+        store,
+        services,
+        Box::new(|store, services| {
+            store.bootstrap.set_startup_ready();
+            projects::load_startup_projects(store, services);
+        }),
+    );
+}
+
+/// The raw winit events the window follows: the wheel's device for Sync Doctor's maps, and on every
+/// resize a restored window that fits its screen and, on macOS, the traffic lights back at their
+/// inset (AppKit puts them in the corner).
+fn follow_window_events(window: &AppWindow) {
     #[cfg(target_os = "macos")]
     let header = window.as_weak();
     window.window().on_winit_window_event(move |slint_window, event| {
-        // Line deltas come from a notched wheel, pixel deltas from a trackpad; Slint's scroll event
-        // that follows does not say which (Phase 8 D5).
-        if let winit::event::WindowEvent::MouseWheel { delta, .. } = event {
-            features::video_sync::record_wheel_device(match delta {
-                winit::event::MouseScrollDelta::LineDelta(..) => ovrley_app::features::video_sync::maps::WheelDevice::Wheel,
-                winit::event::MouseScrollDelta::PixelDelta(..) => ovrley_app::features::video_sync::maps::WheelDevice::Trackpad,
-            });
-        }
-        if let winit::event::WindowEvent::Resized(_) = event {
-            slint_window.with_winit_window(platform::fit_restored_window);
-            #[cfg(target_os = "macos")]
-            if let Some(header) = header.upgrade() {
-                let header_height = f64::from(header.get_header_height());
-                slint_window.with_winit_window(|winit_window| platform::macos::apply_traffic_light_inset(winit_window, header_height));
+        match event {
+            // Line deltas come from a notched wheel, pixel deltas from a trackpad; Slint's scroll
+            // event that follows does not say which.
+            winit::event::WindowEvent::MouseWheel { delta, .. } => sync::record_wheel_device(match delta {
+                winit::event::MouseScrollDelta::LineDelta(..) => WheelDevice::Wheel,
+                winit::event::MouseScrollDelta::PixelDelta(..) => WheelDevice::Trackpad,
+            }),
+            winit::event::WindowEvent::Resized(_) => {
+                slint_window.with_winit_window(platform::fit_restored_window);
+                #[cfg(target_os = "macos")]
+                if let Some(header) = header.upgrade() {
+                    let header_height = f64::from(header.get_header_height());
+                    slint_window.with_winit_window(|winit_window| platform::macos::apply_traffic_light_inset(winit_window, header_height));
+                }
             }
+            _ => {}
         }
         EventResult::Propagate
     });
@@ -203,82 +259,32 @@ pub fn run(
             }
         });
     }
+}
 
-    // `useAppBootstrap`'s shell part runs on the first event-loop turn.
-    let startup = dispatcher.handle();
-    let shown = window.as_weak();
-    slint::Timer::single_shot(std::time::Duration::ZERO, move || {
-        if let Some(window) = shown.upgrade() {
-            when_winit_window_exists(&window, startup.clone());
-        }
-        // `useAppBootstrap`: the template list and the last template, with the font catalog
-        // loading in parallel (D16); the startup screen shows until the restore has finished.
-        startup.dispatch(move |store, services| {
-            ovrley_app::features::app_update::check_at_startup(store, services, distribution, cfg!(debug_assertions));
-            ovrley_app::features::template_manager::fetch_templates(store, services, None);
-            ovrley_app::features::widget_editor::load_font_catalog(store, services);
-            // `useAppBootstrap` detects the codecs once at startup (Phase 7 D8).
-            ovrley_app::features::video_preview::filmstrips::fetch_available_codecs(store, services);
-            ovrley_app::features::maps::initialize(store, services);
-            // Once startup is ready, the startup projects dialog lists the project folder (D11).
-            ovrley_app::features::template_manager::restore_last_loaded_template(
-                store,
-                services,
-                Box::new(|store, services| {
-                    store.bootstrap.set_startup_ready();
-                    ovrley_app::features::projects::load_startup_projects(store, services);
-                }),
-            );
-        });
+/// `OVRLEY_FRAME_RATE=1` logs how many frames the window rendered each second, a measurement aid.
+fn count_frames(window: &AppWindow) -> slint::Timer {
+    let frames = Rc::new(Cell::new(0u32));
+    let counted = Rc::clone(&frames);
+    window
+        .window()
+        .set_rendering_notifier(move |state, _| {
+            if matches!(state, slint::RenderingState::AfterRendering) {
+                counted.set(counted.get() + 1);
+            }
+        })
+        .expect("no other rendering notifier is set");
+    let timer = slint::Timer::default();
+    timer.start(slint::TimerMode::Repeated, Duration::from_secs(1), move || {
+        log::info!("window: {} frames rendered this second", frames.replace(0));
     });
-
-    // Live preview (D17): Slint gives no reload notification, so the projections run on a short
-    // timer. A reload resets the globals to their defaults; the projections compare with the
-    // current values and restore the store's state.
-    #[cfg(feature = "live-preview")]
-    let _live_preview = {
-        let timer = slint::Timer::default();
-        let dispatcher = dispatcher.clone();
-        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || dispatcher.reproject());
-        timer
-    };
-
-    #[cfg(debug_assertions)]
-    crate::snapshot::start_if_requested(&window, &dispatcher);
-
-    // `OVRLEY_FRAME_RATE=1` logs how many frames the window rendered each second (a measurement aid).
-    let _frame_rate = std::env::var_os("OVRLEY_FRAME_RATE").map(|_| {
-        let frames = std::rc::Rc::new(std::cell::Cell::new(0u32));
-        let counted = frames.clone();
-        window
-            .window()
-            .set_rendering_notifier(move |state, _| {
-                if matches!(state, slint::RenderingState::AfterRendering) {
-                    counted.set(counted.get() + 1);
-                }
-            })
-            .expect("no other rendering notifier is set");
-        let timer = slint::Timer::default();
-        timer.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(1), move || {
-            log::info!("window: {} frames rendered this second", frames.replace(0));
-        });
-        timer
-    });
-
-    features::video_playback::start(&window, gpu.as_ref(), &dispatcher.handle());
-    let _gpu = gpu;
-    let result = window.run().map_err(|error| format!("The window failed: {error}"));
-    features::video_playback::shutdown();
-    dispatcher.flush_preferences();
-    let relaunch = dispatcher.with_store(|store| store.app_update.relaunch);
-    result.map(|()| if relaunch { Exit::Relaunch } else { Exit::Closed })
+    timer
 }
 
 /// The theme colours widget fallbacks use, from the `Theme` global, their one source.
-fn theme_colors(window: &AppWindow) -> ovrley_app::lib::template::ThemeColors {
-    let theme = window.global::<crate::Theme>();
+fn theme_colors(window: &AppWindow) -> ThemeColors {
+    let theme = window.global::<Theme>();
     let hex = |color: slint::Color| format!("#{:02x}{:02x}{:02x}", color.red(), color.green(), color.blue());
-    ovrley_app::lib::template::ThemeColors {
+    ThemeColors {
         ice: hex(theme.get_theme_color_ice()),
         aqua: hex(theme.get_theme_color_aqua()),
         teal: hex(theme.get_theme_color_teal()),
@@ -286,9 +292,13 @@ fn theme_colors(window: &AppWindow) -> ovrley_app::lib::template::ThemeColors {
     }
 }
 
-/// Every locale is bundled at build time, and English is the untranslated text, so a failure is a
-/// build that lost its catalogs. Live preview interprets the `.slint` sources without the bundled
-/// catalogs, so there the UI stays in English.
+/// Selects the bundled translation of `locale`.
+///
+/// # Panics
+///
+/// When the translation is not bundled: every locale is bundled at build time, and English is the
+/// untranslated text, so that is a build that lost its catalogs. Live preview interprets the
+/// `.slint` sources without the bundled catalogs, so there the UI stays in English.
 fn select_language(locale: Locale) {
     let selected = slint::select_bundled_translation(locale.code());
     #[cfg(feature = "live-preview")]
@@ -300,11 +310,10 @@ fn select_language(locale: Locale) {
 }
 
 /// Platform work that needs the winit window, which exists only after the first event-loop turn:
-/// on macOS the traffic lights and `useTrafficLightInset`, which follows AppKit's full-screen
-/// transitions (the header gives up its inset as the window starts entering full screen and takes
-/// it back as it starts leaving); on Linux the Wayland drop listener; everywhere the window's
-/// starting maximised state.
-fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::DispatchHandle) {
+/// on macOS the traffic lights, which follow AppKit's full-screen transitions (the header gives up
+/// its inset as the window starts entering full screen and takes it back as it starts leaving); on
+/// Linux the Wayland drop listener; everywhere the window's starting maximised state.
+fn when_winit_window_exists(window: &AppWindow, dispatch: DispatchHandle) {
     let window = window.as_weak();
     let spawned = slint::spawn_local(async move {
         let Some(app) = window.upgrade() else { return };
@@ -315,7 +324,7 @@ fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::Dis
                 return;
             }
         };
-        platform::window_events::set_window_maximized(winit_window.is_maximized() || winit_window.fullscreen().is_some());
+        platform::events::set_window_maximized(winit_window.is_maximized() || winit_window.fullscreen().is_some());
         #[cfg(target_os = "macos")]
         {
             use platform::macos::FullscreenTransition;
@@ -328,7 +337,7 @@ fn when_winit_window_exists(window: &AppWindow, dispatch: ovrley_app::store::Dis
             });
         }
         #[cfg(target_os = "linux")]
-        platform::window_events::start_wayland_drop(&winit_window);
+        platform::events::start_wayland_drop(&winit_window);
         #[cfg(not(target_os = "macos"))]
         drop(dispatch);
     });

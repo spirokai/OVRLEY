@@ -1,0 +1,426 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
+import { Switch } from "../../components/switch.slint";
+import { ScrollArea } from "../../components/scroll-area.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import { ChoiceKind } from "../../components/logic.slint";
+import { FieldSecondsInput } from "../video/fields.slint";
+import { TransitionSelectTrigger } from "../transitions/select.slint";
+import { FileDropZone, DrawerFileHeader, DetailRows } from "parts.slint";
+import { Toolbar, CreationTimeSource, JoinControlView, VideoSegmentView } from "index.slint";
+
+// A field label of the drawer's two-column rows.
+component FieldLabel inherits AppText {
+    font-size: Theme.text-xs * 1rem;
+    font-weight: Theme.font-weight-bold;
+    color: Theme.muted-foreground;
+    vertical-alignment: center;
+    min-height: 2rem;
+    horizontal-stretch: 1;
+    preferred-width: 0px;
+    min-width: 0px;
+}
+
+component JoinControl inherits VerticalLayout {
+    in property <JoinControlView> join;
+    spacing: 0.25rem;
+    HorizontalLayout {
+        spacing: 0.5rem;
+        TransitionSelectTrigger {
+            horizontal-stretch: 1;
+            target: root.join.target;
+            label: root.join.type-label;
+            preview-index: root.join.preview-index;
+            small: true;
+        }
+        if root.join.has-duration: FieldSecondsInput {
+            width: 6rem;
+            field: root.join.duration;
+            field-height: 2rem;
+            font-size: Theme.text-xs * 1rem;
+            show-unit: true;
+            label: @tr("transitions.duration" => "Transition duration");
+        }
+    }
+    if root.join.error != "": AppText {
+        content: root.join.error;
+        font-size: 0.65rem;
+        color: Theme.destructive;
+        wrap: word-wrap;
+    }
+}
+
+// A transition on a dashed line. Slint has no dashed borders, so the line is drawn as short dashes.
+component SegmentJoin inherits HorizontalLayout {
+    in property <JoinControlView> join;
+    padding-top: 0.75rem;
+    padding-bottom: 0.5rem;
+    Rectangle {
+        width: 1.75rem;
+        for dash in Math.ceil(self.height / 6px): Rectangle {
+            x: 0.75rem;
+            y: dash * 6px - 0.5rem;
+            width: 1px;
+            height: 3px;
+            background: Theme.foreground;
+        }
+    }
+    JoinControl {
+        horizontal-stretch: 1;
+        join: root.join;
+    }
+}
+
+component SegmentCard inherits Rectangle {
+    in property <VideoSegmentView> segment;
+    callback seek();
+    callback remove();
+    callback overlay-changed(shows: bool);
+    callback included-changed(included: bool);
+
+    border-radius: Theme.radius-sm * 1rem;
+    background: Theme.foreground.with-alpha(root.segment.included ? 0.06 : 0.03);
+    HorizontalLayout {
+        padding-top: 0.375rem;
+        padding-bottom: 0.375rem;
+        padding-left: 0.625rem;
+        padding-right: 0.5rem;
+        spacing: 0.5rem;
+        SimpleTooltip {
+            content: @tr("toolbar.goToPart" => "Go to part");
+            clicked => {
+                root.seek();
+            }
+            Rectangle {
+                width: range.preferred-width;
+                range := AppText {
+                    content: root.segment.range;
+                    font-size: Theme.text-xs * 1rem;
+                    font-weight: Theme.font-weight-bold;
+                    color: root.segment.included ? Theme.foreground : Theme.muted-foreground.with-alpha(0.35);
+                    vertical-alignment: center;
+                }
+                // `line-through` when the part is excluded.
+                if !root.segment.included: Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    height: 1px;
+                    background: range.color;
+                }
+            }
+        }
+        if root.segment.removable: SimpleTooltip {
+            content: root.segment.remove-label;
+            Button {
+                variant: ButtonVariant.ghost;
+                size: ButtonSize.icon;
+                width: 1.75rem;
+                height: 1.75rem;
+                icon: Icons.trash-2;
+                text-color: Theme.muted-foreground.transparentize(0.4);
+                hover-background: Theme.surface-accent-soft;
+                hover-text-color: Theme.primary;
+                accessible-label: root.segment.remove-label;
+                clicked => {
+                    root.remove();
+                }
+            }
+        }
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+        SimpleTooltip {
+            content: root.segment.shows-overlay ? @tr("toolbar.hideOverlay" => "Hide overlay") : @tr("toolbar.showOverlay" => "Show overlay");
+            Button {
+                variant: ButtonVariant.ghost;
+                size: ButtonSize.icon;
+                width: 1.75rem;
+                height: 1.75rem;
+                icon: Icons.gauge;
+                icon-size: 1.125rem;
+                background: root.segment.shows-overlay ? Theme.primary : Theme.foreground.with-alpha(0.1);
+                hover-background: root.segment.shows-overlay ? Theme.primary.transparentize(0.1) : Theme.foreground.with-alpha(0.15);
+                text-color: root.segment.shows-overlay ? Theme.primary-foreground : Theme.muted-foreground;
+                hover-text-color: root.segment.shows-overlay ? Theme.primary-foreground : Theme.foreground;
+                accessible-label: root.segment.overlay-label;
+                clicked => {
+                    root.overlay-changed(!root.segment.shows-overlay);
+                }
+            }
+        }
+        HorizontalLayout {
+            padding-left: 0.25rem;
+            alignment: center;
+            VerticalLayout {
+                alignment: center;
+                Switch {
+                    checked: root.segment.included;
+                    accessible-label: root.segment.include-label;
+                    checked-changed(checked) => {
+                        root.included-changed(checked);
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component VideoDrawer inherits ScrollArea {
+    VerticalLayout {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-bottom: 1rem;
+        Button {
+            icon: Icons.film;
+            icon-size: 1rem;
+            text: @tr("toolbar.loadVideo" => "Load videos");
+            clicked => {
+                Toolbar.load-videos();
+            }
+        }
+
+        Rectangle {
+            height: 1rem;
+        }
+
+        FileDropZone {
+            label: @tr("toolbar.dropVideoFile" => "Drop video files");
+            sublabel: "MP4, MOV, MKV";
+        }
+
+        if Toolbar.has-videos: VerticalLayout {
+            padding-top: 2.5rem;
+            Rectangle {
+                height: Theme.hairline;
+                background: Theme.border.transparentize(0.2);
+            }
+
+            if !Toolbar.has-selected-video: Rectangle {
+                height: 1.5rem;
+            }
+            if !Toolbar.has-selected-video: AppText {
+                content: @tr("toolbar.selectVideoHint" => "Select a video to see its details.");
+                horizontal-alignment: center;
+                font-size: Theme.text-xs * 1rem;
+                color: Theme.muted-foreground;
+                wrap: word-wrap;
+            }
+
+            if Toolbar.has-selected-video: VerticalLayout {
+                padding-top: 0.5rem;
+                spacing: 1rem;
+                DrawerFileHeader {
+                    name: Toolbar.selected-video.filename;
+                    remove-label: Toolbar.selected-video.remove-label;
+                    remove => {
+                        Toolbar.remove-video(Toolbar.selected-video.id);
+                    }
+                }
+
+                if Toolbar.selected-video.warnings.length > 0: VerticalLayout {
+                    padding-left: 0.5rem;
+                    padding-right: 0.5rem;
+                    spacing: 0.25rem;
+                    for warning in Toolbar.selected-video.warnings: HorizontalLayout {
+                        spacing: 0.375rem;
+                        VerticalLayout {
+                            padding-top: 0.125rem;
+                            alignment: start;
+                            Icon {
+                                glyph: Icons.triangle-alert;
+                                size: 0.75rem;
+                                color: Theme.destructive;
+                            }
+                        }
+                        AppText {
+                            horizontal-stretch: 1;
+                            content: warning;
+                            font-size: Theme.text-xs * 1rem;
+                            color: Theme.destructive;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+
+                if Toolbar.selected-video.missing: VerticalLayout {
+                    padding-left: 0.5rem;
+                    padding-right: 0.5rem;
+                    spacing: 0.5rem;
+                    AppText {
+                        content: @tr("toolbar.lastKnownLocation" => "Last location:") + " " + Toolbar.selected-video.path;
+                        font-size: 0.7rem;
+                        color: Theme.muted-foreground;
+                        wrap: word-wrap;
+                    }
+                    Button {
+                        height: 2rem;
+                        icon: Icons.folder-search;
+                        text: @tr("toolbar.locateVideo" => "Locate video…");
+                        clicked => {
+                            Toolbar.locate-video(Toolbar.selected-video.id);
+                        }
+                    }
+                }
+
+                // Sync the video.
+                VerticalLayout {
+                    spacing: 0.75rem;
+                    SectionHeading {
+                        icon: Icons.clock-3;
+                        title: @tr("toolbar.syncTheVideo" => "Sync the video");
+                        variant: SectionHeadingVariant.drawer;
+                    }
+                    VerticalLayout {
+                        padding-left: 0.5rem;
+                        padding-right: 0.5rem;
+                        spacing: 0.75rem;
+                        HorizontalLayout {
+                            spacing: 1.125rem;
+                            FieldLabel {
+                                content: @tr("toolbar.videoStart" => "Start on timeline");
+                            }
+                            FieldSecondsInput {
+                                horizontal-stretch: 1;
+                                preferred-width: 0px;
+                                min-width: 0px;
+                                field: Toolbar.selected-video.start;
+                                field-height: 2rem;
+                                font-size: Theme.text-xs * 1rem;
+                                label: @tr("toolbar.videoStart" => "Start on timeline");
+                            }
+                        }
+                        HorizontalLayout {
+                            spacing: 1.125rem;
+                            FieldLabel {
+                                content: @tr("toolbar.creationTime" => "Creation Time");
+                            }
+                            TabsList {
+                                horizontal-stretch: 1;
+                                preferred-width: 0px;
+                                min-width: 0px;
+                                height: 2rem;
+                                variant: TabsListVariant.toolbar;
+                                trigger-variant: TabsTriggerVariant.toolbar;
+                                stretch: true;
+                                value: Toolbar.selected-video.creation-source == CreationTimeSource.filename ? "filename" : "detected";
+                                items: [
+                                    { kind: ChoiceKind.item, value: "detected", label: @tr("toolbar.detected" => "Detected") },
+                                    { kind: ChoiceKind.item, value: "filename", label: @tr("toolbar.filename" => "Filename"), disabled: !Toolbar.selected-video.filename-available },
+                                ];
+                                value-changed(value) => {
+                                    Toolbar.set-creation-source(Toolbar.selected-video.id, value == "filename" ? CreationTimeSource.filename : CreationTimeSource.detected);
+                                }
+                            }
+                        }
+                        if Toolbar.selected-video.timezone-shown: HorizontalLayout {
+                            spacing: 1.125rem;
+                            FieldLabel {
+                                content: @tr("toolbar.applyTimezone" => "Apply Timezone");
+                            }
+                            HorizontalLayout {
+                                horizontal-stretch: 1;
+                                preferred-width: 0px;
+                                alignment: start;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Switch {
+                                        checked: Toolbar.selected-video.applies-timezone;
+                                        disabled: Toolbar.selected-video.timezone-disabled;
+                                        accessible-label: @tr("toolbar.applyTimezone" => "Apply Timezone");
+                                        checked-changed(checked) => {
+                                            Toolbar.set-applies-timezone(Toolbar.selected-video.id, checked);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Button {
+                            variant: ButtonVariant.secondary;
+                            icon: Icons.refresh-cw;
+                            text: @tr("toolbar.syncTheVideo" => "Sync the video");
+                            clicked => {
+                                Toolbar.sync-video(Toolbar.selected-video.id);
+                            }
+                        }
+                    }
+                }
+
+                SectionHeading {
+                    icon: Icons.film;
+                    title: @tr("toolbar.details" => "Details");
+                    variant: SectionHeadingVariant.drawer;
+                }
+                DetailRows {
+                    rows: Toolbar.selected-video.metadata;
+                }
+
+                SectionHeading {
+                    icon: Icons.scissors;
+                    title: @tr("toolbar.videoParts" => "Parts");
+                    variant: SectionHeadingVariant.drawer;
+                }
+                VerticalLayout {
+                    spacing: 0.25rem;
+                    for segment in Toolbar.selected-video.segments: VerticalLayout {
+                        if segment.has-join: SegmentJoin {
+                            join: segment.join;
+                        }
+                        SegmentCard {
+                            segment: segment;
+                            seek => {
+                                Toolbar.seek-segment(Toolbar.selected-video.id, segment.key);
+                            }
+                            remove => {
+                                Toolbar.remove-segment(Toolbar.selected-video.id, segment.key);
+                            }
+                            overlay-changed(shows) => {
+                                Toolbar.set-segment-overlay(Toolbar.selected-video.id, segment.key, shows);
+                            }
+                            included-changed(included) => {
+                                Toolbar.set-segment-included(Toolbar.selected-video.id, segment.key, included);
+                            }
+                        }
+                    }
+                    for exit in Toolbar.selected-video.exits: VerticalLayout {
+                        SegmentJoin {
+                            join: exit.join;
+                        }
+                        // A dashed `foreground` at 15% outline (solid here), the 0.7rem bold muted
+                        // "Next clip" and the file name.
+                        Rectangle {
+                            border-radius: Theme.radius-sm * 1rem;
+                            border-width: 1px;
+                            border-color: Theme.foreground.with-alpha(0.15);
+                            HorizontalLayout {
+                                padding-top: 0.375rem;
+                                padding-bottom: 0.375rem;
+                                padding-left: 0.625rem;
+                                padding-right: 0.5rem;
+                                spacing: 0.5rem;
+                                AppText {
+                                    content: @tr("toolbar.nextClip" => "Next clip");
+                                    font-size: 0.7rem;
+                                    font-weight: Theme.font-weight-bold;
+                                    color: Theme.muted-foreground.transparentize(0.3);
+                                    vertical-alignment: center;
+                                }
+                                AppText {
+                                    horizontal-stretch: 1;
+                                    content: exit.next-filename;
+                                    uppercase: false;
+                                    font-size: Theme.text-xs * 1rem;
+                                    color: Theme.muted-foreground;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

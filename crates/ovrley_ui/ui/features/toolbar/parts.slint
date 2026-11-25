@@ -1,0 +1,146 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { DashedBorder } from "../../components/surface.slint";
+import { DrawerRowView } from "index.slint";
+
+// The pieces the activity and video drawers share.
+
+export component Cell inherits HorizontalLayout {
+    in property <string> content;
+    in property <int> weight: Theme.font-weight-medium;
+    in property <length> size: Theme.text-xs * 1rem;
+    in property <color> color: Theme.foreground.transparentize(0.1);
+    // Header cells keep their whole label, as the table's header does.
+    in property <bool> elide: true;
+
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    AppText {
+        content: root.content;
+        font-size: root.size;
+        font-weight: root.weight;
+        color: root.color;
+        horizontal-alignment: left;
+        vertical-alignment: center;
+        overflow: root.elide ? TextOverflow.elide : TextOverflow.clip;
+        max-lines: 1;
+    }
+}
+
+// Native drops land on the whole window, whose overlay covers the drawer while a file hovers, so
+// the zone shows no hover state of its own.
+export component FileDropZone inherits Rectangle {
+    in property <string> label;
+    in property <string> sublabel;
+    in property <string> icon: Icons.file-up;
+
+    min-height: 6rem;
+    vertical-stretch: 0;
+    border-radius: Theme.radius-xs * 1rem;
+    background: Theme.surface;
+    DashedBorder {
+        radius: Theme.radius-xs * 1rem;
+        border-color: Theme.border.transparentize(0.2);
+    }
+    VerticalLayout {
+        alignment: center;
+        padding-left: 1rem;
+        padding-right: 1rem;
+        HorizontalLayout {
+            alignment: center;
+            padding-bottom: 0.5rem;
+            Icon {
+                glyph: root.icon;
+                size: 1.25rem;
+                color: Theme.muted-foreground;
+            }
+        }
+
+        AppText {
+            content: root.label;
+            horizontal-alignment: center;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-extrabold;
+        }
+
+        Rectangle {
+            height: 0.25rem;
+        }
+
+        AppText {
+            content: root.sublabel;
+            horizontal-alignment: center;
+            font-size: 0.75rem;
+            color: Theme.muted-foreground;
+        }
+    }
+}
+
+export component DrawerFileHeader inherits HorizontalLayout {
+    in property <string> name;
+    in property <bool> can-remove: true;
+    in property <string> remove-label;
+    callback remove();
+
+    padding-top: 1rem;
+    padding-bottom: 0.5rem;
+    padding-left: 0.25rem;
+    AppText {
+        horizontal-stretch: 1;
+        content: root.name;
+        horizontal-alignment: left;
+        font-size: Theme.text-sm * 0.95rem;
+        font-weight: Theme.font-weight-extrabold;
+        overflow: elide;
+        max-lines: 1;
+        vertical-alignment: center;
+    }
+
+    if root.can-remove: Button {
+        variant: ButtonVariant.ghost;
+        size: ButtonSize.icon;
+        width: 1.75rem;
+        height: 1.75rem;
+        icon: Icons.trash-2;
+        icon-size: 0.875rem;
+        text-color: Theme.muted-foreground;
+        hover-background: Theme.surface-accent-soft;
+        hover-text-color: Theme.primary;
+        accessible-label: root.remove-label;
+        clicked => {
+            root.remove();
+        }
+    }
+}
+
+// The details list.
+export component DetailRows inherits VerticalLayout {
+    in property <[DrawerRowView]> rows;
+
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
+    spacing: 0.375rem;
+    for row in root.rows: HorizontalLayout {
+        spacing: 1.125rem;
+        AppText {
+            width: (parent.width - parent.spacing) / 2;
+            content: row.label;
+            horizontal-alignment: left;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-bold;
+            color: Theme.muted-foreground;
+        }
+
+        AppText {
+            width: (parent.width - parent.spacing) / 2;
+            content: row.value;
+            horizontal-alignment: left;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-medium;
+            color: Theme.foreground.transparentize(0.1);
+            wrap: word-wrap;
+        }
+    }
+}

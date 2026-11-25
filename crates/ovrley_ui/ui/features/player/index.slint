@@ -1,7 +1,7 @@
 import { Choice } from "../../components/logic.slint";
 import { TransitionOption } from "../transitions/index.slint";
 
-// A pointer event a timeline element reports to Rust (D9), with its x in timeline coordinates.
+// A pointer event a timeline element reports to Rust, with its x in timeline coordinates.
 export enum PointerPhase { down, move, up, cancel }
 
 // The timeline surface a scrub or pan starts on.
@@ -18,7 +18,7 @@ export struct MajorTickView {
 // Where a marker's hit area and line sit against its edge.
 export enum MarkerAlign { start, center, end }
 
-// A clip on a lane (D8), in timeline pixels; what sits inside it is relative to its box.
+// A clip on a lane, in timeline pixels; what sits inside it is relative to its box.
 export struct ClipView {
     lane-id: string,
     x: length,
@@ -84,7 +84,7 @@ export struct MarkerView {
     removable: bool,
 }
 
-// A join's marker (D13): a diamond at the end of its outgoing piece, the transition window shaded.
+// A join's marker: a diamond at the end of its outgoing piece, the transition window shaded.
 export struct JoinMarkerView {
     key: string,
     x: length,
@@ -110,7 +110,7 @@ export struct ClipTooltipView {
     warnings: [string],
 }
 
-// The player feature's global (D5), written by `src/features/player.rs`.
+// The player feature's global, written by `src/features/player.rs`.
 export global Player {
     // `hasActivity || hasVideo`: the player shows.
     in property <bool> visible;
@@ -160,7 +160,7 @@ export global Player {
     // A player popover or dialog is open: presses outside the player keep the clip selection.
     in-out property <bool> keeps-clip-selection;
 
-    // Edits at the playhead (D16) and the trim buttons.
+    // Edits at the playhead and the trim buttons.
     in property <bool> trim-visible;
     in property <bool> trim-targets-video;
     in property <bool> can-trim-start;
@@ -172,7 +172,7 @@ export global Player {
     // The real cut whose "Remove cut" popover is open (`video:<id>` and the cut id).
     in property <string> cut-popover-lane;
     in property <string> cut-popover-cut;
-    // A removed cut waits for the user's choice (D19).
+    // A removed cut waits for the user's choice.
     in property <bool> cut-removal-open;
 
     in property <[JoinMarkerView]> joins;
@@ -224,6 +224,6 @@ export global Player {
     callback clip-pointer(lane-id: string, phase: PointerPhase, x: length);
     callback clip-hover(lane-id: string, hovered: bool);
     callback marker-pointer(lane-id: string, cut-id: string, phase: PointerPhase, x: length);
-    // The timeline's width and absolute x (D8), when they change.
+    // The timeline's width and absolute x, when they change.
     callback timeline-metrics(width: length, x: length, rem: length);
 }

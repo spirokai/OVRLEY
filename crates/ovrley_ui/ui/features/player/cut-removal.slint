@@ -1,0 +1,64 @@
+import { Theme } from "../../theme.slint";
+import { Button, ButtonVariant } from "../../components/button.slint";
+import { Dialog, DialogTitle, DialogDescription } from "../../components/popup.slint";
+import { DialogPanel } from "../shell/dialogs.slint";
+import { Player } from "index.slint";
+
+// `CutRemovalDialog`: asks what happens to the merged part when a removed cut separates an included
+// part from an excluded one. Escape and the scrim keep the cut.
+export component CutRemovalDialog {
+    Dialog {
+        open: Player.cut-removal-open;
+        title: @tr("player.cutRemovalTitle" => "Remove this cut?");
+        open-changed(open) => {
+            if !open {
+                Player.keep-cut();
+            }
+        }
+        DialogPanel {
+            max-width: 32rem;
+            preferred-width: 32rem;
+            VerticalLayout {
+                padding: 1.5rem;
+                DialogTitle {
+                    content: @tr("player.cutRemovalTitle" => "Remove this cut?");
+                    font-size: Theme.text-lg * 1rem;
+                    font-weight: Theme.font-weight-bold;
+                }
+                HorizontalLayout {
+                    padding-top: 0.5rem;
+                    DialogDescription {
+                        content: @tr("player.cutRemovalDescription" => "One side of this cut is included in the export and the other is excluded. Choose what happens to the merged part.");
+                        font-size: Theme.text-sm * 1rem;
+                        color: Theme.muted-foreground;
+                    }
+                }
+                HorizontalLayout {
+                    padding-top: 1.5rem;
+                    spacing: 0.5rem;
+                    alignment: end;
+                    Button {
+                        variant: ButtonVariant.ghost;
+                        text: @tr("player.cutRemovalCancel" => "Keep the cut");
+                        clicked => {
+                            Player.keep-cut();
+                        }
+                    }
+                    Button {
+                        variant: ButtonVariant.secondary;
+                        text: @tr("player.cutRemovalExcludeBoth" => "Exclude both");
+                        clicked => {
+                            Player.resolve-cut-removal(true);
+                        }
+                    }
+                    Button {
+                        text: @tr("player.cutRemovalIncludeBoth" => "Include both");
+                        clicked => {
+                            Player.resolve-cut-removal(false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

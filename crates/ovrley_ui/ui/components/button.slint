@@ -1,18 +1,16 @@
-import { Theme } from "../theme/theme.slint";
-import { AppText } from "app-text.slint";
+import { Theme } from "../theme.slint";
+import { AppText } from "text.slint";
 import { Icon } from "icons.slint";
-import { FocusRing } from "focus-ring.slint";
-import { Shadow, ShadowSize } from "shadow.slint";
-import { GroupPosition, GroupSurface } from "group-surface.slint";
+import { FocusRing } from "focus.slint";
+import { Shadow, ShadowSize, GroupPosition, GroupSurface, Separator } from "surface.slint";
 
 export enum ButtonVariant { default, destructive, outline, secondary, ghost, toolbar, link }
 export enum ButtonSize { default, sm, lg, icon, icon-sm, icon-lg, toolbar-icon }
 
-// button.jsx. Content is `text`, an optional `icon`, and a slot for other content (spinners,
-// custom layouts). Text is `text-sm`, weight 600, in `rounded-sm`, 0.5rem apart; it keeps its
-// case except in the toolbar variant. The default height is 2rem, the File button's (the user's
-// choice; React's is `h-9`). The colour, type, shadow and spacing properties default to
-// the variant's values and are the call sites' overrides (D5); width and height are Slint geometry.
+// Content is `text`, an optional `icon`, and a slot for other content (spinners, custom layouts).
+// The default height is 2rem, the File button's. The colour, type, shadow and spacing properties
+// default to the variant's values and are the call sites' overrides; width and height are Slint
+// geometry.
 export component Button {
     in property <ButtonVariant> variant: ButtonVariant.default;
     in property <ButtonSize> size: ButtonSize.default;
@@ -62,8 +60,8 @@ export component Button {
         : root.size == ButtonSize.lg || root.size == ButtonSize.icon-lg ? 2.5rem
         : root.size == ButtonSize.toolbar-icon ? 1.75rem : 2rem;
     property <bool> square: root.size == ButtonSize.icon || root.size == ButtonSize.icon-sm || root.size == ButtonSize.icon-lg || root.size == ButtonSize.toolbar-icon;
-    // Disabled default and outline buttons keep their normal colours on hover; other variants
-    // still change, as `:hover` applies to disabled buttons in the browser.
+    // Disabled default and outline buttons keep their normal colours on hover; other variants still
+    // change.
     property <bool> hover-styled: touch.has-hover && !(root.disabled && (root.variant == ButtonVariant.default || root.variant == ButtonVariant.outline));
     property <bool> toolbar-pressed: root.variant == ButtonVariant.toolbar && root.pressed;
     property <color> current-text: root.toolbar-pressed ? Theme.surface : root.hover-styled ? root.hover-text-color : root.text-color;
@@ -167,7 +165,7 @@ export component Button {
             }
             reject
         }
-        // Space activates on release, as in the browser.
+        // Space activates on release.
         key-released(event) => {
             if event.text == " " {
                 root.clicked();
@@ -184,4 +182,53 @@ export component Button {
         group-orientation: root.group-orientation;
         ring-color: root.invalid || (root.variant == ButtonVariant.destructive && focus.focus-visible) ? Theme.ring-invalid-color : Theme.ring-color;
     }
+}
+
+// Children join through their own `group-position`; the group lays them out without gaps. Today's
+// groups are input + button and button + button. `@children` cannot sit in a conditional element,
+// so the vertical orientation is its own component; its children set `group-orientation: vertical`.
+export component ButtonGroup inherits HorizontalLayout {
+    alignment: start;
+    accessible-role: AccessibleRole.groupbox;
+}
+
+export component ButtonGroupVertical inherits VerticalLayout {
+    alignment: start;
+    accessible-role: AccessibleRole.groupbox;
+}
+
+// Static text in a group.
+export component ButtonGroupText {
+    in property <string> text;
+
+    Shadow {
+        size: ShadowSize.xs;
+        radius: Theme.radius-md * 1rem;
+    }
+    Rectangle {
+        background: Theme.muted;
+        border-width: 1px;
+        border-color: Theme.border;
+        border-radius: Theme.radius-md * 1rem;
+    }
+    HorizontalLayout {
+        padding-left: 1rem;
+        padding-right: 1rem;
+        spacing: 0.5rem;
+        alignment: center;
+        AppText {
+            content: root.text;
+            uppercase: true;
+            font-size: Theme.text-sm * 1rem;
+            font-weight: Theme.font-weight-medium;
+            line-height: Theme.text-sm-line-height;
+        }
+        @children
+    }
+}
+
+// A separator in `input` that stretches across the group.
+export component ButtonGroupSeparator inherits Separator {
+    orientation: Orientation.vertical;
+    line-color: Theme.input;
 }

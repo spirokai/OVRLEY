@@ -1,5 +1,4 @@
-//! The shell's drawer layout and window controls (ports of `ToolbarDrawerLayout.test.jsx` and
-//! `TitleBar-boundary.test.jsx`).
+//! The shell's drawer layout and window controls.
 
 mod common;
 

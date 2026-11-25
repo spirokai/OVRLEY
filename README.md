@@ -123,7 +123,6 @@ An MDK SDK kept elsewhere is used through `MDK_SDK`, set in the shell that runs 
 ```bash
 pnpm dev:native        # The app
 pnpm dev:native:live   # The app with Slint live preview: saving a .slint file reloads the UI
-pnpm showcase:native   # The component showcase
 ```
 
 `pnpm dev:native:live` sets its environment variable in POSIX shell syntax, so on Windows run it from such a shell.

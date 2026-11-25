@@ -1,4 +1,4 @@
-//! Port of app/src/tests/components/ui/BlurInput.test.jsx: BlurInput's draft lifecycle.
+//! `BlurInput`'s draft lifecycle.
 
 mod common;
 

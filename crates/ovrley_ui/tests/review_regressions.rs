@@ -1,4 +1,4 @@
-//! Regressions found in the user's review of the Phase 1 showcase.
+//! Regressions in the shared components: tooltips, gradient stops and other review findings.
 
 mod common;
 

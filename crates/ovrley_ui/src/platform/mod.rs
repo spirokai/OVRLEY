@@ -1,15 +1,13 @@
-//! The platform layer: backend selection, window chrome, and the services `ovrley_app` defines as
-//! traits (plan D3), implemented with Slint, winit, `rfd` and `arboard`.
+//! The platform layer: backend selection, window chrome, raw window events, and the services
+//! `ovrley_app` defines as traits, implemented with Slint, winit, `rfd` and `arboard`.
 
-#[cfg(target_os = "linux")]
-pub mod appimage_integration;
+pub mod events;
 pub mod gpu;
-pub mod key_input;
-#[cfg(target_os = "linux")]
-pub mod wayland_drop;
-pub mod window_events;
+pub mod keys;
 #[cfg(target_os = "macos")]
-pub mod macos;
+pub(crate) mod macos;
+#[cfg(target_os = "linux")]
+mod wayland;
 
 use crate::AppWindow;
 use gpu::{GpuChoice, GpuDevice};
@@ -22,6 +20,10 @@ use std::cell::RefCell;
 /// Standard output as `--mcp` was given it, for the protocol alone. Everything else that writes
 /// there goes to the null device from here on: MDK puts its banner into C's stdout as it loads,
 /// before `main`, and C writes it out whenever it flushes.
+///
+/// # Errors
+///
+/// When standard output cannot be duplicated or the null device cannot replace it.
 pub fn take_standard_output() -> std::io::Result<std::fs::File> {
     #[cfg(unix)]
     let output = std::os::fd::AsFd::as_fd(&std::io::stdout()).try_clone_to_owned()?;
@@ -52,14 +54,18 @@ fn linux_app_id(flatpak_id: Option<String>) -> String {
     flatpak_id.unwrap_or_else(|| ovrley_services::runtime::APP_IDENTIFIER.to_string())
 }
 
-/// Selects Slint's backend, in the plan's order: the GPU device, the window-attribute hooks, the
-/// renderer, `select()`. Returns the shared device, if any, for the compositor.
+/// Selects Slint's backend: the GPU device first, then the window attributes and the raw event
+/// handler, the renderer, and `select()`. Returns the shared device, if any, for the video players.
+///
+/// # Errors
+///
+/// When the window system cannot start.
 pub fn select_backend() -> Result<Option<GpuDevice>, String> {
     let gpu = gpu::open();
     let selector = slint::BackendSelector::new()
         .backend_name("winit".into())
         .with_winit_window_attributes_hook(window_attributes)
-        .with_winit_custom_application_handler(window_events::AppEvents::default());
+        .with_winit_custom_application_handler(events::AppEvents::default());
     let (selector, shared) = match gpu {
         GpuChoice::Shared(device) => {
             let selector = selector.require_wgpu_30(slint::wgpu_30::WGPUConfiguration::Manual {
@@ -70,7 +76,7 @@ pub fn select_backend() -> Result<Option<GpuDevice>, String> {
             });
             (selector, Some(device))
         }
-        GpuChoice::Software { .. } => (selector.renderer_name("skia-software".into()), None),
+        GpuChoice::Software => (selector.renderer_name("skia-software".into()), None),
         GpuChoice::None => (require_platform_api(selector), None),
     };
     selector.select().map_err(|error| format!("Could not start the window system: {error}"))?;
@@ -89,7 +95,8 @@ fn require_platform_api(selector: slint::BackendSelector) -> slint::BackendSelec
     }
 }
 
-/// The window chrome per platform (D9; `concat-window-chrome.md`).
+/// The window chrome per platform: a native title bar made invisible on macOS, so the traffic
+/// lights stay native; no decorations elsewhere, where the header draws the window buttons.
 fn window_attributes(attributes: winit::window::WindowAttributes) -> winit::window::WindowAttributes {
     let attributes = attributes.with_title("OVRLEY").with_maximized(true).with_active(true);
     #[cfg(target_os = "macos")]
@@ -142,8 +149,8 @@ pub fn is_windows_10() -> bool {
 }
 
 /// The window opens maximised, and leaving that restores the 1920×1080 preferred size, which winit
-/// (unlike Tauri's tao) does not constrain to a smaller screen. A restored window larger than its
-/// monitor shrinks to 90% of it, centred.
+/// does not constrain to a smaller screen. A restored window larger than its monitor shrinks to
+/// 90% of it, centred.
 pub fn fit_restored_window(window: &winit::window::Window) {
     if window.is_maximized() || window.fullscreen().is_some() {
         return;
@@ -164,7 +171,7 @@ pub fn fit_restored_window(window: &winit::window::Window) {
     ));
 }
 
-/// The window icon on Windows and Linux, from the Tauri app's icons.
+/// The window icon on Windows and Linux.
 #[cfg(not(target_os = "macos"))]
 fn window_icon() -> Option<winit::window::Icon> {
     let decoded = image::load_from_memory_with_format(include_bytes!("../../../../assets/icons/128x128.png"), image::ImageFormat::Png)
@@ -267,7 +274,7 @@ impl WindowControl for SlintWindowControl {
     }
 }
 
-/// Text on the system clipboard. Slint 1.18 has no public clipboard API. The `arboard` handle is
+/// Text on the system clipboard, which Slint has no public API for. The `arboard` handle is
 /// kept, because on Linux the clipboard owner must stay alive to serve what it copied.
 #[derive(Default)]
 pub struct SystemClipboard {
@@ -359,7 +366,7 @@ pub fn show_startup_failure(message: &str) {
 }
 
 #[cfg(test)]
-mod app_id_tests {
+mod tests {
     #[test]
     fn the_app_id_is_the_desktop_entrys() {
         assert_eq!(super::linux_app_id(None), "com.ovrley.desktop");

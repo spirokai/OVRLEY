@@ -1,5 +1,5 @@
-//! Port of app/src/tests/components/ui/GradientPicker.test.jsx. The React test fixes the track at
-//! 200px; here positions are fractions of the track's measured width.
+//! The gradient picker's stops: adding, dragging, keys and removal. Positions are fractions of the
+//! track's measured width.
 
 mod common;
 
@@ -40,7 +40,7 @@ fn on_track(window: &ovrley_ui::GradientPickerHarness, fraction: f32) -> Logical
 }
 
 /// Focuses a stop node without opening its picker: pressing focuses it, and releasing away from
-/// it is not a click. (The React test fires `keyDown` on the node directly.)
+/// it is not a click.
 fn focus_node(
     window: &ovrley_ui::GradientPickerHarness,
     node: &i_slint_backend_testing::ElementHandle,

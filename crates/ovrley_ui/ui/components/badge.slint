@@ -1,13 +1,11 @@
-import { Theme } from "../theme/theme.slint";
-import { AppText } from "app-text.slint";
+import { Theme } from "../theme.slint";
+import { AppText } from "text.slint";
 import { Icon } from "icons.slint";
-import { FocusRing } from "focus-ring.slint";
+import { FocusRing } from "focus.slint";
 
 export enum BadgeVariant { default, secondary, destructive, outline }
 
-// badge.jsx: fully rounded, bordered, 0.5rem × 0.125rem padding, `text-xs`, weight 500; icons are
-// 0.75rem with a 0.25rem gap. No badge is a link, so the link hover styles are not ported. The
-// colour, radius and padding properties are the call sites' overrides (D5).
+// The colour, radius and padding properties are the call sites' overrides.
 export component Badge {
     in property <BadgeVariant> variant: BadgeVariant.default;
     in property <string> text;

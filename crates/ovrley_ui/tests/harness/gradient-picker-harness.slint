@@ -1,9 +1,8 @@
-import { FluidWindow } from "../../ui/theme/fluid-window.slint";
+import { FluidWindow } from "../../ui/window.slint";
 import { GradientPicker } from "../../ui/components/gradient-picker.slint";
 import { GradientStop } from "../../ui/components/logic.slint";
 
-// The GradientPicker test harness. Like the React test, the picker reports changes without the
-// stops being fed back, so every change is computed from the stops the test set.
+// The GradientPicker test harness.
 export component GradientPickerHarness inherits FluidWindow {
     width: 1100px;
     height: 720px;

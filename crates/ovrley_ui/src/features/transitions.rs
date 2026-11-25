@@ -1,22 +1,23 @@
-//! The transitions feature's animated previews (plan D13).
+//! Transitions: the animated previews (`TransitionPreviews`), the transition select popover
+//! (`TransitionSelect`), and the options list it shares with the player's join panel.
 //!
 //! `assets/transition-previews.webp` is one animated sprite sheet with a cell per `xfade`
-//! transition. A `slint::Image` shows only the first frame of an animated WebP, so this does what
-//! the webview does: while a transition panel is open, a timer takes the next frame from a lazy
-//! decoder, copies it into the one image every preview tile clips its cell from, and waits that
-//! frame's delay. At the last frame a new decoder starts over the same bytes, so the animation
-//! loops. One decoded frame (960 × 544 RGBA) is held at a time, not all of them. When the last
-//! panel closes, the timer stops and the decoder is dropped.
+//! transition. A `slint::Image` shows only the first frame of an animated WebP, so while a
+//! transition panel is open, a timer takes the next frame from a lazy decoder, copies it into the
+//! one image every preview tile clips its cell from, and waits that frame's delay. At the last
+//! frame a new decoder starts over the same bytes, so the animation loops. One decoded frame
+//! (960 × 544 RGBA) is held at a time, not all of them. When the last panel closes, the timer
+//! stops and the decoder is dropped.
 
-use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
+use crate::projection::{replace_if_changed, rgba_image, set_if_changed};
 use crate::{AppWindow, TransitionOption, TransitionOptionKind, TransitionPreviews, TransitionSelect};
-use ovrley_app::features::transitions::{self as transitions, TransitionSelectTarget};
-use ovrley_app::store::Dispatcher;
-use slint::SharedString;
 use image::codecs::webp::WebPDecoder;
 use image::{AnimationDecoder, Frames};
-use ovrley_app::store::Store;
-use slint::{ComponentHandle, Image, Rgba8Pixel, SharedPixelBuffer};
+use ovrley_app::features::transitions::{self, JoinModel, TransitionSelectTarget};
+use ovrley_app::i18n::{catalog, Locale};
+use ovrley_app::store::{Dispatcher, Store};
+use ovrley_core::encode::ffmpeg::transitions::{transition_preview_grid, xfade_transitions, NO_TRANSITION};
+use slint::{ComponentHandle, SharedString};
 use std::cell::RefCell;
 use std::io::Cursor;
 use std::rc::Rc;
@@ -24,8 +25,35 @@ use std::time::Duration;
 
 static PREVIEW_SHEET: &[u8] = include_bytes!("../../../../assets/transition-previews.webp");
 
-/// Used when a frame has no delay, as browsers clamp a zero delay.
+/// The delay of a frame that has none.
 const FALLBACK_FRAME_DELAY: Duration = Duration::from_millis(100);
+
+/// The catalogue index of a transition, -1 for none: the preview tile's cell.
+pub fn transition_index(name: Option<&str>) -> i32 {
+    let index = name.and_then(|name| xfade_transitions().iter().position(|candidate| candidate == name));
+    index.map_or(-1, |index| i32::try_from(index).expect("the catalogue fits an i32"))
+}
+
+/// A select's options: the join's default (when it has one), no transition, then the catalogue's
+/// transitions that match `filter`.
+pub fn transition_options(default: Option<&JoinModel>, filter: &str, locale: Locale) -> Vec<TransitionOption> {
+    let default = default.map(|model| TransitionOption {
+        kind: TransitionOptionKind::Default,
+        value: transitions::DEFAULT_TRANSITION_OPTION.into(),
+        label: model.default_label.as_str().into(),
+        index: -1,
+    });
+    let none = TransitionOption {
+        kind: TransitionOptionKind::None,
+        value: NO_TRANSITION.into(),
+        label: catalog().t_or(locale, "transitions.none", "No transition").into(),
+        index: -1,
+    };
+    let xfades = transitions::filtered_transitions(filter)
+        .into_iter()
+        .map(|name| TransitionOption { kind: TransitionOptionKind::Xfade, value: name.into(), label: name.into(), index: transition_index(Some(name)) });
+    default.into_iter().chain([none]).chain(xfades).collect()
+}
 
 fn frames() -> Option<Frames<'static>> {
     match WebPDecoder::new(Cursor::new(PREVIEW_SHEET)) {
@@ -48,8 +76,7 @@ impl Animation {
     fn step(self: &Rc<Self>) {
         let frame = {
             let mut frames = self.frames.borrow_mut();
-            let next = frames.as_mut().and_then(Iterator::next);
-            match next {
+            match frames.as_mut().and_then(Iterator::next) {
                 Some(frame) => Some(frame),
                 // The end of the frames: start over.
                 None => {
@@ -68,9 +95,8 @@ impl Animation {
         };
         let delay = Duration::from(frame.delay());
         let buffer = frame.into_buffer();
-        let pixels = SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(buffer.as_raw(), buffer.width(), buffer.height());
         if let Some(window) = self.window.upgrade() {
-            window.global::<TransitionPreviews>().set_frame(Image::from_rgba8(pixels));
+            window.global::<TransitionPreviews>().set_frame(rgba_image(buffer.as_raw(), buffer.width(), buffer.height()));
         }
         let next = Rc::downgrade(self);
         self.timer.start(slint::TimerMode::SingleShot, if delay.is_zero() { FALLBACK_FRAME_DELAY } else { delay }, move || {
@@ -88,11 +114,12 @@ impl Animation {
 
 /// Gives the previews the sheet's grid from the catalogue (`assets/transitions.json`).
 pub fn initialize(window: &AppWindow) {
-    let grid = ovrley_core::encode::ffmpeg::transitions::transition_preview_grid();
+    let grid = transition_preview_grid();
     let previews = window.global::<TransitionPreviews>();
-    previews.set_columns(grid.columns as i32);
-    previews.set_cell_width(grid.width as i32);
-    previews.set_cell_height(grid.height as i32);
+    let int = |value: u32| i32::try_from(value).expect("the preview grid fits an i32");
+    previews.set_columns(int(grid.columns));
+    previews.set_cell_width(int(grid.width));
+    previews.set_cell_height(int(grid.height));
 }
 
 #[derive(Default)]
@@ -101,30 +128,26 @@ pub struct Projection {
 }
 
 impl Projection {
-    /// Runs the animation while a transition panel or a `TransitionSelect` popover is open, and
-    /// projects the open popover.
+    /// Runs the animation while a join panel or a transition select is open, and projects the
+    /// open select.
     pub fn project(&self, window: &AppWindow, store: &Store) {
         project_select(window, store);
         let wanted = store.player.join_panel.is_some() || store.transition_select.is_some();
         let mut animation = self.animation.borrow_mut();
-        match (wanted, animation.is_some()) {
-            (true, false) => {
-                let started = Rc::new(Animation { window: window.as_weak(), timer: slint::Timer::default(), frames: RefCell::new(frames()) });
-                started.step();
-                *animation = Some(started);
+        if wanted && animation.is_none() {
+            let started = Rc::new(Animation { window: window.as_weak(), timer: slint::Timer::default(), frames: RefCell::new(frames()) });
+            started.step();
+            *animation = Some(started);
+        } else if !wanted {
+            if let Some(stopped) = animation.take() {
+                stopped.stop();
             }
-            (false, true) => {
-                if let Some(stopped) = animation.take() {
-                    stopped.stop();
-                }
-            }
-            _ => {}
         }
     }
 }
 
 /// The key a `TransitionSelectTrigger` names its target by.
-pub fn target_key(target: &TransitionSelectTarget) -> String {
+fn target_key(target: &TransitionSelectTarget) -> String {
     match target {
         TransitionSelectTarget::ImportDefaults => "import-defaults".into(),
         TransitionSelectTarget::PanelDefaults => "panel-defaults".into(),
@@ -141,14 +164,16 @@ fn target_of(key: &str) -> Option<TransitionSelectTarget> {
 }
 
 /// The join model of a join target.
-fn join_of(store: &Store, key: &str) -> Option<transitions::JoinModel> {
+fn join_of(store: &Store, key: &str) -> Option<JoinModel> {
     transitions::join_models(&store.player.timeline.timeline().committed, store.i18n.language).into_iter().find(|model| model.key == key)
 }
 
 /// The selected value of a target: its default type, or the join's option.
 fn selected_value(store: &Store, target: &TransitionSelectTarget) -> String {
     match target {
-        TransitionSelectTarget::ImportDefaults => store.video_import_review.review.as_ref().map(|review| review.transition_defaults.transition_type.clone()).unwrap_or_default(),
+        TransitionSelectTarget::ImportDefaults => {
+            store.video_import_review.review.as_ref().map(|review| review.transition_defaults.transition_type.clone()).unwrap_or_default()
+        }
         TransitionSelectTarget::PanelDefaults => store.video_import.transition_defaults.transition_type.clone(),
         TransitionSelectTarget::Join(key) => join_of(store, key).map(|model| model.value).unwrap_or_default(),
     }
@@ -160,50 +185,36 @@ fn project_select(window: &AppWindow, store: &Store) {
         set_if_changed(global.get_open_target(), SharedString::new(), |value| global.set_open_target(value));
         return;
     };
-    let locale = store.i18n.language;
-    let none_label = ovrley_app::i18n::catalog().t_or(locale, "transitions.none", "No transition").to_string();
-    let default_option = match &select.target {
-        TransitionSelectTarget::Join(key) => join_of(store, key).map(|model| TransitionOption {
-            kind: TransitionOptionKind::Default,
-            value: transitions::DEFAULT_TRANSITION_OPTION.into(),
-            label: model.default_label.as_str().into(),
-            index: -1,
-        }),
+    let join = match &select.target {
+        TransitionSelectTarget::Join(key) => join_of(store, key),
         _ => None,
     };
-    let options = default_option.into_iter().chain(std::iter::once(TransitionOption { kind: TransitionOptionKind::None, value: ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION.into(), label: none_label.into(), index: -1 })
-        .chain(transitions::filtered_transitions(&select.filter).into_iter().map(|name| TransitionOption {
-            kind: TransitionOptionKind::Xfade,
-            value: name.into(),
-            label: name.into(),
-            index: crate::features::video_preview::transition_index(Some(name)),
-        })))
-        .collect();
+    let options = transition_options(join.as_ref(), &select.filter, store.i18n.language);
     replace_if_changed(global.get_options(), options, |model| global.set_options(model));
     set_if_changed(global.get_value(), SharedString::from(selected_value(store, &select.target)), |value| global.set_value(value));
     set_if_changed(global.get_filter(), SharedString::from(select.filter.as_str()), |value| global.set_filter(value));
-    set_if_changed(global.get_open_target(), SharedString::from(target_key(&select.target).as_str()), |value| global.set_open_target(value));
+    set_if_changed(global.get_open_target(), SharedString::from(target_key(&select.target)), |value| global.set_open_target(value));
 }
 
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let global = window.global::<TransitionSelect>();
-    let handle = dispatcher.handle();
+    let d = dispatcher.handle();
     global.on_open(move |key| {
         if let Some(target) = target_of(&key) {
-            handle.dispatch(move |store, _| transitions::open_transition_select(store, target));
+            d.dispatch(move |store, _| transitions::open_transition_select(store, target));
         }
     });
-    let handle = dispatcher.handle();
-    global.on_close(move || handle.dispatch(|store, _| transitions::close_transition_select(store)));
-    let handle = dispatcher.handle();
-    global.on_filter_edited(move |text| handle.dispatch(move |store, _| transitions::set_transition_select_filter(store, text.to_string())));
-    let handle = dispatcher.handle();
+    let d = dispatcher.handle();
+    global.on_close(move || d.dispatch(|store, _| transitions::close_transition_select(store)));
+    let d = dispatcher.handle();
+    global.on_filter_edited(move |text| d.dispatch(move |store, _| transitions::set_transition_select_filter(store, text.to_string())));
+    let d = dispatcher.handle();
     global.on_chosen(move |value| {
-        handle.dispatch(move |store, _| {
+        d.dispatch(move |store, _| {
             if let Err(error) = transitions::choose_transition(store, &value) {
                 log::error!("transition select: {error}");
             }
-        })
+        });
     });
 }
 
@@ -213,9 +224,9 @@ mod tests {
 
     #[test]
     fn every_frame_covers_the_whole_sheet_and_has_a_delay() {
-        let grid = ovrley_core::encode::ffmpeg::transitions::transition_preview_grid();
-        let rows = ovrley_core::encode::ffmpeg::transitions::xfade_transitions().len().div_ceil(grid.columns as usize) as u32;
-        let frames: Vec<_> = frames().unwrap().collect::<Result<_, _>>().unwrap();
+        let grid = transition_preview_grid();
+        let rows = xfade_transitions().len().div_ceil(grid.columns as usize) as u32;
+        let frames: Vec<_> = frames().expect("the sheet decodes").collect::<Result<_, _>>().expect("every frame decodes");
         assert!(frames.len() > 1, "the sheet is animated");
         for frame in &frames {
             assert_eq!(frame.buffer().dimensions(), (grid.columns * grid.width, rows * grid.height));

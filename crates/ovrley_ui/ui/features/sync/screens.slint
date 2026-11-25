@@ -1,0 +1,208 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { Shadow, ShadowSize } from "../../components/surface.slint";
+import { Landmarks } from "drawer.slint";
+import { VideoSync, LandmarkKind } from "index.slint";
+import { NavigationMapView, SelectionMapView } from "maps.slint";
+import { VideoPreviewSurface, VideoPreviewNotices } from "../video/surface.slint";
+
+// One mark button.
+component MarkButton inherits Rectangle {
+    in property <LandmarkKind> kind;
+    in property <string> label;
+    in property <bool> enabled;
+    in property <string> reason;
+
+    property <color> tone: Landmarks.color(root.kind);
+    min-height: 1.75rem;
+    Shadow {
+        size: ShadowSize.md;
+        radius: Theme.radius-sm * 1rem;
+    }
+    HorizontalLayout {
+        SimpleTooltip {
+            // A disabled button lets the pointer through to here.
+            mouse-cursor: root.enabled ? MouseCursor.default : MouseCursor.not-allowed;
+            content: root.enabled ? root.label : root.reason;
+            content-width: 16rem;
+            wrap-text: true;
+            Button {
+                variant: ButtonVariant.ghost;
+                size: ButtonSize.sm;
+                radius: Theme.radius-sm * 1rem;
+                padding-x: 0.5rem;
+                font-size: 0.75rem;
+                uppercase: true;
+                icon: Landmarks.icon(root.kind);
+                icon-size: 0.875rem;
+                text: root.label;
+                background: Theme.surface;
+                hover-background: root.tone.transparentize(0.8);
+                border-width: 1px;
+                border-color: root.tone.transparentize(0.3);
+                text-color: root.tone;
+                hover-text-color: root.tone;
+                disabled: !root.enabled;
+                accessible-label: root.label;
+                clicked => {
+                    VideoSync.mark(root.kind);
+                }
+            }
+        }
+    }
+}
+
+component MarkControls inherits VerticalLayout {
+    in property <bool> portrait;
+
+    property <string> left-label: @tr("videoSync.markLeftTurn" => "Mark Left Turn");
+    property <string> stop-label: @tr("videoSync.markStop" => "Mark Stop");
+    property <string> location-label: @tr("videoSync.markLocation" => "Mark Location");
+    property <string> right-label: @tr("videoSync.markRightTurn" => "Mark Right Turn");
+    accessible-role: groupbox;
+    accessible-label: @tr("videoSync.markControls" => "Video sync landmark controls");
+
+    if !root.portrait: HorizontalLayout {
+        spacing: 0.25rem;
+        MarkButton {
+            kind: LandmarkKind.left-turn;
+            label: root.left-label;
+            enabled: VideoSync.can-mark;
+            reason: VideoSync.mark-reason;
+        }
+        MarkButton {
+            kind: LandmarkKind.stop;
+            label: root.stop-label;
+            enabled: VideoSync.can-mark;
+            reason: VideoSync.mark-reason;
+        }
+        MarkButton {
+            kind: LandmarkKind.location;
+            label: root.location-label;
+            enabled: VideoSync.can-mark-location;
+            reason: VideoSync.location-reason;
+        }
+        MarkButton {
+            kind: LandmarkKind.right-turn;
+            label: root.right-label;
+            enabled: VideoSync.can-mark;
+            reason: VideoSync.mark-reason;
+        }
+    }
+    if root.portrait: GridLayout {
+        spacing: 0.25rem;
+        Row {
+            MarkButton {
+                kind: LandmarkKind.left-turn;
+                label: root.left-label;
+                enabled: VideoSync.can-mark;
+                reason: VideoSync.mark-reason;
+            }
+            MarkButton {
+                kind: LandmarkKind.right-turn;
+                label: root.right-label;
+                enabled: VideoSync.can-mark;
+                reason: VideoSync.mark-reason;
+            }
+        }
+        Row {
+            MarkButton {
+                kind: LandmarkKind.stop;
+                label: root.stop-label;
+                enabled: VideoSync.can-mark;
+                reason: VideoSync.mark-reason;
+            }
+            MarkButton {
+                kind: LandmarkKind.location;
+                label: root.location-label;
+                enabled: VideoSync.can-mark-location;
+                reason: VideoSync.location-reason;
+            }
+        }
+    }
+}
+
+component Screen inherits Rectangle {
+    in property <color> fill;
+    border-radius: Theme.radius-sm * 1rem;
+    border-width: 1px;
+    border-color: Theme.border.transparentize(0.5);
+    background: root.fill;
+    drop-shadow-offset-y: 5px;
+    drop-shadow-blur: 20px;
+    drop-shadow-color: #00000033;
+    clip: true;
+    @children
+}
+
+// The video screen (the video, with the mark controls) and the map screen, side by side with the
+// gap between them.
+export component VideoSyncScreens inherits Rectangle {
+    video-screen := Screen {
+        x: 0px;
+        y: 0px;
+        width: VideoSync.screen-width;
+        height: VideoSync.screen-height;
+        fill: #000000;
+        VideoPreviewSurface {
+            width: parent.width;
+            height: parent.height;
+        }
+        // The speed readout at `top 6%`, `left 4%`, under the inset and the mark controls, letting
+        // the pointer through.
+        Rectangle {
+            x: parent.width * 0.04;
+            y: parent.height * 0.06;
+            width: 0px;
+            height: 0px;
+            if VideoSync.speed-shown: Image {
+                x: VideoSync.speed-x;
+                y: VideoSync.speed-y;
+                width: VideoSync.speed-width;
+                height: VideoSync.speed-height;
+                source: VideoSync.speed-image;
+                image-fit: fill;
+            }
+            if VideoSync.speed-error != "": Text {
+                text: VideoSync.speed-error;
+                color: Theme.destructive;
+                font-size: Theme.text-sm * 1rem;
+            }
+        }
+        NavigationMapView {
+            property <length> side: (parent.width < parent.height ? parent.height : parent.width) * 0.25;
+            x: parent.width * 0.98 - self.side;
+            y: parent.height * 0.03;
+            width: self.side;
+            height: self.side;
+            drop-shadow-blur: 15px;
+            drop-shadow-offset-y: 10px;
+            drop-shadow-color: #00000040;
+        }
+        MarkControls {
+            portrait: parent.width < parent.height;
+            width: min(self.preferred-width, parent.width - 2rem);
+            height: self.preferred-height;
+            x: (parent.width - self.width) / 2;
+            y: parent.height - 1rem - self.height;
+        }
+        VideoPreviewNotices {
+            width: parent.width;
+            height: parent.height;
+        }
+    }
+    map-screen := Screen {
+        x: VideoSync.screen-width + VideoSync.screen-gap;
+        y: 0px;
+        width: VideoSync.screen-width;
+        height: VideoSync.screen-height;
+        fill: Theme.surface-elevated;
+        SelectionMapView {
+            width: parent.width;
+            height: parent.height;
+        }
+    }
+}

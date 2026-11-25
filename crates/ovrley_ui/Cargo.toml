@@ -9,7 +9,7 @@ publish = false
 license = "GPL-3.0-or-later"
 
 [features]
-# Exports the component showcase and the test harness windows.
+# Exports the test harness windows.
 dev-windows = []
 # Dev only (`pnpm dev:native:live`, with SLINT_LIVE_PREVIEW=1): saving a .slint file reloads the
 # UI inside the running app. Never in release builds.
@@ -90,8 +90,6 @@ windows = { version = "0.62", default-features = false, features = [
 
 # The Wayland drop listener (winit reports no drops on Wayland).
 [target.'cfg(target_os = "linux")'.dependencies]
-# The AppImage's menu entry goes into the user's data folder (`platform/appimage_integration.rs`).
-dirs = "6"
 wayland-client = "0.31.15"
 wayland-backend = { version = "0.3.17", features = ["client_system", "dlopen"] }
 
@@ -108,10 +106,6 @@ iconify = "=0.3.1"
 regex = "1"
 rspolib = "0.1.2"
 serde_json = "1.0"
-
-[[example]]
-name = "showcase"
-required-features = ["dev-windows"]
 
 [[test]]
 name = "blur_input"

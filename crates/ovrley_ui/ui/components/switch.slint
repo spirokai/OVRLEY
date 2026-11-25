@@ -1,16 +1,14 @@
-import { Theme } from "../theme/theme.slint";
-import { FocusRing } from "focus-ring.slint";
-import { Shadow, ShadowSize } from "shadow.slint";
+import { Theme } from "../theme.slint";
+import { FocusRing } from "focus.slint";
+import { Shadow, ShadowSize } from "surface.slint";
 import { Icon, Icons } from "icons.slint";
 
-// switch.jsx's variants. `status` shows on as green with a tick and off as red with a cross.
+// `status` shows on as green with a tick and off as red with a cross.
 export enum SwitchVariant { default, status }
 
-// switch.jsx: a 1.15rem × 2rem track, fully rounded, `primary` when checked and `input` when not;
-// a 1rem thumb, `primary-foreground` when checked and `foreground` when not, travelling 100% of
-// its width minus 0.148rem. Space and Enter toggle it. The `status` variant: the track green-500
-// at 80% when checked and red-400 at 80% when not; a white thumb holding a 0.75rem tick (green-600)
-// or cross (red-500), stroke 3.
+// Space and Enter toggle it. The `status` variant: the track green-500 at 80% when checked and
+// red-400 at 80% when not; a white thumb holding a 0.75rem tick (green-600) or cross (red-500),
+// stroke 3.
 export component Switch {
     in property <bool> checked;
     in property <bool> disabled;

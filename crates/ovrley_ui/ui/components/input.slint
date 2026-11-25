@@ -1,22 +1,15 @@
-import { FocusedField } from "focused-field.slint";
-import { Theme } from "../theme/theme.slint";
-import { AppText } from "app-text.slint";
-import { FocusRing } from "focus-ring.slint";
-import { Shadow, ShadowSize } from "shadow.slint";
-import { GroupPosition, GroupSurface } from "group-surface.slint";
-import { NumberInputLogic } from "logic.slint";
+import { FocusedField, FocusRing } from "focus.slint";
+import { Theme } from "../theme.slint";
+import { AppText } from "text.slint";
+import { Shadow, ShadowSize, GroupPosition, GroupSurface } from "surface.slint";
+import { NumberInputLogic, InlineBlurKind, NumberConstraints, StepDirection } from "logic.slint";
+import { Icon, Icons } from "icons.slint";
+import { SimpleTooltip } from "tooltip.slint";
 
 export enum InputVariant { default, inline }
 
-// input.jsx.
-// Default: field lift, 2.25rem high, 0.75rem × 0.25rem padding, `text-sm` (the `md:` value, which
-// always applies above the window minimum), `rounded-sm`, `shadow-xs`, muted placeholder,
-// selection in `primary`, a 1px focus ring in `ring` at 50%.
-// Inline: `rounded-xs`, 1.1875rem high, 0.25rem side padding, right-aligned 0.741rem Fira Code
-// with a 0.8125rem line height, muted, no shadow; focused it shows `surface` and `foreground`.
-// Typed text keeps its case. A `number` input accepts only what `<input type="number">` lets the
-// user type. Its border is 0, as in React; `border-width` and `border-color` are overrides (D5).
-// Children are overlays drawn inside the field, positioned in its box.
+// Typed text keeps its case. Its border is 0. Children are overlays drawn inside the field,
+// positioned in its box.
 export component Input {
     in property <InputVariant> variant: InputVariant.default;
     in-out property <string> text;
@@ -50,7 +43,7 @@ export component Input {
     // Key releases, for a step that commits when its key comes up (SecondsInput).
     callback key-released(event: KeyEvent) -> EventResult;
 
-    // `focus()` reaches the field through `forward-focus`.
+    // `focus` reaches the field through `forward-focus`.
     public function blur() {
         field.clear-focus();
     }
@@ -58,7 +51,7 @@ export component Input {
         field.select-all();
     }
 
-    // D19: a press away from the focused field blurs it.
+    // A press away from the focused field blurs it.
     property <int> blur-serial: FocusedField.blur-serial;
     changed blur-serial => {
         if field.has-focus {
@@ -148,7 +141,7 @@ export component Input {
             changed has-focus => {
                 if self.has-focus {
                     root.accepted-text = self.text;
-                    // D19: report where the focused field is.
+                    // Report where the focused field is.
                     FocusedField.x = root.absolute-position.x;
                     FocusedField.y = root.absolute-position.y;
                     FocusedField.width = root.width;
@@ -172,11 +165,408 @@ export component Input {
 
     FocusRing {
         // `:focus-visible` matches text fields on every focus. An invalid field also keeps its
-        // ring: in React, `reportValidity()` refocuses it (Q2 drops the bubble itself).
+        // ring.
         shown: root.show-focus-ring && (field.has-focus || root.invalid);
         ring-width: 1px;
         radius: root.radius;
         group-position: root.group-position;
         ring-color: root.invalid ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+}
+
+// Focusing selects all; Escape restores the value and blurs; Enter blurs. On blur an unchanged
+// number does nothing (an untouched value may sit between steps after a canvas resize), a changed
+// valid number commits, and a changed invalid number keeps the draft and shows the invalid state.
+// The value shows as Slint's number-to-string, which matches JavaScript's `String(value)` for the
+// values the editor displays.
+export component InlineNumberInput {
+    in property <float> value;
+    in property <NumberConstraints> constraints: { step: "" };
+    in property <bool> disabled;
+    // `aria-label`: the field's accessible name.
+    in property <string> label;
+    callback committed(value: float);
+    // Whether it is being edited, and whether its draft is invalid: `SliderField` shows its readout
+    // instead while neither holds.
+    out property <bool> has-focus: field.has-focus;
+    out property <bool> is-invalid: root.invalid;
+
+    property <string> text;
+    property <bool> invalid;
+
+    init => {
+        root.text = (root.value + "");
+    }
+    changed value => {
+        if !field.has-focus && !root.invalid {
+            root.text = (root.value + "");
+        }
+    }
+
+    min-height: field.min-height;
+    max-height: field.max-height;
+    forward-focus: field;
+
+    field := Input {
+        width: root.width;
+        height: root.height;
+        variant: InputVariant.inline;
+        number: true;
+        text <=> root.text;
+        disabled: root.disabled;
+        invalid: root.invalid;
+        label: root.label;
+
+        edited => {
+            root.invalid = false;
+        }
+        focus-changed(focused) => {
+            if focused {
+                self.select-all();
+                return;
+            }
+            let decision = NumberInputLogic.inline-blur(root.text, root.value, root.constraints);
+            if decision.kind == InlineBlurKind.invalid {
+                root.invalid = true;
+                return;
+            }
+            root.invalid = false;
+            if decision.kind == InlineBlurKind.commit {
+                root.committed(decision.value);
+            }
+            root.text = (root.value + "");
+        }
+        accepted => {
+            self.blur();
+        }
+        key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.text = (root.value + "");
+                self.blur();
+                return accept;
+            }
+            reject
+        }
+    }
+}
+
+// One of the number mode's step buttons: it does not take focus from the field.
+component StepButton inherits Rectangle {
+    in property <string> glyph;
+    in property <bool> disabled;
+    callback clicked();
+
+    background: touch.has-hover && !root.disabled ? Theme.surface-accent-soft : transparent;
+    accessible-role: AccessibleRole.button;
+    accessible-enabled: !root.disabled;
+    accessible-action-default => {
+        root.clicked();
+    }
+    animate background { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+
+    Icon {
+        glyph: root.glyph;
+        size: 0.75rem;
+        color: touch.has-hover && !root.disabled ? Theme.primary : Theme.muted-foreground;
+    }
+    touch := TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// Its `border` colours (70%, and `accent-border` while dirty) are kept, but the input's border is
+// 0.
+export component BlurInput {
+    in property <string> value;
+    in property <bool> number;
+    in property <NumberConstraints> constraints: { step: "" };
+    in property <string> placeholder;
+    in property <bool> disabled;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    in property <bool> mono;
+    // The clean field's fill; a dirty draft shows its own.
+    in property <color> background: transparent;
+    in property <length> inset-right: root.number ? 2.75rem : 0.75rem;
+    // `aria-label`: the field's accessible name.
+    in property <string> label;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <bool> show-focus-ring: true;
+    out property <bool> has-focus: field.has-focus;
+    callback changed(value: string);
+    callback blurred();
+
+    property <string> draft;
+    property <string> last-value;
+    property <bool> dirty: root.draft != root.value;
+
+    init => {
+        root.draft = root.value;
+        root.last-value = root.value;
+    }
+    changed value => {
+        let draft-was-dirty = root.draft != root.last-value;
+        root.last-value = root.value;
+        // Preserve an in-progress draft when the committed value changes upstream.
+        if field.has-focus && draft-was-dirty {
+            return;
+        }
+        root.draft = root.value;
+    }
+
+    function step(direction: StepDirection) {
+        let next = NumberInputLogic.step(root.draft, root.constraints, direction);
+        if next.stepped {
+            root.draft = next.text;
+            // Reading `next.text` twice trips a Slint 1.18 code generation bug (a moved value).
+            root.changed(root.draft);
+        }
+    }
+
+    // The field's ring draws above the group's neighbours, which are this element's siblings.
+    z: field.has-focus ? 1 : 0;
+    min-height: field.min-height;
+    max-height: field.max-height;
+    horizontal-stretch: 1;
+    forward-focus: field;
+
+    field := Input {
+        width: root.width;
+        height: root.height;
+        text <=> root.draft;
+        number: root.number;
+        placeholder: root.placeholder;
+        disabled: root.disabled;
+        font-size: root.font-size;
+        mono: root.mono;
+        background: root.dirty ? Theme.surface-accent-soft : root.background;
+        border-color: root.dirty ? Theme.accent-border : Theme.border.transparentize(0.3);
+        inset-right: root.inset-right;
+        label: root.label;
+        group-position: root.group-position;
+        show-focus-ring: root.show-focus-ring;
+
+        focus-changed(focused) => {
+            if !focused {
+                if root.draft != root.value {
+                    root.changed(root.draft);
+                }
+                root.blurred();
+            }
+        }
+        accepted => {
+            self.blur();
+        }
+        key-pressed(event) => {
+            if root.number && event.text == Key.UpArrow {
+                root.step(StepDirection.up);
+                return accept;
+            }
+            if root.number && event.text == Key.DownArrow {
+                root.step(StepDirection.down);
+                return accept;
+            }
+            reject
+        }
+
+        if root.number: Rectangle {
+            x: parent.width - 0.25rem - self.width;
+            y: 0.25rem;
+            width: 1.25rem;
+            height: parent.height - 0.5rem;
+            border-radius: Theme.rounded * 1rem;
+            background: Theme.surface-strong;
+            clip: true;
+
+            VerticalLayout {
+                StepButton {
+                    vertical-stretch: 1;
+                    glyph: Icons.chevron-up;
+                    disabled: root.disabled;
+                    accessible-label: @tr("components.increaseValue" => "Increase value");
+                    clicked => {
+                        root.step(StepDirection.up);
+                    }
+                }
+                Rectangle {
+                    height: Theme.hairline;
+                    background: Theme.border.transparentize(0.4);
+                }
+                StepButton {
+                    vertical-stretch: 1;
+                    glyph: Icons.chevron-down;
+                    disabled: root.disabled;
+                    accessible-label: @tr("components.decreaseValue" => "Decrease value");
+                    clicked => {
+                        root.step(StepDirection.down);
+                    }
+                }
+            }
+        }
+
+        // The caller's overlays (a unit suffix).
+        @children
+    }
+}
+
+// The placement slot: none, a reset button for a value set by hand, or a clock for an automatic
+// one.
+export enum SecondsSlot { none, manual, auto }
+
+// Rust owns the field (`lib/seconds_input.rs`): it accepts or refuses each edit, commits on Enter,
+// blur and a step's key release, and discards on Escape. Below the field: the error (0.65rem
+// `destructive`) or the preview (0.65rem muted). With `show-unit` a `SEC` unit sits inside the
+// field's right edge (without step buttons or a slot). With `step-buttons` a 1.25rem column of up
+// and down buttons on `surface-strong` sits at the right edge; the placement slot (`slot`) sits
+// left of it.
+export component SecondsInput inherits VerticalLayout {
+    in property <string> text;
+    in property <bool> disabled;
+    in property <bool> step-buttons;
+    in property <SecondsSlot> slot: SecondsSlot.none;
+    in property <string> reset-label;
+    in property <string> manual-hint;
+    in property <string> auto-hint;
+    callback step(direction: int);
+    callback reset();
+    in property <string> preview;
+    in property <string> error;
+    in property <string> label;
+    in property <bool> show-unit;
+    in property <length> field-height: 2.25rem;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    // The text changed; returns whether Rust accepted it. A refused edit restores `text`.
+    callback edited(text: string) -> bool;
+    // A key in the field; returns whether Rust used it.
+    callback key(text: string, alt: bool, control: bool, shift: bool, meta: bool) -> bool;
+    callback key-up(text: string) -> bool;
+    callback blurred();
+
+    // The field's own text: Rust's `text`, and the typing in between. A one-way binding would be
+    // dropped at the first keystroke.
+    property <string> draft;
+    init => {
+        root.draft = root.text;
+    }
+    changed text => {
+        root.draft = root.text;
+    }
+
+    spacing: 0.25rem;
+    Rectangle {
+        height: root.field-height;
+        field := Input {
+            width: parent.width;
+            height: parent.height;
+            text <=> root.draft;
+            label: root.label;
+            invalid: root.error != "";
+            font-size: root.font-size;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            disabled: root.disabled;
+            inset-right: root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none ? 2.25rem
+                : root.step-buttons && root.slot != SecondsSlot.none ? 3.25rem
+                : root.step-buttons || root.slot != SecondsSlot.none ? 1.75rem : 0.75rem;
+            edited(text) => {
+                if !root.edited(text) {
+                    root.draft = root.text;
+                }
+            }
+            accepted => {
+                root.key("\n", false, false, false, false);
+            }
+            key-pressed(event) => {
+                root.key(event.text, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta) ? accept : reject
+            }
+            key-released(event) => {
+                root.key-up(event.text) ? accept : reject
+            }
+            focus-changed(focused) => {
+                if !focused {
+                    root.blurred();
+                }
+            }
+
+            if root.step-buttons: Rectangle {
+                x: parent.width - self.width - 0.25rem;
+                y: 0.25rem;
+                width: 1.25rem;
+                height: parent.height - 0.5rem;
+                border-radius: 0.25rem;
+                background: Theme.surface-strong;
+                clip: true;
+                VerticalLayout {
+                    for direction in [1, -1]: step-touch := TouchArea {
+                        enabled: !root.disabled;
+                        clicked => {
+                            root.step(direction);
+                        }
+                        Rectangle {
+                            background: step-touch.has-hover ? Theme.surface-accent-soft : transparent;
+                            Icon {
+                                glyph: direction > 0 ? Icons.chevron-up : Icons.chevron-down;
+                                size: 0.75rem;
+                                color: step-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+                            }
+                        }
+                    }
+                }
+            }
+            if root.slot == SecondsSlot.manual: reset-touch := SimpleTooltip {
+                x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
+                y: 0.25rem;
+                width: 1.25rem;
+                height: parent.height - 0.5rem;
+                content: root.manual-hint;
+                accessible-role: AccessibleRole.button;
+                accessible-label: root.reset-label;
+                enabled: !root.disabled;
+                clicked => {
+                    root.reset();
+                }
+                Rectangle {
+                    border-radius: 0.25rem;
+                    background: reset-touch.has-hover ? Theme.surface-accent-soft : transparent;
+                    Icon {
+                        glyph: Icons.rotate-ccw;
+                        size: 0.75rem;
+                        color: reset-touch.has-hover ? Theme.primary : Theme.muted-foreground;
+                    }
+                }
+            }
+            if root.slot == SecondsSlot.auto: SimpleTooltip {
+                x: parent.width - self.width - (root.step-buttons ? 1.75rem : 0.25rem);
+                y: 0.25rem;
+                width: 1.25rem;
+                height: parent.height - 0.5rem;
+                content: root.auto-hint;
+                Icon {
+                    glyph: Icons.clock;
+                    size: 0.75rem;
+                    color: Theme.muted-foreground.transparentize(0.5);
+                }
+            }
+            if root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none: AppText {
+                x: parent.width - self.width - 0.5rem;
+                content: @tr("components.secondsUnit" => "SEC");
+                font-size: Theme.text-xs * 1rem;
+                color: Theme.muted-foreground;
+            }
+        }
+    }
+    if root.error != "": AppText {
+        content: root.error;
+        font-size: 0.65rem;
+        color: Theme.destructive;
+        wrap: word-wrap;
+    }
+    if root.error == "" && root.preview != "": AppText {
+        content: root.preview;
+        font-size: 0.65rem;
+        color: Theme.muted-foreground;
     }
 }

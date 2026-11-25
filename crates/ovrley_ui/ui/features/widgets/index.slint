@@ -1,0 +1,195 @@
+import { Choice, GradientStop } from "../../components/logic.slint";
+
+// One row of the widget list: its name and icon. A manifest icon is either a lucide glyph (an
+// `Icons` path in `glyph`) or a bundled SVG (`image`, tinted with the row's text colour).
+export struct WidgetRowView {
+    id: string,
+    name: string,
+    glyph: string,
+    image: image,
+}
+
+export enum InspectorCellKind {
+    slider,
+    color,
+    select,
+    number,
+    text,
+    switch,
+    switch-row,
+    font,
+    toggle-group,
+    alignment,
+    italic,
+    icon-button,
+    gradient,
+    shape-grid,
+    chart-series,
+    gforce-axis,
+    raster-picker,
+    alert,
+    window-seconds,
+    locked,
+    note,
+    tabs,
+    empty,
+}
+
+// How a label-and-switch row is laid out; `ovrley_app`'s `SwitchRowStyle`. `none` is a heading
+// switch without a visible label.
+export enum SwitchRowStyle { none, toggle, label, tall }
+
+// Where a row sits in an accent panel.
+export enum PanelPart { none, first, middle, last, only }
+
+// A toggle of the backdrop's shape grid.
+export struct ShapeToggleView {
+    key: string,
+    edge: bool,
+    active: bool,
+    label: string,
+}
+
+// One control. Which fields a kind reads is listed in `ovrley_ui/src/features/widgets.rs` (`cell`);
+// the others keep their defaults.
+export struct InspectorCell {
+    kind: InspectorCellKind,
+    // The field's JSON path, or the cell's stable name.
+    id: string,
+    label: string,
+    disabled: bool,
+    tooltip: string,
+    // The value: a select's or text's value, a colour, a number field's text, a path, a message.
+    text: string,
+    // A second string: a placeholder, a series colour, a button's label.
+    text2: string,
+    suffix: string,
+    // A slider's value, range, step, display scale and readout.
+    value: float,
+    minimum: float,
+    maximum: float,
+    step: float,
+    scale: float,
+    readout: string,
+    checked: bool,
+    invalid: bool,
+    resettable: bool,
+    // The chart series row's position; the raster picker's loading flag (`busy`).
+    first: bool,
+    last: bool,
+    only: bool,
+    busy: bool,
+    outline: bool,
+    // A slider's inline input (`editable`).
+    editable: bool,
+    end: bool,
+    // A toggle group in a `FieldBlock` with its label; a multiple group (`options[].pressed`).
+    labelled: bool,
+    multiple: bool,
+    // A font select's 9px label.
+    small-label: bool,
+    // An `Icons` path.
+    icon: string,
+    style: SwitchRowStyle,
+    // A `label` switch row's padding (rem) and its label's own top padding.
+    padding-top: float,
+    padding-right: float,
+    padding-bottom: float,
+    padding-left: float,
+    label-top: float,
+    options: [Choice],
+    stops: [GradientStop],
+    toggles: [ShapeToggleView],
+}
+
+// One row of the inspector: a heading, or a grid row of cells. `gap` is the space above it, in
+// rem.
+export struct InspectorRow {
+    key: string,
+    heading: bool,
+    gap: float,
+    panel: PanelPart,
+    icon: string,
+    title: string,
+    has-trailing: bool,
+    trailing: InspectorCell,
+    // Scene settings' heading variant.
+    scene-heading: bool,
+    columns: int,
+    column-gap: float,
+    align-end: bool,
+    // The first cell beside a column of the others (the backdrop's shape grid).
+    aside: bool,
+    cells: [InspectorCell],
+}
+
+// The widget editor feature's global, written by `src/features/widgets.rs`.
+export global WidgetEditor {
+    in property <[WidgetRowView]> rows;
+    in property <string> open-id;
+    in property <bool> has-inspector;
+    // The open widget's inspector.
+    in property <[InspectorRow]> inspector;
+    // Every font select's system fonts; each font cell carries its own bundled options.
+    in property <[Choice]> system-fonts;
+
+    // The accordion: opening an item selects its widget; closing it clears the selection.
+    callback toggle(id: string);
+    callback delete-widget(id: string);
+    // The inspector's edits, keyed by the field id: a slider's live value and its release, a
+    // number field's raw text, a text or choice, a switch, a field's reset button, a button, and
+    // a gradient's stops (live; the release is `commit-draft`).
+    callback draft(id: string, value: float);
+    callback commit-draft();
+    callback set-number(id: string, raw: string);
+    callback set-text(id: string, value: string);
+    callback set-flag(id: string, value: bool);
+    callback clear-field(id: string);
+    callback press(id: string);
+    callback set-stops(id: string, stops: [GradientStop]);
+}
+
+// The scene settings feature's global, written by `src/features/widgets.rs`: the settings tab's
+// description, rendered by the inspector's renderer, and its edits by field id.
+export global SceneSettings {
+    in property <[InspectorRow]> rows;
+
+    callback draft(id: string, value: float);
+    callback commit-draft();
+    callback set-number(id: string, raw: string);
+    callback set-text(id: string, value: string);
+    callback set-flag(id: string, value: bool);
+    callback press(id: string);
+}
+
+// One creation option of a drawer button. A manifest icon is a lucide glyph (`glyph`) or a
+// bundled SVG (`image`, tinted).
+export struct DrawerOptionView {
+    label: string,
+    glyph: string,
+    image: image,
+}
+
+// One button: its icon and short name, the availability marker, and its options (one adds at
+// once; several open the option popover).
+export struct DrawerItemView {
+    key: string,
+    short-name: string,
+    glyph: string,
+    image: image,
+    available: bool,
+    options: [DrawerOptionView],
+}
+
+// A category with its buttons.
+export struct DrawerGroupView {
+    name: string,
+    items: [DrawerItemView],
+}
+
+// The widget drawer feature's global, written by `src/features/widgets.rs`.
+export global WidgetDrawer {
+    in property <[DrawerGroupView]> groups;
+    // Adds the item's option at `index`.
+    callback add(key: string, index: int);
+}

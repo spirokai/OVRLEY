@@ -7,7 +7,8 @@
 //!   map frames; [`tiles`] fetches and caches the vector tiles they need.
 //! - [`video`]: still frames of source videos, as thumbnails and timeline filmstrips.
 //! - [`cache`]: the size-limited disk caches' shared limit policy, and the filmstrip cache.
-//! - [`runtime`]: where the app runs from: its runtime roots and its distribution.
+//! - [`runtime`]: where the app runs from: its runtime roots, its distribution and the AppImage's
+//!   menu entry.
 //! - [`updater`]: checking for, downloading and installing a newer release.
 
 pub mod cache;

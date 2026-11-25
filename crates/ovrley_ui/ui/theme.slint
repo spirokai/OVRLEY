@@ -1,0 +1,151 @@
+// Slint cannot resolve `rem` inside a global (the window's default font size is unknown there), so
+// every rem token is a plain number of rems and components multiply it by `1rem`.
+
+export global Theme {
+    // Base colours
+    out property <color> theme-color-background: #00111b;
+    out property <color> theme-color-accent: #ad5013;
+    out property <color> theme-color-aqua: #40e0d0;
+    out property <color> theme-color-ice: #86aaaa;
+    out property <color> theme-color-success: #37d67a;
+    out property <color> theme-color-teal: #005b5b;
+
+    // Fixed colours
+    out property <color> destructive: rgb(196, 23, 23);
+    out property <color> video-sync-stop: #ef4444;
+    out property <color> video-sync-turn: #2c99f2;
+    out property <color> video-sync-location: #a855f7;
+
+    // Semantic colours
+    out property <color> background: theme-color-background;
+    out property <color> foreground: theme-color-ice;
+    out property <color> card: theme-color-background.mix(theme-color-teal, 0.98);
+    out property <color> card-foreground: theme-color-ice;
+    out property <color> popover: theme-color-background.mix(theme-color-teal, 0.82);
+    out property <color> popover-foreground: theme-color-ice;
+    out property <color> primary: theme-color-accent;
+    out property <color> primary-foreground: theme-color-background;
+    out property <color> secondary: theme-color-background.mix(theme-color-teal, 0.72);
+    out property <color> secondary-foreground: theme-color-ice;
+    out property <color> muted: theme-color-background.mix(theme-color-teal, 0.88);
+    out property <color> muted-foreground: theme-color-ice.mix(theme-color-aqua, 0.72);
+    out property <color> accent: theme-color-aqua;
+    out property <color> accent-foreground: theme-color-background;
+    out property <color> success: theme-color-success;
+    out property <color> border: theme-color-background.mix(theme-color-ice, 0.62);
+    out property <color> input: theme-color-background.mix(theme-color-teal, 0.70);
+    out property <color> ring: theme-color-accent.mix(theme-color-aqua, 0.70);
+    out property <color> chart-1: theme-color-accent;
+    out property <color> chart-2: theme-color-aqua;
+    out property <color> chart-3: theme-color-teal;
+    out property <color> chart-4: theme-color-ice;
+    out property <color> chart-5: theme-color-accent.mix(theme-color-aqua, 0.45);
+    out property <color> sidebar: card;
+    out property <color> sidebar-foreground: theme-color-ice;
+    out property <color> sidebar-primary: theme-color-accent;
+    out property <color> sidebar-primary-foreground: theme-color-background;
+    out property <color> sidebar-accent: theme-color-aqua;
+    out property <color> sidebar-accent-foreground: theme-color-background;
+    out property <color> sidebar-border: border;
+    out property <color> sidebar-ring: ring;
+    out property <color> surface: theme-color-background.mix(theme-color-teal, 0.84);
+    out property <color> surface-elevated: theme-color-background.mix(theme-color-teal, 0.80);
+    out property <color> surface-strong: theme-color-background.mix(theme-color-teal, 0.72);
+    out property <color> surface-overlay: theme-color-background.with-alpha(0.92);
+    out property <color> surface-tooltip: theme-color-background.mix(theme-color-teal, 0.64);
+    out property <color> surface-accent-soft: theme-color-background.mix(theme-color-accent, 0.76);
+    out property <color> surface-accent-strong: theme-color-background.mix(theme-color-accent, 0.64);
+    out property <color> surface-highlight: theme-color-background.mix(theme-color-aqua, 0.76);
+    out property <color> surface-highlight-soft: theme-color-background.mix(theme-color-aqua, 0.88);
+    out property <color> surface-darken: theme-color-background.mix(#000000, 0.70);
+    out property <color> field-lift: theme-color-ice.with-alpha(0.04);
+    out property <color> accent-border: theme-color-background.mix(theme-color-accent, 0.48);
+    out property <color> highlight: theme-color-aqua;
+    out property <color> highlight-foreground: theme-color-background;
+    out property <color> support: theme-color-teal;
+    out property <color> support-foreground: theme-color-ice;
+    // Also baked into assets/checkerboard-tile.svg at 20% over black: change them together.
+    out property <color> grid-line: theme-color-background.mix(theme-color-aqua, 0.66);
+
+    // Radii, in rem
+    out property <float> radius: 0.625;
+    out property <float> radius-xs: 0.125;
+    out property <float> radius-sm: radius - 0.296;
+    out property <float> radius-md: radius - 0.148;
+    out property <float> radius-lg: radius;
+    out property <float> radius-xl: radius + 0.296;
+    out property <float> radius-2xl: radius + 0.593;
+    out property <float> radius-3xl: radius + 0.889;
+    out property <float> radius-4xl: radius + 1.185;
+    out property <float> rounded: 0.25;
+
+    // Type. Sizes in rem. The bundled Figtree with tabular figures, whose family name is "Figtree
+    // Tabular".
+    out property <string> font-sans: "Figtree Tabular";
+    out property <string> font-mono: "Fira Code";
+    // Natural line heights (ascent + descent, in em) of the bundled fonts.
+    out property <float> font-sans-natural-line-height: 1.2;
+    out property <float> font-mono-natural-line-height: 1.312;
+    out property <float> text-xs: 0.75;
+    out property <float> text-xs-line-height: 1 / 0.75;
+    out property <float> text-sm: 0.875;
+    out property <float> text-sm-line-height: 1.25 / 0.875;
+    // Field heights are fixed, so this changes only the text.
+    out property <float> field-text-scale: 1.1;
+    out property <float> text-base: 1;
+    out property <float> text-base-line-height: 1.5;
+    out property <float> text-lg: 1.125;
+    out property <float> text-lg-line-height: 1.75 / 1.125;
+    out property <float> text-xl: 1.25;
+    out property <float> text-xl-line-height: 1.75 / 1.25;
+    out property <float> text-2xl: 1.5;
+    out property <float> text-2xl-line-height: 2 / 1.5;
+    out property <float> leading-root: 1.5;
+    out property <float> leading-none: 1;
+    out property <float> leading-relaxed: 1.625;
+    out property <int> font-weight-normal: 300;
+    out property <int> font-weight-medium: 400;
+    out property <int> font-weight-semibold: 500;
+    out property <int> font-weight-bold: 600;
+    out property <int> font-weight-extrabold: 700;
+    out property <int> font-weight-black: 800;
+    // Tracking, in em.
+    out property <float> tracking-root: 0.03;
+    out property <float> tracking-tight: -0.025;
+    out property <float> tracking-wider: 0.05;
+    out property <float> tracking-widest: 0.1;
+
+    // Motion
+    out property <duration> duration-100: 100ms;
+    out property <duration> duration-150: 150ms;
+    out property <duration> duration-160: 160ms;
+    out property <duration> duration-200: 200ms;
+    out property <duration> duration-300: 300ms;
+    out property <duration> overlay-enter-duration: 150ms;
+    out property <float> overlay-enter-scale: 0.95;
+    out property <float> overlay-enter-slide: 0.5;
+
+    // A 1px line that covers at least one physical pixel. Skia snaps rect edges to the pixel grid,
+    // so below scale 1 (KDE at 0.9) a 1px rect that does not cross a pixel centre draws nothing.
+    // A global does not know the scale factor, so FluidWindow writes it.
+    in-out property <length> hairline: 1px;
+
+    // Ring colour is `ring` at 50%.
+    out property <float> ring-width: 0.222;
+    out property <color> ring-color: ring.transparentize(0.5);
+    out property <color> ring-invalid-color: destructive.transparentize(0.8);
+
+    out property <float> scrollbar-size: 0.148;
+    out property <float> scrollbar-thumb-radius: 0.0625;
+    out property <color> scrollbar-thumb: foreground.with-alpha(0.4);
+    out property <color> scrollbar-thumb-hover: accent;
+
+    // Checkerboard (.bg-overlay-grid-muted)
+    out property <float> checkerboard-tile: 2.37;
+}
+
+// The window's size, written by FluidWindow, for popup placement.
+export global WindowMetrics {
+    in-out property <length> width;
+    in-out property <length> height;
+}

@@ -1,0 +1,196 @@
+import { Theme, WindowMetrics } from "../theme.slint";
+import { AppText } from "text.slint";
+import { Shadow, ShadowSize, OverlayMotion } from "surface.slint";
+import { Placement, PlacementAlign, PlacementLogic, PlacementSide } from "logic.slint";
+import { AlertLayerView } from "alert.slint";
+
+// Slint has one slot per component, so `Popover` is placed beside the trigger, inside the trigger's
+// parent, which it fills and anchors to; its slot is the content. Escape and an outside click close
+// it; focus moves into the content on open. Slint cannot focus an element of the caller, so the
+// caller returns focus to its trigger in `open-changed`. Flip and shift come from the shared
+// placement.
+export component Popover {
+    in property <bool> open;
+    in property <PlacementSide> side: PlacementSide.bottom;
+    in property <PlacementAlign> align: PlacementAlign.center;
+    in property <length> side-offset: 4px;
+    in property <length> content-width: 18rem;
+    in property <length> content-padding: 1rem;
+    in property <length> radius: Theme.radius-xs * 1rem;
+    in property <ShadowSize> shadow: ShadowSize.sm;
+    in property <bool> has-shadow-color;
+    in property <color> shadow-color;
+    callback open-changed(open: bool);
+
+    property <bool> popup-open: popup.is-open;
+    changed popup-open => {
+        if !root.popup-open && root.open {
+            root.open-changed(false);
+        }
+    }
+    changed open => {
+        if root.open {
+            popup.show();
+        } else {
+            popup.close();
+        }
+    }
+
+    width: 100%;
+    height: 100%;
+
+    popup := PopupWindow {
+        property <Placement> placed: PlacementLogic.place(
+            { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
+            root.content-width, content.preferred-height, WindowMetrics.width, WindowMetrics.height, root.side, root.align, root.side-offset);
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        x: self.placed.x - root.absolute-position.x;
+        y: self.placed.y - root.absolute-position.y;
+        width: root.content-width;
+        height: content.preferred-height;
+
+        OverlayMotion {
+            side: popup.placed.side;
+            Shadow {
+                size: root.shadow;
+                radius: root.radius;
+                has-color: root.has-shadow-color;
+                color: root.shadow-color;
+            }
+            Rectangle {
+                border-radius: root.radius;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: Theme.popover;
+            }
+            content := VerticalLayout {
+                padding: root.content-padding;
+                FocusScope {
+                    init => {
+                        self.focus();
+                    }
+                    VerticalLayout {
+                        @children
+                    }
+                }
+            }
+        }
+    }
+}
+
+// `flex flex-col gap-1 text-sm`.
+export component PopoverHeader inherits VerticalLayout {
+    spacing: 0.25rem;
+}
+
+export component PopoverTitle inherits AppText {
+    uppercase: true;
+    font-size: Theme.text-sm * 1rem;
+    font-weight: Theme.font-weight-medium;
+    line-height: Theme.text-sm-line-height;
+    color: Theme.popover-foreground;
+}
+
+export component PopoverDescription inherits AppText {
+    uppercase: true;
+    font-size: Theme.text-sm * 1rem;
+    line-height: Theme.text-sm-line-height;
+    color: Theme.muted-foreground;
+    wrap: word-wrap;
+}
+
+// The scrim is `surface-overlay` at the caller's opacity (today 70% or 82%) over a 6px backdrop
+// blur. The slot is centred with 1rem side padding; feature dialogs draw their own panel in it, as
+// today. Escape and a scrim click report `open-changed(false)`; focus moves into the content on
+// open. A dialog opened later stacks above one opened earlier, which matches today's z-index use
+// (130 over 120). `title` and `description` are the dialog's accessible name and description.
+export component Dialog {
+    in property <bool> open;
+    // `surface-overlay/82` by default; callers pass `surface-overlay/70` where they use it.
+    in property <color> scrim: Theme.surface-overlay.transparentize(0.18);
+    in property <string> title;
+    in property <string> description;
+    callback open-changed(open: bool);
+
+    changed open => {
+        if root.open {
+            popup.show();
+        } else {
+            popup.close();
+        }
+    }
+
+    width: 0px;
+    height: 0px;
+
+    popup := PopupWindow {
+        close-policy: PopupClosePolicy.no-auto-close;
+        x: -root.absolute-position.x;
+        y: -root.absolute-position.y;
+        width: WindowMetrics.width;
+        height: WindowMetrics.height;
+
+        Rectangle {
+            background: root.scrim;
+            backdrop-blur: 6px;
+            TouchArea {
+                clicked => {
+                    root.open-changed(false);
+                }
+            }
+        }
+        focus := FocusScope {
+            accessible-role: AccessibleRole.groupbox;
+            accessible-label: root.title;
+            accessible-description: root.description;
+            init => {
+                self.focus();
+            }
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    root.open-changed(false);
+                    return accept;
+                }
+                reject
+            }
+            HorizontalLayout {
+                padding-left: 1rem;
+                padding-right: 1rem;
+                alignment: center;
+                VerticalLayout {
+                    alignment: center;
+                    // Clicks on the content do not reach the scrim.
+                    TouchArea {
+                        min-width: dialog-content.min-width;
+                        preferred-width: dialog-content.preferred-width;
+                        min-height: dialog-content.min-height;
+                        preferred-height: dialog-content.preferred-height;
+                        dialog-content := VerticalLayout {
+                            @children
+                        }
+                    }
+                }
+            }
+        }
+        // The error alert stays visible and clickable above an open dialog.
+        AlertLayerView { }
+    }
+}
+
+// The dialog's visible title; pass the same text as the dialog's `title`.
+export component DialogTitle inherits AppText {
+    uppercase: true;
+}
+
+// The dialog's visible description; pass the same text as the dialog's `description`.
+export component DialogDescription inherits AppText {
+    uppercase: true;
+    wrap: word-wrap;
+}
+
+// A control that closes the dialog. Slint parts cannot reach their dialog, so `clicked` goes to the
+// caller.
+export component DialogClose inherits TouchArea {
+    accessible-role: AccessibleRole.button;
+    mouse-cursor: MouseCursor.pointer;
+}

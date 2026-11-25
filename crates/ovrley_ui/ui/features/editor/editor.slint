@@ -1,0 +1,450 @@
+import { Projects } from "../documents.slint";
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Checkerboard, Shadow, ShadowSize } from "../../components/surface.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Icons } from "../../components/icons.slint";
+import { UndoRedo } from "../shell/index.slint";
+import { BackgroundMode, EditorCursor, OverlayEditor, WidgetView, HandleView, GuideLabelView, BadgeView } from "index.slint";
+import { EditorToolbar } from "toolbar.slint";
+import { VideoSync } from "../sync/index.slint";
+import { VideoSyncScreens } from "../sync/screens.slint";
+import { VideoPreviewSurface, VideoPreviewNotices } from "../video/surface.slint";
+
+// The selection layer over the stage: outlines in accent at one device pixel, square accent handles
+// rotated with their widget, the white rotation knob with its line, the guides (scene lines 1 px,
+// widget lines 2 px, connectors in ice; Slint has no dashes, so connectors are solid), their
+// distance labels in bold `#f55`, the marquee and the badges.
+component SelectionLayer inherits Rectangle {
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.guides-normal;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.guide-scale;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.guides-bold;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.guide-scale * 2;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.guides-dashed;
+        stroke: Theme.theme-color-ice;
+        stroke-width: OverlayEditor.guide-scale;
+        fill: transparent;
+    }
+    for label in OverlayEditor.guide-labels: AppText {
+        x: label.vertical ? label.x + 2px + 3 * OverlayEditor.guide-scale : label.x - self.preferred-width / 2;
+        y: label.vertical ? label.y - self.preferred-height / 2 : label.y - self.preferred-height - 2px - 3 * OverlayEditor.guide-scale;
+        content: label.text;
+        font-size: 1.037rem * OverlayEditor.guide-scale / 1px;
+        font-weight: Theme.font-weight-bold;
+        color: #ff5555;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.selection-commands;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.border-width;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.selection-dashed-commands;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.border-width;
+        fill: transparent;
+    }
+    Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: OverlayEditor.knob-line-commands;
+        stroke: Theme.theme-color-accent;
+        stroke-width: OverlayEditor.guide-scale;
+        fill: transparent;
+    }
+    for handle in OverlayEditor.handles: Rectangle {
+        property <length> size: handle.knob ? OverlayEditor.knob-size : OverlayEditor.handle-size;
+        x: handle.x - self.size / 2;
+        y: handle.y - self.size / 2;
+        width: self.size;
+        height: self.size;
+        transform-rotation: handle.rotation;
+        border-radius: handle.knob ? self.size / 2 : 0px;
+        background: handle.knob ? #ffffff : Theme.theme-color-accent;
+        border-width: handle.knob ? 0.148rem * OverlayEditor.guide-scale / 1px : 0px;
+        border-color: Theme.theme-color-accent;
+    }
+    if OverlayEditor.marquee-shown: Rectangle {
+        x: OverlayEditor.marquee-x;
+        y: OverlayEditor.marquee-y;
+        width: OverlayEditor.marquee-width;
+        height: OverlayEditor.marquee-height;
+        border-width: 1px;
+        border-color: Theme.primary.transparentize(0.3);
+        background: Theme.primary.transparentize(0.9);
+    }
+    for badge in OverlayEditor.badges: Rectangle {
+        x: badge.x;
+        y: badge.y;
+        width: badge-text.preferred-width + 1rem;
+        height: 1.25rem;
+        transform-origin: { x: 0px, y: 0px };
+        transform-rotation: badge.rotation;
+        Shadow {
+            size: ShadowSize.sm;
+            radius: Theme.radius-xs * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.radius-xs * 1rem;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            background: Theme.card.transparentize(0.1);
+        }
+        badge-text := AppText {
+            content: badge.label;
+            font-size: 0.815rem;
+            font-weight: Theme.font-weight-semibold;
+            color: Theme.muted-foreground;
+            line-height: Theme.leading-none;
+        }
+    }
+    for badge in OverlayEditor.badges: Rectangle {
+        if badge.map: HorizontalLayout {
+            x: badge.hint-x - self.preferred-width / 2;
+            y: badge.hint-y - 0.75rem - 1.5rem;
+            width: self.preferred-width;
+            height: 1.5rem;
+            spacing: 0.375rem;
+            Rectangle {
+                width: hint-text.preferred-width + 1rem;
+                Shadow {
+                    size: ShadowSize.sm;
+                    radius: Theme.radius-xs * 1rem;
+                }
+                Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 1px;
+                    border-color: Theme.border.transparentize(0.3);
+                    background: Theme.card.transparentize(0.1);
+                }
+                hint-text := AppText {
+                    // A chase camera follows the rider, so it only zooms.
+                    content: badge.fixed ? @tr("overlay-editor.mapViewHint" => "Double-click to pan & zoom") : @tr("overlay-editor.mapViewZoomHint" => "Double-click to zoom");
+                    font-size: 0.741rem;
+                    font-weight: Theme.font-weight-medium;
+                    color: Theme.muted-foreground;
+                    line-height: Theme.leading-none;
+                }
+            }
+            if badge.fixed: Button {
+                variant: ButtonVariant.outline;
+                size: ButtonSize.sm;
+                min-height: 1.5rem;
+                preferred-height: 1.5rem;
+                max-height: 1.5rem;
+                text: @tr("overlay-editor.mapReset" => "Reset");
+                uppercase: true;
+                icon: Icons.rotate-ccw;
+                icon-size: 0.75rem;
+                font-size: 0.741rem;
+                padding-x: 0.5rem;
+                spacing: 0.25rem;
+                radius: Theme.radius-xs * 1rem;
+                border-color: Theme.accent-border.transparentize(0.3);
+                text-color: Theme.muted-foreground;
+                hover-text-color: Theme.foreground;
+                hover-background: Theme.surface-accent-soft;
+                clicked => {
+                    OverlayEditor.reset-map-view(badge.id);
+                }
+            }
+        }
+    }
+}
+
+
+
+
+// No drop shadow: Slint draws it whole under the scene on every repaint.
+component OverlayCanvas inherits Rectangle {
+    in property <BackgroundMode> background-mode;
+    in property <color> background-color;
+    in property <image> background-image;
+    in property <bool> grid-visible;
+    in property <string> grid-commands;
+    in property <float> display-scale;
+    in property <[WidgetView]> widgets;
+    in property <string> error;
+
+    Rectangle {
+        border-radius: Theme.radius-sm * 1rem;
+        border-width: 1px;
+        border-color: Theme.border.transparentize(0.5);
+        background: root.background-color;
+        clip: true;
+        if root.background-mode == BackgroundMode.checker && !root.grid-visible: Checkerboard {
+            scale: root.display-scale;
+        }
+        if root.background-mode == BackgroundMode.image: Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.background-image;
+            image-fit: cover;
+        }
+        if root.background-mode == BackgroundMode.video: VideoPreviewSurface {
+            width: parent.width;
+            height: parent.height;
+            display-scale: root.display-scale;
+        }
+    }
+    if root.grid-visible: Path {
+        width: root.width;
+        height: root.height;
+        viewbox-width: self.width / 1px;
+        viewbox-height: self.height / 1px;
+        commands: root.grid-commands;
+        stroke: #003836;
+        stroke-width: 1px;
+        fill: transparent;
+    }
+    for widget in root.widgets: Image {
+        x: widget.x;
+        y: widget.y;
+        width: widget.width;
+        height: widget.height;
+        source: widget.image;
+        image-fit: fill;
+    }
+    if root.background-mode == BackgroundMode.video: VideoPreviewNotices {
+        width: root.width;
+        height: root.height;
+    }
+    if root.error != "": Rectangle {
+        x: 0px;
+        y: 0px;
+        width: min(root.width, error-text.preferred-width + 1rem);
+        height: error-text.preferred-height + 1rem;
+        background: Theme.destructive;
+        error-text := AppText {
+            x: 0.5rem;
+            y: 0.5rem;
+            width: parent.width - 1rem;
+            content: root.error;
+            font-size: Theme.text-sm * 1rem;
+            color: #ffffff;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// `OverlayEditor`: the scene size chip at the top right, the canvas toolbar at the top centre, and
+// the scroll area 3rem below the top. Rust owns the scroll position and the zoom: the stage scrolls
+// by the offsets it writes, and wheel events go to it.
+export component OverlayEditorView inherits Rectangle {
+    property <length> toolbar-row: 3rem;
+    property <length> stage-padding: 1rem;
+
+    function report() {
+        OverlayEditor.viewport-changed(root.width, root.height, root.width, root.height - root.toolbar-row, root.stage-padding, 1rem);
+    }
+    init => {
+        root.report();
+    }
+    changed width => {
+        root.report();
+    }
+    changed height => {
+        root.report();
+    }
+    // The root font follows the window width (`FluidWindow`), and the handles follow the rem.
+    property <length> rem: 1rem;
+    changed rem => {
+        root.report();
+    }
+
+    clip: true;
+    scroll-area := Rectangle {
+        y: root.toolbar-row;
+        height: root.height - root.toolbar-row;
+        clip: true;
+        TouchArea {
+            mouse-cursor: OverlayEditor.cursor == EditorCursor.move ? MouseCursor.move
+                : OverlayEditor.cursor == EditorCursor.resize-ns ? MouseCursor.ns-resize
+                : OverlayEditor.cursor == EditorCursor.resize-ew ? MouseCursor.ew-resize
+                : OverlayEditor.cursor == EditorCursor.resize-nwse ? MouseCursor.nwse-resize
+                : OverlayEditor.cursor == EditorCursor.resize-nesw ? MouseCursor.nesw-resize
+                : OverlayEditor.cursor == EditorCursor.rotate ? MouseCursor.alias
+                : MouseCursor.default;
+            pointer-event(event) => {
+                // Sync Doctor has no selection, marquee or gestures.
+                if VideoSync.mode {
+                    return;
+                }
+                if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                    OverlayEditor.pointer-down(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                    OverlayEditor.pointer-up(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                } else if event.kind == PointerEventKind.move {
+                    OverlayEditor.pointer-move(self.mouse-x, self.mouse-y, event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                }
+            }
+            changed has-hover => {
+                if !self.has-hover && !self.pressed {
+                    OverlayEditor.pointer-leave();
+                }
+            }
+            double-clicked => {
+                if !VideoSync.mode {
+                    OverlayEditor.double-click(self.mouse-x, self.mouse-y);
+                }
+            }
+            scroll-event(event) => {
+                OverlayEditor.wheel(event.delta-x, event.delta-y, self.mouse-x, self.mouse-y,
+                    event.modifiers.alt, event.modifiers.control, event.modifiers.shift, event.modifiers.meta);
+                accept
+            }
+        }
+        stage := Rectangle {
+            x: -OverlayEditor.scroll-x;
+            y: -OverlayEditor.scroll-y;
+            width: OverlayEditor.stage-width;
+            height: OverlayEditor.stage-height;
+            if VideoSync.mode: VideoSyncScreens {
+                x: OverlayEditor.scene-left;
+                y: OverlayEditor.scene-top;
+                width: OverlayEditor.scene-width;
+                height: OverlayEditor.scene-height;
+            }
+            if !VideoSync.mode: OverlayCanvas {
+                x: OverlayEditor.scene-left;
+                y: OverlayEditor.scene-top;
+                width: OverlayEditor.scene-width;
+                height: OverlayEditor.scene-height;
+                background-mode: OverlayEditor.background-mode;
+                background-color: OverlayEditor.background-color;
+                background-image: OverlayEditor.background-image;
+                grid-visible: OverlayEditor.grid-visible;
+                grid-commands: OverlayEditor.grid-commands;
+                display-scale: OverlayEditor.display-scale;
+                widgets: OverlayEditor.widgets;
+                error: OverlayEditor.error;
+            }
+            if !VideoSync.mode: SelectionLayer {
+                width: parent.width;
+                height: parent.height;
+            }
+        }
+    }
+
+    if Projects.status-shown: status := Rectangle {
+        x: chip.x - 0.5rem - self.width;
+        y: 1rem + (chip.height - self.height) / 2;
+        width: status-text.preferred-width + 1rem;
+        height: 1.5rem;
+        Shadow {
+            size: ShadowSize.lg;
+            radius: Theme.radius-xs * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.radius-xs * 1rem;
+            border-width: 1px;
+            border-color: Projects.status-modified ? Theme.accent-border : Theme.border;
+            background: Projects.status-modified ? Theme.surface-accent-soft.transparentize(0.8) : Theme.card.transparentize(0.15);
+        }
+        status-text := AppText {
+            content: Projects.status-modified ? @tr("overlay-editor.statusModified" => "Modified") : @tr("overlay-editor.statusUnsaved" => "Unsaved");
+            font-size: 0.741rem;
+            font-weight: Theme.font-weight-medium;
+            color: Projects.status-modified ? Theme.primary : Theme.foreground;
+        }
+    }
+
+    // The scene size chip.
+    chip := Rectangle {
+        x: root.width - 2rem - self.width;
+        y: 1rem;
+        width: chip-text.preferred-width + 1.5rem;
+        height: chip-text.preferred-height + 0.5rem;
+        // A still region: drawn from a cached layer.
+        cache-rendering-hint: true;
+        Shadow {
+            size: ShadowSize.lg;
+            radius: Theme.radius-xs * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.radius-xs * 1rem;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            background: Theme.card.transparentize(0.15);
+        }
+        chip-text := AppText {
+            content: OverlayEditor.scene-size-label;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-medium;
+            color: Theme.muted-foreground;
+        }
+    }
+
+    toolbar := EditorToolbar {
+        x: (root.width - self.preferred-width) / 2;
+        y: 1rem;
+        width: self.preferred-width;
+        height: self.preferred-height;
+        // A still region: drawn from a cached layer.
+        cache-rendering-hint: true;
+        can-undo: UndoRedo.can-undo;
+        can-redo: UndoRedo.can-redo;
+        background-mode: OverlayEditor.background-mode;
+        has-background-image: OverlayEditor.has-background-image;
+        has-videos: OverlayEditor.has-videos;
+        zoom-label: OverlayEditor.zoom-label;
+        grid-visible: OverlayEditor.grid-visible;
+        snap-to-grid: OverlayEditor.snap-to-grid;
+        undo => {
+            UndoRedo.undo();
+        }
+        redo => {
+            UndoRedo.redo();
+        }
+        set-background-mode(mode) => {
+            OverlayEditor.set-background-mode(mode);
+        }
+        zoom-in => {
+            OverlayEditor.zoom-in();
+        }
+        zoom-out => {
+            OverlayEditor.zoom-out();
+        }
+        reset-zoom => {
+            OverlayEditor.reset-zoom();
+        }
+        set-grid-visible(visible) => {
+            OverlayEditor.set-grid-visible(visible);
+        }
+        set-snap-to-grid(snap) => {
+            OverlayEditor.set-snap-to-grid(snap);
+        }
+    }
+}

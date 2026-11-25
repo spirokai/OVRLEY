@@ -1,13 +1,13 @@
-//! OVRLEY's Slint UI: the markup compiled from `ui/`, and the glue that binds its logic globals
-//! (D2) to `ovrley_app`.
+//! OVRLEY's Slint UI: the markup compiled from `ui/`, the projections that write the store into
+//! its globals, the callbacks that dispatch actions, and the platform glue.
 
 slint::include_modules!();
 
 pub mod app;
-pub mod features;
-pub mod hooks;
-pub mod logic;
+mod features;
+mod logic;
 pub mod platform;
+mod projection;
 #[cfg(debug_assertions)]
 mod snapshot;
 

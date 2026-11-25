@@ -1,18 +1,10 @@
-import { Theme } from "../theme/theme.slint";
-import { FocusRing } from "focus-ring.slint";
-import { Shadow, ShadowSize } from "shadow.slint";
+import { Theme } from "../theme.slint";
+import { FocusRing } from "focus.slint";
+import { Shadow, ShadowSize } from "surface.slint";
 
-// slider.jsx, with one thumb: every caller passes a one-element array (Q4).
-// A 0.375rem `primary`-at-20% track with a `primary` range; a 1rem round thumb with a `primary`
-// border, `highlight-foreground` fill, `shadow-sm`, and a 4px ring (`ring` at 50%) on hover and
-// focus. Vertical sliders (video sync) are at least 11rem tall. The slot draws inside the track
-// (`trackChildren`). As with Radix, whose thumb is positioned absolutely, a horizontal slider is
-// only as tall as its track: the thumb, and the area that takes presses, extend past it.
-//
-// Radix behaviour: pressing the track jumps there and starts a drag; values snap to the step;
-// arrows move one step, Shift+arrow, PageUp and PageDown ten, Home and End go to the ends.
-// `value-changed` fires when the value changes during a drag or key press; `value-committed`
-// fires on release and on each key press, when the value changed.
+// A 0.375rem `primary`-at-20% track with a `primary` range. Vertical sliders (video sync) are at
+// least 11rem tall. `value-changed` fires when the value changes during a drag or key press;
+// `value-committed` fires on release and on each key press, when the value changed.
 export component Slider {
     in property <float> value;
     in property <float> minimum: 0;
@@ -20,7 +12,7 @@ export component Slider {
     in property <float> step: 1;
     in property <Orientation> orientation: Orientation.horizontal;
     in property <bool> disabled;
-    // Style overrides (D5), used by the colour picker's hue slider.
+    // Style overrides, used by the colour picker's hue slider.
     in property <brush> track-background: Theme.primary.transparentize(0.8);
     in property <brush> range-background: Theme.primary;
     in property <length> track-thickness: 0.375rem;
@@ -35,8 +27,6 @@ export component Slider {
     property <length> thumb-size: 1rem;
     property <float> fraction: root.maximum > root.minimum ? clamp((root.value - root.minimum) / (root.maximum - root.minimum), 0, 1) : 0;
     property <length> length: root.horizontal ? root.width : root.height;
-    // Radix keeps the thumb inside the slider: its centre moves from half a thumb in at the start
-    // to half a thumb in at the end.
     property <length> thumb-center: root.fraction * root.length + root.thumb-size / 2 * (1 - 2 * root.fraction);
     property <float> value-before-slide;
 

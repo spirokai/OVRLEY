@@ -1,0 +1,63 @@
+import { Theme } from "../theme.slint";
+import { GroupCorners, GroupPosition } from "surface.slint";
+
+// Tracks `:focus-visible` for a FocusScope: the ring shows for keyboard focus only. Slint reports
+// why focus arrived; Tab navigation is keyboard focus.
+export component FocusVisible inherits FocusScope {
+    out property <bool> focus-visible;
+    focus-gained(reason) => {
+        self.focus-visible = reason == FocusReason.tab-navigation;
+    }
+    focus-lost => {
+        self.focus-visible = false;
+    }
+}
+
+// The press-away blur. Slint keeps the focus until something else takes it. While a text field has
+// focus it reports its window rectangle here. The field then gives up its focus, so it commits as
+// when Tab moves the focus, and the press is routed as usual: a press on another field focuses that
+// field.
+export global FocusedField {
+    in-out property <bool> active;
+    in-out property <length> x;
+    in-out property <length> y;
+    in-out property <length> width;
+    in-out property <length> height;
+    in-out property <int> blur-serial;
+}
+
+// A ring outside the parent's border box, following its corner radii. Place it as the last child of
+// the element it rings; it fills that element. In a group, `group-position` squares the joined
+// corners, as the control's own corners are.
+export component FocusRing {
+    width: 100%;
+    height: 100%;
+    in property <bool> shown;
+    in property <length> ring-width: Theme.ring-width * 1rem;
+    in property <length> radius;
+    in property <color> ring-color: Theme.ring-color;
+    // `ring-offset-*`: a gap between the element and the ring.
+    in property <length> offset;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <Orientation> group-orientation: Orientation.horizontal;
+
+    property <length> spread: root.ring-width + root.offset;
+
+    // A square corner stays square outside; a rounded one grows by the ring's spread.
+    pure function outer(corner: length) -> length {
+        corner > 0px ? corner + root.spread : 0px
+    }
+
+    if root.shown: Rectangle {
+        x: -root.ring-width - root.offset;
+        y: -root.ring-width - root.offset;
+        width: root.width + 2 * (root.ring-width + root.offset);
+        height: root.height + 2 * (root.ring-width + root.offset);
+        border-width: root.ring-width;
+        border-color: root.ring-color;
+        border-top-left-radius: root.outer(GroupCorners.top-left(root.group-position, root.group-orientation, root.radius));
+        border-top-right-radius: root.outer(GroupCorners.top-right(root.group-position, root.group-orientation, root.radius));
+        border-bottom-left-radius: root.outer(GroupCorners.bottom-left(root.group-position, root.group-orientation, root.radius));
+        border-bottom-right-radius: root.outer(GroupCorners.bottom-right(root.group-position, root.group-orientation, root.radius));
+    }
+}

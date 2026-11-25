@@ -1,16 +1,15 @@
-import { Theme } from "../theme/theme.slint";
-import { AppText } from "app-text.slint";
+import { Theme } from "../theme.slint";
+import { AppText } from "text.slint";
 import { Icon } from "icons.slint";
-import { FocusRing } from "focus-ring.slint";
+import { FocusRing } from "focus.slint";
 import { Choice, ChoiceListLogic } from "logic.slint";
 
 export enum TabsListVariant { default, main, toolbar }
 export enum TabsTriggerVariant { default, main, toolbar }
 
-// tabs.jsx `TabsList` with its `TabsTrigger`s, drawn from `items` (D4; `kind` is `item`). List and trigger variants are
-// set separately, as today. Left and Right move and activate (Radix's automatic activation),
-// skipping disabled triggers; Home and End go to the ends. `stretch` is the call sites'
-// `grid w-full grid-cols-N`; the other style properties are their overrides (D5).
+// List and trigger variants are set separately, as today. Left and Right move and activate,
+// skipping disabled triggers; Home and End go to the ends. `stretch` is the call sites' `grid
+// w-full grid-cols-N`; the other style properties are their overrides.
 export component TabsList {
     in property <[Choice]> items;
     in property <string> value;
@@ -161,7 +160,6 @@ export component TabsList {
                     enabled: !item.disabled;
                     mouse-cursor: MouseCursor.pointer;
                     pointer-event(event) => {
-                        // Radix activates on pointer down.
                         if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
                             focus.focus();
                             root.activate(index);
@@ -180,11 +178,9 @@ export component TabsList {
     }
 }
 
-// tabs.jsx `TabsContent`: its slot, shown when `value` is `active-value`, 0.5rem below the list.
 export component TabsContent inherits VerticalLayout {
     in property <string> value;
     in property <string> active-value;
-    // `mt-2`; the call site's override (D5).
     in property <length> inset-top: 0.5rem;
     property <bool> active: root.value == root.active-value;
 

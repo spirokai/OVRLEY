@@ -1,0 +1,201 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { AccordionTrigger, AccordionContent } from "../../components/accordion.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { WidgetEditor } from "index.slint";
+import { InspectorBlocks } from "inspector.slint";
+
+component WidgetInspector inherits InspectorBlocks {
+    rows: WidgetEditor.inspector;
+    system-fonts: WidgetEditor.system-fonts;
+    draft(id, value) => {
+        WidgetEditor.draft(id, value);
+    }
+    commit-draft => {
+        WidgetEditor.commit-draft();
+    }
+    set-number(id, raw) => {
+        WidgetEditor.set-number(id, raw);
+    }
+    set-text(id, value) => {
+        WidgetEditor.set-text(id, value);
+    }
+    set-flag(id, value) => {
+        WidgetEditor.set-flag(id, value);
+    }
+    clear-field(id) => {
+        WidgetEditor.clear-field(id);
+    }
+    press(id) => {
+        WidgetEditor.press(id);
+    }
+    set-stops(id, stops) => {
+        WidgetEditor.set-stops(id, stops);
+    }
+}
+
+// `SidebarWidgetsTab`: the widgets in sidebar order as a single, collapsible accordion whose open
+// item is the selected widget (held while a marquee runs). Each row shows the widget's icon and
+// name and a delete button; the open row is `primary` on `surface-accent-soft` inside an
+// `accent-border` frame, and its content holds the inspector. The scroll area belongs to the
+// control panel, which passes its offset (`scroll-y`, two-way), its position and its sizes.
+export component SidebarWidgetsTab inherits VerticalLayout {
+    in-out property <length> scroll-y;
+    in property <length> viewport-y;
+    in property <length> viewport-height;
+    in property <length> content-height;
+
+    property <string> open-id: WidgetEditor.open-id;
+    property <string> autoscroll-id;
+
+    changed open-id => {
+        root.autoscroll-id = root.open-id;
+        autoscroll-stop.running = false;
+        autoscroll-stop.running = root.open-id != "";
+    }
+
+    // Aligns an item's top with the scroll area's top, within the scroll range.
+    function align(item-y: length) {
+        root.scroll-y = clamp(root.scroll-y - (item-y - root.viewport-y), -max(0px, root.content-height - root.viewport-height), 0px);
+    }
+
+    autoscroll-stop := Timer {
+        interval: 220ms;
+        running: false;
+        triggered => {
+            self.running = false;
+            root.autoscroll-id = "";
+        }
+    }
+
+    if WidgetEditor.rows.length == 0: HorizontalLayout {
+        padding-left: 0.75rem;
+        Rectangle {
+            height: 4.5rem;
+            border-radius: Theme.radius-sm * 1rem;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            AppText {
+                content: @tr("widget-editor.noActiveWidgets" => "No active widgets");
+                font-size: Theme.text-xs * 1rem;
+                color: Theme.muted-foreground;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    if WidgetEditor.rows.length > 0: Rectangle {
+        VerticalLayout {
+            for row in WidgetEditor.rows: item := Rectangle {
+                property <bool> open: row.id == root.open-id;
+                property <bool> row-hover: trigger.has-hover || delete.has-hover;
+                property <color> row-color: item.open || item.row-hover ? Theme.primary : Theme.muted-foreground;
+
+                Timer {
+                    interval: 16ms;
+                    running: root.autoscroll-id == row.id;
+                    triggered => {
+                        root.align(item.absolute-position.y);
+                    }
+                }
+
+                VerticalLayout {
+                    Rectangle {
+                        trigger := AccordionTrigger {
+                            width: parent.width;
+                            open: item.open;
+                            open-background: Theme.surface-accent-soft;
+                            text-color: Theme.muted-foreground;
+                            hover-text-color: Theme.primary;
+                            open-text-color: Theme.primary;
+                            underline-on-hover: false;
+                            inset-left: 0.75rem;
+                            inset-right: 2.5rem;
+                            inset-y: 0.75rem;
+                            accessible-label: row.name;
+                            toggled => {
+                                WidgetEditor.toggle(row.id);
+                            }
+                            HorizontalLayout {
+                                spacing: 0.625rem;
+                                Rectangle {
+                                    width: 1.75rem;
+                                    height: 1.75rem;
+                                    if row.glyph != "": Icon {
+                                        glyph: row.glyph;
+                                        size: 0.875rem;
+                                        color: item.row-color;
+                                    }
+                                    if row.glyph == "": Image {
+                                        width: 0.875rem;
+                                        height: 0.875rem;
+                                        source: row.image;
+                                        colorize: item.row-color;
+                                    }
+                                }
+                                AppText {
+                                    horizontal-stretch: 1;
+                                    content: row.name;
+                                    uppercase: false;
+                                    font-size: Theme.text-sm * 1rem;
+                                    font-weight: Theme.font-weight-semibold;
+                                    color: item.row-color;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                        delete := Button {
+                            x: parent.width - 0.5rem - self.width;
+                            y: (parent.height - self.height) / 2;
+                            width: 1.75rem;
+                            height: 1.75rem;
+                            variant: ButtonVariant.ghost;
+                            size: ButtonSize.icon;
+                            icon: Icons.trash-2;
+                            icon-size: 0.875rem;
+                            text-color: item.open ? Theme.primary : Theme.muted-foreground;
+                            hover-text-color: Theme.primary;
+                            hover-background: Theme.surface-accent-soft;
+                            clicked => {
+                                WidgetEditor.delete-widget(row.id);
+                            }
+                        }
+                    }
+                    AccordionContent {
+                        open: item.open;
+                        background: Theme.surface.transparentize(0.4);
+                        inset-left: 1rem;
+                        inset-right: 1rem;
+                        inset-top: 0.375rem;
+                        inset-bottom: 1.5rem;
+                        if item.open && WidgetEditor.has-inspector: WidgetInspector { }
+                    }
+                    Rectangle {
+                        height: Theme.hairline;
+                        background: Theme.border.transparentize(0.3);
+                    }
+                }
+                if item.open: Rectangle {
+                    x: 0px;
+                    y: -1px;
+                    width: parent.width + 1px;
+                    height: parent.height + 2px;
+                    border-width: 1px;
+                    border-color: Theme.accent-border;
+                }
+            }
+        }
+        // `border-t border-r`.
+        Rectangle {
+            y: 0px;
+            height: Theme.hairline;
+            background: Theme.border.transparentize(0.3);
+        }
+        Rectangle {
+            x: parent.width - Theme.hairline;
+            width: Theme.hairline;
+            background: Theme.border.transparentize(0.3);
+        }
+    }
+}

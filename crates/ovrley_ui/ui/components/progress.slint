@@ -1,10 +1,7 @@
-import { Theme } from "../theme/theme.slint";
+import { Theme } from "../theme.slint";
 
-// progress.jsx: a `primary`-at-20% track, 0.5rem high, fully rounded, with a `primary` indicator.
-// The value is clamped to 0–100; a non-finite value counts as 0. The glide is ported as it is:
-// each forward move eases (ease-out cubic) over the time since the previous value, clamped to
-// 16–800 ms; the bar snaps on a backward move, at 0, and at 100 or more. `track-color` is the
-// call sites' override (D5).
+// The value is clamped to 0–100; a non-finite value counts as 0. `track-color` is the call sites'
+// override.
 export component Progress {
     in property <float> value;
     in property <color> track-color: Theme.primary.transparentize(0.8);

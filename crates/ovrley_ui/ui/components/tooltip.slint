@@ -1,0 +1,245 @@
+import { Theme, WindowMetrics } from "../theme.slint";
+import { AppText } from "text.slint";
+import { Shadow, ShadowSize } from "surface.slint";
+import { Placement, PlacementAlign, PlacementLogic, PlacementRect, PlacementSide } from "logic.slint";
+import { Icon, Icons } from "icons.slint";
+import { FocusRing } from "focus.slint";
+
+// The window's tooltip. Tooltips are drawn instead in this layer, the last child of `FluidWindow`:
+// above the content, never clipped by scroll areas, and taking no input. `SimpleTooltip` writes the
+// global; `serial` lets a tooltip that is leaving hide only itself. A tooltip cannot appear above
+// an open popup.
+export global TooltipLayer {
+    in-out property <bool> shown;
+    in-out property <int> serial;
+    in-out property <string> content;
+    in-out property <PlacementRect> anchor;
+    in-out property <PlacementSide> side: PlacementSide.top;
+    in-out property <PlacementAlign> align: PlacementAlign.center;
+    // The bubble's wrapping width; 0 keeps it on one line.
+    in-out property <length> content-width;
+    // Long content such as a file path wraps at 20rem, breaking anywhere.
+    in-out property <bool> wrap-text;
+    // Space between the trigger and the bubble; each SimpleTooltip sets it when it shows.
+    in-out property <length> gap;
+}
+
+// The arrow keeps pointing at the trigger after a shift, at least 0.5rem from a bubble corner. It
+// fades in over 100 ms with ease-out and hides at once; resizing the window hides it, as a placed
+// bubble would drift from its trigger.
+export component TooltipLayerView {
+    property <length> pad-x: 0.625rem;
+    property <length> pad-y: 0.375rem;
+    property <length> arrow: 4px;
+    property <length> bubble-width: measure.width + 2 * root.pad-x + 2px;
+    property <length> bubble-height: measure.preferred-height + 2 * root.pad-y + 2px;
+    property <Placement> placed: PlacementLogic.place(TooltipLayer.anchor, root.bubble-width, root.bubble-height, WindowMetrics.width, WindowMetrics.height, TooltipLayer.side, TooltipLayer.align, TooltipLayer.gap);
+    property <bool> vertical-side: root.placed.side == PlacementSide.top || root.placed.side == PlacementSide.bottom;
+
+    width: 100%;
+    height: 100%;
+
+    changed width => {
+        TooltipLayer.shown = false;
+    }
+    changed height => {
+        TooltipLayer.shown = false;
+    }
+
+    // Measures the text; never shown.
+    measure := AppText {
+        visible: false;
+        x: 0px;
+        y: 0px;
+        width: TooltipLayer.content-width > 0px ? TooltipLayer.content-width - 2 * root.pad-x - 2px
+            : TooltipLayer.wrap-text ? min(self.preferred-width, 20rem - 2 * root.pad-x - 2px) : self.preferred-width;
+        content: TooltipLayer.content;
+        uppercase: true;
+        font-size: Theme.text-xs * 1rem;
+        line-height: Theme.text-xs-line-height;
+        wrap: TooltipLayer.wrap-text ? TextWrap.char-wrap : TooltipLayer.content-width > 0px ? TextWrap.word-wrap : TextWrap.no-wrap;
+    }
+
+    bubble := Rectangle {
+        x: root.placed.x;
+        y: root.placed.y;
+        width: root.bubble-width;
+        height: root.bubble-height;
+        visible: TooltipLayer.shown;
+        opacity: TooltipLayer.shown ? 1 : 0;
+        animate opacity { duration: TooltipLayer.shown ? Theme.duration-100 : 0ms; easing: ease-out; }
+
+        Shadow {
+            size: ShadowSize.xxl;
+            radius: Theme.rounded * 1rem;
+        }
+        Rectangle {
+            border-radius: Theme.rounded * 1rem;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            background: Theme.surface-tooltip;
+        }
+        AppText {
+            x: root.pad-x + 1px;
+            y: root.pad-y + 1px;
+            width: measure.width;
+            height: measure.preferred-height;
+            content: TooltipLayer.content;
+            uppercase: true;
+            font-size: Theme.text-xs * 1rem;
+            line-height: Theme.text-xs-line-height;
+            wrap: measure.wrap;
+        }
+        // It points at the trigger's start (0.5rem in), centre or end (0.5rem from it), kept 0.5rem
+        // from the corners.
+        Path {
+            property <length> edge: root.vertical-side ? root.bubble-width : root.bubble-height;
+            property <length> anchor-start: root.vertical-side ? TooltipLayer.anchor.x : TooltipLayer.anchor.y;
+            property <length> anchor-size: root.vertical-side ? TooltipLayer.anchor.width : TooltipLayer.anchor.height;
+            property <length> target: self.anchor-start + (TooltipLayer.align == PlacementAlign.start ? 0.5rem
+                : TooltipLayer.align == PlacementAlign.end ? self.anchor-size - 0.5rem : self.anchor-size / 2);
+            property <length> along: max(0.5rem, min(self.target - (root.vertical-side ? root.placed.x : root.placed.y), self.edge - 0.5rem));
+            x: root.vertical-side ? self.along - root.arrow : root.placed.side == PlacementSide.left ? root.bubble-width - 1px : 1px - root.arrow;
+            y: root.vertical-side ? (root.placed.side == PlacementSide.top ? root.bubble-height - 1px : 1px - root.arrow) : self.along - root.arrow;
+            width: root.vertical-side ? 2 * root.arrow : root.arrow;
+            height: root.vertical-side ? root.arrow : 2 * root.arrow;
+            viewbox-width: root.vertical-side ? 2 : 1;
+            viewbox-height: root.vertical-side ? 1 : 2;
+            fill: Theme.surface-tooltip;
+            commands: root.placed.side == PlacementSide.top ? "M0 0 L2 0 L1 1 Z"
+                : root.placed.side == PlacementSide.bottom ? "M0 1 L2 1 L1 0 Z"
+                : root.placed.side == PlacementSide.left ? "M0 0 L1 1 L0 2 Z" : "M1 0 L0 1 L1 2 Z";
+        }
+    }
+}
+
+// It wraps its trigger (the slot); with no `content` it only renders the trigger. It shows on
+// pointer hover only, after `delay` (400 ms in the code; its doc comment says 500), and hides at
+// once when the pointer leaves the trigger. The bubble is drawn by the window's `TooltipLayerView`,
+// so it is never clipped and takes no input. Flip and shift come from the shared placement.
+export component SimpleTooltip inherits TouchArea {
+    in property <string> content;
+    in property <PlacementSide> side: PlacementSide.top;
+    in property <PlacementAlign> align: PlacementAlign.center;
+    in property <duration> delay: 400ms;
+    in property <length> content-width: 0px;
+    in property <bool> wrap-text;
+    in property <length> gap: 0.5rem;
+    // Keeps a shown bubble while the pointer leaves (a focused HelpTooltip).
+    in property <bool> keep-shown;
+
+    // The layer's serial while this tooltip shows; 0 when hidden.
+    property <int> my-serial;
+
+    // Public for triggers that also show on keyboard focus (HelpTooltip).
+    public function show() {
+        TooltipLayer.serial += 1;
+        root.my-serial = TooltipLayer.serial;
+        TooltipLayer.content = root.content;
+        TooltipLayer.anchor = { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height };
+        TooltipLayer.side = root.side;
+        TooltipLayer.align = root.align;
+        TooltipLayer.content-width = root.content-width;
+        TooltipLayer.wrap-text = root.wrap-text;
+        TooltipLayer.gap = root.gap;
+        TooltipLayer.shown = true;
+    }
+    public function hide() {
+        if root.my-serial != 0 && TooltipLayer.serial == root.my-serial {
+            TooltipLayer.shown = false;
+        }
+        root.my-serial = 0;
+    }
+
+    min-width: layout.min-width;
+    preferred-width: layout.preferred-width;
+    min-height: layout.min-height;
+    preferred-height: layout.preferred-height;
+
+    layout := HorizontalLayout {
+        @children
+    }
+
+    Timer {
+        interval: root.delay;
+        running: root.has-hover && root.content != "" && root.my-serial == 0;
+        triggered => {
+            root.show();
+        }
+    }
+    changed has-hover => {
+        if !self.has-hover && !root.keep-shown {
+            root.hide();
+        }
+    }
+    changed content => {
+        if root.content == "" {
+            root.hide();
+        } else if root.my-serial != 0 {
+            TooltipLayer.content = root.content;
+        }
+    }
+}
+
+// Its tooltip has no delay, sits 6px off at the bottom start and flips without room, is 20rem wide,
+// honours newlines, and opens on hover and on keyboard focus.
+export component HelpTooltip {
+    in property <string> content;
+    // The button's accessible name; defaults to the content.
+    in property <string> label: root.content;
+    in property <PlacementSide> side: PlacementSide.bottom;
+    in property <PlacementAlign> align: PlacementAlign.start;
+    in property <length> content-width: 20rem;
+
+    property <length> box: 0.875rem + 0.25rem;
+    width: root.box;
+    height: root.box;
+
+    tip := SimpleTooltip {
+        content: root.content;
+        side: root.side;
+        align: root.align;
+        delay: 0ms;
+        gap: 6px;
+        keep-shown: focus.focus-visible;
+        content-width: root.content-width;
+        mouse-cursor: MouseCursor.help;
+
+        button := Rectangle {
+            width: root.box;
+            height: root.box;
+            border-radius: self.width / 2;
+            forward-focus: focus;
+            accessible-role: AccessibleRole.button;
+            accessible-label: root.label;
+
+            Icon {
+                glyph: Icons.info;
+                size: 0.875rem;
+                color: tip.has-hover ? Theme.foreground : Theme.muted-foreground;
+            }
+            focus := FocusScope {
+                out property <bool> focus-visible;
+                focus-on-click: false;
+                focus-gained(reason) => {
+                    self.focus-visible = reason == FocusReason.tab-navigation;
+                    if self.focus-visible {
+                        tip.show();
+                    }
+                }
+                focus-lost => {
+                    self.focus-visible = false;
+                    if !tip.has-hover {
+                        tip.hide();
+                    }
+                }
+            }
+            FocusRing {
+                shown: focus.focus-visible;
+                ring-width: 2px;
+                radius: parent.width / 2;
+                ring-color: Theme.ring;
+            }
+        }
+    }
+}

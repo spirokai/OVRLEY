@@ -1,0 +1,364 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
+import { Switch } from "../../components/switch.slint";
+import { ScrollArea } from "../../components/scroll-area.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { TabsList, TabsListVariant, TabsTriggerVariant } from "../../components/tabs.slint";
+import { ChoiceKind, PlacementAlign } from "../../components/logic.slint";
+import { FieldSecondsInput } from "../video/fields.slint";
+import { TransitionSelectTrigger } from "../transitions/select.slint";
+import { Toolbar, VideoCardView } from "index.slint";
+
+component PanelLabel inherits AppText {
+    min-width: 0px;
+    font-size: Theme.text-xs * 1rem;
+    font-weight: Theme.font-weight-bold;
+    color: Theme.muted-foreground;
+    vertical-alignment: center;
+}
+
+component LabeledField inherits VerticalLayout {
+    in property <string> label;
+    spacing: 0.25rem;
+    horizontal-stretch: 1;
+    preferred-width: 0px;
+    min-width: 0px;
+    PanelLabel {
+        content: root.label;
+    }
+    @children
+}
+
+// Its trash button shows on hover and focus; Delete and Backspace remove it while it has focus.
+component VideoCard inherits Rectangle {
+    in property <VideoCardView> card;
+    // Overlapping touch areas each own their hover, so the card counts the name's and the trash's.
+    property <bool> hovered: touch.has-hover || name.has-hover || trash.has-hover;
+    property <bool> active: root.hovered || focus.has-focus;
+
+    border-radius: Theme.radius-xs * 1rem;
+    border-width: 1px;
+    border-color: root.card.selected ? Theme.primary : root.hovered ? Theme.border : transparent;
+    background: root.card.selected ? Theme.surface-accent-soft : Theme.surface-darken;
+    clip: true;
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            focus.focus();
+            Toolbar.select-card(root.card.id);
+        }
+    }
+    focus := FocusScope {
+        // The press goes to `touch`, which focuses the card; the scope would take the first press.
+        focus-on-click: false;
+        key-pressed(event) => {
+            if event.text == Key.Delete || event.text == Key.Backspace {
+                Toolbar.remove-video(root.card.id);
+                return accept;
+            }
+            reject
+        }
+    }
+    layout := VerticalLayout {
+        Rectangle {
+            height: self.width * 9 / 16;
+            background: #000000;
+            if root.card.missing: Rectangle {
+                background: Theme.destructive.with-alpha(0.15);
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 0.375rem;
+                    padding-left: 0.5rem;
+                    padding-right: 0.5rem;
+                    Icon {
+                        glyph: Icons.triangle-alert;
+                        size: 1.25rem;
+                        color: Theme.destructive;
+                    }
+                    AppText {
+                        content: @tr("toolbar.videoNotFound" => "Video not found");
+                        horizontal-alignment: center;
+                        font-size: Theme.text-xs * 1rem;
+                        font-weight: Theme.font-weight-bold;
+                        color: Theme.destructive;
+                    }
+                }
+            }
+            if !root.card.missing && !root.card.has-thumbnail: VerticalLayout {
+                alignment: center;
+                spacing: 0.375rem;
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+                Icon {
+                    glyph: Icons.image-off;
+                    size: 1.25rem;
+                    color: Theme.muted-foreground;
+                }
+                AppText {
+                    content: @tr("toolbar.noVideoFrame" => "No frame could be read");
+                    horizontal-alignment: center;
+                    font-size: Theme.text-xs * 1rem;
+                    font-weight: Theme.font-weight-bold;
+                    color: Theme.muted-foreground;
+                    wrap: word-wrap;
+                }
+            }
+            if !root.card.missing && root.card.has-thumbnail: Image {
+                width: parent.width;
+                height: parent.height;
+                source: root.card.thumbnail;
+                image-fit: contain;
+            }
+            Rectangle {
+                x: parent.width - self.width - 0.25rem;
+                y: parent.height - self.height - 0.25rem;
+                width: chip.preferred-width + 0.5rem;
+                height: chip.preferred-height;
+                border-radius: Theme.radius-xs * 1rem;
+                background: #000000b3;
+                chip := AppText {
+                    content: root.card.duration;
+                    font-size: 0.65rem;
+                    font-weight: Theme.font-weight-bold;
+                    color: #ffffff;
+                }
+            }
+        }
+        name := SimpleTooltip {
+            content: root.card.filename;
+            align: PlacementAlign.start;
+            wrap-text: true;
+            clicked => {
+                focus.focus();
+                Toolbar.select-card(root.card.id);
+            }
+            HorizontalLayout {
+                padding-left: 0.5rem;
+                padding-right: 0.5rem;
+                padding-top: 0.375rem;
+                padding-bottom: 0.375rem;
+                AppText {
+                    content: root.card.filename;
+                    uppercase: false;
+                    font-size: Theme.text-xs * 1rem;
+                    font-weight: Theme.font-weight-bold;
+                    overflow: elide;
+                }
+            }
+        }
+    }
+    trash := Button {
+        visible: root.active;
+        x: parent.width - self.width - 0.25rem;
+        y: 0.25rem;
+        variant: ButtonVariant.ghost;
+        size: ButtonSize.icon;
+        width: 1.5rem;
+        height: 1.5rem;
+        icon: Icons.trash-2;
+        icon-size: 0.875rem;
+        background: #00000099;
+        text-color: #ffffff;
+        hover-background: Theme.surface-accent-soft;
+        hover-text-color: Theme.primary;
+        accessible-label: root.card.remove-label;
+        clicked => {
+            Toolbar.remove-video(root.card.id);
+        }
+    }
+}
+
+// `VideoPanel`: in the control panel's place while the video drawer is open.
+export component VideoPanel inherits Rectangle {
+    background: Theme.card;
+    Rectangle {
+        x: 0;
+        width: Theme.hairline;
+        background: Theme.border;
+    }
+    if Toolbar.video-cards.length == 0: AppText {
+        y: 1.5rem;
+        width: parent.width;
+        content: @tr("toolbar.noVideos" => "No videos imported yet.");
+        horizontal-alignment: center;
+        font-size: Theme.text-xs * 1rem;
+        color: Theme.muted-foreground;
+    }
+    if Toolbar.video-cards.length > 0: ScrollArea {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding-left: 1.125rem;
+            padding-right: 1.125rem;
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+            spacing: 2rem;
+            // Sync all videos.
+            VerticalLayout {
+                spacing: 0.75rem;
+                SectionHeading {
+                    icon: Icons.clock-3;
+                    title: @tr("toolbar.syncAllVideos" => "Sync all videos");
+                    variant: SectionHeadingVariant.drawer;
+                }
+                VerticalLayout {
+                    padding-left: 0.5rem;
+                    padding-right: 0.5rem;
+                    spacing: 0.75rem;
+                    Button {
+                        variant: ButtonVariant.secondary;
+                        icon: Icons.refresh-cw;
+                        text: @tr("toolbar.syncAllVideos" => "Sync all videos");
+                        clicked => {
+                            Toolbar.sync-all-videos();
+                        }
+                    }
+                    HorizontalLayout {
+                        spacing: 1.125rem;
+                        PanelLabel {
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-height: 2rem;
+                            content: @tr("toolbar.creationTime" => "Creation Time");
+                        }
+                        TabsList {
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-width: 0px;
+                            height: 2rem;
+                            variant: TabsListVariant.toolbar;
+                            trigger-variant: TabsTriggerVariant.toolbar;
+                            stretch: true;
+                            value: Toolbar.panel-sync.can-reset-creation-time ? "filename" : "detected";
+                            items: [
+                                { kind: ChoiceKind.item, value: "detected", label: @tr("toolbar.detected" => "Detected") },
+                                { kind: ChoiceKind.item, value: "filename", label: @tr("toolbar.filename" => "Filename"), disabled: !Toolbar.panel-sync.filename-creation-time-available },
+                            ];
+                            value-changed(value) => {
+                                if value == "filename" {
+                                    Toolbar.panel-filename-creation-times();
+                                } else {
+                                    Toolbar.panel-reset-creation-times();
+                                }
+                            }
+                        }
+                    }
+                    if Toolbar.panel-sync.timezone-shown: HorizontalLayout {
+                        spacing: 1.125rem;
+                        PanelLabel {
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-height: 2rem;
+                            content: @tr("toolbar.applyTimezone" => "Apply Timezone");
+                        }
+                        HorizontalLayout {
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            alignment: start;
+                            VerticalLayout {
+                                alignment: center;
+                                Switch {
+                                    checked: Toolbar.panel-sync.utc;
+                                    disabled: Toolbar.panel-sync.timezone-disabled;
+                                    accessible-label: @tr("toolbar.applyTimezone" => "Apply Timezone");
+                                    checked-changed(checked) => {
+                                        Toolbar.panel-set-utc(checked);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            // Default transitions.
+            VerticalLayout {
+                spacing: 0.75rem;
+                SectionHeading {
+                    icon: Icons.blend;
+                    title: @tr("toolbar.transitionDefaults" => "Default transitions");
+                    variant: SectionHeadingVariant.drawer;
+                    help: @tr("toolbar.transitionDefaultsHint" => "Used at every join you have not set yourself. Separate videos closer together than the continuity threshold, such as a camera's split recording, are joined without a transition.");
+                }
+                HorizontalLayout {
+                    spacing: 1rem;
+                    LabeledField {
+                        label: @tr("video-preview.transitionType" => "Transition");
+                        TransitionSelectTrigger {
+                            target: "panel-defaults";
+                            label: Toolbar.panel-transition-label;
+                            preview-index: Toolbar.panel-transition-preview-index;
+                        }
+                    }
+                    LabeledField {
+                        label: @tr("video-preview.transitionDuration" => "Duration");
+                        FieldSecondsInput {
+                            field: Toolbar.panel-transition-duration;
+                            font-size: Theme.text-xs * 1rem;
+                            show-unit: true;
+                            label: @tr("video-preview.transitionDuration" => "Duration");
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 1rem;
+                    LabeledField {
+                        label: @tr("video-preview.continuityThreshold" => "Continuity threshold");
+                        FieldSecondsInput {
+                            field: Toolbar.panel-continuity-threshold;
+                            font-size: Theme.text-xs * 1rem;
+                            label: @tr("video-preview.continuityThreshold" => "Continuity threshold");
+                        }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        preferred-width: 0px;
+                    }
+                }
+            }
+            // Imported videos.
+            VerticalLayout {
+                spacing: 0.75rem;
+                SectionHeading {
+                    icon: Icons.film;
+                    title: @tr("toolbar.importedVideos" => "Imported videos");
+                    variant: SectionHeadingVariant.drawer;
+                    Button {
+                        horizontal-stretch: 0;
+                        variant: ButtonVariant.ghost;
+                        height: 1.75rem;
+                        padding-x: 0.5rem;
+                        spacing: 0.375rem;
+                        icon: Icons.trash-2;
+                        icon-size: 0.875rem;
+                        font-size: Theme.text-xs * 1rem;
+                        text: @tr("toolbar.removeAll" => "Remove all");
+                        text-color: Theme.muted-foreground;
+                        hover-background: Theme.surface-accent-soft;
+                        hover-text-color: Theme.primary;
+                        clicked => {
+                            Toolbar.remove-all-videos();
+                        }
+                    }
+                }
+                for row in Math.ceil(Toolbar.video-cards.length / 2): HorizontalLayout {
+                    spacing: 0.75rem;
+                    for column in 2: Rectangle {
+                        horizontal-stretch: 1;
+                        preferred-width: 0px;
+                        min-width: 0px;
+                        // The picture's 16:9 and the name's row.
+                        height: self.width * 9 / 16 + 1.875rem;
+                        if row * 2 + column < Toolbar.video-cards.length: VideoCard {
+                            width: parent.width;
+                            height: parent.height;
+                            card: Toolbar.video-cards[row * 2 + column];
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

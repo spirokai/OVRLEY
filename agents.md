@@ -46,7 +46,6 @@ app/                the former React app: a frozen reading reference. Nothing re
 | --------------------------------------------------------- | --------------------------------------------------------------------- |
 | `pnpm dev:native`                                         | The app: `cargo run -p ovrley_ui --bin ovrley`                        |
 | `pnpm dev:native:live`                                    | The app with Slint live preview (`live-preview` feature)              |
-| `pnpm showcase:native`                                    | Slint component showcase (`dev-windows` feature)                      |
 | `cargo check -p <crate>`                                  | Compile check of the crate you touched                                |
 | `cargo test --workspace --features ovrley_ui/dev-windows` | The whole suite                                                       |
 | `pnpm test:native-ui`                                     | `ovrley_app`, `ovrley_ui`, `ovrley_services` and `ovrley_mcp` tests   |

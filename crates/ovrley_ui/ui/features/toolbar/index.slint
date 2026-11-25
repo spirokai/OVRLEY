@@ -1,5 +1,8 @@
-import { SecondsFieldView } from "../seconds-fields/index.slint";
-import { VideoSyncView } from "../video-sync/index.slint";
+import { SecondsFieldView } from "../video/fields.slint";
+import { VideoSyncView } from "../sync/index.slint";
+
+// Where a video's creation time comes from.
+export enum CreationTimeSource { detected, filename }
 
 // The drawer's tools, in the rail's order.
 export enum DrawerTool { projects, activity, video, video-sync, widgets }
@@ -19,7 +22,6 @@ export struct ActivityLapView {
     enabled: bool,
 }
 
-// A join's transition control in the video drawer (`JoinTransitionControl`).
 export struct JoinControlView {
     // The `TransitionSelect` target of the join.
     target: string,
@@ -50,7 +52,6 @@ export struct VideoExitView {
     join: JoinControlView,
 }
 
-// The video drawer's selected video (`useSelectedVideoRow`).
 export struct SelectedVideoView {
     id: string,
     filename: string,
@@ -60,7 +61,7 @@ export struct SelectedVideoView {
     warnings: [string],
     metadata: [DrawerRowView],
     start: SecondsFieldView,
-    creation-source: string,
+    creation-source: CreationTimeSource,
     filename-available: bool,
     timezone-shown: bool,
     applies-timezone: bool,
@@ -81,13 +82,12 @@ export struct VideoCardView {
     remove-label: string,
 }
 
-// The toolbar feature's global (D5), written by `src/features/toolbar.rs`.
+// The toolbar feature's global, written by `src/features/toolbar.rs`.
 export global Toolbar {
     in property <DrawerTool> active-tool: DrawerTool.widgets;
     in property <bool> visible;
     in property <bool> pinned;
 
-    // The activity drawer (`buildActivityDrawerViewModel`, `buildLapRows`).
     in property <bool> has-activity;
     in property <string> activity-file-name;
     in property <bool> can-delete-activity;
@@ -97,7 +97,7 @@ export global Toolbar {
     in property <[string]> activity-derived;
     in property <[ActivityLapView]> activity-laps;
 
-    // The video drawer and the video panel (D10).
+    // The video drawer and the video panel.
     in property <bool> has-videos;
     in property <bool> has-selected-video;
     in property <SelectedVideoView> selected-video;
@@ -114,7 +114,7 @@ export global Toolbar {
     callback remove-video(id: string);
     callback locate-video(id: string);
     callback sync-video(id: string);
-    callback set-creation-source(id: string, source: string);
+    callback set-creation-source(id: string, source: CreationTimeSource);
     callback set-applies-timezone(id: string, applies: bool);
     callback set-segment-included(id: string, key: string, included: bool);
     callback set-segment-overlay(id: string, key: string, shows: bool);

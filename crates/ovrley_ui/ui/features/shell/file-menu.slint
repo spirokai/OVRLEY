@@ -1,0 +1,123 @@
+import { Theme } from "../../theme.slint";
+import { Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Popover } from "../../components/popup.slint";
+import { ShadowSize, Separator } from "../../components/surface.slint";
+import { PlacementAlign } from "../../components/logic.slint";
+import { Projects } from "../documents.slint";
+
+// It fills the popover's width, so the hover background spans the row.
+component MenuItem inherits HorizontalLayout {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> disabled;
+    callback clicked();
+
+    Button {
+        horizontal-stretch: 1;
+        variant: ButtonVariant.ghost;
+        icon: root.icon;
+        icon-size: 0.875rem;
+        text: root.label;
+        uppercase: true;
+        font-size: 0.7rem;
+        padding-x: 0.5rem;
+        spacing: 0.75rem;
+        alignment: LayoutAlignment.start;
+        disabled: root.disabled;
+        hover-background: Theme.muted-foreground.transparentize(0.9);
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export component FileMenu {
+    callback import-activity();
+    callback import-videos();
+
+    property <bool> open;
+
+    trigger := Button {
+        size: ButtonSize.sm;
+        height: 2rem;
+        icon: Icons.menu;
+        icon-size: 0.875rem;
+        text: @tr("app-shell.file" => "File");
+        spacing: 0.5rem;
+        accessible-label: @tr("app-shell.fileMenu" => "File menu");
+        clicked => {
+            root.open = !root.open;
+        }
+    }
+    Popover {
+        open: root.open;
+        align: PlacementAlign.start;
+        side-offset: 6px;
+        content-width: 13.75rem;
+        shadow: ShadowSize.md;
+        has-shadow-color: true;
+        shadow-color: #000000b3;
+        content-padding: 0.25rem;
+        open-changed(open) => {
+            root.open = open;
+        }
+        MenuItem {
+            icon: Icons.file-plus-2;
+            label: @tr("app-shell.newProject" => "New Project");
+            clicked => {
+                root.open = false;
+                Projects.new-project();
+            }
+        }
+        MenuItem {
+            icon: Icons.folder-open;
+            label: @tr("app-shell.loadProject" => "Load Project");
+            clicked => {
+                root.open = false;
+                Projects.open-project();
+            }
+        }
+        MenuItem {
+            icon: Icons.save;
+            label: @tr("app-shell.saveProject" => "Save Project");
+            disabled: Projects.save-disabled;
+            clicked => {
+                root.open = false;
+                Projects.save-project();
+            }
+        }
+        MenuItem {
+            icon: Icons.save;
+            label: @tr("app-shell.saveProjectAs" => "Save Project As");
+            clicked => {
+                root.open = false;
+                Projects.save-project-as();
+            }
+        }
+        Rectangle {
+            height: 0.75rem;
+            Separator { }
+        }
+        MenuItem {
+            icon: Icons.activity;
+            label: @tr("app-shell.importActivity" => "Import Activity");
+            clicked => {
+                root.open = false;
+                root.import-activity();
+            }
+        }
+        Rectangle {
+            height: 0.75rem;
+            Separator { }
+        }
+        MenuItem {
+            icon: Icons.film;
+            label: @tr("app-shell.importVideo" => "Import Videos");
+            clicked => {
+                root.open = false;
+                root.import-videos();
+            }
+        }
+    }
+}

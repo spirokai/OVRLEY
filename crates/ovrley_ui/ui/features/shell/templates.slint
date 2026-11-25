@@ -1,0 +1,105 @@
+import { Theme, WindowMetrics } from "../../theme.slint";
+import { Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Select, SelectSize, SelectPosition } from "../../components/select.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { Choice, PlacementAlign } from "../../components/logic.slint";
+
+// A ghost 2rem header button with a 1rem icon, muted; hover `surface-elevated` and `foreground`,
+// or `surface-accent-soft` and `primary` for save.
+component HeaderIconButton {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> disabled;
+    in property <bool> accent;
+    callback clicked();
+
+    SimpleTooltip {
+        content: root.label;
+        side: bottom;
+        Button {
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            width: 2rem;
+            height: 2rem;
+            icon: root.icon;
+            icon-size: 1rem;
+            disabled: root.disabled;
+            text-color: Theme.muted-foreground;
+            hover-background: root.accent ? Theme.surface-accent-soft : Theme.surface-elevated;
+            hover-text-color: root.accent ? Theme.primary : Theme.foreground;
+            accessible-label: root.label;
+            clicked => {
+                root.clicked();
+            }
+        }
+    }
+}
+
+// `TemplateSection`: the template select and the new, import and save buttons. Save is enabled only
+// while the save status shows.
+export component TemplateSection inherits HorizontalLayout {
+    in property <[Choice]> choices;
+    in property <string> selected;
+    in property <string> file-name;
+    in property <bool> can-save;
+    in property <int> selector-open-serial;
+    callback select-template(string);
+    callback new-template();
+    callback import-template();
+    callback save-template();
+
+    changed selector-open-serial => {
+        select.open();
+    }
+
+    spacing: 0.5rem;
+    alignment: start;
+    padding-left: 1rem;
+
+    VerticalLayout {
+        alignment: center;
+        select := Select {
+            width: min(14rem, WindowMetrics.width * 0.22);
+            horizontal-stretch: 0;
+            size: SelectSize.sm;
+            items: root.choices;
+            value: root.selected;
+            placeholder: root.file-name != "" ? root.file-name : @tr("app-shell.selectTemplate" => "Select Template...");
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.border.transparentize(0.3);
+            font-size: Theme.text-xs * 1rem;
+            leading-icon: Icons.sparkles;
+            value-changed(value) => {
+                root.select-template(value);
+            }
+        }
+    }
+    HorizontalLayout {
+        spacing: 0.25rem;
+        HeaderIconButton {
+            icon: Icons.file-plus-2;
+            label: @tr("app-shell.newTemplate" => "New Template");
+            clicked => {
+                root.new-template();
+            }
+        }
+        HeaderIconButton {
+            icon: Icons.folder-open;
+            label: @tr("app-shell.importTemplate" => "Import Template");
+            clicked => {
+                root.import-template();
+            }
+        }
+        HeaderIconButton {
+            icon: Icons.save;
+            label: @tr("app-shell.saveTemplate" => "Save Template");
+            disabled: !root.can-save;
+            accent: true;
+            clicked => {
+                root.save-template();
+            }
+        }
+    }
+}

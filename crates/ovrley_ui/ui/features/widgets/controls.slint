@@ -1,0 +1,308 @@
+import { Theme } from "../../theme.slint";
+import { AppText, Label } from "../../components/text.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { BlurInput, InlineNumberInput } from "../../components/input.slint";
+import { Select } from "../../components/select.slint";
+import { Slider } from "../../components/slider.slint";
+import { Switch } from "../../components/switch.slint";
+import { HexColorPicker } from "../../components/color-picker.slint";
+import { ToggleGroup, ToggleGroupSize, ToggleGroupType } from "../../components/toggle.slint";
+import { Icons } from "../../components/icons.slint";
+import { Choice, ChoiceKind } from "../../components/logic.slint";
+import { SwitchRowStyle } from "index.slint";
+
+
+// `FIELD_LABEL_CLASS`.
+export component FieldLabel inherits Label {
+    height: 0.75rem;
+    font-size: 0.667rem;
+    font-weight: Theme.font-weight-bold;
+    color: Theme.muted-foreground;
+}
+
+// `FieldBlock`: the label above its control, 0.25rem apart; with `resettable`, a 1.25rem ghost
+// reset button at the label row's right.
+export component FieldBlock inherits VerticalLayout {
+    in property <string> label;
+    in property <bool> disabled;
+    in property <bool> resettable;
+    callback reset();
+
+    spacing: 0.25rem;
+    Rectangle {
+        height: 0.75rem;
+        FieldLabel {
+            x: 0px;
+            width: parent.width;
+            text: root.label;
+            disabled: root.disabled;
+        }
+        if root.resettable: Button {
+            x: parent.width - self.width;
+            y: -0.25rem;
+            width: 1.25rem;
+            height: 1.25rem;
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            icon: Icons.rotate-ccw;
+            icon-size: 0.875rem;
+            text-color: Theme.muted-foreground;
+            hover-text-color: Theme.foreground;
+            hover-background: Theme.surface-elevated;
+            accessible-label: root.label != "" ? @tr("widget-editor.resetLabel" => "Reset {0}", root.label) : @tr("widget-editor.resetField" => "Reset field");
+            clicked => {
+                root.reset();
+            }
+        }
+    }
+    @children
+}
+
+// `SelectField`.
+export component SelectField inherits FieldBlock {
+    in property <string> value;
+    in property <[Choice]> options;
+    callback value-changed(value: string);
+
+    Select {
+        height: 2.25rem;
+        items: root.options;
+        value: root.value;
+        disabled: root.disabled;
+        font-size: Theme.text-xs * 1rem;
+        background: Theme.surface;
+        border-color: Theme.border.transparentize(0.3);
+        accessible-label: root.label;
+        value-changed(value) => {
+            root.value-changed(value);
+        }
+    }
+}
+
+// `NumberField`: a number `BlurInput` showing whole numbers (the caller rounds), with an optional
+// unit suffix 2rem from the right in 0.741rem Fira Code.
+export component NumberField inherits FieldBlock {
+    in property <string> value;
+    in property <string> placeholder;
+    in property <string> suffix;
+    callback changed(raw: string);
+
+    Rectangle {
+        height: 2.25rem;
+        BlurInput {
+            width: parent.width;
+            height: parent.height;
+            number: true;
+            value: root.value;
+            placeholder: root.placeholder;
+            disabled: root.disabled;
+            font-size: Theme.text-xs * 1rem;
+            background: Theme.surface;
+            inset-right: root.suffix != "" ? 4rem : 2.75rem;
+            label: root.label;
+            changed(raw) => {
+                root.changed(raw);
+            }
+            if root.suffix != "": AppText {
+                x: parent.width - 2rem - self.width;
+                content: root.suffix;
+                uppercase: false;
+                font-size: 0.741rem;
+                mono: true;
+                color: Theme.muted-foreground;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// `ColorField`: a label above the colour picker.
+export component ColorField inherits VerticalLayout {
+    in property <string> label: @tr("widget-editor.color" => "Color");
+    in property <string> value;
+    in property <bool> disabled;
+    callback changed(hex: string);
+
+    spacing: 0.25rem;
+    FieldLabel {
+        text: root.label;
+        disabled: root.disabled;
+    }
+    HexColorPicker {
+        value: root.value;
+        disabled: root.disabled;
+        field-background: Theme.surface;
+        field-font-size: Theme.text-xs * 1rem;
+        field-mono: false;
+        changed(hex) => {
+            root.changed(hex);
+        }
+    }
+}
+
+// `SliderField`, always `editable` in the widget editor: the label and the value readout, which
+// turns into an inline number input on focus, then the slider. Live values go to `value-changed`,
+// the release and a typed value also to `value-committed`.
+export component SliderField inherits VerticalLayout {
+    in property <string> label;
+    in property <float> value;
+    in property <float> minimum;
+    in property <float> maximum;
+    in property <float> step: 1;
+    in property <float> scale: 1;
+    // `editable`: the readout turns into an inline number input on focus.
+    in property <bool> editable: true;
+    in property <bool> disabled;
+    in property <string> value-display;
+    in property <string> suffix;
+    callback value-changed(value: float);
+    callback value-committed(value: float);
+
+    // The track's centre lines up with a neighbouring field's control: label row 0.9375rem, gap
+    // 0.5rem, then the track in 0.5rem padding, as `FieldBlock`'s 0.75rem label, 0.25rem gap and
+    // 2.25rem control centre at 2.125rem. Packed to the top, so a taller neighbour in the row does
+    // not stretch the gap.
+    spacing: 0.5rem;
+    alignment: start;
+    HorizontalLayout {
+        height: 0.9375rem;
+        spacing: 0.75rem;
+        FieldLabel {
+            horizontal-stretch: 1;
+            text: root.label;
+            disabled: root.disabled;
+        }
+        Rectangle {
+            min-width: 2.5rem;
+            horizontal-stretch: 0;
+            readout := AppText {
+                x: parent.width - self.width;
+                visible: !root.editable || (!input.has-focus && !input.is-invalid);
+                content: root.value-display + root.suffix;
+                uppercase: false;
+                font-size: 0.741rem;
+                mono: true;
+                color: Theme.muted-foreground;
+                opacity: root.disabled ? 0.5 : 1;
+                vertical-alignment: center;
+            }
+            input := InlineNumberInput {
+                visible: root.editable;
+                width: parent.width;
+                height: 1.1875rem;
+                y: (parent.height - self.height) / 2;
+                opacity: (self.has-focus || self.is-invalid) && !root.disabled ? 1 : 0;
+                // `Number((value * valueScale).toPrecision(12))`.
+                value: round(root.value * root.scale * 1000000000) / 1000000000;
+                constraints: { has-min: true, min: root.minimum * root.scale, has-max: true, max: root.maximum * root.scale, step: root.step * root.scale + "" };
+                disabled: root.disabled;
+                label: root.label;
+                committed(value) => {
+                    root.value-changed(value / root.scale);
+                    root.value-committed(value / root.scale);
+                }
+            }
+        }
+    }
+    HorizontalLayout {
+        padding-left: 0.25rem;
+        padding-right: 0.25rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        Slider {
+            value: root.value;
+            minimum: root.minimum;
+            maximum: root.maximum;
+            step: root.step;
+            disabled: root.disabled;
+            accessible-label: root.label;
+            value-changed(value) => {
+                root.value-changed(value);
+            }
+            value-committed(value) => {
+                root.value-committed(value);
+            }
+        }
+    }
+}
+
+// `ContentAlignmentControl`: a compact single toggle group; clicking the pressed item changes
+// nothing (an empty value is ignored).
+export component ContentAlignmentControl inherits HorizontalLayout {
+    in property <string> value;
+    // The group's and its three items' accessible labels (left, centre, right).
+    in property <string> group-label;
+    in property <[Choice]> labels;
+    callback value-changed(value: string);
+
+    alignment: end;
+    ToggleGroup {
+        size: ToggleGroupSize.compact;
+        type: ToggleGroupType.single;
+        value: root.value;
+        accessible-label: root.group-label;
+        items: [
+            { kind: ChoiceKind.item, value: "left", icon: Icons.align-left, accessible-label: root.labels[0].label },
+            { kind: ChoiceKind.item, value: "center", icon: Icons.align-center, accessible-label: root.labels[1].label },
+            { kind: ChoiceKind.item, value: "right", icon: Icons.align-right, accessible-label: root.labels[2].label },
+        ];
+        value-changed(value) => {
+            if value != "" {
+                root.value-changed(value);
+            }
+        }
+    }
+}
+
+export component SwitchRow inherits HorizontalLayout {
+    in property <string> label;
+    in property <bool> checked;
+    in property <bool> disabled;
+    in property <SwitchRowStyle> style: SwitchRowStyle.toggle;
+    // A `label` row's padding, and its label's own top padding.
+    in property <length> inset-top;
+    in property <length> inset-right;
+    in property <length> inset-bottom;
+    in property <length> inset-left;
+    in property <length> label-top;
+    callback checked-changed(checked: bool);
+
+    padding-top: root.style == SwitchRowStyle.toggle ? 0.5rem : root.style == SwitchRowStyle.label ? root.inset-top : 0px;
+    padding-bottom: root.style == SwitchRowStyle.toggle ? 0.5rem : root.style == SwitchRowStyle.label ? root.inset-bottom : 0px;
+    padding-left: root.style == SwitchRowStyle.toggle ? 0px : root.style == SwitchRowStyle.label ? root.inset-left : 0.25rem;
+    padding-right: root.style == SwitchRowStyle.tall ? 0.25rem : root.style == SwitchRowStyle.label ? root.inset-right : 0px;
+    height: root.style == SwitchRowStyle.tall ? 2.25rem : self.preferred-height;
+    spacing: 0.5rem;
+    if root.style == SwitchRowStyle.toggle: AppText {
+        horizontal-stretch: 1;
+        content: root.label;
+        font-size: 0.741rem;
+        font-weight: Theme.font-weight-bold;
+        tracking: Theme.tracking-wider;
+        color: Theme.muted-foreground;
+        vertical-alignment: center;
+    }
+    if root.style != SwitchRowStyle.toggle: VerticalLayout {
+        horizontal-stretch: 1;
+        alignment: center;
+        padding-top: root.label-top;
+        FieldLabel {
+            height: root.style == SwitchRowStyle.tall ? 9px : 0.667rem;
+            inset-left: 0px;
+            font-size: root.style == SwitchRowStyle.tall ? 9px : 0.667rem;
+            text: root.label;
+            disabled: root.disabled;
+        }
+    }
+    VerticalLayout {
+        alignment: center;
+        Switch {
+            checked: root.checked;
+            disabled: root.disabled;
+            accessible-label: root.label;
+            checked-changed(checked) => {
+                root.checked-changed(checked);
+            }
+        }
+    }
+}

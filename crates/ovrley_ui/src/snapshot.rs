@@ -1,6 +1,6 @@
 //! Debug builds only: `OVRLEY_SNAPSHOT=<dir>` renders the window through Slint's own
 //! `take_snapshot()` into `<dir>/shell-<n>-<state>.png` for a fixed tour of shell states, then
-//! quits. It needs no screen-recording permission, as the Phase 1 showcase's snapshots did.
+//! quits. It needs no screen-recording permission.
 //! `OVRLEY_SNAPSHOT_SIZE=<width>x<height>` sets the window size.
 
 use crate::AppWindow;
@@ -30,7 +30,7 @@ fn tour() -> Vec<Step> {
     use ovrley_app::store::slices::layout::LeftDrawerTool;
     let steps: Vec<(&'static str, StepAction)> = vec![
         // The startup projects dialog opens once its listing arrives; the tour shows it, then
-        // dismisses it as the user would (D14).
+        // dismisses it as the user would.
         ("startup-projects", |store, _| store.projects.startup.open = true),
         ("shell", |store, _| {
             ovrley_app::features::projects::dismiss_startup_dialog(store);
@@ -101,7 +101,7 @@ fn tour() -> Vec<Step> {
             store.layout.dismiss_left_drawer_overlay();
             change_language_preference(store, services, Locale::En);
         }),
-        // The render dialog (Phase 7): the settings without videos, a single render's progress
+        // The render dialog: the settings without videos, a single render's progress
         // (a session set as acceptance sets it), the settings with two videos, the mismatch screen.
         ("render-settings", |store, services| ovrley_app::features::render_video::open_render_dialog(store, services)),
         ("render-progress", |store, _| {
@@ -135,7 +135,7 @@ fn tour() -> Vec<Step> {
             ovrley_app::features::render_video::close_render_dialog(store);
             snapshot_videos(store, &[]);
         }),
-        // Sync Doctor (Phase 8): the Autodetect tab over the pair, then the Manual Sync tab with
+        // Sync Doctor: the Autodetect tab over the pair, then the Manual Sync tab with
         // landmarks, a course location and a search.
         ("sync-autodetect", |store, _| {
             use ovrley_app::store::slices::manual_video_sync as manual;
@@ -183,7 +183,7 @@ fn tour() -> Vec<Step> {
             store.editor.set_selected_widget_id(Some("speed"));
         }),
     ));
-    // One editor per capture (phase 5): the widget alone in the document, selected.
+    // One editor per capture: the widget alone in the document, selected.
     tour.push(("editor-arc", StepKind::Action(|store, _| show_editor(store, "speed", "arc", serde_json::json!({})))));
     tour.push(("editor-linear-bars", StepKind::Action(|store, _| show_editor(store, "speed", "linear", serde_json::json!({"track_fill_style": "bars", "bar_count": 12, "bar_gap": 4})))));
     tour.push(("editor-g-force", StepKind::Action(|store, _| show_editor(store, "g_force", "g_force", serde_json::json!({})))));
@@ -193,7 +193,7 @@ fn tour() -> Vec<Step> {
     tour.push(("editor-time", StepKind::Action(|store, _| show_editor(store, "time", "", serde_json::json!({})))));
     tour.push(("editor-elevation", StepKind::Action(|store, _| show_editor(store, "elevation", "", serde_json::json!({})))));
     tour.push(("editor-heart-zones", StepKind::Action(|store, _| show_editor(store, "heartrate", "heart_zones", serde_json::json!({"zone_calculation": "manual"})))));
-    // Maps (phase 5 step 9): a chase camera over the imported ride, then a top-down circle in its
+    // Maps: a chase camera over the imported ride, then a top-down circle in its
     // view mode (the dashed outline, the hint and Reset).
     tour.push(("editor-map", StepKind::Action(|store, _| show_editor(store, "map", "", serde_json::json!({})))));
     tour.push((

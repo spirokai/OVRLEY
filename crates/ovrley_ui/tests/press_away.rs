@@ -1,11 +1,11 @@
-//! The press-away blur (D19): a press away from the focused text field blurs it and commits. The
+//! The press-away blur: a press away from the focused text field blurs it and commits. The
 //! testing backend has no winit events, so `press` runs the platform handler's check first, as the
 //! application handler does before Slint routes a press.
 
 mod common;
 
 use common::*;
-use ovrley_ui::platform::window_events::press_is_away;
+use ovrley_ui::platform::events::press_is_away;
 use ovrley_ui::FocusedField;
 use slint::platform::Key;
 use slint::{ComponentHandle, LogicalPosition};

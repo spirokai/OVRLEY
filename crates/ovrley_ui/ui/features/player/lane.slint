@@ -1,0 +1,611 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { Popover } from "../../components/popup.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { PlacementSide } from "../../components/logic.slint";
+import { Shadow, ShadowSize } from "../../components/surface.slint";
+import { BandView, ClipTooltipView, ClipView, JoinMarkerView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TileView } from "index.slint";
+import { JoinTransitionPanel } from "../transitions/join-panel.slint";
+
+// Pointer events of a lane element with the x of `area` in timeline coordinates.
+global LanePointer {
+    public pure function phase(event: PointerEvent) -> int {
+        if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+            return 1;
+        }
+        if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+            return 2;
+        }
+        if event.kind == PointerEventKind.cancel {
+            return 3;
+        }
+        return 0;
+    }
+}
+
+// Striped shade (an excluded part or the trimmed-off activity, `background` at 90% with white at
+// 8%; an overlap band, `destructive` at 45% with black at 25%). The lines overshoot the box, which
+// clips them to straight top and bottom edges. The commands are in the box's own pixels, so the
+// path is not fitted: Slint's default `contain` fit scales it into the box minus the stroke width,
+// keeping the aspect ratio, which pulled the stripes in from both ends of a wide box.
+component Stripes inherits Rectangle {
+    in property <string> commands;
+    in property <color> stripe-color;
+    in property <length> stripe-width;
+    clip: true;
+    Path {
+        width: parent.width;
+        height: parent.height;
+        fit: preserve;
+        commands: root.commands;
+        stroke: root.stripe-color;
+        stroke-width: root.stripe-width;
+    }
+}
+
+// A video clip's icon, name and duration in a badge at the left edge of its visible part.
+component ClipBadge {
+    in property <ClipView> view;
+    x: root.view.badge-x;
+    y: 0px;
+    width: min(root.view.badge-max-width, pill.preferred-width + 0.5rem);
+    height: pill.preferred-height + 0.5rem;
+    pill := Rectangle {
+        x: 0.25rem;
+        y: 0.25rem;
+        width: parent.width - 0.5rem;
+        height: row.preferred-height;
+        preferred-width: row.preferred-width;
+        preferred-height: row.preferred-height;
+        border-radius: Theme.radius-xs * 1rem;
+        background: Theme.background.transparentize(0.1);
+        Shadow {
+            size: ShadowSize.sm;
+            radius: Theme.radius-xs * 1rem;
+        }
+
+        row := HorizontalLayout {
+            padding-left: 0.4375rem;
+            padding-right: 0.4375rem;
+            padding-top: 0.15625rem;
+            padding-bottom: 0.15625rem;
+            spacing: 0.75rem;
+            Icon {
+                glyph: root.view.missing ? Icons.triangle-alert : Icons.video;
+                size: 0.875rem;
+                stroke: 3;
+                horizontal-stretch: 0;
+            }
+
+            AppText {
+                content: root.view.label;
+                font-size: 0.75rem;
+                font-weight: Theme.font-weight-extrabold;
+                line-height: 1;
+                overflow: elide;
+                horizontal-stretch: 1;
+                min-width: 0px;
+            }
+
+            AppText {
+                content: root.view.duration-label;
+                font-size: 0.75rem;
+                font-weight: Theme.font-weight-extrabold;
+                line-height: 1;
+                color: Theme.muted-foreground;
+                horizontal-stretch: 0;
+                min-width: self.preferred-width;
+            }
+        }
+    }
+}
+
+// The activity's format (or icon), name and duration over its untrimmed part.
+component ActivityText inherits HorizontalLayout {
+    in property <ClipView> view;
+    padding-left: 0.625rem;
+    padding-right: 0.625rem;
+    spacing: 0.75rem;
+    HorizontalLayout {
+        width: 3rem;
+        padding-left: 0.5rem;
+        AppText {
+            content: root.view.format-label;
+            font-size: 0.85rem;
+            font-weight: Theme.font-weight-black;
+            line-height: 1;
+            overflow: elide;
+            color: Theme.accent-foreground;
+        }
+    }
+
+    AppText {
+        content: root.view.label;
+        font-size: 0.7rem;
+        font-weight: Theme.font-weight-extrabold;
+        line-height: 1;
+        overflow: elide;
+        horizontal-stretch: 1;
+        min-width: 0px;
+        color: Theme.accent-foreground;
+    }
+
+    HorizontalLayout {
+        padding-left: 0.25rem;
+        AppText {
+            content: root.view.duration-label;
+            font-size: 0.7rem;
+            font-weight: Theme.font-weight-black;
+            line-height: 1;
+            color: Theme.accent-foreground;
+        }
+    }
+}
+
+// A clip's box: its press and drag go to Rust (select, drag), its hover shows the tooltip. A clip
+// only a few px wide still gets a 1.5rem hit area centred on it.
+component LaneClip {
+    in property <ClipView> view;
+    in property <bool> is-video;
+    x: root.view.x;
+    width: root.view.width;
+    height: 100%;
+
+    if !root.is-video: Rectangle {
+        background: Theme.accent.transparentize(0.3);
+    }
+    touch := TouchArea {
+        x: min(0px, (parent.width - 1.5rem) / 2);
+        width: max(parent.width, 1.5rem);
+        mouse-cursor: self.pressed ? MouseCursor.grabbing : MouseCursor.grab;
+        pointer-event(event) => {
+            if LanePointer.phase(event) == 1 {
+                Player.clip-pointer(root.view.lane-id, PointerPhase.down, root.view.x + self.x + self.mouse-x);
+            } else if LanePointer.phase(event) == 2 {
+                Player.clip-pointer(root.view.lane-id, PointerPhase.up, root.view.x + self.x + self.mouse-x);
+            } else if LanePointer.phase(event) == 3 {
+                Player.clip-pointer(root.view.lane-id, PointerPhase.cancel, root.view.x + self.x + self.mouse-x);
+            }
+        }
+        moved => {
+            Player.clip-pointer(root.view.lane-id, PointerPhase.move, root.view.x + self.x + self.mouse-x);
+        }
+        changed has-hover => {
+            Player.clip-hover(root.view.lane-id, self.has-hover);
+        }
+    }
+}
+
+// A cut marker or trim handle: a 0.75rem hit area centred on a cut, inside the clip at an edge; a
+// 0.25rem `primary` line on hover and while dragging; `ew-resize`.
+component LaneMarker {
+    in property <MarkerView> marker;
+    property <length> hit: 0.75rem;
+    x: root.marker.align == MarkerAlign.start ? root.marker.x : root.marker.align == MarkerAlign.end ? root.marker.x - root.hit : root.marker.x - root.hit / 2;
+    width: root.hit;
+    SimpleTooltip {
+        content: root.marker.label;
+        width: root.hit;
+        height: root.height;
+        mouse-cursor: MouseCursor.ew-resize;
+        Rectangle {
+            property <length> line: 0.25rem;
+            Rectangle {
+                x: root.marker.align == MarkerAlign.start ? (root.marker.line-inside ? 0px : -parent.line / 2)
+                    : root.marker.align == MarkerAlign.end ? (root.marker.line-inside ? root.hit - parent.line : root.hit - parent.line / 2)
+                    : (root.hit - parent.line) / 2;
+                width: parent.line;
+                background: Theme.primary;
+                opacity: root.marker.dragging || area.has-hover ? 1 : 0;
+                animate opacity { duration: 150ms; }
+            }
+            // A real cut's click opens "Remove cut".
+            if root.marker.removable: Popover {
+                open: Player.cut-popover-lane == root.marker.lane-id && Player.cut-popover-cut == root.marker.cut-id;
+                side: PlacementSide.top;
+                content-width: 14rem;
+                content-padding: 0.75rem;
+                open-changed(open) => {
+                    if !open {
+                        Player.close-cut-popover();
+                    }
+                }
+                VerticalLayout {
+                    spacing: 0.5rem;
+                    AppText {
+                        content: root.marker.label;
+                        font-size: Theme.text-xs * 1rem;
+                        font-weight: Theme.font-weight-semibold;
+                        wrap: word-wrap;
+                    }
+
+                    Button {
+                        variant: ButtonVariant.secondary;
+                        height: 1.75rem;
+                        font-size: Theme.text-xs * 1rem;
+                        text: @tr("player.removeCut" => "Remove cut");
+                        clicked => {
+                            Player.remove-cut(root.marker.lane-id, root.marker.cut-id);
+                        }
+                    }
+                }
+            }
+            area := TouchArea {
+                mouse-cursor: MouseCursor.ew-resize;
+                pointer-event(event) => {
+                    if LanePointer.phase(event) == 1 {
+                        Player.marker-pointer(root.marker.lane-id, root.marker.cut-id, PointerPhase.down, root.x + self.mouse-x);
+                    } else if LanePointer.phase(event) == 2 {
+                        Player.marker-pointer(root.marker.lane-id, root.marker.cut-id, PointerPhase.up, root.x + self.mouse-x);
+                    } else if LanePointer.phase(event) == 3 {
+                        Player.marker-pointer(root.marker.lane-id, root.marker.cut-id, PointerPhase.cancel, root.x + self.mouse-x);
+                    }
+                }
+                moved => {
+                    Player.marker-pointer(root.marker.lane-id, root.marker.cut-id, PointerPhase.move, root.x + self.mouse-x);
+                }
+            }
+        }
+    }
+}
+
+// The clip tooltip above the clip's visible part. The title 0.72rem semibold, the duration row
+// 0.65rem, the metrics 0.6rem, warnings 0.65rem `destructive`.
+export component ClipTooltip {
+    in property <ClipTooltipView> tooltip;
+    property <length> pad-x: 0.625rem;
+    property <length> pad-y: 0.375rem;
+    property <length> inner: root.width - 2 * root.pad-x - 2px;
+    // The widest line unwrapped, which sets the width up to 31rem.
+    property <length> natural: max(max(title.preferred-width, metrics-measure.preferred-width), duration-row.preferred-width);
+    property <length> rule-gap: 0.25rem;
+    width: min(31rem, root.natural + 2 * root.pad-x + 2px);
+    height: root.warnings-y + warnings.height + root.pad-y + 1px;
+    x: root.tooltip.anchor-x - self.width / 2;
+
+    property <length> duration-y: title.y + title.height + root.rule-gap * 2 + 1px;
+    property <length> metrics-y: duration-row.y + duration-row.height + (root.tooltip.metrics != "" ? root.rule-gap * 2 + 1px : 0px);
+    property <length> warnings-y: metrics.y + metrics.height + (root.tooltip.warnings.length > 0 ? root.rule-gap * 2 + 1px : 0px);
+
+    Shadow {
+        size: ShadowSize.xxl;
+        radius: Theme.rounded * 1rem;
+    }
+
+    Rectangle {
+        border-radius: Theme.rounded * 1rem;
+        border-width: 1px;
+        border-color: Theme.border.transparentize(0.3);
+        background: Theme.surface-tooltip;
+    }
+
+    Path {
+        x: (root.width - 8px) / 2;
+        y: root.height - 1px;
+        width: 8px;
+        height: 4px;
+        viewbox-width: 2;
+        viewbox-height: 1;
+        commands: "M0 0 L2 0 L1 1 Z";
+        fill: Theme.surface-tooltip;
+    }
+
+    metrics-measure := AppText {
+        visible: false;
+        content: root.tooltip.metrics;
+        font-size: 0.6rem;
+    }
+
+    title := AppText {
+        x: root.pad-x + 1px;
+        y: root.pad-y + 1px;
+        width: root.inner;
+        height: self.preferred-height;
+        content: root.tooltip.title;
+        font-size: 0.72rem;
+        font-weight: Theme.font-weight-semibold;
+        wrap: word-wrap;
+    }
+
+    Rectangle {
+        x: root.pad-x + 1px;
+        y: title.y + title.height + root.rule-gap;
+        width: root.inner;
+        height: 1px;
+        background: Theme.border.transparentize(0.6);
+    }
+
+    duration-row := HorizontalLayout {
+        x: root.pad-x + 1px;
+        y: root.duration-y;
+        width: root.inner;
+        height: self.preferred-height;
+        spacing: 1rem;
+        AppText {
+            content: @tr("player.duration" => "Duration");
+            font-size: 0.65rem;
+            font-weight: Theme.font-weight-medium;
+            color: Theme.muted-foreground;
+            horizontal-stretch: 1;
+        }
+
+        AppText {
+            content: root.tooltip.duration-label;
+            font-size: 0.65rem;
+        }
+    }
+
+    if root.tooltip.metrics != "": Rectangle {
+        x: root.pad-x + 1px;
+        y: duration-row.y + duration-row.height + root.rule-gap;
+        width: root.inner;
+        height: 1px;
+        background: Theme.border.transparentize(0.6);
+    }
+    metrics := AppText {
+        x: root.pad-x + 1px;
+        y: root.metrics-y;
+        width: root.inner;
+        height: root.tooltip.metrics != "" ? self.preferred-height : 0px;
+        visible: root.tooltip.metrics != "";
+        content: root.tooltip.metrics;
+        font-size: 0.6rem;
+        font-weight: Theme.font-weight-medium;
+        wrap: word-wrap;
+    }
+
+    if root.tooltip.warnings.length > 0: Rectangle {
+        x: root.pad-x + 1px;
+        y: metrics.y + metrics.height + root.rule-gap;
+        width: root.inner;
+        height: 1px;
+        background: Theme.border.transparentize(0.6);
+    }
+    // Warnings may read alike: two overlapping clips can share a file name.
+    warnings := AppText {
+        x: root.pad-x + 1px;
+        y: root.warnings-y;
+        width: root.inner;
+        height: root.tooltip.warnings.length > 0 ? self.preferred-height : 0px;
+        visible: root.tooltip.warnings.length > 0;
+        content: Player.tooltip-warning-text;
+        font-size: 0.65rem;
+        color: Theme.destructive;
+        wrap: word-wrap;
+    }
+}
+
+// A join's diamond. Its popover holds the join's panel.
+component JoinMarker {
+    in property <JoinMarkerView> marker;
+    property <length> size: 0.75rem;
+    x: root.marker.x - self.width / 2;
+    width: root.size * 1.5;
+    height: root.size * 1.5;
+    SimpleTooltip {
+        content: root.marker.label;
+        width: parent.width;
+        height: parent.height;
+        Rectangle {
+            Rectangle {
+                width: root.size;
+                height: root.size;
+                transform-rotation: 45deg;
+                border-radius: 2px;
+                border-width: 1px;
+                border-color: root.marker.invalid ? Theme.destructive : Theme.foreground.transparentize(root.marker.has-transition ? 0.3 : 0.4);
+                background: root.marker.invalid ? Theme.destructive : root.marker.has-transition ? Theme.primary : Theme.background;
+            }
+
+            Popover {
+                open: Player.join-panel-key == root.marker.key;
+                side: PlacementSide.top;
+                content-width: 26rem;
+                content-padding: 0.75rem;
+                open-changed(open) => {
+                    if !open {
+                        Player.close-join();
+                    }
+                }
+                JoinTransitionPanel { }
+            }
+
+            TouchArea {
+                mouse-cursor: MouseCursor.pointer;
+                clicked => {
+                    Player.open-join(root.marker.key);
+                }
+            }
+        }
+    }
+}
+
+// A join whose default did not fit: a dashed, disabled diamond with the reason in a 16rem tooltip.
+component SkippedJoinMarker {
+    in property <JoinMarkerView> marker;
+    property <length> size: 0.75rem;
+    x: root.marker.x - self.width / 2;
+    width: root.size * 1.5;
+    height: root.size * 1.5;
+    SimpleTooltip {
+        content: root.marker.disabled-reason;
+        content-width: 16rem;
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: MouseCursor.not-allowed;
+        Rectangle {
+            Rectangle {
+                width: root.size;
+                height: root.size;
+                transform-rotation: 45deg;
+                border-radius: 2px;
+                background: Theme.background.transparentize(0.3);
+                // Slint draws no dashed border: four dashes per side stand in for it.
+                for side in 4: Rectangle {
+                    x: side == 1 ? root.size - 1px : 0px;
+                    y: side == 2 ? root.size - 1px : 0px;
+                    width: side == 1 || side == 3 ? 1px : root.size;
+                    height: side == 1 || side == 3 ? root.size : 1px;
+                    background: @linear-gradient(side == 1 || side == 3 ? 180deg : 90deg, Theme.foreground.transparentize(0.2) 0%, Theme.foreground.transparentize(0.2) 25%, transparent 25%, transparent 50%, Theme.foreground.transparentize(0.2) 50%, Theme.foreground.transparentize(0.2) 75%, transparent 75%);
+                }
+            }
+        }
+    }
+}
+
+// Tooltips are drawn outside the mask.
+export component TimelineLane {
+    in property <bool> is-video;
+    property <length> above: 0.75rem;
+    property <length> below: 0.25rem;
+    height: root.is-video ? 3rem : 1.5rem;
+
+    mask := Rectangle {
+        y: -root.above;
+        height: root.height + root.above + root.below;
+        clip: true;
+        if root.is-video: Rectangle {
+            y: root.above;
+            height: root.height;
+            for segment in Player.segments: Rectangle {
+                x: segment.x;
+                width: segment.width;
+                background: segment.missing ? Theme.destructive.transparentize(0.4) : Theme.accent.transparentize(0.3);
+                if segment.seam-before: Rectangle {
+                    x: 0px;
+                    width: 1px;
+                    background: Theme.background;
+                }
+                if segment.seam-after: Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    background: Theme.background;
+                }
+            }
+            // Filmstrip tiles, each clipped to its segment, inside a `primary` border.
+            for tile in Player.tiles: Rectangle {
+                x: tile.clip-x;
+                width: tile.clip-width;
+                y: 1px;
+                height: parent.height - 2px;
+                clip: true;
+                Image {
+                    x: tile.x - tile.clip-x;
+                    width: tile.width;
+                    height: parent.height;
+                    source: tile.image;
+                    source-clip-x: tile.frame-x;
+                    source-clip-width: tile.frame-width;
+                    image-fit: fill;
+                }
+            }
+            for segment in Player.segments: Rectangle {
+                x: segment.x;
+                width: segment.width;
+                if segment.has-tiles: Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 1px;
+                    border-color: Theme.primary;
+                }
+                if segment.excluded: Stripes {
+                    background: Theme.background.transparentize(0.1);
+                    commands: segment.stripes;
+                    stripe-color: #ffffff.transparentize(0.92);
+                    stripe-width: 3px;
+                }
+                if segment.selected: Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 2px;
+                    border-color: Theme.primary;
+                }
+            }
+            for clip in Player.video-clips: Rectangle {
+                x: clip.x;
+                width: clip.width;
+                if clip.show-text: ClipBadge {
+                    view: clip;
+                }
+                // The outline sits inside the clip, above its stripes.
+                if clip.has-warnings && !clip.selected: Rectangle {
+                    border-width: 1px;
+                    border-color: Theme.destructive;
+                }
+                if clip.selected: Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    border-width: 2px;
+                    border-color: Theme.primary;
+                }
+            }
+            for clip in Player.video-clips: LaneClip {
+                view: clip;
+                is-video: true;
+            }
+            for join in Player.joins: Rectangle {
+                x: join.band-x;
+                width: join.has-band ? join.band-width : 0px;
+                visible: join.has-band;
+                background: @linear-gradient(90deg, Theme.primary.transparentize(0.65) 0%, Theme.primary.mix(#ffffff, 0.75).transparentize(0.5) 100%);
+            }
+            for band in Player.overlap-bands: Stripes {
+                x: band.x;
+                width: band.width;
+                background: Theme.destructive.transparentize(0.55);
+                commands: band.stripes;
+                stripe-color: #000000.transparentize(0.75);
+                stripe-width: 4px;
+            }
+        }
+        if !root.is-video && Player.activity-clip-visible: Rectangle {
+            y: root.above;
+            height: root.height;
+            LaneClip {
+                view: Player.activity-clip;
+                is-video: false;
+            }
+
+            for trim in Player.trim-masks: Stripes {
+                x: trim.x;
+                width: trim.width;
+                background: Theme.background.transparentize(0.1);
+                commands: trim.stripes;
+                stripe-color: #ffffff.transparentize(0.92);
+                stripe-width: 3px;
+            }
+            if Player.activity-clip.show-text: ActivityText {
+                height: 100%;
+                x: Player.activity-clip.x + Player.activity-clip.text-x;
+                width: Player.activity-clip.text-width;
+                view: Player.activity-clip;
+            }
+            if Player.activity-clip.selected: Rectangle {
+                x: Player.activity-clip.x;
+                width: Player.activity-clip.width;
+                border-radius: Theme.radius-xs * 1rem;
+                border-width: 2px;
+                border-color: Theme.primary;
+            }
+        }
+        for marker in (root.is-video ? Player.cut-markers : Player.trim-markers): LaneMarker {
+            y: root.above;
+            height: root.height;
+            marker: marker;
+        }
+        if root.is-video: Rectangle {
+            for join in Player.joins: JoinMarker {
+                visible: join.visible && join.disabled-reason == "";
+                y: root.above + 0.375rem - 0.1875rem;
+                marker: join;
+            }
+        }
+    }
+    // Skipped defaults sit outside the mask, so their tooltips are not clipped.
+    if root.is-video: Rectangle {
+        for join in Player.joins: SkippedJoinMarker {
+            visible: join.visible && join.disabled-reason != "";
+            y: -0.375rem - 0.1875rem;
+            marker: join;
+        }
+    }
+}

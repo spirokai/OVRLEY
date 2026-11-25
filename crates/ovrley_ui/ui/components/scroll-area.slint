@@ -1,10 +1,8 @@
-import { Theme } from "../theme/theme.slint";
+import { Theme } from "../theme.slint";
 
-// A Flickable with the app's one scrollbar, `.thin-scrollbar` (utilities.css): 0.148rem wide, a
-// 1px radius thumb `foreground` at 40%, `accent` on hover and while dragged, on a transparent track.
-// React also has a wider default scrollbar (the control panel's); the regression review asked for
-// one style everywhere, so every scroll area uses the thin one. The bar sits beside the content,
-// never over it (`scrollbar-gutter: stable`).
+// A Flickable with the app's one scrollbar, `.thin-scrollbar`: 0.148rem wide, a 1px radius thumb
+// `foreground` at 40%, `accent` on hover and while dragged, on a transparent track. The bar sits
+// beside the content, never over it (`scrollbar-gutter: stable`).
 export component ScrollArea {
     in-out property <length> content-y <=> flick.content-y;
     out property <length> content-height: flick.content-height;
@@ -22,11 +20,9 @@ export component ScrollArea {
         height: root.height;
         interactive: false;
         content-width: self.width;
-        // The webview's styled scrollbar takes layout space only while the content overflows.
         // Here the width would then depend on the height it produces, a binding loop, so the
-        // scrollbar's width is always reserved.
-        // `x` pins the content to the left edge: an element with a width but no `x` is centred,
-        // which would push it half a bar under the scrollbar.
+        // scrollbar's width is always reserved. `x` pins the content to the left edge: an element
+        // with a width but no `x` is centred, which would push it half a bar under the scrollbar.
         VerticalLayout {
             x: 0px;
             width: root.width - root.bar-size;

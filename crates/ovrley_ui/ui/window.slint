@@ -1,0 +1,56 @@
+import "../../../fonts/ui/Figtree-variable.ttf";
+import "../../../fonts/ui/FiraCode-variable.ttf";
+import { Theme, WindowMetrics } from "theme.slint";
+import { TooltipLayerView } from "components/tooltip.slint";
+import { AlertLayerView } from "components/alert.slint";
+
+// What a frameless window draws of its own frame: nothing (the system draws it, or the window is
+// maximised), a 1px `border` edge, as the app's other borders, or that edge with the content
+// clipped to rounded corners over a transparent window.
+export enum WindowFrame { none, edge, rounded }
+
+// Every rem in the UI follows it. It also hosts the window's tooltip layer, above the content.
+export component FluidWindow inherits Window {
+    // From `WindowMetrics.width`, which the `changed width` handler below keeps current, not from
+    // `self.width`: rem widths in the content feed the window's minimum size, so a binding on the
+    // window's own width would be a binding loop.
+    default-font-size: max(9px, min(14.6px, WindowMetrics.width * 0.00584 + 5.5px));
+    default-font-family: Theme.font-sans;
+    default-font-weight: Theme.font-weight-normal;
+    in property <WindowFrame> drawn-frame;
+    property <bool> rounded-frame: root.drawn-frame == WindowFrame.rounded;
+    property <length> frame-radius: root.rounded-frame ? 8px : 0px;
+    background: root.rounded-frame ? transparent : Theme.background;
+
+    property <length> hairline: max(1px, 1phx);
+
+    init => {
+        WindowMetrics.width = self.width;
+        WindowMetrics.height = self.height;
+        Theme.hairline = self.hairline;
+    }
+    changed hairline => {
+        Theme.hairline = self.hairline;
+    }
+    changed width => {
+        WindowMetrics.width = self.width;
+    }
+    changed height => {
+        WindowMetrics.height = self.height;
+    }
+
+    Rectangle {
+        background: Theme.background;
+        border-radius: root.frame-radius;
+        clip: root.rounded-frame;
+        @children
+        TooltipLayerView { }
+        // Last, so the error alert stays above everything in the main tree.
+        AlertLayerView { }
+    }
+    if root.drawn-frame != WindowFrame.none: Rectangle {
+        border-radius: root.frame-radius;
+        border-width: 1px;
+        border-color: Theme.border;
+    }
+}

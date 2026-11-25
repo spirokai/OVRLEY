@@ -1,11 +1,11 @@
-import { Theme } from "../theme/theme.slint";
-import { AppText } from "app-text.slint";
+import { Theme } from "../theme.slint";
+import { AppText } from "text.slint";
 import { Icon, Icons } from "icons.slint";
-import { FocusRing } from "focus-ring.slint";
+import { FocusRing } from "focus.slint";
 
-// accordion.jsx. The one caller uses single, collapsible mode driven by app state, so the caller
-// (Phase 3) applies that rule: it passes `open` to the trigger and the content, and handles
-// `toggled`. Slint parents cannot hand state to their children, hence `open` on both parts.
+// The one caller uses single, collapsible mode driven by app state, so the caller applies that
+// rule: it passes `open` to the trigger and the content, and handles `toggled`. Slint parents
+// cannot hand state to their children, hence `open` on both parts.
 
 // An item: its trigger and content, with a bottom border.
 export component AccordionItem inherits VerticalLayout {
@@ -16,9 +16,8 @@ export component AccordionItem inherits VerticalLayout {
     }
 }
 
-// The trigger: 1rem vertical padding, `text-sm`, weight 500, underlined on hover; the slot holds
-// its content. The muted 1rem chevron rotates 180° over 200 ms and turns `primary` when open.
-// Enter and Space toggle it. The colour and padding properties are the call site's overrides (D5).
+// The muted 1rem chevron rotates 180° over 200 ms and turns `primary` when open. Enter and Space
+// toggle it. The colour and padding properties are the call site's overrides.
 export component AccordionTrigger {
     in property <bool> open;
     in property <string> text;
@@ -118,9 +117,8 @@ export component AccordionTrigger {
     }
 }
 
-// The content: its height animates over 160 ms (Radix's accordion keyframes, `ease-out`) and is
-// clipped, with 1rem bottom padding. The colour and padding properties are the call site's
-// overrides (D5).
+// The content: its height animates over 160 ms and is clipped, with 1rem bottom padding. The colour
+// and padding properties are the call site's overrides.
 export component AccordionContent inherits Rectangle {
     in property <bool> open;
     in property <length> inset-left: 0px;

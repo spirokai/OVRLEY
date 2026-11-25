@@ -1,7 +1,7 @@
-// Logic globals (D2). Slint cannot call Rust directly, so components call these pure callbacks;
-// they are bound after the window is created, so components must not call them from `init`;
-// `install_component_logic` (ovrley_ui/src/logic) binds them to ovrley_app. In the LSP preview they
-// are unbound: components still render, and interactions that need Rust are tested in the showcase.
+// Logic globals. Slint cannot call Rust directly, so components call these pure callbacks; they are
+// bound after the window is created, so components must not call them from `init`;
+// `install_component_logic` (`src/logic.rs`) binds them to ovrley_app. In the LSP preview they are
+// unbound: components still render, and interactions that need Rust are tested in tests/.
 
 // ── Colour ──────────────────────────────────────────────────────────────────────────────────────
 
@@ -103,7 +103,7 @@ export struct NumberConstraints {
 
 export enum StepDirection { up, down }
 
-// `stepUp()`/`stepDown()`: `stepped` is false where the input cannot step (`step="any"`).
+// `stepUp`/`stepDown`: `stepped` is false where the input cannot step (`step="any"`).
 export struct SteppedNumber {
     stepped: bool,
     text: string,
@@ -173,15 +173,15 @@ export global PlacementLogic {
 
 export enum ChoiceKind { item, label, separator }
 
-// One entry of a list of choices (D4): a tab trigger, a toggle-group item, or a select item,
-// group label or separator. `pressed` is a toggle-group item's state in multiple mode.
+// One entry of a list of choices: a tab trigger, a toggle-group item, or a select item, group label
+// or separator. `pressed` is a toggle-group item's state in multiple mode.
 export struct Choice {
     kind: ChoiceKind,
     value: string,
     label: string,
     // An `Icons` path; empty for none.
     icon: string,
-    // A select item's icon colour (`OptionIcon className`); transparent for the item's text colour.
+    // A select item's icon colour; transparent for the item's text colour.
     icon-color: color,
     // The accessible name of an icon-only item; empty to use `label`.
     accessible-label: string,
@@ -206,7 +206,6 @@ export global ChoiceListLogic {
     // The first enabled item from `from` (inclusive) stepping by `direction`; `wrap` continues
     // past the ends.
     pure callback next-enabled(items: [Choice], from: int, direction: int, wrap: bool) -> int;
-    // Radix Select's type-ahead from the `current` item.
     pure callback typeahead(items: [Choice], current: int, search: string) -> int;
     // The list's content height and where entry `index` starts: items and labels are `row-height`
     // tall, separators `separator-height`, inside `padding` above and below.

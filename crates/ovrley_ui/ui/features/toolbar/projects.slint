@@ -1,0 +1,139 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant } from "../../components/button.slint";
+import { SectionHeading, SectionHeadingVariant } from "../../components/section-heading.slint";
+import { ScrollArea } from "../../components/scroll-area.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { PlacementAlign } from "../../components/logic.slint";
+import { Projects, ProjectSourceView } from "../documents.slint";
+
+component ProjectSource inherits VerticalLayout {
+    in property <string> icon;
+    in property <string> label;
+    in property <ProjectSourceView> source;
+
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    spacing: 0.75rem;
+    SectionHeading {
+        icon: root.icon;
+        title: root.label;
+        variant: SectionHeadingVariant.drawer;
+        SimpleTooltip {
+            content: root.source.filename;
+            align: PlacementAlign.end;
+            wrap-text: true;
+            max-width: 8rem;
+            AppText {
+                content: root.source.filename;
+                font-size: Theme.text-xs * 1rem;
+                font-weight: Theme.font-weight-medium;
+                color: Theme.foreground.transparentize(0.1);
+                overflow: elide;
+                max-lines: 1;
+            }
+        }
+    }
+    AppText {
+        content: root.source.path;
+        font-size: Theme.text-xs * 1rem;
+        color: Theme.muted-foreground;
+        wrap: char-wrap;
+    }
+}
+
+export component ProjectsDrawer inherits ScrollArea {
+    VerticalLayout {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-bottom: 1rem;
+        alignment: start;
+        VerticalLayout {
+            spacing: 0.75rem;
+            HorizontalLayout {
+                spacing: 0.5rem;
+                Button {
+                    horizontal-stretch: 1;
+                    preferred-width: 0px;
+                    icon: Icons.file-plus-2;
+                    text: @tr("toolbar.newProject" => "New Project");
+                    disabled: Projects.busy;
+                    clicked => {
+                        Projects.new-project();
+                    }
+                }
+                Button {
+                    horizontal-stretch: 1;
+                    preferred-width: 0px;
+                    variant: ButtonVariant.secondary;
+                    icon: Icons.folder-open;
+                    text: @tr("toolbar.openProject" => "Open Project");
+                    disabled: Projects.busy;
+                    clicked => {
+                        Projects.open-project();
+                    }
+                }
+            }
+            Button {
+                variant: ButtonVariant.secondary;
+                icon: Icons.save;
+                text: @tr("toolbar.saveProject" => "Save Project");
+                disabled: Projects.busy || Projects.save-disabled;
+                clicked => {
+                    Projects.save-project();
+                }
+            }
+            Button {
+                variant: ButtonVariant.secondary;
+                icon: Icons.save;
+                text: @tr("toolbar.saveProjectAs" => "Save Project As");
+                disabled: Projects.busy;
+                clicked => {
+                    Projects.save-project-as();
+                }
+            }
+        }
+        if Projects.has-project: VerticalLayout {
+            padding-top: 2.5rem;
+            Rectangle {
+                height: Theme.hairline;
+                background: Theme.border.transparentize(0.2);
+            }
+            VerticalLayout {
+                padding-top: 0.5rem;
+                spacing: 1.5rem;
+                SimpleTooltip {
+                    content: Projects.project.filename;
+                    align: PlacementAlign.start;
+                    wrap-text: true;
+                    HorizontalLayout {
+                        padding-top: 1rem;
+                        padding-bottom: 0.5rem;
+                        padding-left: 0.25rem;
+                        AppText {
+                            content: Projects.project.filename;
+                            font-size: Theme.text-sm * 1rem;
+                            font-weight: Theme.font-weight-extrabold;
+                            overflow: elide;
+                            max-lines: 1;
+                        }
+                    }
+                }
+                VerticalLayout {
+                    spacing: 2rem;
+                    if Projects.has-activity: ProjectSource {
+                        icon: Icons.activity;
+                        label: @tr("toolbar.activity" => "Activity");
+                        source: Projects.activity;
+                    }
+                    for video in Projects.videos: ProjectSource {
+                        icon: Icons.film;
+                        label: @tr("toolbar.video" => "Video");
+                        source: video;
+                    }
+                }
+            }
+        }
+    }
+}

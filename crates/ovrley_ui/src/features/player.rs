@@ -1,57 +1,77 @@
-//! The player feature (phase 4): its projection into the `Player` global, its callbacks, and the
-//! playback timer.
+//! The player (`Player`): transport, timeline axis and ticks, the video and activity lanes, cuts,
+//! trims and joins, and the timers that drive playback, edge auto-scroll and filmstrip requests.
 //!
-//! The timeline clock is driven by a repeating 8 ms timer while it plays (Concat drives its clock
-//! the same way; `concat-playback.md`). A tick dispatches only when the next preview frame is due,
-//! so the projections run at the preview's frame rate, not at the timer's. Nothing runs while
-//! paused.
+//! While the timeline clock plays, a repeating 8 ms timer checks whether the next preview frame is
+//! due and dispatches only then, so the projections run at the preview's frame rate, not at the
+//! timer's. Nothing runs while paused.
 
-use crate::hooks::app_store_selectors::{replace_if_changed, set_if_changed};
-use crate::{AppWindow, TileView, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, JoinMarkerView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView, TimelineSurfaceKind, TransitionOption, TransitionOptionKind};
-use crate::platform::key_input::{key_input, SlintModifiers};
-use ovrley_app::features::transitions;
-use ovrley_app::features::player::lanes::{self, MarkerTarget};
-use ovrley_app::lib::activity::TrimEdge;
-use ovrley_app::store::slices::video_import::ClipLane;
-use ovrley_app::features::player::gestures::{surface_cancel, surface_down, surface_move, surface_up, SurfaceGesture};
+use crate::features::transitions::{transition_index, transition_options};
+use crate::platform::keys::{key_name, Modifiers};
+use crate::projection::{convert_enum, models_equal, replace_if_changed, rgba_image, set_if_changed, strings};
+use crate::{
+    AppWindow, BandView, Choice, ChoiceKind, ClipTooltipView, ClipView, JoinMarkerView, MajorTickView, MarkerAlign, MarkerView, Player, PointerPhase, SegmentView,
+    TileView, TimelineSurfaceKind,
+};
+use ovrley_app::features::player::gestures::{self, surface_cancel, SurfaceGesture};
+use ovrley_app::features::player::lanes::{self, MarkerAlign as AppMarkerAlign, MarkerTarget};
 use ovrley_app::features::player::playback::{self, player_timing};
 use ovrley_app::features::player::viewport::{self, compute_tick_strip, fit_targets, matching_fit_target, tick_placement, zoom_limits, FitTargetId, TickPlacement};
+use ovrley_app::features::player::{self as player_feature, edits};
+use ovrley_app::features::transitions;
+use ovrley_app::lib::activity::TrimEdge;
 use ovrley_app::lib::format::format_clock_duration;
 use ovrley_app::lib::utils::clamp;
+use ovrley_app::lib::video_program::segments::TrimSide;
 use ovrley_app::store::slices::editor::PreviewPlaybackState;
+use ovrley_app::store::slices::video_filmstrip::{ReadyStrip, StripState};
+use ovrley_app::store::slices::video_import::ClipLane;
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
-use slint::{ComponentHandle, SharedString};
-use std::cell::RefCell;
-use std::rc::Rc;
+use slint::{ComponentHandle, Image, SharedString};
+use std::cell::{Cell, RefCell};
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+convert_enum!(MarkerAlign <=> AppMarkerAlign { Start, Center, End });
 
 /// How often the playback timer checks whether a preview frame is due.
 const PLAYBACK_TIMER_INTERVAL: Duration = Duration::from_millis(8);
+/// How often a clip drag in an edge zone scrolls the timeline.
+const AUTO_SCROLL_INTERVAL: Duration = Duration::from_millis(16);
 
-/// The tick strip as last built: rebuilt only when its placement or the pixel grid changes.
-type TickStrip = (TickPlacement, f64, f64, Vec<MajorTickView>, Vec<f32>);
+/// The tick strip as last built, rebuilt only when its placement or the pixel grid changes.
+struct TickStrip {
+    placement: TickPlacement,
+    width: f64,
+    scale_factor: f64,
+    major: Vec<MajorTickView>,
+    minor: Vec<f32>,
+}
 
 pub struct Projection {
     dispatch: DispatchHandle,
-    timer: Rc<slint::Timer>,
-    /// Steps the auto-scroll while a clip drag sits in an edge zone (D9), standing in for React's
-    /// animation-frame loop.
+    playback_timer: slint::Timer,
+    /// Steps the auto-scroll while a clip drag sits in an edge zone.
     scroll_timer: slint::Timer,
     strip: RefCell<Option<TickStrip>>,
-    /// Each loaded filmstrip's sprite, uploaded once however many tiles show it (D12).
-    sprites: RefCell<std::collections::HashMap<usize, (std::sync::Arc<ovrley_app::store::slices::video_filmstrip::ReadyStrip>, slint::Image)>>,
+    /// Each loaded filmstrip's sprite, uploaded once however many tiles show it, by the strip's
+    /// address; the strip is kept so the address stays its own.
+    sprites: RefCell<HashMap<usize, (Arc<ReadyStrip>, Image)>>,
     /// Publishes the timeline's wanted filmstrip windows once the view settled.
     wanted_timer: slint::Timer,
-    wanted_deadline: std::cell::Cell<Option<Instant>>,
+    wanted_deadline: Cell<Option<Instant>>,
 }
 
 impl Projection {
     pub fn new(dispatch: DispatchHandle) -> Self {
-        Self { dispatch, timer: Rc::new(slint::Timer::default()), scroll_timer: slint::Timer::default(),
+        Self {
+            dispatch,
+            playback_timer: slint::Timer::default(),
+            scroll_timer: slint::Timer::default(),
             strip: RefCell::new(None),
             sprites: RefCell::default(),
             wanted_timer: slint::Timer::default(),
-            wanted_deadline: std::cell::Cell::new(None),
+            wanted_deadline: Cell::new(None),
         }
     }
 
@@ -59,14 +79,14 @@ impl Projection {
     fn drive_playback(&self, store: &Store) {
         let playing = store.editor.preview_playback_state == PreviewPlaybackState::Playing && playback::next_frame_at(store).is_some();
         if !playing {
-            self.timer.stop();
+            self.playback_timer.stop();
             return;
         }
-        if self.timer.running() {
+        if self.playback_timer.running() {
             return;
         }
         let dispatch = self.dispatch.clone();
-        self.timer.start(slint::TimerMode::Repeated, PLAYBACK_TIMER_INTERVAL, move || {
+        self.playback_timer.start(slint::TimerMode::Repeated, PLAYBACK_TIMER_INTERVAL, move || {
             let now = Instant::now();
             let due = dispatch.with_store(playback::next_frame_at).flatten();
             if due.is_some_and(|due| due <= now) {
@@ -78,7 +98,7 @@ impl Projection {
     }
 
     fn drive_auto_scroll(&self, store: &Store) {
-        if !ovrley_app::features::player::gestures::clip_drag_in_edge_zone(store) {
+        if !gestures::clip_drag_in_edge_zone(store) {
             self.scroll_timer.stop();
             return;
         }
@@ -86,19 +106,18 @@ impl Projection {
             return;
         }
         let dispatch = self.dispatch.clone();
-        self.scroll_timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
+        self.scroll_timer.start(slint::TimerMode::Repeated, AUTO_SCROLL_INTERVAL, move || {
             dispatch.dispatch(|store, _| {
-                ovrley_app::features::player::gestures::clip_drag_auto_scroll(store, Instant::now());
+                gestures::clip_drag_auto_scroll(store, Instant::now());
             });
         });
     }
 
     fn drive_wanted_windows(&self, store: &Store) {
         let deadline = store.filmstrip_queue.wanted_deadline();
-        if deadline == self.wanted_deadline.get() {
+        if deadline == self.wanted_deadline.replace(deadline) {
             return;
         }
-        self.wanted_deadline.set(deadline);
         let Some(deadline) = deadline else {
             self.wanted_timer.stop();
             return;
@@ -109,47 +128,44 @@ impl Projection {
         });
     }
 
-    /// The sprite of a strip as one Slint image, cached by the strip.
-    fn sprite(&self, strip: &std::sync::Arc<ovrley_app::store::slices::video_filmstrip::ReadyStrip>) -> slint::Image {
-        let key = std::sync::Arc::as_ptr(strip) as usize;
+    /// The sprite of a strip as one image, cached by the strip.
+    fn sprite(&self, strip: &Arc<ReadyStrip>) -> Image {
+        let key = Arc::as_ptr(strip) as usize;
         let mut sprites = self.sprites.borrow_mut();
-        sprites
-            .entry(key)
-            .or_insert_with(|| {
-                let buffer = slint::SharedPixelBuffer::<slint::Rgba8Pixel>::clone_from_slice(&strip.pixels, strip.width, strip.height);
-                (std::sync::Arc::clone(strip), slint::Image::from_rgba8(buffer))
-            })
-            .1
-            .clone()
+        let (_, image) = sprites.entry(key).or_insert_with(|| (Arc::clone(strip), rgba_image(&strip.pixels, strip.width, strip.height)));
+        image.clone()
     }
 
-    fn project_lanes(&self, player: &Player<'_>, store: &Store) {
-        let (video, activity) = ovrley_app::features::player::lanes_view(store);
-        let tiles: Vec<TileView> = project_lanes(player, video, activity)
+    fn project_tiles(&self, player: &Player<'_>, store: &Store, tiles: &[lanes::TileView]) {
+        let views: Vec<TileView> = tiles
             .iter()
             .map(|tile| {
                 let frame_width = tile.strip.width / tile.strip.sample_count.max(1);
+                let int = |value: u32| i32::try_from(value).expect("a sprite offset fits an i32");
                 TileView {
                     x: tile.x as f32,
                     width: tile.width as f32,
                     clip_x: tile.clip_x as f32,
                     clip_width: tile.clip_width as f32,
                     image: self.sprite(&tile.strip),
-                    frame_x: (tile.sample * frame_width) as i32,
-                    frame_width: frame_width as i32,
+                    frame_x: int(tile.sample * frame_width),
+                    frame_width: int(frame_width),
                 }
             })
             .collect();
         // Sprites no strip holds any more are released.
-        let live: std::collections::HashSet<usize> = store
+        let live: HashSet<usize> = store
             .video_filmstrip
             .strips
             .values()
             .flat_map(|strips| strips.values())
-            .filter_map(|strip| if let ovrley_app::store::slices::video_filmstrip::StripState::Ready(strip) = strip { Some(std::sync::Arc::as_ptr(strip) as usize) } else { None })
+            .filter_map(|strip| match strip {
+                StripState::Ready(strip) => Some(Arc::as_ptr(strip) as usize),
+                _ => None,
+            })
             .collect();
         self.sprites.borrow_mut().retain(|key, _| live.contains(key));
-        replace_if_changed(player.get_tiles(), tiles, |model| player.set_tiles(model));
+        replace_if_changed(player.get_tiles(), views, |model| player.set_tiles(model));
     }
 
     pub fn project(&self, window: &AppWindow, store: &Store) {
@@ -168,7 +184,7 @@ impl Projection {
 
         let view = store.editor.timeline_viewport;
         let metrics = store.player.viewport.metrics;
-        let minimum = ovrley_app::features::player::playback::timeline_minimum(store.player.timeline.timeline().displayed.bounds);
+        let minimum = playback::timeline_minimum(store.player.timeline.timeline().displayed.bounds);
         let (can_zoom_in, can_zoom_out) = zoom_limits(view, timing.total_duration, minimum, metrics.width_px);
         set_if_changed(player.get_can_zoom_in(), can_zoom_in, |value| player.set_can_zoom_in(value));
         set_if_changed(player.get_can_zoom_out(), can_zoom_out, |value| player.set_can_zoom_out(value));
@@ -176,23 +192,29 @@ impl Projection {
         let matched = matching_fit_target(view, &targets);
         set_if_changed(player.get_reset_view_disabled(), matched == Some(FitTargetId::All), |value| player.set_reset_view_disabled(value));
         let locale = store.i18n.language;
-        let choices = targets
-            .iter()
-            .map(|target| Choice { kind: ChoiceKind::Item, value: target.id.id().into(), label: target.id.label(locale).into(), ..Choice::default() })
-            .collect();
+        let choices = targets.iter().map(|target| Choice { kind: ChoiceKind::Item, value: target.id.id().into(), label: target.id.label(locale).into(), ..Choice::default() }).collect();
         replace_if_changed(player.get_fit_targets(), choices, |model| player.set_fit_targets(model));
         set_if_changed(player.get_fit_target(), SharedString::from(matched.map_or("", FitTargetId::id)), |value| player.set_fit_target(value));
 
         self.project_ticks(&player, store);
-        let px = |second: f64| if view.view_end > view.view_start && metrics.width_px > 0.0 { (second - view.view_start) / (view.view_end - view.view_start) * metrics.width_px } else { 0.0 };
+        let px = |second: f64| {
+            if view.view_end > view.view_start && metrics.width_px > 0.0 {
+                (second - view.view_start) / (view.view_end - view.view_start) * metrics.width_px
+            } else {
+                0.0
+            }
+        };
         // The playhead's line centre (6.5 px into its 13 px) sits on the playhead.
         let playhead = metrics.snap_to_screen_pixel(px(timing.clamped_playhead) - 6.5);
         set_if_changed(player.get_playhead_x(), playhead as f32, |value| player.set_playhead_x(value));
-        self.project_lanes(&player, store);
+        let (video, activity) = player_feature::lanes_view(store);
+        let tiles = project_lanes(&player, video, activity.as_ref());
+        self.project_tiles(&player, store, &tiles);
         project_edits(&player, store);
         project_join_panel(&player, store);
         // One drag runs at a time: the guideline of a dragged cut, or of a dragged clip.
-        let guideline = store.player.cut_drag.as_ref().and_then(|drag| drag.guideline_second).or_else(|| store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second));
+        let cut_guideline = store.player.cut_drag.as_ref().and_then(|drag| drag.guideline_second);
+        let guideline = cut_guideline.or_else(|| store.player.clip_drag.as_ref().and_then(|drag| drag.guideline_second));
         set_if_changed(player.get_guideline_visible(), guideline.is_some(), |value| player.set_guideline_visible(value));
         if let Some(second) = guideline {
             set_if_changed(player.get_guideline_x(), metrics.round_to_device_pixel(px(second)) as f32, |value| player.set_guideline_x(value));
@@ -211,19 +233,20 @@ impl Projection {
             return;
         };
         let mut strip = self.strip.borrow_mut();
-        let stale = strip.as_ref().is_none_or(|(cached, width, scale, _, _)| *cached != placement || *width != metrics.width_px || *scale != metrics.scale_factor);
-        if stale {
+        let fresh = strip.as_ref().is_some_and(|strip| strip.placement == placement && strip.width == metrics.width_px && strip.scale_factor == metrics.scale_factor);
+        let strip = if fresh {
+            strip.as_ref().expect("checked above")
+        } else {
             let (major, minor) = compute_tick_strip(placement.anchor_second, placement.step, placement.px_per_second, metrics.width_px);
             let major = major
                 .into_iter()
                 .map(|tick| MajorTickView { line_x: metrics.round_to_device_pixel(tick.x) as f32, label_x: tick.x as f32, label: tick.label.unwrap_or_default().into() })
                 .collect();
             let minor = minor.into_iter().map(|tick| metrics.round_to_device_pixel(tick.x) as f32).collect();
-            *strip = Some((placement, metrics.width_px, metrics.scale_factor, major, minor));
-        }
-        let (_, _, _, major, minor) = strip.as_ref().expect("built above");
-        replace_if_changed(player.get_major_ticks(), major.clone(), |model| player.set_major_ticks(model));
-        replace_if_changed(player.get_minor_ticks(), minor.clone(), |model| player.set_minor_ticks(model));
+            strip.insert(TickStrip { placement, width: metrics.width_px, scale_factor: metrics.scale_factor, major, minor })
+        };
+        replace_if_changed(player.get_major_ticks(), strip.major.clone(), |model| player.set_major_ticks(model));
+        replace_if_changed(player.get_minor_ticks(), strip.minor.clone(), |model| player.set_minor_ticks(model));
         let offset = metrics.round_to_device_pixel((placement.anchor_second - view.view_start) * placement.px_per_second);
         set_if_changed(player.get_strip_offset(), offset as f32, |value| player.set_strip_offset(value));
     }
@@ -253,20 +276,24 @@ fn band_view(band: &lanes::BandView) -> BandView {
     BandView { x: band.x as f32, width: band.width as f32, stripes: band.stripes.as_str().into() }
 }
 
+/// The marker id of an activity trim edge, which `bind` reads back.
+fn trim_marker_id(edge: TrimEdge) -> &'static str {
+    match edge {
+        TrimEdge::Start => "start",
+        TrimEdge::End => "end",
+    }
+}
+
 fn marker_view(marker: &lanes::MarkerView) -> MarkerView {
     let (lane_id, cut_id) = match &marker.target {
         MarkerTarget::Cut { video_id, cut_id } => (ClipLane::Video(video_id.clone()).id(), cut_id.clone()),
-        MarkerTarget::ActivityTrim(edge) => (ClipLane::Activity.id(), if *edge == TrimEdge::Start { "start".into() } else { "end".into() }),
+        MarkerTarget::ActivityTrim(edge) => (ClipLane::Activity.id(), trim_marker_id(*edge).to_string()),
     };
     MarkerView {
         lane_id: lane_id.into(),
         cut_id: cut_id.into(),
         x: marker.x as f32,
-        align: match marker.align {
-            lanes::MarkerAlign::Start => MarkerAlign::Start,
-            lanes::MarkerAlign::Center => MarkerAlign::Center,
-            lanes::MarkerAlign::End => MarkerAlign::End,
-        },
+        align: marker.align.into(),
         line_inside: marker.line_inside,
         label: marker.label.as_str().into(),
         dragging: marker.dragging,
@@ -290,7 +317,7 @@ fn join_view(join: &lanes::JoinMarkerView) -> JoinMarkerView {
     }
 }
 
-/// The open join's panel (D13): its transition, duration field and picker.
+/// The open join's panel: its transition, duration field and picker.
 fn project_join_panel(player: &Player<'_>, store: &Store) {
     let open = store.player.join_panel.as_ref().and_then(|panel| transitions::join_model(store, &panel.key).map(|model| (panel, model)));
     let Some((panel, model)) = open else {
@@ -300,9 +327,7 @@ fn project_join_panel(player: &Player<'_>, store: &Store) {
     let locale = store.i18n.language;
     set_if_changed(player.get_join_panel_key(), SharedString::from(model.key.as_str()), |value| player.set_join_panel_key(value));
     set_if_changed(player.get_join_label(), SharedString::from(model.label.as_str()), |value| player.set_join_label(value));
-    let catalogue = ovrley_core::encode::ffmpeg::transitions::xfade_transitions();
-    let index_of = |name: &str| catalogue.iter().position(|candidate| candidate == name).map_or(-1, |index| index as i32);
-    set_if_changed(player.get_join_preview_index(), model.preview_type.map_or(-1, index_of), |value| player.set_join_preview_index(value));
+    set_if_changed(player.get_join_preview_index(), transition_index(model.preview_type), |value| player.set_join_preview_index(value));
     set_if_changed(player.get_join_duration_visible(), model.duration_seconds.is_some(), |value| player.set_join_duration_visible(value));
     if let Some(seconds) = model.duration_seconds {
         let field = panel.duration.view(transitions::duration_options(model.duration_fps), seconds, locale);
@@ -310,21 +335,19 @@ fn project_join_panel(player: &Player<'_>, store: &Store) {
         set_if_changed(player.get_join_duration_preview(), SharedString::from(field.preview.unwrap_or_default()), |value| player.set_join_duration_preview(value));
         set_if_changed(player.get_join_duration_error(), SharedString::from(field.error.unwrap_or_default()), |value| player.set_join_duration_error(value));
     }
-    set_if_changed(player.get_join_error(), SharedString::from(model.error.unwrap_or_default()), |value| player.set_join_error(value));
-    let none_label = ovrley_app::i18n::catalog().t_or(locale, "transitions.none", "No transition").to_string();
-    let options = [
-        TransitionOption { kind: TransitionOptionKind::Default, value: transitions::DEFAULT_TRANSITION_OPTION.into(), label: model.default_label.as_str().into(), index: -1 },
-        TransitionOption { kind: TransitionOptionKind::None, value: ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION.into(), label: none_label.into(), index: -1 },
-    ]
-    .into_iter()
-    .chain(transitions::filtered_transitions(&panel.filter).into_iter().map(|name| TransitionOption { kind: TransitionOptionKind::Xfade, value: name.into(), label: name.into(), index: index_of(name) }))
-    .collect();
-    replace_if_changed(player.get_join_options(), options, |model| player.set_join_options(model));
+    set_if_changed(player.get_join_error(), SharedString::from(model.error.clone().unwrap_or_default()), |value| player.set_join_error(value));
+    replace_if_changed(player.get_join_options(), transition_options(Some(&model), &panel.filter, locale), |model| player.set_join_options(model));
     set_if_changed(player.get_join_value(), SharedString::from(model.value.as_str()), |value| player.set_join_value(value));
     set_if_changed(player.get_join_filter(), SharedString::from(panel.filter.as_str()), |value| player.set_join_filter(value));
 }
 
-fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activity: Option<lanes::ActivityLaneView>) -> Vec<lanes::TileView> {
+/// Whether the shown tooltip equals `next`, its warnings compared by rows.
+fn same_tooltip(current: &ClipTooltipView, next: &ClipTooltipView) -> bool {
+    *current == ClipTooltipView { warnings: current.warnings.clone(), ..next.clone() } && models_equal(&current.warnings, &next.warnings)
+}
+
+/// Projects both lanes and returns the video lane's filmstrip tiles.
+fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activity: Option<&lanes::ActivityLaneView>) -> Vec<lanes::TileView> {
     set_if_changed(player.get_video_lane_visible(), video.is_some(), |value| player.set_video_lane_visible(value));
     set_if_changed(player.get_activity_lane_visible(), activity.is_some(), |value| player.set_activity_lane_visible(value));
     let video = video.unwrap_or_default();
@@ -351,12 +374,13 @@ fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activ
     replace_if_changed(player.get_cut_markers(), video.cut_markers.iter().map(marker_view).collect(), |model| player.set_cut_markers(model));
     replace_if_changed(player.get_joins(), video.joins.iter().map(join_view).collect(), |model| player.set_joins(model));
 
-    let activity_clip = activity.as_ref().and_then(|lane| lane.clip.as_ref());
+    let activity_clip = activity.and_then(|lane| lane.clip.as_ref());
     set_if_changed(player.get_activity_clip_visible(), activity_clip.is_some(), |value| player.set_activity_clip_visible(value));
     if let Some(clip) = activity_clip {
         set_if_changed(player.get_activity_clip(), clip_view(clip), |value| player.set_activity_clip(value));
     }
-    let (masks, trim_markers) = activity.as_ref().map_or((Vec::new(), Vec::new()), |lane| (lane.masks.iter().map(band_view).collect(), lane.trim_markers.iter().map(marker_view).collect()));
+    let (masks, trim_markers) =
+        activity.map_or((Vec::new(), Vec::new()), |lane| (lane.masks.iter().map(band_view).collect(), lane.trim_markers.iter().map(marker_view).collect()));
     replace_if_changed(player.get_trim_masks(), masks, |model| player.set_trim_masks(model));
     replace_if_changed(player.get_trim_markers(), trim_markers, |model| player.set_trim_markers(model));
 
@@ -371,29 +395,21 @@ fn project_lanes(player: &Player<'_>, video: Option<lanes::VideoLaneView>, activ
             title: tooltip.title.as_str().into(),
             duration_label: tooltip.duration_label.as_str().into(),
             metrics: tooltip.metrics.as_str().into(),
-            warnings: slint::ModelRc::new(slint::VecModel::from(tooltip.warnings.iter().map(|warning| SharedString::from(warning.as_str())).collect::<Vec<_>>())),
+            warnings: strings(&tooltip.warnings),
         },
         None => ClipTooltipView::default(),
     };
-    let current = player.get_tooltip();
-    let same = current.visible == view.visible
-        && current.lane_id == view.lane_id
-        && current.anchor_x == view.anchor_x
-        && current.title == view.title
-        && current.metrics == view.metrics
-        && slint::Model::iter(&current.warnings).eq(slint::Model::iter(&view.warnings));
-    if !same {
+    if !same_tooltip(&player.get_tooltip(), &view) {
         player.set_tooltip(view);
     }
     video.tiles
 }
 
 fn project_edits(player: &Player<'_>, store: &Store) {
-    use ovrley_app::features::player::{edits::video_edit_state, video_sync_mode};
-    let sync = video_sync_mode(store);
+    let sync = player_feature::video_sync_mode(store);
     let has_video = store.video_import.has_videos();
     let has_activity_data = store.media.activity_summary.is_some();
-    let state = video_edit_state(store);
+    let state = edits::video_edit_state(store);
     set_if_changed(player.get_trim_visible(), !sync && (has_video || has_activity_data), |value| player.set_trim_visible(value));
     set_if_changed(player.get_trim_targets_video(), has_video, |value| player.set_trim_targets_video(value));
     let (can_start, can_end) = if has_video { (state.can_trim_start, state.can_trim_end) } else { (has_activity_data, has_activity_data) };
@@ -412,7 +428,7 @@ fn project_edits(player: &Player<'_>, store: &Store) {
     set_if_changed(player.get_keeps_clip_selection(), asking || popover, |value| player.set_keeps_clip_selection(value));
 }
 
-fn surface(kind: TimelineSurfaceKind) -> SurfaceGesture {
+fn surface_gesture(kind: TimelineSurfaceKind) -> SurfaceGesture {
     match kind {
         TimelineSurfaceKind::Axis => SurfaceGesture::Scrub,
         TimelineSurfaceKind::Playhead => SurfaceGesture::Playhead,
@@ -420,56 +436,81 @@ fn surface(kind: TimelineSurfaceKind) -> SurfaceGesture {
     }
 }
 
+/// A cut or trim marker's pointer event.
+fn marker_pointer(store: &mut Store, lane: &ClipLane, cut_id: &str, phase: PointerPhase, x: f64) {
+    if let Some(video_id) = lane.video_id() {
+        match phase {
+            PointerPhase::Down => gestures::cut_down(store, video_id, cut_id, x),
+            PointerPhase::Move => gestures::cut_move(store, x),
+            PointerPhase::Up => {
+                let removable = cut_id != lanes::EDGE_START && cut_id != lanes::EDGE_END;
+                if gestures::cut_up(store) && removable {
+                    store.player.cut_popover = Some((video_id.to_string(), cut_id.to_string()));
+                }
+            }
+            PointerPhase::Cancel => surface_cancel(store),
+        }
+        return;
+    }
+    let edge = if cut_id == trim_marker_id(TrimEdge::Start) { TrimEdge::Start } else { TrimEdge::End };
+    match phase {
+        PointerPhase::Down => gestures::trim_down(store, edge, x),
+        PointerPhase::Move => gestures::trim_move(store, x),
+        PointerPhase::Up => gestures::trim_up(store),
+        PointerPhase::Cancel => surface_cancel(store),
+    }
+}
+
 pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let player = window.global::<Player>();
-    let on = |dispatcher: &Dispatcher, action: fn(&mut Store)| {
-        let dispatcher = dispatcher.clone();
-        move || dispatcher.dispatch(move |store, _| action(store))
+    let on = |action: fn(&mut Store)| {
+        let d = dispatcher.handle();
+        move || d.dispatch(move |store, _| action(store))
     };
-    let play = dispatcher.clone();
-    player.on_play(move || play.dispatch(|store, _| playback::play(store, Instant::now())));
-    player.on_pause(on(dispatcher, playback::pause));
-    player.on_reset_to_start(on(dispatcher, playback::reset_to_start));
-    player.on_jump_to_end(on(dispatcher, playback::jump_to_end));
-    player.on_toggle_mute(on(dispatcher, |store| store.editor.toggle_video_mute()));
-    player.on_zoom_in(on(dispatcher, |store| viewport::zoom(store, true)));
-    player.on_zoom_out(on(dispatcher, |store| viewport::zoom(store, false)));
-    player.on_reset_view(on(dispatcher, viewport::reset_view));
-    let step = dispatcher.clone();
-    player.on_step(move |seconds| step.dispatch(move |store, _| playback::step_by_seconds(store, f64::from(seconds))));
-    let fit = dispatcher.clone();
+    let d = dispatcher.handle();
+    player.on_play(move || d.dispatch(|store, _| playback::play(store, Instant::now())));
+    player.on_pause(on(playback::pause));
+    player.on_reset_to_start(on(playback::reset_to_start));
+    player.on_jump_to_end(on(playback::jump_to_end));
+    player.on_toggle_mute(on(|store| store.editor.toggle_video_mute()));
+    player.on_zoom_in(on(|store| viewport::zoom(store, true)));
+    player.on_zoom_out(on(|store| viewport::zoom(store, false)));
+    player.on_reset_view(on(viewport::reset_view));
+    let d = dispatcher.handle();
+    player.on_step(move |seconds| d.dispatch(move |store, _| playback::step_by_seconds(store, f64::from(seconds))));
+    let d = dispatcher.handle();
     player.on_fit_target_selected(move |id| {
         if let Some(target) = FitTargetId::from_id(&id) {
-            fit.dispatch(move |store, _| {
+            d.dispatch(move |store, _| {
                 viewport::fit_target(store, target);
             });
         }
     });
-    let pointer = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_surface_pointer(move |kind, phase, x| {
         let x = f64::from(x);
-        pointer.dispatch(move |store, _| match phase {
-            PointerPhase::Down => surface_down(store, surface(kind), x),
-            PointerPhase::Move => surface_move(store, x),
-            PointerPhase::Up => surface_up(store, x),
+        d.dispatch(move |store, _| match phase {
+            PointerPhase::Down => gestures::surface_down(store, surface_gesture(kind), x),
+            PointerPhase::Move => gestures::surface_move(store, x),
+            PointerPhase::Up => gestures::surface_up(store, x),
             PointerPhase::Cancel => surface_cancel(store),
         });
     });
-    let clip = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_clip_pointer(move |lane_id, phase, x| {
         let lane = ClipLane::from_id(&lane_id);
         let x = f64::from(x);
-        clip.dispatch(move |store, _| match phase {
-            PointerPhase::Down => ovrley_app::features::player::gestures::clip_down(store, lane, x),
-            PointerPhase::Move => ovrley_app::features::player::gestures::clip_move(store, x),
-            PointerPhase::Up => ovrley_app::features::player::gestures::clip_up(store, x),
+        d.dispatch(move |store, _| match phase {
+            PointerPhase::Down => gestures::clip_down(store, lane, x),
+            PointerPhase::Move => gestures::clip_move(store, x),
+            PointerPhase::Up => gestures::clip_up(store, x),
             PointerPhase::Cancel => surface_cancel(store),
         });
     });
-    let hover = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_clip_hover(move |lane_id, hovered| {
         let lane = ClipLane::from_id(&lane_id);
-        hover.dispatch(move |store, _| {
+        d.dispatch(move |store, _| {
             if hovered {
                 store.player.hovered_lane = Some(lane);
             } else if store.player.hovered_lane.as_ref() == Some(&lane) {
@@ -477,143 +518,110 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             }
         });
     });
-    let marker = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_marker_pointer(move |lane_id, cut_id, phase, x| {
-        use ovrley_app::features::player::gestures::{trim_down, trim_move, trim_up};
         let lane = ClipLane::from_id(&lane_id);
-        let x = f64::from(x);
         let cut_id = cut_id.to_string();
-        marker.dispatch(move |store, _| {
-            use ovrley_app::features::player::gestures::{cut_down, cut_move, cut_up};
-            if let Some(video_id) = lane.video_id() {
-                match phase {
-                    PointerPhase::Down => cut_down(store, video_id, &cut_id, x),
-                    PointerPhase::Move => cut_move(store, x),
-                    PointerPhase::Up => {
-                        let removable = cut_id != ovrley_app::features::player::lanes::EDGE_START && cut_id != ovrley_app::features::player::lanes::EDGE_END;
-                        if cut_up(store) && removable {
-                            store.player.cut_popover = Some((video_id.to_string(), cut_id.clone()));
-                        }
-                    }
-                    PointerPhase::Cancel => surface_cancel(store),
-                }
-                return;
-            }
-            let edge = if cut_id == "start" { TrimEdge::Start } else { TrimEdge::End };
-            match phase {
-                PointerPhase::Down => trim_down(store, edge, x),
-                PointerPhase::Move => trim_move(store, x),
-                PointerPhase::Up => trim_up(store),
-                PointerPhase::Cancel => surface_cancel(store),
-            }
-        });
+        let x = f64::from(x);
+        d.dispatch(move |store, _| marker_pointer(store, &lane, &cut_id, phase, x));
     });
-    let trim = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_trim(move |start| {
-        trim.dispatch(move |store, _| {
-            use ovrley_app::lib::video_program::segments::TrimSide;
-            let side = if start { TrimSide::Start } else { TrimSide::End };
+        let side = if start { TrimSide::Start } else { TrimSide::End };
+        d.dispatch(move |store, _| {
             if store.video_import.has_videos() {
-                ovrley_app::features::player::edits::trim_at_playhead(store, side);
+                edits::trim_at_playhead(store, side);
             } else {
-                ovrley_app::features::player::trim_activity_at_playhead(store, side);
+                player_feature::trim_activity_at_playhead(store, side);
             }
         });
     });
-    player.on_cut(on(dispatcher, |store| {
-        ovrley_app::features::player::edits::cut_at_playhead(store);
+    player.on_cut(on(|store| {
+        edits::cut_at_playhead(store);
     }));
-    player.on_toggle_excluded(on(dispatcher, |store| {
-        ovrley_app::features::player::edits::toggle_excluded_at_playhead(store);
+    player.on_toggle_excluded(on(|store| {
+        edits::toggle_excluded_at_playhead(store);
     }));
-    player.on_close_cut_popover(on(dispatcher, |store| store.player.cut_popover = None));
-    let remove = dispatcher.clone();
+    player.on_close_cut_popover(on(|store| store.player.cut_popover = None));
+    let d = dispatcher.handle();
     player.on_remove_cut(move |lane_id, cut_id| {
         let lane = ClipLane::from_id(&lane_id);
         let cut_id = cut_id.to_string();
-        remove.dispatch(move |store, _| {
+        d.dispatch(move |store, _| {
             store.player.cut_popover = None;
-            if let Some(video_id) = lane.video_id() {
-                let _ = ovrley_app::store::slices::video_import::request_cut_removal(store, video_id, &cut_id, None);
+            let Some(video_id) = lane.video_id() else { return };
+            if let Err(error) = ovrley_app::store::slices::video_import::request_cut_removal(store, video_id, &cut_id, None) {
+                log::error!("cut removal: {error}");
             }
         });
     });
-    let resolve = dispatcher.clone();
-    player.on_resolve_cut_removal(move |excluded| {
-        resolve.dispatch(move |store, _| {
-            ovrley_app::features::player::resolve_cut_removal(store, excluded);
-        });
-    });
-    player.on_keep_cut(on(dispatcher, ovrley_app::features::player::dismiss_cut_removal));
-    bind_join_panel(&player, dispatcher);
-    let wheel = dispatcher.clone();
-    player.on_wheel(move |delta_y, x, ctrl| {
-        wheel.dispatch(move |store, _| {
+    let d = dispatcher.handle();
+    player.on_resolve_cut_removal(move |excluded| d.dispatch(move |store, _| player_feature::resolve_cut_removal(store, excluded)));
+    player.on_keep_cut(on(player_feature::dismiss_cut_removal));
+    let d = dispatcher.handle();
+    player.on_wheel(move |delta_y, x, ctrl| d.dispatch(move |store, _| {
             viewport::wheel(store, f64::from(delta_y), f64::from(x), ctrl);
-        });
-    });
-    let metrics = dispatcher.clone();
+        }));
+    let d = dispatcher.handle();
     let weak = window.as_weak();
     player.on_timeline_metrics(move |width, x, rem| {
         let scale_factor = weak.upgrade().map_or(1.0, |window| f64::from(window.window().scale_factor()));
-        let next = viewport::TimelineMetrics { width_px: f64::from(width), x: f64::from(x), scale_factor, rem: f64::from(rem) };
-        metrics.dispatch(move |store, _| {
+        let next = viewport::TimelineMetrics { width_px: width.into(), x: x.into(), scale_factor, rem: rem.into() };
+        d.dispatch(move |store, _| {
             if store.player.viewport.metrics != next {
                 store.player.viewport.metrics = next;
             }
         });
     });
+    bind_join_panel(&player, dispatcher);
 }
 
-/// The join panel's callbacks (D13). A choice and a committed duration are one undo step each.
+/// The join panel's callbacks. A choice and a committed duration are one undo step each.
 fn bind_join_panel(player: &Player<'_>, dispatcher: &Dispatcher) {
-    let open = dispatcher.clone();
-    player.on_open_join(move |key| open.dispatch(move |store, _| transitions::open_join_panel(store, &key)));
-    let close = dispatcher.clone();
-    player.on_close_join(move || close.dispatch(|store, _| store.player.join_panel = None));
-    let chosen = dispatcher.clone();
+    let d = dispatcher.handle();
+    player.on_open_join(move |key| d.dispatch(move |store, _| transitions::open_join_panel(store, &key)));
+    let d = dispatcher.handle();
+    player.on_close_join(move || d.dispatch(|store, _| store.player.join_panel = None));
+    let d = dispatcher.handle();
     player.on_join_chosen(move |value| {
-        chosen.dispatch(move |store, _| {
+        d.dispatch(move |store, _| {
             let Some(key) = store.player.join_panel.as_ref().map(|panel| panel.key.clone()) else { return };
             if let Err(error) = transitions::select_join_transition(store, &key, &value) {
                 log::error!("join transition: {error}");
             }
         });
     });
-    let filter = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_join_filter_edited(move |text| {
-        filter.dispatch(move |store, _| {
+        d.dispatch(move |store, _| {
             if let Some(panel) = store.player.join_panel.as_mut() {
                 panel.filter = text.to_string();
             }
         });
     });
-    let edited = dispatcher.handle();
+    let d = dispatcher.handle();
     player.on_join_duration_edited(move |text| {
-        edited
-            .dispatch_with_result(move |store, _| transitions::with_duration_field(store, |field, options, _, _, _| field.change(options, &text)).unwrap_or(false))
-            .unwrap_or(false)
+        d.dispatch_with_result(move |store, _| transitions::with_duration_field(store, |field, options, _, _, _| field.change(options, &text)).unwrap_or(false)).unwrap_or(false)
     });
-    let key = dispatcher.handle();
+    let d = dispatcher.handle();
     player.on_join_duration_key(move |text, alt, control, shift, meta| {
-        let input = key_input(&text, SlintModifiers { alt, control, shift, meta }, false, cfg!(target_os = "macos"));
-        key.dispatch_with_result(move |store, _| {
+        let input = Modifiers { alt, control, shift, meta }.key_input(&text);
+        d.dispatch_with_result(move |store, _| {
             transitions::with_duration_field(store, |field, options, value, locale, commit| field.key_down(options, value, &input, locale, commit)).unwrap_or(false)
         })
         .unwrap_or(false)
     });
-    let key_up = dispatcher.handle();
+    let d = dispatcher.handle();
     player.on_join_duration_key_up(move |text| {
-        let released = key_input(&text, SlintModifiers::default(), false, cfg!(target_os = "macos")).key;
-        key_up
-            .dispatch_with_result(move |store, _| {
-                transitions::with_duration_field(store, |field, options, value, locale, commit| field.key_up(options, value, &released, locale, commit)).unwrap_or(false)
-            })
-            .unwrap_or(false)
+        let released = key_name(&text);
+        d.dispatch_with_result(move |store, _| {
+            transitions::with_duration_field(store, |field, options, value, locale, commit| field.key_up(options, value, &released, locale, commit)).unwrap_or(false)
+        })
+        .unwrap_or(false)
     });
-    let blurred = dispatcher.clone();
+    let d = dispatcher.handle();
     player.on_join_duration_blurred(move || {
-        blurred.dispatch(|store, _| {
+        d.dispatch(|store, _| {
             transitions::with_duration_field(store, |field, options, value, locale, commit| field.blur(options, value, locale, commit));
         });
     });

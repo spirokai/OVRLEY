@@ -1,0 +1,88 @@
+import { SecondsFieldView } from "fields.slint";
+import { VideoSyncView } from "../sync/index.slint";
+
+
+export enum ImportPhase { probing, reviewing, confirming, importing }
+
+// The colour of a row's format line: muted, red-700 (another resolution) or amber-500
+// (incompatible).
+export enum ImportTone { muted, red, amber }
+
+// One row of the import dialog, its texts built in Rust.
+export struct ImportRowView {
+    id: string,
+    filename: string,
+    path: string,
+    is-new: bool,
+    included: bool,
+    // Off for a video with another resolution than the overlay.
+    can-switch: bool,
+    switch-label: string,
+    format-label: string,
+    format-tone: ImportTone,
+    status: string,
+    status-red: bool,
+    far: string,
+    positioned: bool,
+    overlaps: [string],
+    can-move-up: bool,
+    can-move-down: bool,
+    move-up-label: string,
+    move-down-label: string,
+    offset: SecondsFieldView,
+    manual: bool,
+    reset-label: string,
+    sync-label: string,
+}
+
+export struct ImportFailureView {
+    name: string,
+    path: string,
+    message: string,
+}
+
+// Written by `src/features/import.rs`.
+export global VideoImport {
+    in property <bool> open;
+    in property <ImportPhase> phase;
+    in property <string> reading-label;
+    in property <[ImportRowView]> rows;
+    in property <[ImportFailureView]> failures;
+    in property <[string]> issues;
+    in property <string> far-text;
+    in property <string> error;
+    in property <string> import-label;
+    // Every label the import button can show, so it keeps the width of the widest.
+    in property <[string]> import-label-alternatives;
+    in property <bool> can-import;
+    in property <VideoSyncView> sync;
+    in property <string> transition-label;
+    in property <int> transition-preview-index: -1;
+    in property <SecondsFieldView> transition-duration;
+    callback cancel();
+    callback confirm();
+    callback back();
+    callback row-included(id: string, included: bool);
+    callback row-move(id: string, up: bool);
+    callback row-reset(id: string);
+    callback sync-compute();
+    callback sync-reset-creation-times();
+    callback sync-filename-creation-times();
+    callback sync-set-utc(utc: bool);
+}
+
+// The video preview's placeholder: none, or why there is no frame.
+export enum VideoPlaceholder { none, missing, failed, no-gpu }
+
+// The video preview's surface. Written by `src/features/playback.rs`.
+export global VideoPreview {
+    // The decoder's wgpu texture.
+    in property <image> frame;
+    in property <bool> frame-shown;
+    // Outside the pieces.
+    in property <bool> dimmed;
+    in property <VideoPlaceholder> placeholder;
+    in property <bool> excluded;
+    in property <bool> overlap;
+    in property <bool> rendering-transition;
+}

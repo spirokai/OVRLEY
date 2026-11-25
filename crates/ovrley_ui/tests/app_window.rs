@@ -1,5 +1,5 @@
-//! The composed app window with fake services: keyboard routing (plan D7, step 0 check 1) and the
-//! drawer through the real projections.
+//! The composed app window with fake services: keyboard routing and the drawer through the real
+//! projections.
 
 mod common;
 

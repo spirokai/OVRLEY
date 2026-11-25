@@ -1,6 +1,5 @@
-// With the `dev-windows` feature, `ui/dev-index.slint` re-exports `ui/index.slint` plus the
-// showcase (ui/showcase/) and the test harness windows (tests/harness/), so they share the app's
-// globals. It also emits the debug info the testing backend's element search needs.
+// With the `dev-windows` feature, `ui/dev-index.slint` re-exports `ui/index.slint` plus the test
+// harness windows (tests/harness/), so they share the app's globals. It also emits the debug info the testing backend's element search needs.
 //
 // The translations are bundled from the catalogs in the root locales/ folder.
 

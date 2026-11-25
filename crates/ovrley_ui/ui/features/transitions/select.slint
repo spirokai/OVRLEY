@@ -1,0 +1,78 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Popover } from "../../components/popup.slint";
+import { PlacementAlign } from "../../components/logic.slint";
+import { TransitionPicker } from "picker.slint";
+import { TransitionPreview } from "preview.slint";
+import { TransitionSelect } from "index.slint";
+
+// Opening and the options go through the `TransitionSelect` global, by `target`.
+export component TransitionSelectTrigger {
+    in property <string> target;
+    in property <string> label;
+    // The previewed transition's catalogue index, or -1 for none.
+    in property <int> preview-index: -1;
+    in property <bool> small;
+    in property <bool> disabled;
+    height: root.small ? 2rem : 2.25rem;
+    min-width: 0px;
+    opacity: root.disabled ? 0.5 : 1;
+
+    touch := TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+        clicked => {
+            TransitionSelect.open(root.target);
+        }
+        Rectangle {
+            border-radius: Theme.radius-sm * 1rem;
+            background: touch.has-hover ? Theme.surface-highlight-soft : Theme.field-lift;
+            HorizontalLayout {
+                padding-left: root.preview-index >= 0 ? 0.25rem : 0.75rem;
+                padding-right: 0.75rem;
+                padding-top: root.preview-index >= 0 ? 0.125rem : 0px;
+                padding-bottom: root.preview-index >= 0 ? 0.125rem : 0px;
+                spacing: 0.75rem;
+                if root.preview-index >= 0: TransitionPreview {
+                    width: root.small ? 2.875rem : 3.25rem;
+                    index: root.preview-index;
+                }
+                AppText {
+                    content: root.label;
+                    font-size: Theme.text-xs * 1rem;
+                    overflow: elide;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    min-width: 0px;
+                }
+                Icon {
+                    glyph: Icons.chevron-down;
+                    color: Theme.muted-foreground.transparentize(0.5);
+                }
+            }
+        }
+    }
+    Popover {
+        open: TransitionSelect.open-target == root.target;
+        align: PlacementAlign.start;
+        content-width: 26rem;
+        content-padding: 0.75rem;
+        open-changed(open) => {
+            if !open {
+                TransitionSelect.close();
+            }
+        }
+        TransitionPicker {
+            options: TransitionSelect.options;
+            value: TransitionSelect.value;
+            filter: TransitionSelect.filter;
+            filter-edited(text) => {
+                TransitionSelect.filter-edited(text);
+            }
+            chosen(value) => {
+                TransitionSelect.chosen(value);
+            }
+        }
+    }
+}

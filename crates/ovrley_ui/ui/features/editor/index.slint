@@ -1,0 +1,127 @@
+// The pointer's cursor over the stage: move over a widget, resize cursors (turned with the
+// widget) over handles, and the knob's rotate cursor.
+export enum EditorCursor { default, move, resize-ns, resize-ew, resize-nwse, resize-nesw, rotate }
+
+// The canvas background behind the scene.
+export enum BackgroundMode { checker, black, white, image, video }
+
+// One widget on the canvas: its image and its raster rectangle, in logical pixels relative to the
+// scene's top-left corner. Rotated families bake their rotation into the pixels.
+export struct WidgetView {
+    id: string,
+    image: image,
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+}
+
+// A transform handle in stage pixels: a resize square, rotated with its widget, or the knob.
+export struct HandleView {
+    x: length,
+    y: length,
+    rotation: angle,
+    knob: bool,
+}
+
+// A guide's distance label in stage pixels.
+export struct GuideLabelView {
+    x: length,
+    y: length,
+    text: string,
+    vertical: bool,
+}
+
+// A widget's type badge in stage pixels.
+export struct BadgeView {
+    x: length,
+    y: length,
+    rotation: angle,
+    label: string,
+    id: string,
+    // A map's view hint, centred above the middle of its frame's bottom edge; a top-down map also
+    // shows the Reset button.
+    map: bool,
+    fixed: bool,
+    hint-x: length,
+    hint-y: length,
+}
+
+// The overlay-editor feature's global, written by `src/features/editor.rs`.
+export global OverlayEditor {
+    // The stage (the scroll area's content) and the scene inside it, in logical pixels.
+    in property <length> stage-width;
+    in property <length> stage-height;
+    in property <length> scene-left;
+    in property <length> scene-top;
+    in property <length> scene-width;
+    in property <length> scene-height;
+    // Rust owns the scroll position.
+    in property <length> scroll-x;
+    in property <length> scroll-y;
+    in property <float> display-scale: 1;
+    // "1920 × 1080".
+    in property <string> scene-size-label;
+
+    in property <BackgroundMode> background-mode;
+    in property <color> background-color;
+    // The debug background image, drawn under the scene while the image mode is on.
+    in property <image> background-image;
+    // The toolbar's image and video buttons show while there is an image, or videos.
+    in property <bool> has-background-image;
+    in property <bool> has-videos;
+    in property <bool> grid-visible;
+    // Grid lines as path commands in scene-display pixels, on device-pixel centres.
+    in property <string> grid-commands;
+    in property <bool> snap-to-grid;
+    // "100%".
+    in property <string> zoom-label;
+
+    // Widgets in stacking order.
+    in property <[WidgetView]> widgets;
+    // A resource or render failure.
+    in property <string> error;
+
+    // The selection, in stage pixels: outlines as path commands, the handles, the rotation line,
+    // the guides by style, their labels, the marquee and the badges.
+    in property <string> selection-commands;
+    // The map in view mode's outline, as dashes (Slint has no dashed stroke).
+    in property <string> selection-dashed-commands;
+    in property <length> border-width: 1px;
+    in property <[HandleView]> handles;
+    in property <string> knob-line-commands;
+    in property <length> handle-size;
+    in property <length> knob-size;
+    in property <length> guide-scale: 1px;
+    in property <string> guides-normal;
+    in property <string> guides-bold;
+    in property <string> guides-dashed;
+    in property <[GuideLabelView]> guide-labels;
+    in property <bool> marquee-shown;
+    in property <length> marquee-x;
+    in property <length> marquee-y;
+    in property <length> marquee-width;
+    in property <length> marquee-height;
+    in property <[BadgeView]> badges;
+    in property <EditorCursor> cursor;
+
+    // The editor area, the scroll area below the toolbar row, and the stage's padding.
+    callback viewport-changed(editor-width: length, editor-height: length, scroll-width: length, scroll-height: length, padding: length, rem: length);
+    // A wheel over the stage: deltas in logical pixels as Slint reports them, the cursor in
+    // scroll-area coordinates, and the modifiers.
+    callback wheel(delta-x: length, delta-y: length, x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    // The pointer over the stage, in scroll-area coordinates, with its modifiers.
+    callback pointer-down(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback pointer-move(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback pointer-up(x: length, y: length, alt: bool, control: bool, shift: bool, meta: bool);
+    callback pointer-leave();
+    // A double-click enters the view mode of the map under the pointer.
+    callback double-click(x: length, y: length);
+    callback reset-map-view(id: string);
+    callback zoom-in();
+    callback zoom-out();
+    callback reset-zoom();
+    callback set-background-mode(BackgroundMode);
+    callback set-grid-visible(bool);
+    callback set-snap-to-grid(bool);
+}

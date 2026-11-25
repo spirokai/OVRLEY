@@ -44,10 +44,11 @@ Frequent events are coalesced before they reach the loop: render and update prog
 
 `crates/ovrley_ui/`:
 
-- `ui/components/` holds OVRLEY's own controls (no std-widgets), and `ui/theme/` the tokens.
-- `ui/features/<feature>/` holds a feature's markup and its global, and `src/features/<feature>.rs` its projection and callbacks.
-- `src/app.rs` composes both and runs the event loop. `src/main.rs` starts up: logging, paths and distribution, preferences, the store, the GPU, then the window.
-- `src/platform/` holds window chrome, file drops, the traffic lights on macOS, the Wayland drop listener and the AppImage's menu entry.
+- `ui/components/` holds OVRLEY's own controls (no std-widgets), `ui/theme.slint` the tokens and `ui/window.slint` the scaled window every window derives from.
+- `ui/features/` holds each feature's markup and globals, and `src/features/` the projections that write the store into them and the callbacks that dispatch actions: `shell`, `documents` (projects and templates), `editor`, `widgets` (inspector, scene settings, drawer), `toolbar`, `video` (import dialog, seconds fields; `import.rs` and `playback.rs`), `player`, `transitions`, `sync` and `render`.
+- `src/projection.rs` holds what the projections share (change-only writes, keyed models, images, icons, the Slint↔app enum conversions); `src/logic.rs` binds the component logic globals.
+- `src/app.rs` composes everything and runs the event loop. `src/main.rs` starts up: logging, paths and distribution, preferences, the store, the GPU, then the window.
+- `src/platform/` holds backend selection and the GPU device, window chrome, raw window events and file drops, key conversion, the traffic lights on macOS and the Wayland drop listener. The AppImage's menu entry is `ovrley_services::runtime`'s.
 
 One wgpu device is shared by the window and the video players: Metal on macOS, DX12 on Windows, Vulkan on Linux. On a software adapter the window uses Skia's CPU rasterizer instead. Slint's Skia renderer is patched (`patches/README.md`).
 

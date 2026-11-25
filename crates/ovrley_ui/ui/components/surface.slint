@@ -1,0 +1,332 @@
+import { Theme } from "../theme.slint";
+import { PlacementSide } from "logic.slint";
+
+// Where a control sits in a ButtonGroup or input group. Slint parents cannot style their children,
+// so the caller sets it: `first`, `middle` and `last` square the joined corners, and every item
+// after the first drops the border on its joined side.
+export enum GroupPosition { isolated, first, middle, last }
+
+// The corner radii of a control at a group position: joined corners are square. Shared by
+// `GroupSurface` and the control's `FocusRing`.
+export global GroupCorners {
+    pure public function joins-before(position: GroupPosition) -> bool {
+        position == GroupPosition.middle || position == GroupPosition.last
+    }
+    pure public function joins-after(position: GroupPosition) -> bool {
+        position == GroupPosition.first || position == GroupPosition.middle
+    }
+    pure public function top-left(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        self.joins-before(position) ? 0px : radius
+    }
+    pure public function top-right(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        (orientation == Orientation.horizontal ? self.joins-after(position) : self.joins-before(position)) ? 0px : radius
+    }
+    pure public function bottom-left(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        (orientation == Orientation.horizontal ? self.joins-before(position) : self.joins-after(position)) ? 0px : radius
+    }
+    pure public function bottom-right(position: GroupPosition, orientation: Orientation, radius: length) -> length {
+        self.joins-after(position) ? 0px : radius
+    }
+}
+
+// The background, border and field lift of a groupable control.
+export component GroupSurface {
+    width: 100%;
+    height: 100%;
+    in property <GroupPosition> group-position: GroupPosition.isolated;
+    in property <Orientation> group-orientation: Orientation.horizontal;
+    in property <length> radius;
+    in property <brush> background: transparent;
+    in property <length> border-width;
+    in property <brush> border-color: Theme.border;
+    // `.field-lift`: a faint `field-lift` wash over the field's own background.
+    in property <bool> field-lift;
+
+    property <bool> joins-before: GroupCorners.joins-before(root.group-position);
+    property <bool> horizontal: root.group-orientation == Orientation.horizontal;
+    property <length> top-left: GroupCorners.top-left(root.group-position, root.group-orientation, root.radius);
+    property <length> top-right: GroupCorners.top-right(root.group-position, root.group-orientation, root.radius);
+    property <length> bottom-left: GroupCorners.bottom-left(root.group-position, root.group-orientation, root.radius);
+    property <length> bottom-right: GroupCorners.bottom-right(root.group-position, root.group-orientation, root.radius);
+    // The joined border is drawn outside the clip, which hides it.
+    property <length> hidden-before: root.joins-before ? root.border-width : 0px;
+
+    Rectangle {
+        clip: true;
+        border-top-left-radius: root.top-left;
+        border-top-right-radius: root.top-right;
+        border-bottom-left-radius: root.bottom-left;
+        border-bottom-right-radius: root.bottom-right;
+
+        Rectangle {
+            x: root.horizontal ? -root.hidden-before : 0px;
+            y: root.horizontal ? 0px : -root.hidden-before;
+            width: root.width + (root.horizontal ? root.hidden-before : 0px);
+            height: root.height + (root.horizontal ? 0px : root.hidden-before);
+            background: root.background;
+            border-width: root.border-width;
+            border-color: root.border-color;
+            border-top-left-radius: root.top-left;
+            border-top-right-radius: root.top-right;
+            border-bottom-left-radius: root.bottom-left;
+            border-bottom-right-radius: root.bottom-right;
+
+            if root.field-lift: Rectangle {
+                background: Theme.field-lift;
+                border-top-left-radius: root.top-left;
+                border-top-right-radius: root.top-right;
+                border-bottom-left-radius: root.bottom-left;
+                border-bottom-right-radius: root.bottom-right;
+            }
+        }
+
+        @children
+    }
+}
+
+// Slint casts a drop shadow from its rectangle's fill and takes the fill's alpha, so a layer casts
+// from an opaque rectangle seen only through four strips around the box.
+export enum ShadowSize { none, xs, sm, md, lg, xxl }
+
+// One strip around the box, positioned in the box's coordinates: it shows the part of the
+// layer's shadow that falls inside it.
+component ShadowStrip inherits Rectangle {
+    in property <length> box-width;
+    in property <length> box-height;
+    in property <length> offset-y;
+    in property <length> blur;
+    in property <length> spread;
+    in property <color> shadow-color;
+    in property <length> radius;
+    clip: true;
+
+    Rectangle {
+        x: -root.x - root.spread;
+        y: -root.y - root.spread;
+        width: root.box-width + 2 * root.spread;
+        height: root.box-height + 2 * root.spread;
+        border-radius: max(0px, root.radius + root.spread);
+        // Opaque, so the shadow has its full colour; it lies inside the box, outside every strip.
+        background: #000000;
+        drop-shadow-offset-y: root.offset-y;
+        drop-shadow-blur: root.blur;
+        drop-shadow-color: root.shadow-color;
+    }
+}
+
+component ShadowLayer {
+    width: 100%;
+    height: 100%;
+    in property <length> offset-y;
+    in property <length> blur;
+    in property <length> spread;
+    in property <color> shadow-color;
+    in property <length> radius;
+    // How far the shadow reaches past the box: Skia's blur fades out at about 1.5 × the radius.
+    property <length> reach: root.blur * 1.5 + abs(root.offset-y) + 1px;
+
+    // Above and below the box, across its whole width and the corners.
+    ShadowStrip {
+        x: -root.reach;
+        y: -root.reach;
+        width: root.width + 2 * root.reach;
+        height: root.reach;
+        box-width: root.width;
+        box-height: root.height;
+        offset-y: root.offset-y;
+        blur: root.blur;
+        spread: root.spread;
+        shadow-color: root.shadow-color;
+        radius: root.radius;
+    }
+    ShadowStrip {
+        x: -root.reach;
+        y: root.height;
+        width: root.width + 2 * root.reach;
+        height: root.reach;
+        box-width: root.width;
+        box-height: root.height;
+        offset-y: root.offset-y;
+        blur: root.blur;
+        spread: root.spread;
+        shadow-color: root.shadow-color;
+        radius: root.radius;
+    }
+    // Left and right of the box, between the strips above and below.
+    ShadowStrip {
+        x: -root.reach;
+        y: 0px;
+        width: root.reach;
+        height: root.height;
+        box-width: root.width;
+        box-height: root.height;
+        offset-y: root.offset-y;
+        blur: root.blur;
+        spread: root.spread;
+        shadow-color: root.shadow-color;
+        radius: root.radius;
+    }
+    ShadowStrip {
+        x: root.width;
+        y: 0px;
+        width: root.reach;
+        height: root.height;
+        box-width: root.width;
+        box-height: root.height;
+        offset-y: root.offset-y;
+        blur: root.blur;
+        spread: root.spread;
+        shadow-color: root.shadow-color;
+        radius: root.radius;
+    }
+}
+
+// Draws the shadow of its parent's border box. Place it as the first child so it sits behind; it
+// fills the parent. `color` replaces every layer's colour.
+export component Shadow {
+    width: 100%;
+    height: 100%;
+    in property <ShadowSize> size;
+    in property <length> radius;
+    in property <bool> has-color;
+    in property <color> color;
+
+    function layer-color(base: color) -> color {
+        root.has-color ? root.color : base
+    }
+
+    if root.size != ShadowSize.none: ShadowLayer {
+        radius: root.radius;
+        offset-y: root.size == ShadowSize.xs ? 1px : root.size == ShadowSize.sm ? 1px : root.size == ShadowSize.md ? 4px : root.size == ShadowSize.lg ? 10px : 25px;
+        blur: root.size == ShadowSize.xs ? 2px : root.size == ShadowSize.sm ? 3px : root.size == ShadowSize.md ? 6px : root.size == ShadowSize.lg ? 15px : 50px;
+        spread: root.size == ShadowSize.md ? -1px : root.size == ShadowSize.lg ? -3px : root.size == ShadowSize.xxl ? -12px : 0px;
+        shadow-color: root.layer-color(root.size == ShadowSize.xs ? #0000000d : root.size == ShadowSize.xxl ? #00000040 : #0000001a);
+    }
+    if root.size == ShadowSize.sm || root.size == ShadowSize.md || root.size == ShadowSize.lg: ShadowLayer {
+        radius: root.radius;
+        offset-y: root.size == ShadowSize.sm ? 1px : root.size == ShadowSize.md ? 2px : 4px;
+        blur: root.size == ShadowSize.sm ? 2px : root.size == ShadowSize.md ? 4px : 6px;
+        spread: root.size == ShadowSize.sm ? -1px : root.size == ShadowSize.md ? -2px : -4px;
+        shadow-color: root.layer-color(#0000001a);
+    }
+}
+
+// `line-color` is the `bg-*` override (`ButtonGroupSeparator` uses `input`). Given more room across
+// its line, it centres the line, so it sits level with text in a row. Slint has no separator role,
+// so the separator is never exposed to accessibility, decorative or not.
+export component Separator {
+    in property <Orientation> orientation: Orientation.horizontal;
+    in property <bool> decorative: true;
+    in property <color> line-color: Theme.border;
+
+    property <bool> horizontal: root.orientation == Orientation.horizontal;
+    min-height: root.horizontal ? Theme.hairline : 0px;
+    preferred-height: root.horizontal ? Theme.hairline : 0px;
+    min-width: root.horizontal ? 0px : Theme.hairline;
+    preferred-width: root.horizontal ? 0px : Theme.hairline;
+    max-height: root.horizontal ? 100000px : 100000px;
+    horizontal-stretch: root.horizontal ? 1 : 0;
+    vertical-stretch: root.horizontal ? 0 : 1;
+    accessible-role: AccessibleRole.none;
+
+    Rectangle {
+        x: root.horizontal ? 0px : (root.width - Theme.hairline) / 2;
+        y: root.horizontal ? (root.height - Theme.hairline) / 2 : 0px;
+        width: root.horizontal ? root.width : Theme.hairline;
+        height: root.horizontal ? Theme.hairline : root.height;
+        background: root.line-color;
+        opacity: 0.5;
+    }
+}
+
+// `.bg-overlay-grid-muted` over the canvas black: two 45° gradients that colour the four corner
+// triangles of each 2.37rem tile. Tiled, they form `grid-line`-at-20% diamonds with a 2.37rem
+// diagonal centred on the tile corners. One opaque tile repeats as a texture: one textured
+// rectangle per repaint, where a path of every diamond cost Skia CPU work on each repaint. The
+// tile bakes in both colours, as `colorize` tints only one.
+export component Checkerboard inherits Rectangle {
+    // The canvas draws the pattern inside the zoomed scene, so its tiles scale with the zoom.
+    in property <float> scale: 1;
+    property <length> tile: Theme.checkerboard-tile * 1rem * root.scale;
+
+    // The tile SVG is 2px; the transform scales it to the tile, and Skia rasterizes it again at
+    // the magnified size, so the diagonals stay sharp.
+    Image {
+        x: 0;
+        y: 0;
+        width: root.width / root.tile * 2px;
+        height: root.height / root.tile * 2px;
+        source: @image-url("../../../../assets/checkerboard-tile.svg");
+        horizontal-tiling: repeat;
+        vertical-tiling: repeat;
+        horizontal-alignment: left;
+        vertical-alignment: top;
+        transform-origin: { x: 0px, y: 0px };
+        transform-scale-x: root.tile / 2px;
+        transform-scale-y: root.tile / 2px;
+    }
+}
+
+// Slint rectangles draw only solid borders; a path's stroke can be dashed. The view box matches the
+// element in pixels, so the stroke and its dashes keep their size.
+export component DashedBorder inherits Path {
+    in property <length> radius;
+    in property <length> border-width: 1px;
+    in property <brush> border-color;
+
+    // The stroke is centred on the path, so the path runs half a stroke inside the edge.
+    property <float> inset: root.border-width / 2px;
+    property <float> r: max(0, root.radius / 1px - root.inset);
+    property <float> left: root.inset;
+    property <float> top: root.inset;
+    property <float> right: root.width / 1px - root.inset;
+    property <float> bottom: root.height / 1px - root.inset;
+
+    width: 100%;
+    height: 100%;
+    viewbox-x: 0;
+    viewbox-y: 0;
+    viewbox-width: root.width / 1px;
+    viewbox-height: root.height / 1px;
+    fill: transparent;
+    stroke: root.border-color;
+    stroke-width: root.border-width;
+    stroke-dash-array: [4px, 3px];
+    commands: "M \{root.left + root.r} \{root.top} "
+        + "L \{root.right - root.r} \{root.top} "
+        + "A \{root.r} \{root.r} 0 0 1 \{root.right} \{root.top + root.r} "
+        + "L \{root.right} \{root.bottom - root.r} "
+        + "A \{root.r} \{root.r} 0 0 1 \{root.right - root.r} \{root.bottom} "
+        + "L \{root.left + root.r} \{root.bottom} "
+        + "A \{root.r} \{root.r} 0 0 1 \{root.left} \{root.bottom - root.r} "
+        + "L \{root.left} \{root.top + root.r} "
+        + "A \{root.r} \{root.r} 0 0 1 \{root.left + root.r} \{root.top} Z";
+}
+
+// The shared overlay enter animation: fading from 0, zooming from 0.95 and sliding 0.5rem in from
+// the side it opens on, over 150ms with `ease`. It starts when the popup's content is created.
+// Popups close at once: Slint closes a PopupWindow without waiting for an exit animation.
+export component OverlayMotion {
+    in property <PlacementSide> side: PlacementSide.bottom;
+    property <float> progress: 0;
+    property <length> slide: Theme.overlay-enter-slide * 1rem * (1 - self.progress);
+
+    init => {
+        self.progress = 1;
+    }
+    animate progress { duration: Theme.overlay-enter-duration; easing: ease; }
+
+    width: 100%;
+    height: 100%;
+    opacity: self.progress;
+
+    Rectangle {
+        x: root.side == PlacementSide.left ? root.slide : root.side == PlacementSide.right ? -root.slide : 0px;
+        y: root.side == PlacementSide.top ? root.slide : root.side == PlacementSide.bottom ? -root.slide : 0px;
+        width: root.width;
+        height: root.height;
+        transform-scale-x: (Theme.overlay-enter-scale + (1 - Theme.overlay-enter-scale) * root.progress) * 100%;
+        transform-scale-y: self.transform-scale-x;
+        @children
+    }
+}

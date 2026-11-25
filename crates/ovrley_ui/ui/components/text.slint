@@ -1,0 +1,110 @@
+import { Theme } from "../theme.slint";
+
+// The shared text element. Set `content`, not `text`.
+export component AppText inherits Text {
+    in property <string> content;
+    in property <bool> uppercase: true;
+    in property <bool> mono;
+    in property <float> line-height: Theme.leading-root;
+    // Letter spacing, in em.
+    in property <float> tracking: Theme.tracking-root;
+
+    text: root.uppercase ? root.content.to-uppercase() : root.content;
+    font-family: root.mono ? Theme.font-mono : Theme.font-sans;
+    font-size: 1rem;
+    font-weight: Theme.font-weight-normal;
+    color: Theme.foreground;
+    line-height-factor: root.line-height / (root.mono ? Theme.font-mono-natural-line-height : Theme.font-sans-natural-line-height);
+    letter-spacing: self.font-size * root.tracking;
+    vertical-alignment: center;
+}
+
+// The style properties are the call sites' overrides.
+export component Label {
+    in property <string> text;
+    in property <bool> disabled;
+    in property <length> font-size: Theme.text-sm * 1rem;
+    in property <int> font-weight: Theme.font-weight-medium;
+    in property <color> color: Theme.foreground;
+    in property <bool> uppercase: true;
+    in property <float> tracking: Theme.tracking-root;
+    in property <length> inset-left: 0.25rem;
+    callback clicked;
+
+    opacity: root.disabled ? 0.5 : 1;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    HorizontalLayout {
+        padding-left: root.inset-left;
+        spacing: 0.5rem;
+        alignment: start;
+        AppText {
+            content: root.text;
+            uppercase: root.uppercase;
+            font-size: root.font-size;
+            font-weight: root.font-weight;
+            color: root.color;
+            tracking: root.tracking;
+            line-height: Theme.leading-none;
+        }
+        @children
+    }
+
+    TouchArea {
+        enabled: !root.disabled;
+        mouse-cursor: root.disabled ? MouseCursor.not-allowed : MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// It takes no input. A hard shadow 2px below (no blur), a darker shade of the face, makes it read
+// as a key. The face is the 10% tint mixed into `surface`, opaque, so the shadow does not show
+// through it.
+export component Kbd inherits Rectangle {
+    in property <string> text;
+    // What the key sits on: the dialogs' `card`.
+    in property <color> surface: Theme.card;
+
+    min-height: 1.5rem;
+    min-width: 1.25rem;
+    max-height: 1.5rem;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+
+    property <color> face: Theme.muted-foreground.mix(root.surface, 0.1);
+
+    Rectangle {
+        y: 2px;
+        border-radius: Theme.radius-sm * 1rem;
+        background: root.face.darker(0.35);
+    }
+    Rectangle {
+        border-radius: Theme.radius-sm * 1rem;
+        background: root.face;
+    }
+
+    HorizontalLayout {
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+        spacing: 0.25rem;
+        alignment: center;
+        AppText {
+            content: root.text;
+            uppercase: true;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-medium;
+            color: Theme.muted-foreground;
+            line-height: Theme.text-xs-line-height;
+        }
+        @children
+    }
+}
+
+// KbdGroup: keys 0.25rem apart.
+export component KbdGroup inherits HorizontalLayout {
+    spacing: 0.25rem;
+    alignment: start;
+}

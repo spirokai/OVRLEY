@@ -1,0 +1,201 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { SimpleTooltip } from "../../components/tooltip.slint";
+import { Shadow, ShadowSize } from "../../components/surface.slint";
+import { PlacementSide } from "../../components/logic.slint";
+import { UndoRedoControls } from "../shell/history.slint";
+import { BackgroundMode } from "index.slint";
+
+// A 2rem toolbar button: `default` while active, `ghost` otherwise; its tooltip below.
+component ToolbarButton {
+    in property <string> icon;
+    in property <string> label;
+    in property <bool> active;
+    // A filled icon (White's Square): the icon and its inside in this colour; transparent for none.
+    in property <color> icon-fill: transparent;
+    callback clicked();
+
+    SimpleTooltip {
+        content: root.label;
+        side: PlacementSide.bottom;
+        Rectangle {
+        width: 2rem;
+        height: 2rem;
+        Button {
+            variant: root.active ? ButtonVariant.default : ButtonVariant.ghost;
+            size: ButtonSize.icon;
+            width: 2rem;
+            height: 2rem;
+            icon: root.icon;
+            icon-size: 1rem;
+            text-color: root.icon-fill != transparent ? root.icon-fill : self.variant == ButtonVariant.default ? Theme.primary-foreground : Theme.foreground;
+            hover-text-color: self.text-color;
+            accessible-label: root.label;
+            clicked => {
+                root.clicked();
+            }
+        }
+        if root.icon-fill != transparent: Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            width: 0.75rem;
+            height: 0.75rem;
+            border-radius: 0.0833rem;
+            background: root.icon-fill;
+        }
+        }
+    }
+}
+
+component ToolbarSeparator inherits HorizontalLayout {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    VerticalLayout {
+        alignment: center;
+        Rectangle {
+            width: Theme.hairline;
+            height: 1.25rem;
+            background: Theme.border.transparentize(0.3);
+        }
+    }
+}
+
+export component EditorToolbar {
+    in property <bool> can-undo;
+    in property <bool> can-redo;
+    in property <BackgroundMode> background-mode;
+    in property <bool> has-background-image;
+    in property <bool> has-videos;
+    in property <string> zoom-label;
+    in property <bool> grid-visible;
+    in property <bool> snap-to-grid;
+    callback undo();
+    callback redo();
+    callback set-background-mode(BackgroundMode);
+    callback zoom-in();
+    callback zoom-out();
+    callback reset-zoom();
+    callback set-grid-visible(bool);
+    callback set-snap-to-grid(bool);
+
+    property <length> radius: Theme.radius-xs * 1rem;
+
+    Shadow {
+        size: ShadowSize.lg;
+        radius: root.radius;
+    }
+    Rectangle {
+        border-radius: root.radius;
+        border-width: 1px;
+        border-color: Theme.border.transparentize(0.3);
+        background: Theme.card.transparentize(0.2);
+    }
+    // Presses on the toolbar do not reach the stage.
+    TouchArea { }
+    HorizontalLayout {
+        padding: 0.25rem;
+        spacing: 0.25rem;
+        UndoRedoControls {
+            can-undo: root.can-undo;
+            can-redo: root.can-redo;
+            undo => {
+                root.undo();
+            }
+            redo => {
+                root.redo();
+            }
+        }
+        ToolbarSeparator { }
+        ToolbarButton {
+            icon: Icons.layout-grid;
+            label: @tr("app-shell.checkeredBackground" => "Checkered background");
+            active: root.background-mode == BackgroundMode.checker;
+            clicked => {
+                root.set-background-mode(BackgroundMode.checker);
+            }
+        }
+        ToolbarButton {
+            icon: Icons.square;
+            label: @tr("app-shell.blackBackground" => "Black background");
+            active: root.background-mode == BackgroundMode.black;
+            clicked => {
+                root.set-background-mode(BackgroundMode.black);
+            }
+        }
+        ToolbarButton {
+            icon: Icons.square;
+            icon-fill: #f4ead2;
+            label: @tr("app-shell.whiteBackground" => "White background");
+            active: root.background-mode == BackgroundMode.white;
+            clicked => {
+                root.set-background-mode(BackgroundMode.white);
+            }
+        }
+        if root.has-background-image || root.has-videos: ToolbarSeparator { }
+        if root.has-background-image: ToolbarButton {
+            icon: Icons.image;
+            label: @tr("app-shell.imageBackground" => "Image background");
+            active: root.background-mode == BackgroundMode.image;
+            clicked => {
+                root.set-background-mode(BackgroundMode.image);
+            }
+        }
+        if root.has-background-image || root.has-videos: ToolbarButton {
+            icon: Icons.film;
+            label: @tr("app-shell.videoBackground" => "Video background");
+            active: root.background-mode == BackgroundMode.video;
+            clicked => {
+                root.set-background-mode(BackgroundMode.video);
+            }
+        }
+        ToolbarSeparator { }
+        ToolbarButton {
+            icon: Icons.minus;
+            label: @tr("app-shell.zoomOut" => "Zoom out");
+            clicked => {
+                root.zoom-out();
+            }
+        }
+        AppText {
+            min-width: 3.5rem;
+            content: root.zoom-label;
+            horizontal-alignment: center;
+            font-size: Theme.text-xs * 1rem;
+            font-weight: Theme.font-weight-semibold;
+            color: Theme.muted-foreground;
+        }
+        ToolbarButton {
+            icon: Icons.zoom-in;
+            label: @tr("app-shell.zoomIn" => "Zoom in");
+            clicked => {
+                root.zoom-in();
+            }
+        }
+        ToolbarButton {
+            icon: Icons.rotate-ccw;
+            label: @tr("app-shell.resetZoom" => "Reset zoom");
+            clicked => {
+                root.reset-zoom();
+            }
+        }
+        ToolbarSeparator { }
+        ToolbarButton {
+            icon: Icons.grid-3x3;
+            label: @tr("app-shell.grid" => "Toggle grid");
+            active: root.grid-visible;
+            clicked => {
+                root.set-grid-visible(!root.grid-visible);
+            }
+        }
+        ToolbarButton {
+            icon: Icons.magnet;
+            label: @tr("app-shell.snapToGrid" => "Snap to grid");
+            active: root.snap-to-grid;
+            clicked => {
+                root.set-snap-to-grid(!root.snap-to-grid);
+            }
+        }
+    }
+}

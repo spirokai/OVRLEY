@@ -1,32 +1,20 @@
-import { Theme } from "../theme/theme.slint";
+import { Theme } from "../theme.slint";
 import { Icons } from "icons.slint";
-import { Label } from "label.slint";
+import { Label } from "text.slint";
 import { Button, ButtonSize, ButtonVariant } from "button.slint";
-import { FocusRing } from "focus-ring.slint";
-import { Shadow, ShadowSize } from "shadow.slint";
-import { SimpleTooltip } from "simple-tooltip.slint";
-import { HexColorPicker } from "hex-color-picker.slint";
+import { FocusRing } from "focus.slint";
+import { Shadow, ShadowSize } from "surface.slint";
+import { SimpleTooltip } from "tooltip.slint";
+import { HexColorPicker } from "color-picker.slint";
 import { ColorPickerLogic, GradientPickerLogic, GradientStop, GradientStopKeyResult } from "logic.slint";
 
-// gradient-picker.jsx with `useGradientPicker`; the rules are in ovrley_app
-// (`hooks/gradient_picker.rs`, `lib/gradient_stops.rs`).
-// - Label: 0.667rem, muted, uppercase, bold (default `components.gradient`).
-// - Track: 0.625rem high, `rounded-xs`, `border` at 70%, `shadow-xs`, inset 0.5rem on every side,
-//   its hit area extended 0.5rem above and below; the copy cursor and the hint tooltip while a stop
-//   can be added. Slint gradients have a fixed stop count, so the fill is one two-colour segment
-//   per pair of neighbouring stops, with solid ends.
-// - Stops: 0.875rem, a 2px white border, two shadows, grab and grabbing cursors, 125% while their
-//   picker is open, centred on their offset, labelled `gradientStopLabel`.
-// - Pressing the track (not a stop) adds a stop there in the sampled colour, up to 5. Pressing a
-//   stop drags it once the pointer moves 3px, reporting at most one change per frame; releasing
-//   commits if it moved and suppresses the click. A click opens the stop's picker, with a Remove
-//   button (disabled at 2 stops). Delete and Backspace remove; ← and → move by 0.01 (Shift 0.1).
-//   Recolouring commits. Discrete edits fire `changed` and `committed` together.
-// - React keys stop nodes by the stop count so an open picker never jumps to another stop. Here the
-//   nodes repeat over `node-count`: every edit hands over a new stops model, and repeating over the
-//   model (or over a binding to its length) rebuilds the nodes, closing an open picker, on each
-//   change. `node-count` is set, not bound, and a set notifies only when the number changes, so the
-//   nodes are rebuilt only when stops are added or removed.
+// Pressing a stop drags it once the pointer moves 3px, reporting at most one change per frame;
+// releasing commits if it moved and suppresses the click. A click opens the stop's picker, with a
+// Remove button (disabled at 2 stops). Delete and Backspace remove; ← and → move by 0.01 (Shift
+// 0.1). Recolouring commits. Here the nodes repeat over `node-count`: every edit hands over a new
+// stops model, and repeating over the model (or over a binding to its length) rebuilds the nodes,
+// closing an open picker, on each change. `node-count` is set, not bound, and a set notifies only
+// when the number changes, so the nodes are rebuilt only when stops are added or removed.
 export component GradientPicker inherits VerticalLayout {
     in property <[GradientStop]> stops;
     in property <string> label: @tr("components.gradient" => "Gradient");

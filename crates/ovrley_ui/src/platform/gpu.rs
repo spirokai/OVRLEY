@@ -1,4 +1,4 @@
-//! The shared GPU device (plan D11; `concat-gpu-device.md`).
+//! The shared GPU device.
 //!
 //! One wgpu device is opened before the backend is selected, on the backend Skia is built for:
 //! Metal on Apple, DX12 on Windows (with FXC, which ships with Windows), Vulkan elsewhere. Slint
@@ -9,7 +9,6 @@
 //!   rasteriser becomes a visible startup failure.
 
 use slint::wgpu_30::wgpu;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// The device Slint renders on and MDK draws on.
@@ -19,8 +18,6 @@ pub struct GpuDevice {
     pub adapter: wgpu::Adapter,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    /// Set by the device-lost callback.
-    pub lost: Arc<AtomicBool>,
 }
 
 /// What the backend selection does with the GPU.
@@ -28,7 +25,7 @@ pub enum GpuChoice {
     /// A hardware adapter: Slint renders on this device.
     Shared(GpuDevice),
     /// A CPU rasteriser adapter: not shared; the window uses Skia's software renderer.
-    Software { adapter: String },
+    Software,
     /// No adapter opened: the platform API is required by name.
     None,
 }
@@ -44,7 +41,7 @@ fn backend() -> wgpu::Backends {
 }
 
 /// A one-line description of an adapter, for the log.
-pub fn describe(info: &wgpu::AdapterInfo) -> String {
+fn describe(info: &wgpu::AdapterInfo) -> String {
     let software = if info.device_type == wgpu::DeviceType::Cpu {
         ", software"
     } else {
@@ -80,9 +77,7 @@ pub fn open() -> GpuChoice {
             "GPU adapter {} is a software rasteriser; the window renders on the CPU",
             describe(&info)
         );
-        return GpuChoice::Software {
-            adapter: describe(&info),
-        };
+        return GpuChoice::Software;
     }
 
     // The adapter's own limits: wgpu's defaults are WebGPU's baseline, which caps 2D textures at
@@ -100,10 +95,7 @@ pub fn open() -> GpuChoice {
         }
     };
 
-    let lost = Arc::new(AtomicBool::new(false));
-    let lost_flag = lost.clone();
-    device.set_device_lost_callback(move |reason, message| {
-        lost_flag.store(true, Ordering::SeqCst);
+    device.set_device_lost_callback(|reason, message| {
         log::error!("GPU device lost ({reason:?}): {message}");
     });
     // wgpu's default handler panics, which would take the UI thread down.
@@ -117,6 +109,5 @@ pub fn open() -> GpuChoice {
         adapter,
         device,
         queue,
-        lost,
     })
 }

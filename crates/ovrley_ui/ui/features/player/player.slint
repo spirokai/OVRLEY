@@ -1,0 +1,19 @@
+import { Theme } from "../../theme.slint";
+import { Player } from "index.slint";
+import { PlayerToolbar } from "toolbar.slint";
+import { TimelineSurface } from "surface.slint";
+
+// `OverlayPlayer`: below the editor while there is something to play or a video.
+export component OverlayPlayer inherits Rectangle {
+    vertical-stretch: 0;
+    background: #000000.transparentize(0.7);
+
+    VerticalLayout {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+        PlayerToolbar { }
+        TimelineSurface { }
+    }
+}

@@ -1,0 +1,343 @@
+import { Theme } from "../../theme.slint";
+import { AppText } from "../../components/text.slint";
+import { Icon, Icons } from "../../components/icons.slint";
+import { Button, ButtonVariant, ButtonSize } from "../../components/button.slint";
+import { Select, SelectSize, SelectPosition } from "../../components/select.slint";
+import { Slider } from "../../components/slider.slint";
+import { Shadow, ShadowSize } from "../../components/surface.slint";
+import { VideoSync } from "index.slint";
+
+// The zoom control: two stacked 29px white buttons with a divider, rounded, with a thin shadow.
+component ZoomControl inherits Rectangle {
+    in property <bool> can-zoom-in;
+    in property <bool> can-zoom-out;
+    callback zoom(zoom-in: bool);
+
+    width: 29px;
+    height: 58px;
+    border-radius: 4px;
+    background: #ffffff;
+    drop-shadow-blur: 2px;
+    drop-shadow-color: #0000001a;
+    drop-shadow-offset-y: 0px;
+    for entry[index] in [{ zoom-in: true, glyph: Icons.plus }, { zoom-in: false, glyph: Icons.minus }]: Rectangle {
+        y: index * 29px;
+        height: 29px;
+        property <bool> enabled: entry.zoom-in ? root.can-zoom-in : root.can-zoom-out;
+        background: touch.has-hover && self.enabled ? #0000000d : transparent;
+        border-radius: 4px;
+        accessible-role: button;
+        accessible-label: entry.zoom-in ? @tr("videoSync.zoomIn" => "Zoom in") : @tr("videoSync.zoomOut" => "Zoom out");
+        accessible-enabled: self.enabled;
+        Icon {
+            glyph: entry.glyph;
+            size: 1rem;
+            color: #333333;
+            opacity: parent.enabled ? 1 : 0.25;
+        }
+        touch := TouchArea {
+            enabled: parent.enabled;
+            clicked => {
+                root.zoom(entry.zoom-in);
+            }
+        }
+    }
+    Rectangle {
+        y: 29px;
+        height: 1px;
+        background: #dddddd;
+    }
+}
+
+// The location pin: the default marker shape, a teardrop in the location colour with a white dot,
+// its tip at the course position. Dragged, it follows the pointer; released near the course it
+// moves there, farther away it returns. A click toggles its popup.
+component LocationPin inherits Rectangle {
+    property <length> drag-x;
+    property <length> drag-y;
+    property <bool> dragging;
+    x: VideoSync.pin-x - self.width / 2 + self.drag-x;
+    y: VideoSync.pin-y - self.height + self.drag-y;
+    width: 27px;
+    height: 41px;
+    Path {
+        width: parent.width;
+        height: parent.height;
+        viewbox-width: 27;
+        viewbox-height: 41;
+        fill: Theme.video-sync-location;
+        stroke: #00000033;
+        stroke-width: 1px;
+        commands: "M13.5 41 C13.5 41 0 24.5 0 13.5 A13.5 13.5 0 0 1 27 13.5 C27 24.5 13.5 41 13.5 41 Z";
+    }
+    Rectangle {
+        x: 8.5px;
+        y: 8.5px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        background: #ffffff;
+    }
+    TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        moved => {
+            if self.pressed {
+                root.dragging = root.dragging || abs(self.mouse-x - self.pressed-x) + abs(self.mouse-y - self.pressed-y) > 3px;
+                if root.dragging {
+                    root.drag-x = self.mouse-x - self.pressed-x;
+                    root.drag-y = self.mouse-y - self.pressed-y;
+                }
+            }
+        }
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                if root.dragging {
+                    VideoSync.pin-dropped(VideoSync.pin-x + root.drag-x, VideoSync.pin-y + root.drag-y);
+                } else {
+                    VideoSync.pin-clicked();
+                }
+                root.dragging = false;
+                root.drag-x = 0px;
+                root.drag-y = 0px;
+            }
+        }
+    }
+}
+
+// The frame on show placed against the camera, the style's background where it does not reach, the
+// markers, the action button, the pin and its popup, the zoom control at the top right, the style
+// select at the bottom left and the attribution at the bottom right.
+export component SelectionMapView inherits Rectangle {
+    background: VideoSync.map-background;
+    clip: true;
+    if VideoSync.has-map-image: Image {
+        x: VideoSync.map-image-x;
+        y: VideoSync.map-image-y;
+        width: VideoSync.map-image-width;
+        height: VideoSync.map-image-height;
+        source: VideoSync.map-image;
+        image-fit: fill;
+    }
+    touch := TouchArea {
+        mouse-cursor: VideoSync.map-dragging ? MouseCursor.grabbing : VideoSync.hover-shown ? MouseCursor.crosshair : MouseCursor.grab;
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                VideoSync.map-pointer("down", self.mouse-x, self.mouse-y);
+            } else if event.button == PointerEventButton.left && event.kind == PointerEventKind.up {
+                VideoSync.map-pointer("up", self.mouse-x, self.mouse-y);
+            }
+        }
+        moved => {
+            VideoSync.map-pointer("move", self.mouse-x, self.mouse-y);
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                VideoSync.map-pointer("leave", self.mouse-x, self.mouse-y);
+            }
+        }
+        double-clicked => {
+            VideoSync.map-double-click(self.mouse-x, self.mouse-y, false);
+        }
+        scroll-event(event) => {
+            VideoSync.map-wheel(event.delta-y, self.mouse-x, self.mouse-y, event.modifiers.shift);
+            accept
+        }
+    }
+    // The playback marker: `1rem`, a white border, `#EF6C15`, an 8px halo at 35%.
+    if VideoSync.playback-shown: Rectangle {
+        x: VideoSync.playback-x - self.width / 2;
+        y: VideoSync.playback-y - self.height / 2;
+        width: 1rem + 16px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: #ef6c1559;
+        Rectangle {
+            width: 1rem;
+            height: 1rem;
+            border-radius: 0.5rem;
+            border-width: 1px;
+            border-color: #ffffff;
+            background: #ef6c15;
+        }
+    }
+    if VideoSync.hover-shown: Rectangle {
+        x: VideoSync.hover-x - 0.5rem;
+        y: VideoSync.hover-y - 0.5rem;
+        width: 1rem;
+        height: 1rem;
+        border-radius: 0.5rem;
+        border-width: 1px;
+        border-color: #ffffff;
+        background: Theme.video-sync-location;
+    }
+    if VideoSync.pin-shown: LocationPin { }
+    // The popup: anchored bottom-left 6px right of and 20px above the pin's tip, holding the `×`.
+    if VideoSync.pin-shown && VideoSync.popup-open: Rectangle {
+        x: VideoSync.pin-x + 6px;
+        y: VideoSync.pin-y - 20px - self.height;
+        width: 1.25rem + 1rem;
+        height: 1.25rem + 1rem;
+        border-radius: 4px;
+        background: #ffffff;
+        drop-shadow-blur: 4px;
+        drop-shadow-color: #0000001a;
+        Rectangle {
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: self.width / 2;
+            border-width: 2px;
+            border-color: #f87171;
+            background: delete-touch.has-hover ? #fee2e2 : #ffffff;
+            accessible-role: button;
+            accessible-label: @tr("videoSync.deleteLocationMarker" => "Delete location marker");
+            AppText {
+                content: "×";
+                font-size: Theme.text-sm * 1rem;
+                font-weight: Theme.font-weight-bold;
+                color: #dc2626;
+                line-height: Theme.leading-none;
+            }
+            delete-touch := TouchArea {
+                mouse-cursor: MouseCursor.pointer;
+                clicked => {
+                    VideoSync.delete-location();
+                }
+            }
+        }
+    }
+    // "Set location", `0.593rem` above the picked point.
+    if VideoSync.action-shown: Rectangle {
+        x: VideoSync.action-x - self.width / 2;
+        y: VideoSync.action-y - 0.593rem - self.height;
+        width: action-button.preferred-width;
+        height: 1.75rem;
+        border-radius: Theme.radius-sm * 1rem;
+        background: Theme.surface;
+        Shadow {
+            size: ShadowSize.md;
+            radius: Theme.radius-sm * 1rem;
+        }
+        action-button := Button {
+            variant: ButtonVariant.ghost;
+            size: ButtonSize.sm;
+            height: 1.75rem;
+            padding-x: 0.5rem;
+            font-size: 0.75rem;
+            uppercase: true;
+            icon: Icons.map-pin;
+            icon-size: 0.875rem;
+            text: @tr("videoSync.setLocationInMap" => "Set location");
+            background: Theme.surface;
+            border-width: 1px;
+            border-color: Theme.video-sync-location;
+            text-color: Theme.video-sync-location;
+            hover-text-color: Theme.video-sync-location;
+            hover-background: Theme.video-sync-location.transparentize(0.8);
+            clicked => {
+                VideoSync.set-location();
+            }
+        }
+    }
+    ZoomControl {
+        x: parent.width - 10px - self.width;
+        y: 10px;
+        can-zoom-in: VideoSync.map-can-zoom-in;
+        can-zoom-out: VideoSync.map-can-zoom-out;
+        zoom(zoom-in) => {
+            VideoSync.map-zoom(zoom-in);
+        }
+    }
+    if VideoSync.map-styles.length > 0: Select {
+        x: 0.5rem;
+        y: parent.height - 0.5rem - 1.75rem;
+        width: 7rem;
+        size: SelectSize.sm;
+        min-height: 1.75rem;
+        preferred-height: 1.75rem;
+        max-height: 1.75rem;
+        padding-x: 0.5rem;
+        font-size: 0.741rem;
+        uppercase: false;
+        shadow: ShadowSize.md;
+        background: Theme.surface.transparentize(0.05);
+        position: SelectPosition.popper;
+        items: VideoSync.map-styles;
+        value: VideoSync.map-style;
+        accessible-label: @tr("videoSync.mapStyle" => "Map style");
+        value-changed(value) => {
+            VideoSync.set-map-style(value);
+        }
+    }
+    attribution := Rectangle {
+        x: parent.width - self.width;
+        y: parent.height - self.height;
+        width: attribution-text.preferred-width + 10px;
+        height: attribution-text.preferred-height;
+        background: #ffffff80;
+        attribution-text := Text {
+            text: VideoSync.attribution;
+            font-size: 12px;
+            color: #000000bf;
+        }
+    }
+}
+
+// The wheel zooms about the centre and never reaches the editor.
+export component NavigationMapView inherits Rectangle {
+    border-radius: Theme.radius-sm * 1rem;
+    background: Theme.surface-elevated;
+    clip: true;
+    if VideoSync.has-nav-image: Image {
+        width: parent.width;
+        height: parent.height;
+        source: VideoSync.nav-image;
+        image-fit: fill;
+    }
+    TouchArea {
+        scroll-event(event) => {
+            VideoSync.nav-wheel(event.delta-y, event.modifiers.shift);
+            accept
+        }
+    }
+    if VideoSync.nav-marker-shown: Image {
+        x: parent.width / 2 - self.width / 2;
+        y: parent.height * 0.725 - self.height / 2;
+        width: 2.5rem;
+        height: 2.5rem;
+        // Slint draws no shadow under an image, so the marker has none.
+        source: @image-url("../../../../../assets/navigation-marker.svg");
+    }
+    Rectangle {
+        x: parent.width * 0.03;
+        y: parent.height * 0.16;
+        width: 1.5rem;
+        height: parent.height * 0.68;
+        Slider {
+            width: parent.width;
+            height: parent.height;
+            orientation: Orientation.vertical;
+            minimum: 0;
+            maximum: VideoSync.nav-max-pitch;
+            step: 1;
+            value: VideoSync.nav-pitch;
+            accessible-label: @tr("videoSync.navigationPitch" => "Navigation map pitch");
+            value-changed(value) => {
+                VideoSync.nav-pitch-changed(value);
+            }
+        }
+    }
+    ZoomControl {
+        x: parent.width - 10px - self.width;
+        y: 10px;
+        can-zoom-in: VideoSync.nav-can-zoom-in;
+        can-zoom-out: VideoSync.nav-can-zoom-out;
+        zoom(zoom-in) => {
+            VideoSync.nav-zoom(zoom-in);
+        }
+    }
+    Rectangle {
+        border-radius: parent.border-radius;
+        border-width: 1px;
+        border-color: #ffffff80;
+    }
+}

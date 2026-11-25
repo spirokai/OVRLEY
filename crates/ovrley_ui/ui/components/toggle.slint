@@ -1,14 +1,14 @@
-import { Theme } from "../theme/theme.slint";
-import { AppText } from "app-text.slint";
+import { Theme } from "../theme.slint";
+import { AppText } from "text.slint";
 import { Icon } from "icons.slint";
-import { FocusRing } from "focus-ring.slint";
-import { Shadow, ShadowSize } from "shadow.slint";
+import { FocusRing } from "focus.slint";
+import { Shadow, ShadowSize } from "surface.slint";
+import { Choice, ChoiceListLogic } from "logic.slint";
 
 export enum ToggleVariant { default, outline }
 export enum ToggleSize { default, sm, lg }
 
-// toggle.jsx. On: `accent` with `accent-foreground`. Hover: `muted` with muted text (outline:
-// `accent`). Nothing uses it today (Q4); it is ported because the parent plan lists it.
+// On: `accent` with `accent-foreground`. Hover: `muted` with muted text (outline: `accent`).
 export component Toggle {
     in property <ToggleVariant> variant: ToggleVariant.default;
     in property <ToggleSize> size: ToggleSize.default;
@@ -102,5 +102,170 @@ export component Toggle {
         shown: focus.focus-visible || root.invalid;
         radius: root.radius;
         ring-color: root.invalid ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+}
+
+export enum ToggleGroupType { single, multiple }
+export enum ToggleGroupSize { default, compact }
+
+// Multiple mode reads each item's `pressed`; single mode compares `value`. Items: 1.75rem squares
+// (compact 1.8rem), 1rem icons (compact 0.9rem), uppercase, weight 600, muted; hover
+// `surface-elevated` with `foreground`; on `foreground` with `surface`; a 2px focus ring.
+export component ToggleGroup {
+    in property <ToggleGroupType> type: ToggleGroupType.single;
+    in property <ToggleGroupSize> size: ToggleGroupSize.default;
+    in property <[Choice]> items;
+    in property <string> value;
+    in property <bool> disabled;
+    in property <bool> stretch;
+    in property <length> item-padding-x: 0px;
+    in property <length> item-font-size: Theme.text-sm * 1rem;
+    // Single mode.
+    callback value-changed(value: string);
+    // Multiple mode.
+    callback item-pressed-changed(value: string, pressed: bool);
+
+    property <bool> compact: root.size == ToggleGroupSize.compact;
+    property <length> item-size: root.compact ? 1.8rem : 1.75rem;
+    property <length> pad: root.compact ? 0.1rem : 0.125rem;
+    property <int> focused-index: 0;
+
+    pure function is-pressed(index: int) -> bool {
+        root.type == ToggleGroupType.single ? root.items[index].value == root.value : root.items[index].pressed
+    }
+    function toggle(index: int) {
+        if root.disabled || root.items[index].disabled {
+            return;
+        }
+        if root.type == ToggleGroupType.single {
+            root.value-changed(root.is-pressed(index) ? "" : root.items[index].value);
+        } else {
+            root.item-pressed-changed(root.items[index].value, !root.items[index].pressed);
+        }
+    }
+    function move-focus(from: int, direction: int) {
+        let next = ChoiceListLogic.next-enabled(root.items, from, direction, true);
+        if next >= 0 {
+            root.focused-index = next;
+        }
+    }
+
+    horizontal-stretch: root.stretch ? 1 : 0;
+    min-width: group-layout.min-width;
+    preferred-width: group-layout.preferred-width;
+    min-height: group-layout.min-height;
+    max-height: group-layout.preferred-height;
+    opacity: root.disabled ? 0.5 : 1;
+    forward-focus: focus;
+    accessible-role: AccessibleRole.groupbox;
+
+    Rectangle {
+        border-radius: Theme.radius-sm * 1rem;
+        border-width: 1px;
+        border-color: Theme.input;
+        background: Theme.background;
+    }
+
+    focus := FocusScope {
+        out property <bool> focus-visible;
+        enabled: !root.disabled;
+        focus-on-click: false;
+        focus-gained(reason) => {
+            self.focus-visible = reason == FocusReason.tab-navigation;
+        }
+        focus-lost => {
+            self.focus-visible = false;
+        }
+        key-pressed(event) => {
+            if root.items.length == 0 {
+                return reject;
+            }
+            if event.text == Key.RightArrow || event.text == Key.DownArrow {
+                root.move-focus(root.focused-index + 1, 1);
+                return accept;
+            }
+            if event.text == Key.LeftArrow || event.text == Key.UpArrow {
+                root.move-focus(root.focused-index - 1, -1);
+                return accept;
+            }
+            if event.text == Key.Home {
+                root.move-focus(0, 1);
+                return accept;
+            }
+            if event.text == Key.End {
+                root.move-focus(root.items.length - 1, -1);
+                return accept;
+            }
+            if event.text == " " || event.text == Key.Return {
+                root.toggle(root.focused-index);
+                return accept;
+            }
+            reject
+        }
+
+        group-layout := HorizontalLayout {
+            padding: root.pad;
+            padding-right: root.compact ? 0px : root.pad;
+            alignment: root.stretch ? LayoutAlignment.stretch : LayoutAlignment.start;
+
+            for item[index] in root.items: cell := Rectangle {
+                property <bool> on: root.is-pressed(index);
+                property <bool> hovered: cell-touch.has-hover && !item.disabled;
+                property <color> text-color: self.on ? Theme.surface : self.hovered ? Theme.foreground : Theme.muted-foreground;
+
+                min-width: root.item-size;
+                height: root.item-size;
+                horizontal-stretch: root.stretch ? 1 : 0;
+                opacity: item.disabled ? 0.5 : 1;
+                accessible-role: AccessibleRole.button;
+                accessible-label: item.accessible-label != "" ? item.accessible-label : item.label;
+                accessible-checkable: true;
+                accessible-checked: self.on;
+                accessible-enabled: !item.disabled;
+                accessible-action-default => {
+                    root.toggle(index);
+                }
+
+                Rectangle {
+                    border-radius: Theme.radius-xs * 1rem;
+                    background: cell.on ? Theme.foreground : cell.hovered ? Theme.surface-elevated : transparent;
+                    animate background { duration: Theme.duration-150; easing: cubic-bezier(0.4, 0, 0.2, 1); }
+                }
+                HorizontalLayout {
+                    padding-left: root.item-padding-x;
+                    padding-right: root.item-padding-x;
+                    spacing: 0.5rem;
+                    alignment: center;
+                    if item.icon != "": Icon {
+                        glyph: item.icon;
+                        size: root.compact ? 0.9rem : 1rem;
+                        color: cell.text-color;
+                    }
+                    if item.label != "": AppText {
+                        content: item.label;
+                        uppercase: true;
+                        font-size: root.item-font-size;
+                        font-weight: Theme.font-weight-semibold;
+                        color: cell.text-color;
+                        line-height: Theme.text-sm-line-height;
+                    }
+                }
+                cell-touch := TouchArea {
+                    enabled: !root.disabled && !item.disabled;
+                    mouse-cursor: MouseCursor.pointer;
+                    clicked => {
+                        root.focused-index = index;
+                        focus.focus();
+                        root.toggle(index);
+                    }
+                }
+                FocusRing {
+                    shown: focus.focus-visible && root.focused-index == index;
+                    ring-width: 2px;
+                    radius: Theme.radius-xs * 1rem;
+                    ring-color: Theme.ring;
+                }
+            }
+        }
     }
 }

@@ -1,11 +1,10 @@
 //! The native OVRLEY binary. With `--mcp` it is instead an MCP server on stdio for an agent,
 //! forwarding to the running window.
 //!
-//! Startup, in order: logging; runtime paths and distribution; the preferences file; the language
-//! and drawer hydration; backend selection with the shared GPU device; then the window
-//! (`app::run`), and after an update the relaunch. A failure before the window exists is shown in a
-//! native message dialog. A failure once it exists (a malformed `lng`) is shown in the window, as
-//! `main.jsx` does.
+//! Startup, in order: logging; runtime paths and distribution; the preferences file; the store's
+//! hydration; backend selection with the shared GPU device; then the window (`app::run`), and after
+//! an update the relaunch. A failure before the window exists is shown in a native message dialog.
+//! A failure once it exists (a malformed saved language) is shown in the window.
 
 // A release build is a GUI app without a console. `--mcp` uses the pipes its client passes.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -17,8 +16,8 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info")).init();
-    // MCP over stdio for an agent (D13), before anything touches Slint or winit: no window, Dock
-    // icon or GPU device. Standard output carries only the protocol; logs go to standard error.
+    // MCP over stdio for an agent, before anything touches Slint or winit: no window, Dock icon or
+    // GPU device. Standard output carries only the protocol; logs go to standard error.
     if std::env::args().nth(1).as_deref() == Some("--mcp") {
         return serve_mcp();
     }
@@ -61,7 +60,7 @@ fn start() -> Result<(), String> {
     let distribution = ovrley_services::runtime::Distribution::detect()?;
     log::info!("{distribution:?} distribution; settings in {}", roots.app_data_dir.display());
     #[cfg(target_os = "linux")]
-    ovrley_ui::platform::appimage_integration::register();
+    ovrley_services::runtime::register_appimage();
 
     let preferences = open_preferences(&roots.app_data_dir)?;
     let store = Store::hydrate(&preferences).unwrap_or_else(|error| {
@@ -72,11 +71,18 @@ fn start() -> Result<(), String> {
     });
 
     let gpu = ovrley_ui::platform::select_backend()?;
-    let agent_socket = ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir);
-    let paths = roots.app_paths()?;
-    // The installed map styles and the tile cache (phase 5 D9).
+    // The installed map styles and the tile cache.
     let maps = std::sync::Arc::new(ovrley_app::store::services::NativeMapServices::open(&roots, &preferences)?);
-    let exit = ovrley_ui::app::run(store, distribution, paths, &roots.app_cache_dir, preferences, maps, gpu, agent_socket)?;
+    let exit = ovrley_ui::app::run(ovrley_ui::app::Startup {
+        store,
+        distribution,
+        paths: roots.app_paths()?,
+        app_cache_dir: roots.app_cache_dir.clone(),
+        preferences,
+        maps,
+        gpu,
+        agent_socket: ovrley_mcp::link::SocketLocation::for_user(&roots.app_data_dir),
+    })?;
     if exit == ovrley_ui::app::Exit::Relaunch {
         // The update is installed either way, so this is no startup failure.
         if let Err(error) = ovrley_services::updater::relaunch() {
