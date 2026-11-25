@@ -1,5 +1,4 @@
-//! Shader data layouts and render pipelines, ported from maplibre-rs `render/shaders/mod.rs` and
-//! `render/resource/tile_pipeline.rs`, and the bundled `fill-pattern` images they sample.
+//! Shader data layouts and render pipelines, and the bundled `fill-pattern` images they sample.
 
 use super::tile::{ExtrusionVertex, LayerKind};
 use bytemuck::{Pod, Zeroable};
@@ -262,9 +261,7 @@ const ROUTE_INSTANCE_ATTRIBUTES: [wgpu::VertexAttribute; 10] = wgpu::vertex_attr
     13 => Float32, // keep_side
 ];
 
-const fn instance_layout<'a, T>(
-    attributes: &'a [wgpu::VertexAttribute],
-) -> wgpu::VertexBufferLayout<'a> {
+const fn instance_layout<T>(attributes: &[wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'_> {
     wgpu::VertexBufferLayout {
         array_stride: size_of::<T>() as u64,
         step_mode: wgpu::VertexStepMode::Instance,
@@ -272,9 +269,7 @@ const fn instance_layout<'a, T>(
     }
 }
 
-const fn vertex_layout<'a, T>(
-    attributes: &'a [wgpu::VertexAttribute],
-) -> wgpu::VertexBufferLayout<'a> {
+const fn vertex_layout<T>(attributes: &[wgpu::VertexAttribute]) -> wgpu::VertexBufferLayout<'_> {
     wgpu::VertexBufferLayout {
         array_stride: size_of::<T>() as u64,
         step_mode: wgpu::VertexStepMode::Vertex,
@@ -282,7 +277,7 @@ const fn vertex_layout<'a, T>(
     }
 }
 
-/// Blends lines upstream, and fills here so `fill-opacity` and alpha colours work.
+/// Blends lines and fills, so `fill-opacity` and alpha colours work.
 const LAYER_BLEND: wgpu::BlendState = wgpu::BlendState {
     color: wgpu::BlendComponent {
         src_factor: wgpu::BlendFactor::SrcAlpha,
@@ -470,7 +465,7 @@ impl PipelineBuilder<'_> {
                 vertex: wgpu::VertexState {
                     module: &vertex,
                     entry_point: Some("main"),
-                    compilation_options: Default::default(),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     buffers,
                 },
                 primitive: wgpu::PrimitiveState {
@@ -489,7 +484,7 @@ impl PipelineBuilder<'_> {
                 fragment: Some(wgpu::FragmentState {
                     module: &fragment,
                     entry_point: Some("main"),
-                    compilation_options: Default::default(),
+                    compilation_options: wgpu::PipelineCompilationOptions::default(),
                     targets: &[Some(target)],
                 }),
                 multiview_mask: None,

@@ -1,4 +1,5 @@
-//! Map vocabulary shared by the app and export, plus the renderer and the style validator.
+//! Map vocabulary shared by the widgets, the preview and export, plus the renderer and the style
+//! validator.
 //!
 //! Without features this crate has no wgpu, which `ovrley_widgets` does not need. The `gpu`
 //! feature adds the renderer that export and the preview draw with. The `validate`
@@ -12,6 +13,8 @@
 mod camera;
 #[cfg(feature = "gpu")]
 pub mod gpu;
+#[cfg(feature = "validate")]
+mod spec;
 #[cfg(feature = "validate")]
 mod validate;
 
@@ -62,24 +65,6 @@ pub const VECTOR_SOURCE: &str = "openmaptiles";
 /// `fill-extrusion` layer. Without it they take the colour of the style's flat building fill.
 pub const BUILDING_COLOR_KEY: &str = "ovrley:building-color";
 
-/// Where map bytes come from. The shell owns the installed styles, the network and the disk cache.
-pub trait MapDataSource: Send + Sync {
-    /// An installed style's JSON as its file holds it, without any URL rewriting.
-    fn style(&self, style: &MapStyleId) -> Result<Vec<u8>, String>;
-    /// The vector tile at `z/x/y`, with `z` at most 14.
-    fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String>;
-    /// The bundled map fonts' glyphs, opened once by the shell. Tile threads call it directly.
-    #[cfg(feature = "gpu")]
-    fn glyphs(&self) -> Arc<gpu::labels::GlyphService>;
-}
-
-/// What a render's maps draw from: the installed styles, and the bytes behind them.
-#[derive(Clone)]
-pub struct MapSource {
-    pub styles: MapStyleCatalog,
-    pub data: Arc<dyn MapDataSource>,
-}
-
 /// Which groups of map layers are drawn.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct MapLayers {
@@ -89,14 +74,6 @@ pub struct MapLayers {
     pub paths: bool,
     /// Each place's own name, as written locally, instead of the one it is known by internationally.
     pub local_names: bool,
-}
-
-impl MapLayers {
-    /// Whether these toggles hide a style layer, from its `type` and `source-layer`.
-    pub fn hides_layer(self, layer_type: &str, source_layer: Option<&str>) -> bool {
-        (!self.labels && layer_type == "symbol")
-            || (!self.buildings && source_layer == Some("building"))
-    }
 }
 
 /// One translated style: an installed style with its layer toggles applied.
@@ -276,6 +253,88 @@ impl PartialEq for MapRouteDraw {
         Arc::ptr_eq(&self.line, &other.line)
             && self.style == other.style
             && self.travelled_metres == other.travelled_metres
+    }
+}
+
+/// The direct sub-expressions of `expr`, in the order MapLibre's `eachChild` visits them.
+#[cfg(any(feature = "gpu", feature = "validate"))]
+fn sub_expressions(expr: &maplibre_expr::Expr) -> Vec<&maplibre_expr::Expr> {
+    use maplibre_expr::Expr;
+    match expr {
+        Expr::Literal(_) | Expr::Var(_) | Expr::Within(_) | Expr::Distance(_) => Vec::new(),
+        Expr::Call { args, .. } => args.iter().collect(),
+        Expr::Let { bindings, body } => bindings
+            .iter()
+            .map(|(_, value)| value)
+            .chain([&**body])
+            .collect(),
+        Expr::Match {
+            input,
+            arms,
+            default,
+        } => [&**input]
+            .into_iter()
+            .chain(arms.iter().map(|(_, output)| output))
+            .chain([&**default])
+            .collect(),
+        Expr::Step {
+            input,
+            output0,
+            stops,
+        } => [&**input, &**output0]
+            .into_iter()
+            .chain(stops.iter().map(|(_, output)| output))
+            .collect(),
+        Expr::Interpolate { input, stops, .. } => [&**input]
+            .into_iter()
+            .chain(stops.iter().map(|(_, output)| output))
+            .collect(),
+        Expr::Format(sections) => sections
+            .iter()
+            .flat_map(|section| {
+                [Some(&section.content)]
+                    .into_iter()
+                    .chain([
+                        section.scale.as_ref(),
+                        section.font.as_ref(),
+                        section.text_color.as_ref(),
+                        section.vertical_align.as_ref(),
+                    ])
+                    .flatten()
+            })
+            .collect(),
+        Expr::Collator {
+            case_sensitive,
+            diacritic_sensitive,
+            locale,
+        } => [case_sensitive, diacritic_sensitive, locale]
+            .into_iter()
+            .flatten()
+            .map(|expr| &**expr)
+            .collect(),
+        Expr::NumberFormat {
+            value,
+            locale,
+            currency,
+            min_fraction_digits,
+            max_fraction_digits,
+            unit,
+        } => [&**value]
+            .into_iter()
+            .chain(
+                [
+                    locale,
+                    currency,
+                    min_fraction_digits,
+                    max_fraction_digits,
+                    unit,
+                ]
+                .into_iter()
+                .flatten()
+                .map(|expr| &**expr),
+            )
+            .collect(),
+        Expr::Assert(_, inner) | Expr::Coerce(_, inner) => vec![&**inner],
     }
 }
 

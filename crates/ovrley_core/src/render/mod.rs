@@ -13,7 +13,7 @@ use crate::{
     normalize::{ValidatedRenderConfig, ValidatedSceneConfig},
     paths::AppPaths,
 };
-use ovrley_map::MapSource;
+use ovrley_map::gpu::MapSource;
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},

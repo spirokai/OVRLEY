@@ -2,8 +2,7 @@
 //!
 //! The shaping covers what the maps draw: one font, horizontal writing, no inline images.
 //! It works in glyph units, where one em is [`ONE_EM`] (the 24 px the glyph bitmaps are made at), and
-//! takes glyph metrics from a caller-supplied lookup. That keeps it free of font files, so the preview's
-//! decode workers can run it from the metrics the glyph service gave them.
+//! takes glyph metrics from a caller-supplied lookup, so it needs no font files.
 //!
 //! None of the supported scripts needs contextual shaping (Latin, Greek, Cyrillic, Hebrew, Chinese,
 //! Japanese and Korean: one codepoint, one glyph), so a character is a shaping unit. Hebrew needs bidi

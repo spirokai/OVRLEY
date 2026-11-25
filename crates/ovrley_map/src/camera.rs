@@ -1,9 +1,8 @@
-//! MapLibre-style camera and view state, ported from maplibre-rs `render/camera.rs` and
-//! `render/view_state.rs`. It matches how maplibre-gl-js builds its perspective.
+//! The camera, its view matrix, and the tiles it sees. The perspective is built the way MapLibre builds
+//! it, after maplibre-rs (MIT, see `gpu/LICENSE-MIT`).
 //!
 //! This is the one owner of the view matrix: the GPU renderer draws roads with it and the widget
-//! projects the route with it, so the two cannot disagree. Tile identities and view regions are
-//! ported from maplibre-rs `coords.rs`.
+//! projects the route with it, so the two cannot disagree.
 
 use crate::mercator::lon_lat_to_world;
 use crate::{MAX_TILE_ZOOM, TILE_SIZE};
@@ -27,7 +26,7 @@ pub const LIGHT_XY: (f64, f64) = (0.2875, -0.498);
 
 /// The most tiles one view draws. A view that reaches this may be missing some.
 pub const MAX_VIEW_TILES: usize = 512;
-/// Tiles stop at this level upstream. Deeper views draw these tiles scaled.
+/// The tile service's data stops at this level. Deeper views draw these tiles scaled.
 const MAX_DATA_LEVEL: u8 = 14;
 
 #[rustfmt::skip]
@@ -108,7 +107,8 @@ impl MapCamera {
         self.pitch_deg
     }
 
-    /// `lon, lat, zoom, pitch, bearing, top padding`, for a renderer in another WASM module.
+    /// `lon, lat, zoom, pitch, bearing, top padding`, as a debug payload or a benchmark case records
+    /// the camera.
     pub const fn values(self) -> [f64; 6] {
         [
             self.lon,
@@ -374,8 +374,8 @@ impl ViewState {
         let far_z = self.furthest_distance(camera_to_center_distance) * 1.01;
         let near_z = self.height / 50.0;
         let (xmax, ymax) = (near_z * self.x_tan(), near_z * self.y_tan);
-        // Upstream shifts this frustum the other way, which moves the centre up. FLIP_Y runs after
-        // the frustum, so MapLibre's padding needs the opposite sign here.
+        // FLIP_Y runs after the frustum, so MapLibre's top padding takes the opposite sign here.
+        // The centre then lands `(0.5 + ratio / 2)` of the height down the window.
         let offset = self.top_padding_ratio;
         let perspective = frustum(
             -xmax,
@@ -435,7 +435,7 @@ impl ViewState {
 
     /// The tiles at `level` under the frustum's footprint on the ground. `None` when the ground
     /// is not in view.
-    pub fn create_view_region(&self, level: u8) -> Option<ViewRegion> {
+    pub(crate) fn view_region(&self, level: u8) -> Option<ViewRegion> {
         let tile_scale = 2_f64.powi(i32::from(level)) / self.world_size();
         let footprint = self
             .ground_corners()?
@@ -518,7 +518,7 @@ pub fn data_level(zoom: f64) -> u8 {
 /// The on-grid tiles a camera sees on a viewport.
 pub fn view_tiles(camera: &MapCamera, viewport: MapViewport) -> Vec<TileId> {
     let view = ViewState::new(camera, viewport);
-    view.create_view_region(data_level(view.zoom()))
+    view.view_region(data_level(view.zoom()))
         .map(|region| region.iter().collect())
         .unwrap_or_default()
 }
@@ -565,7 +565,7 @@ pub fn frame_tiles(
 }
 
 /// A bounding box of tiles at one level, cut to the frustum's footprint.
-pub struct ViewRegion {
+pub(crate) struct ViewRegion {
     min_tile: TileId,
     max_tile: TileId,
     /// The footprint's corners in order, in tile units at this level. A pitched, rotated view's
@@ -574,7 +574,7 @@ pub struct ViewRegion {
 }
 
 impl ViewRegion {
-    pub fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = TileId> + '_ {
         let z = self.min_tile.z;
         (self.min_tile.x..=self.max_tile.x)
             .flat_map(move |x| {

@@ -19,7 +19,7 @@ use std::sync::Arc;
 /// Cell size of the collision grid, in output pixels.
 const GRID_CELL: f64 = 25.0;
 /// How far outside the viewport labels are still placed, so they settle off screen first.
-pub(crate) const VIEWPORT_PADDING: f64 = 100.0;
+const VIEWPORT_PADDING: f64 = 100.0;
 /// Labels where the perspective ratio is below this are not placed or drawn: where the haze is full,
 /// since `FOG_FULL` is the map centre's share of the depth there and the ratio is `0.5 + 0.5` times it.
 pub(crate) const PERSPECTIVE_CUTOFF: f64 = 0.5 + 0.5 * FOG_FULL as f64;
@@ -423,7 +423,7 @@ fn place_line(
     let mut circles = Vec::with_capacity(count);
     for step in 0..count {
         let along = if count == 1 {
-            (first + last) / 2.0
+            f64::midpoint(first, last)
         } else {
             first + (last - first) * step as f64 / (count - 1) as f64
         };

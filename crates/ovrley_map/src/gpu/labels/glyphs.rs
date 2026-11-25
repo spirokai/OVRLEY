@@ -1,7 +1,6 @@
 //! The glyph service: the bundled font files, opened once, and every glyph made from them. Given a
 //! style's font and a character it answers with the face that draws it, an SDF bitmap and its
-//! metrics. Export's tile threads open the files in place; the preview's decode workers have no files,
-//! so they are handed the same bytes and make the same glyphs.
+//! metrics. Tile threads share one service and read the memory-mapped files in place.
 //!
 //! The SDF is made from the outline's coverage by a Euclidean distance transform with radius 8 and
 //! cutoff 0.25 at 24 px with a 3 px buffer, the values the label shader's constants assume. Faces
@@ -90,14 +89,10 @@ impl GlyphService {
                 ))
             })
             .collect::<Result<_, String>>()?;
-        Ok(Self::with_faces(faces))
-    }
-
-    fn with_faces(faces: HashMap<Face, FaceFile>) -> Self {
-        Self {
+        Ok(Self {
             faces,
             made: RwLock::new(HashMap::new()),
-        }
+        })
     }
 
     /// The distance field of a character a face has, which the atlas holds under that key.
@@ -123,22 +118,19 @@ impl GlyphService {
             .expect("glyph cache lock")
             .get(&key)
             .cloned();
-        match cached {
-            Some(made) => Ok(made),
-            None => {
-                let rasterized =
-                    rasterize(&self.faces[&face].font, character, face.texture_scale())?;
-                let made = (rasterized.metrics, Arc::new(rasterized.bitmap));
-                // Two threads may make the same glyph at once; both get the first one stored.
-                Ok(self
-                    .made
-                    .write()
-                    .expect("glyph cache lock")
-                    .entry(key)
-                    .or_insert(made)
-                    .clone())
-            }
+        if let Some(made) = cached {
+            return Ok(made);
         }
+        let rasterized = rasterize(&self.faces[&face].font, character, face.texture_scale())?;
+        let made = (rasterized.metrics, Arc::new(rasterized.bitmap));
+        // Two threads may make the same glyph at once; both get the first one stored.
+        Ok(self
+            .made
+            .write()
+            .expect("glyph cache lock")
+            .entry(key)
+            .or_insert(made)
+            .clone())
     }
 }
 
@@ -240,28 +232,22 @@ fn rasterize(font: &impl Font, character: char, texture_scale: u32) -> Result<Gl
 
     let mut scratch = Edt1d::new(width.max(height));
     // Columns left and right of the glyph have no seeds and stay INF in the column pass.
-    edt(
-        &mut grid_outer,
-        0,
-        0,
+    let whole = Region {
+        x0: 0,
+        y0: 0,
         width,
         height,
-        width,
-        buffer,
-        &mut scratch,
-    );
+    };
+    edt(&mut grid_outer, whole, width, buffer, &mut scratch);
     // The inner region is padded by a pixel so ink touching the bounding box sees the outside.
     let pad = buffer.min(1);
-    edt(
-        &mut grid_inner,
-        buffer - pad,
-        buffer - pad,
-        glyph_width + 2 * pad,
-        glyph_height + 2 * pad,
-        width,
-        0,
-        &mut scratch,
-    );
+    let inner = Region {
+        x0: buffer - pad,
+        y0: buffer - pad,
+        width: glyph_width + 2 * pad,
+        height: glyph_height + 2 * pad,
+    };
+    edt(&mut grid_inner, inner, width, 0, &mut scratch);
 
     // Inside maps to high bytes, with the edge gradient spanning
     // [-radius * cutoff, radius * (1 - cutoff)] pixels around the outline.
@@ -323,15 +309,25 @@ impl Edt1d {
     }
 }
 
-/// 2D Euclidean squared distance transform (Felzenszwalb and Huttenlocher), over a `width` x `height`
-/// region at (`x0`, `y0`) of a grid `grid_size` wide. The column pass skips `skip_cols` columns at each side.
-#[allow(clippy::too_many_arguments)]
-fn edt(
-    data: &mut [f64],
+/// A `width` x `height` area of a grid, at (`x0`, `y0`).
+#[derive(Clone, Copy)]
+struct Region {
     x0: usize,
     y0: usize,
     width: usize,
     height: usize,
+}
+
+/// 2D Euclidean squared distance transform (Felzenszwalb and Huttenlocher), over `region` of a grid
+/// `grid_size` wide. The column pass skips `skip_cols` columns at each side.
+fn edt(
+    data: &mut [f64],
+    Region {
+        x0,
+        y0,
+        width,
+        height,
+    }: Region,
     grid_size: usize,
     skip_cols: usize,
     scratch: &mut Edt1d,

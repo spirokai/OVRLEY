@@ -7,9 +7,6 @@
 //! chose. Names along roads and rivers lie flat on the ground, their glyphs walked along the line for
 //! each camera. The atlas holds the distance fields of every glyph the resident tiles use. The vertex
 //! shader passes positions through, so projection happens here, in `f64`, once per placed symbol.
-//!
-//! Both hosts fill the atlas the same way, from a bitmap lookup: export's is its glyph service, and the
-//! preview's the bitmaps its decode workers sent with each tile.
 
 mod glyphs;
 mod layout;
@@ -36,9 +33,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use std::mem::size_of;
 use std::ops::Range;
 use std::sync::Arc;
-
-/// Where the atlas gets the bitmap of a glyph it lacks.
-pub(crate) type BitmapLookup<'a> = dyn Fn(GlyphId) -> Result<Arc<GlyphBitmap>, String> + 'a;
 
 /// The atlas is square, and no larger than this however much the device allows.
 const ATLAS_MAX_SIZE: u32 = 4096;
@@ -152,11 +146,13 @@ impl GlyphAtlas {
     fn insert<'a>(
         &mut self,
         queue: &wgpu::Queue,
-        bitmap: &BitmapLookup<'_>,
+        glyphs: &GlyphService,
         ids: impl IntoIterator<Item = &'a GlyphId>,
     ) -> Result<bool, String> {
         for id in ids {
-            if !self.rects.contains_key(id) && !self.insert_one(queue, *id, &*bitmap(*id)?) {
+            if !self.rects.contains_key(id)
+                && !self.insert_one(queue, *id, &*glyphs.bitmap(id.face, id.character)?)
+            {
                 return Ok(false);
             }
         }
@@ -337,7 +333,7 @@ impl LabelLayers {
         queue: &wgpu::Queue,
         loaded: &HashSet<TileId>,
         view: &[TileId],
-        bitmap: &BitmapLookup<'_>,
+        glyphs: &GlyphService,
     ) -> Result<(), String> {
         let resident = self.tiles.len();
         self.tiles.retain(|tile, _| loaded.contains(tile));
@@ -351,7 +347,7 @@ impl LabelLayers {
             .collect();
         let needed = glyphs_of(sources.iter().map(|tile| &self.tiles[tile]));
         let held = self.atlas.rects.len();
-        if self.atlas.insert(queue, bitmap, &needed)? {
+        if self.atlas.insert(queue, glyphs, &needed)? {
             self.generation += u64::from(self.atlas.rects.len() != held);
             return Ok(());
         }
@@ -359,7 +355,7 @@ impl LabelLayers {
         self.atlas.clear(queue);
         self.atlas_clears += 1;
         self.generation += 1;
-        if !self.atlas.insert(queue, bitmap, &needed)? {
+        if !self.atlas.insert(queue, glyphs, &needed)? {
             return Err(format!(
                 "One map view's labels need more than the {0}x{0} glyph atlas holds",
                 self.atlas.size
@@ -368,7 +364,7 @@ impl LabelLayers {
         let resident = glyphs_of(self.tiles.values());
         self.atlas_partial = !self
             .atlas
-            .insert(queue, bitmap, resident.difference(&needed))?;
+            .insert(queue, glyphs, resident.difference(&needed))?;
         Ok(())
     }
 
@@ -382,25 +378,26 @@ impl LabelLayers {
         self.atlas_partial
     }
 
-    /// Puts as many of `glyphs` in the atlas as fit, without clearing it. Export knows every glyph
-    /// it will use before its first frame.
+    /// Puts as many of `ids` in the atlas as fit, without clearing it. Export knows every glyph it
+    /// will use before its first frame.
     pub(crate) fn preload_atlas(
         &mut self,
         queue: &wgpu::Queue,
-        bitmap: &BitmapLookup<'_>,
-        glyphs: &BTreeSet<GlyphId>,
+        glyphs: &GlyphService,
+        ids: &BTreeSet<GlyphId>,
     ) -> Result<(), String> {
-        if !self.atlas.insert(queue, bitmap, glyphs)? {
+        if !self.atlas.insert(queue, glyphs, ids)? {
             self.atlas_partial = true;
         }
         self.generation += 1;
         Ok(())
     }
 
-    /// Chooses this frame's symbols and writes their quads. Labels are placed at each camera of `labels` in
-    /// turn, each placement on the one before it, and the frame fades between the last two by its blend: in both placements it is fully drawn, in one only
-    /// it is drawn by the blend or its rest. Positions and sizes follow `camera`, so labels move with the
-    /// map between placements. Without `labels` nothing is drawn. A frame like the last one writes nothing.
+    /// Chooses this frame's symbols and writes their quads. Labels are placed at each camera of `labels`
+    /// in turn, each placement on the one before it, and the frame fades between the last two by its
+    /// blend: a label in both placements is fully drawn, one in only one is drawn by the blend or its
+    /// rest. Positions and sizes follow `camera`, so labels move with the map between placements.
+    /// Without `labels` nothing is drawn. A frame like the last one writes nothing.
     pub(crate) fn prepare(
         &mut self,
         device: &wgpu::Device,

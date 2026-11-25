@@ -1,25 +1,24 @@
-//! MapLibre's style validator, `validateStyleMin` from `@maplibre/maplibre-gl-style-spec`, ported so
-//! the shell can tell which installed styles MapLibre will load. It reads the same reference at the
-//! version the frontend's maplibre-gl ships: `style-spec/v8.json`, written by
-//! `scripts/prune-map-style-spec.mjs` (rerun it after updating maplibre-gl).
+//! MapLibre's style validator (`validateStyleMin` of the MapLibre style specification), so the shell
+//! only installs styles MapLibre loads. It reads MapLibre's style reference, embedded from
+//! `style-spec/v8.json` at the release `style-spec/VERSION` names, pruned to what validation reads.
 //!
-//! Parity is on acceptance: a style passes exactly when MapLibre reports no errors. Messages follow
-//! MapLibre's and are keyed by where in the style they are, without its line numbers. Warnings are
-//! not reported, because MapLibre loads a style that only has warnings. Expressions parse and
-//! type-check with `maplibre-expr`, which accepts a few constant expressions with unreachable bad
-//! branches that MapLibre rejects.
+//! A style passes exactly when MapLibre reports no errors. Messages follow MapLibre's and are keyed by
+//! where in the style they are, without line numbers. Warnings are not reported, because MapLibre loads
+//! a style that only has warnings. Expressions parse and type-check with `maplibre-expr`, which accepts
+//! a few constant expressions with unreachable bad branches that MapLibre rejects.
 //!
-//! Each function names the MapLibre source file it ports. The structure stays close to it, quirks
-//! included, so the two can be compared line by line when the reference is refreshed.
+//! Each method is named after the MapLibre validator it mirrors (`number` for `validateNumber`), and
+//! keeps its structure and quirks, so the two compare side by side when the reference is refreshed.
 
-use maplibre_expr::{format_number, Color};
+use crate::sub_expressions;
+use maplibre_expr::{format_number, parse, typecheck, Color, Expr, ParseErrorKind, Type};
 use serde_json::{json, Value as Json};
 use std::sync::OnceLock;
 
-pub(super) const REFERENCE_JSON: &str = include_str!("../../style-spec/v8.json");
+const REFERENCE_JSON: &str = include_str!("../style-spec/v8.json");
 
 /// The embedded style reference.
-pub(super) fn reference() -> &'static Json {
+pub(crate) fn reference() -> &'static Json {
     static REFERENCE: OnceLock<Json> = OnceLock::new();
     REFERENCE.get_or_init(|| {
         serde_json::from_str(REFERENCE_JSON).expect("the embedded style reference is valid JSON")
@@ -27,13 +26,12 @@ pub(super) fn reference() -> &'static Json {
 }
 
 /// Every error MapLibre's `validateStyleMin` finds in `style`. Empty means MapLibre loads it.
-pub fn style_errors(style: &Json) -> Vec<String> {
+pub(crate) fn style_errors(style: &Json) -> Vec<String> {
     let mut validator = Validator {
         spec: reference(),
         style,
         errors: Vec::new(),
     };
-    // validate_style.min.ts
     validator.object(
         "",
         style,
@@ -56,7 +54,7 @@ pub fn style_errors(style: &Json) -> Vec<String> {
 
 /// Where a value sits, which decides how its expressions are read: MapLibre's `expressionContext`.
 #[derive(Clone, Copy)]
-pub(super) enum Context<'k> {
+enum Context<'k> {
     None,
     Property { layout: bool, name: &'k str },
     Filter,
@@ -66,25 +64,25 @@ pub(super) enum Context<'k> {
 
 /// How [`Validator::object`] hands elements to their own validators: MapLibre's
 /// `objectElementValidators`. `None` where MapLibre passes none.
-pub(super) struct Elements<'c, 's> {
+struct Elements<'c, 's> {
     /// Elements with their own validator, which are also exempt from the `required` check.
-    pub(super) named: &'c [&'c str],
+    named: &'c [&'c str],
     /// Whether an element with neither a validator nor a spec goes to `validate` too, as `"*"`,
     /// rather than being an unknown property.
-    pub(super) star: bool,
+    star: bool,
     /// Called with the element's spec key (`"*"` for the catch-all), its key in the object, its full
     /// key and its value.
-    pub(super) validate: &'c mut dyn FnMut(&mut Validator<'s>, &str, &str, &str, &'s Json),
+    validate: &'c mut dyn FnMut(&mut Validator<'s>, &str, &str, &str, &'s Json),
 }
 
-pub(super) struct Validator<'s> {
-    pub(super) spec: &'static Json,
-    pub(super) style: &'s Json,
-    pub(super) errors: Vec<String>,
+struct Validator<'s> {
+    spec: &'static Json,
+    style: &'s Json,
+    errors: Vec<String>,
 }
 
 impl<'s> Validator<'s> {
-    pub(super) fn error(&mut self, key: &str, message: impl AsRef<str>) {
+    fn error(&mut self, key: &str, message: impl AsRef<str>) {
         let message = message.as_ref();
         self.errors.push(if key.is_empty() {
             message.to_string()
@@ -93,8 +91,8 @@ impl<'s> Validator<'s> {
         });
     }
 
-    /// validate/validate.ts
-    pub(super) fn validate(
+    /// Validates `value` against its `spec`, dispatching on the spec's type.
+    fn validate(
         &mut self,
         key: &str,
         value: &'s Json,
@@ -131,7 +129,6 @@ impl<'s> Validator<'s> {
             Some("projection") => self.projection(key, value),
             Some("projectionDefinition") => self.projection_definition(key, value),
             Some("string") => self.string(key, value),
-            // validate_formatted.ts, validate_image.ts
             Some("formatted" | "resolvedImage") => {
                 if !value.is_string() {
                     self.expression(key, value, Some(spec), context);
@@ -154,8 +151,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_object.ts
-    pub(super) fn object(
+    fn object(
         &mut self,
         key: &str,
         value: &'s Json,
@@ -206,8 +202,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_array.ts
-    pub(super) fn array(&mut self, key: &str, value: &'s Json, spec: &Json) {
+    fn array(&mut self, key: &str, value: &'s Json, spec: &Json) {
         let Some(array) = value.as_array() else {
             self.error(key, format!("array expected, {} found", type_name(value)));
             return;
@@ -251,8 +246,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_number.ts
-    pub(super) fn number(&mut self, key: &str, value: &Json, spec: &Json) {
+    fn number(&mut self, key: &str, value: &Json, spec: &Json) {
         let Some(number) = value.as_f64() else {
             self.error(key, format!("number expected, {} found", type_name(value)));
             return;
@@ -284,22 +278,19 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_string.ts
-    pub(super) fn string(&mut self, key: &str, value: &Json) {
+    fn string(&mut self, key: &str, value: &Json) {
         if !value.is_string() {
             self.error(key, format!("string expected, {} found", type_name(value)));
         }
     }
 
-    /// validate/validate_boolean.ts
-    pub(super) fn boolean(&mut self, key: &str, value: &Json) {
+    fn boolean(&mut self, key: &str, value: &Json) {
         if !value.is_boolean() {
             self.error(key, format!("boolean expected, {} found", type_name(value)));
         }
     }
 
-    /// validate/validate_color.ts
-    pub(super) fn color(&mut self, key: &str, value: &Json) {
+    fn color(&mut self, key: &str, value: &Json) {
         match value.as_str() {
             None => self.error(key, format!("color expected, {} found", type_name(value))),
             Some(color) if Color::parse(color).is_none() => {
@@ -309,9 +300,9 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_enum.ts. The reference lists `$root.version`'s values as an array and every
+    /// The reference lists `$root.version`'s values as an array and every
     /// other enum's as an object.
-    pub(super) fn enumeration(&mut self, key: &str, value: &Json, spec: &Json) {
+    fn enumeration(&mut self, key: &str, value: &Json, spec: &Json) {
         let (allowed, listed): (bool, Vec<String>) = match &spec["values"] {
             Json::Array(values) => (
                 values.iter().any(|allowed| js_equal(allowed, value)),
@@ -333,8 +324,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_padding.ts
-    pub(super) fn padding(&mut self, key: &str, value: &'s Json) {
+    fn padding(&mut self, key: &str, value: &'s Json) {
         let Some(values) = value.as_array() else {
             return self.number(key, value, &json!({}));
         };
@@ -358,8 +348,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_number_array.ts
-    pub(super) fn number_array(&mut self, key: &str, value: &'s Json) {
+    fn number_array(&mut self, key: &str, value: &'s Json) {
         let Some(values) = value.as_array() else {
             return self.number(key, value, &json!({}));
         };
@@ -377,8 +366,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_color_array.ts
-    pub(super) fn color_array(&mut self, key: &str, value: &Json) {
+    fn color_array(&mut self, key: &str, value: &Json) {
         let Some(values) = value.as_array() else {
             return self.color(key, value);
         };
@@ -391,8 +379,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate/validate_variable_anchor_offset_collection.ts
-    pub(super) fn variable_anchor_offset_collection(&mut self, key: &str, value: &'s Json) {
+    fn variable_anchor_offset_collection(&mut self, key: &str, value: &'s Json) {
         let Some(values) = value
             .as_array()
             .filter(|values| !values.is_empty() && values.len() % 2 == 0)
@@ -416,7 +403,7 @@ impl<'s> Validator<'s> {
 }
 
 /// `options.key` joined with an element's, as MapLibre builds them.
-pub(super) fn join_key(key: &str, element: &str) -> String {
+fn join_key(key: &str, element: &str) -> String {
     if key.is_empty() {
         element.to_string()
     } else {
@@ -424,8 +411,8 @@ pub(super) fn join_key(key: &str, element: &str) -> String {
     }
 }
 
-/// util/get_type.ts
-pub(super) fn type_name(value: &Json) -> &'static str {
+/// MapLibre's `getType`.
+fn type_name(value: &Json) -> &'static str {
     match value {
         Json::Null => "null",
         Json::Bool(_) => "boolean",
@@ -436,8 +423,8 @@ pub(super) fn type_name(value: &Json) -> &'static str {
     }
 }
 
-/// Whether JavaScript reads the value as true. Absent is `undefined`.
-pub(super) fn truthy(value: Option<&Json>) -> bool {
+/// Whether MapLibre reads the value as true. Absent counts as unset.
+fn truthy(value: Option<&Json>) -> bool {
     match value {
         None | Some(Json::Null) => false,
         Some(Json::Bool(value)) => *value,
@@ -447,9 +434,9 @@ pub(super) fn truthy(value: Option<&Json>) -> bool {
     }
 }
 
-/// JavaScript's `===` on JSON scalars. Arrays and objects are never equal, as two parsed ones are
+/// MapLibre's strict equality on JSON scalars. Arrays and objects are never equal, as two parsed ones are
 /// distinct objects.
-pub(super) fn js_equal(a: &Json, b: &Json) -> bool {
+fn js_equal(a: &Json, b: &Json) -> bool {
     match (a, b) {
         (Json::Number(a), Json::Number(b)) => a.as_f64() == b.as_f64(),
         (Json::Array(_) | Json::Object(_), _) | (_, Json::Array(_) | Json::Object(_)) => false,
@@ -457,8 +444,8 @@ pub(super) fn js_equal(a: &Json, b: &Json) -> bool {
     }
 }
 
-/// A value as JavaScript's template strings write it.
-pub(super) fn js_display(value: &Json) -> String {
+/// A value as MapLibre's messages write it.
+fn js_display(value: &Json) -> String {
     match value {
         Json::Null => "null".to_string(),
         Json::Bool(value) => value.to_string(),
@@ -471,32 +458,31 @@ pub(super) fn js_display(value: &Json) -> String {
     }
 }
 
-/// util/properties.ts `supportsPropertyExpression`
-pub(super) fn supports_property_expression(spec: &Json) -> bool {
+/// MapLibre's `supportsPropertyExpression`.
+fn supports_property_expression(spec: &Json) -> bool {
     matches!(
         spec["property-type"].as_str(),
         Some("data-driven" | "cross-faded-data-driven")
     )
 }
 
-/// util/properties.ts `supportsZoomExpression`
-pub(super) fn supports_zoom_expression(spec: &Json) -> bool {
+/// MapLibre's `supportsZoomExpression`.
+fn supports_zoom_expression(spec: &Json) -> bool {
     spec["expression"]["parameters"]
         .as_array()
         .is_some_and(|parameters| parameters.iter().any(|parameter| parameter == "zoom"))
 }
 
-/// util/properties.ts `supportsInterpolation`
-pub(super) fn supports_interpolation(spec: &Json) -> bool {
+/// MapLibre's `supportsInterpolation`.
+fn supports_interpolation(spec: &Json) -> bool {
     truthy(spec["expression"].get("interpolated"))
 }
 
-// --- validate/validate_layer.ts, validate_property.ts and validate_filter.ts, with the filter
-// classification from feature_filter/index.ts.
+// Layers, their properties and their filters.
 
 impl<'s> Validator<'s> {
     /// `index` is the layer's place in `layers`: an id may not repeat one before it.
-    pub(super) fn layer(&mut self, key: &str, layer: &'s Json, index: usize) {
+    fn layer(&mut self, key: &str, layer: &'s Json, index: usize) {
         let Some(object) = layer.as_object() else {
             self.error(key, format!("object expected, {} found", type_name(layer)));
             return;
@@ -640,8 +626,8 @@ impl<'s> Validator<'s> {
         );
     }
 
-    /// validate/validate_property.ts. `name` is the property's key in its `layout` or `paint`.
-    pub(super) fn property(
+    /// `name` is the property's key in its `layout` or `paint`.
+    fn property(
         &mut self,
         key: &str,
         name: &str,
@@ -696,9 +682,8 @@ impl<'s> Validator<'s> {
         self.validate(key, value, spec, Context::Property { layout, name });
     }
 
-    /// validate/validate_filter.ts. Mixed legacy filters are only a warning there, so they are not
-    /// reported.
-    pub(super) fn filter(&mut self, key: &str, value: &'s Json) {
+    /// Mixed legacy filters are only a MapLibre warning, so they are not reported.
+    fn filter(&mut self, key: &str, value: &'s Json) {
         if matches!(classify_filter(value), FilterSyntax::Legacy) {
             self.legacy_filter(key, value);
         } else {
@@ -706,7 +691,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn legacy_filter(&mut self, key: &str, value: &'s Json) {
+    fn legacy_filter(&mut self, key: &str, value: &'s Json) {
         let Some(filter) = value.as_array() else {
             self.error(key, format!("array expected, {} found", type_name(value)));
             return;
@@ -784,17 +769,17 @@ impl<'s> Validator<'s> {
     }
 }
 
-/// Which syntax a filter node is written in: feature_filter/index.ts `FilterClassification`.
+/// Which syntax a filter node is written in: MapLibre's `FilterClassification`.
 #[derive(Clone, Copy)]
-pub(super) enum FilterSyntax {
+enum FilterSyntax {
     Expression,
     Legacy,
     /// Reads the same either way, so it says nothing about the tree around it.
     Neutral,
 }
 
-/// feature_filter/index.ts `classifyFilter`. Anything but legacy validates as an expression.
-pub(super) fn classify_filter(filter: &Json) -> FilterSyntax {
+/// MapLibre's `classifyFilter`. Anything but legacy validates as an expression.
+fn classify_filter(filter: &Json) -> FilterSyntax {
     if filter.is_boolean() {
         return FilterSyntax::Neutral;
     }
@@ -845,18 +830,13 @@ pub(super) fn classify_filter(filter: &Json) -> FilterSyntax {
     }
 }
 
-#[cfg(test)]
-pub(super) fn is_legacy_filter(filter: &Json) -> bool {
-    matches!(classify_filter(filter), FilterSyntax::Legacy)
-}
+// Sources.
 
-// --- validate/validate_source.ts and validate_raster_dem_source.ts.
-
-pub(super) const CUSTOM_ENCODING_KEYS: [&str; 4] =
+const CUSTOM_ENCODING_KEYS: [&str; 4] =
     ["redFactor", "greenFactor", "blueFactor", "baseShift"];
 
 impl<'s> Validator<'s> {
-    pub(super) fn source(&mut self, key: &str, value: &'s Json) {
+    fn source(&mut self, key: &str, value: &'s Json) {
         if !truthy(value.get("type")) {
             self.error(key, "\"type\" is required");
             return;
@@ -909,7 +889,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn promote_id(&mut self, key: &str, value: &Json) {
+    fn promote_id(&mut self, key: &str, value: &Json) {
         match value {
             Json::String(_) => {}
             Json::Object(ids) => {
@@ -926,7 +906,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn cluster_properties(&mut self, key: &str, source: &Json) {
+    fn cluster_properties(&mut self, key: &str, source: &Json) {
         let Some(properties) = source.get("clusterProperties").and_then(Json::as_object) else {
             return;
         };
@@ -965,7 +945,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn raster_dem_source(&mut self, key: &str, value: &'s Json) {
+    fn raster_dem_source(&mut self, key: &str, value: &'s Json) {
         let Some(object) = value.as_object() else {
             self.error(key, format!("object expected, {} found", type_name(value)));
             return;
@@ -995,32 +975,31 @@ impl<'s> Validator<'s> {
     }
 }
 
-// --- validate/validate_function.ts: legacy `{"stops": ...}` property functions, which the
-// OpenFreeMap styles still use throughout.
+// The style's top-level objects: light, sky, terrain, projection, sprite, glyphs, font faces and state.
 
-/// What MapLibre's closure keeps across one function's stops.
-pub(super) const MAX_CODE_POINT: u32 = 0x10ffff;
+/// The highest Unicode code point.
+const MAX_CODE_POINT: u32 = 0x10ffff;
 
 impl<'s> Validator<'s> {
-    pub(super) fn light(&mut self, key: &str, value: &'s Json) {
+    fn light(&mut self, key: &str, value: &'s Json) {
         self.top_level_object(key, value, "light", true);
     }
 
-    pub(super) fn sky(&mut self, key: &str, value: &'s Json) {
+    fn sky(&mut self, key: &str, value: &'s Json) {
         self.top_level_object(key, value, "sky", true);
     }
 
-    pub(super) fn terrain(&mut self, key: &str, value: &'s Json) {
+    fn terrain(&mut self, key: &str, value: &'s Json) {
         self.top_level_object(key, value, "terrain", false);
     }
 
-    pub(super) fn projection(&mut self, key: &str, value: &'s Json) {
+    fn projection(&mut self, key: &str, value: &'s Json) {
         self.top_level_object(key, value, "projection", false);
     }
 
     /// An object whose every property has a spec in `section`. Transitionable ones also take a
     /// `-transition` property when `transitions` is set.
-    pub(super) fn top_level_object(
+    fn top_level_object(
         &mut self,
         key: &str,
         value: &'s Json,
@@ -1054,7 +1033,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn projection_definition(&mut self, key: &str, value: &Json) {
+    fn projection_definition(&mut self, key: &str, value: &Json) {
         match value {
             Json::Array(definition) => {
                 let projection = definition.len() == 3
@@ -1084,7 +1063,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn sprite(&mut self, key: &str, value: &'s Json) {
+    fn sprite(&mut self, key: &str, value: &'s Json) {
         let Some(sprites) = value.as_array() else {
             return self.string(key, value);
         };
@@ -1113,7 +1092,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn glyphs(&mut self, key: &str, value: &Json) {
+    fn glyphs(&mut self, key: &str, value: &Json) {
         let Some(url) = value.as_str() else {
             return self.string(key, value);
         };
@@ -1125,7 +1104,7 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn font_faces(&mut self, key: &str, value: &'s Json) {
+    fn font_faces(&mut self, key: &str, value: &'s Json) {
         let Some(fonts) = value.as_object() else {
             self.error(key, format!("object expected, {} found", type_name(value)));
             return;
@@ -1162,9 +1141,9 @@ impl<'s> Validator<'s> {
         }
     }
 
-    /// validate_font_faces.ts `validateUnicodeRange`, without its regular expression: `U+26`,
+    /// `validateUnicodeRange`, without its regular expression: `U+26`,
     /// `U+0-7F` or `U+4??`, with at most six hex digits either side.
-    pub(super) fn unicode_range(&mut self, key: &str, value: &Json) {
+    fn unicode_range(&mut self, key: &str, value: &Json) {
         let Some(range) = value.as_str() else {
             return;
         };
@@ -1209,13 +1188,898 @@ impl<'s> Validator<'s> {
         }
     }
 
-    pub(super) fn state(&mut self, key: &str, value: &Json) {
+    fn state(&mut self, key: &str, value: &Json) {
         if !value.is_object() {
             self.error(key, format!("object expected, {} found", type_name(value)));
         }
     }
 }
 
-// --- validate/validate_expression.ts, with `createExpression` and `createPropertyExpression` from
-// expression/index.ts. `maplibre-expr` parses and type-checks; the checks MapLibre makes on the
-// parsed tree are ported here over its `Expr`.
+// Legacy `{"stops": ...}` property functions, which the OpenFreeMap styles still use throughout.
+
+/// What validating one function carries from stop to stop.
+struct Stops<'v> {
+    /// The spec of the property the function sets.
+    value_spec: &'v Json,
+    function_type: Option<&'v Json>,
+    zoom_and_property: bool,
+    key_type: Option<&'static str>,
+    previous_value: Option<f64>,
+    previous_zoom: Option<Json>,
+    domain_values: Vec<Json>,
+}
+
+impl Stops<'_> {
+    fn is(&self, function_type: &str) -> bool {
+        self.function_type
+            .is_some_and(|value| value == function_type)
+    }
+}
+
+impl<'s> Validator<'s> {
+    fn function(&mut self, key: &str, value: &'s Json, value_spec: &Json) {
+        let function_type = value.get("type");
+        let is_zoom_function = !function_type.is_some_and(|value| value == "categorical")
+            && value.get("property").is_none();
+        let stops_value = value.get("stops");
+        let zoom_and_property = stops_value
+            .and_then(Json::as_array)
+            .and_then(|stops| stops.first())
+            .and_then(Json::as_array)
+            .and_then(|stop| stop.first())
+            .is_some_and(Json::is_object);
+        let mut stops = Stops {
+            value_spec,
+            function_type,
+            zoom_and_property,
+            key_type: None,
+            previous_value: None,
+            previous_zoom: None,
+            domain_values: Vec::new(),
+        };
+        let function_spec = &self.spec["function"];
+        self.object(
+            key,
+            value,
+            function_spec,
+            Some(Elements {
+                named: &["stops", "default"],
+                star: false,
+                validate: &mut |validator, spec_key, _, key, value| {
+                    if spec_key == "stops" {
+                        validator.function_stops(&mut stops, key, value);
+                    } else {
+                        validator.validate(key, value, stops.value_spec, Context::None);
+                    }
+                },
+            }),
+        );
+
+        let is = |name: &str| function_type.is_some_and(|value| value == name);
+        if is("identity") && is_zoom_function {
+            self.error(key, "missing required property \"property\"");
+        }
+        if !is("identity") && !truthy(stops_value) {
+            self.error(key, "missing required property \"stops\"");
+        }
+        if is("exponential")
+            && truthy(value_spec.get("expression"))
+            && !supports_interpolation(value_spec)
+        {
+            self.error(key, "exponential functions not supported");
+        }
+        if !is_zoom_function && !supports_property_expression(value_spec) {
+            self.error(key, "property functions not supported");
+        } else if is_zoom_function && !supports_zoom_expression(value_spec) {
+            self.error(key, "zoom functions not supported");
+        }
+        if (is("categorical") || zoom_and_property) && value.get("property").is_none() {
+            self.error(key, "\"property\" property is required");
+        }
+    }
+
+    fn function_stops(&mut self, stops: &mut Stops<'_>, key: &str, value: &'s Json) {
+        if stops.is("identity") {
+            self.error(key, "identity function may not have a \"stops\" property");
+            return;
+        }
+        // validateArray with `validateFunctionStop` for each element: the stops spec has no length.
+        let Some(list) = value.as_array() else {
+            self.error(key, format!("array expected, {} found", type_name(value)));
+            return;
+        };
+        for (index, stop) in list.iter().enumerate() {
+            self.function_stop(stops, &format!("{key}[{index}]"), stop);
+        }
+        if list.is_empty() {
+            self.error(key, "array must have at least one stop");
+        }
+    }
+
+    fn function_stop(&mut self, stops: &mut Stops<'_>, key: &str, value: &'s Json) {
+        let Some(stop) = value.as_array() else {
+            self.error(key, format!("array expected, {} found", type_name(value)));
+            return;
+        };
+        if stop.len() != 2 {
+            self.error(
+                key,
+                format!("array length 2 expected, length {} found", stop.len()),
+            );
+            return;
+        }
+        if stops.zoom_and_property {
+            let Some(domain) = stop[0].as_object() else {
+                self.error(
+                    key,
+                    format!("object expected, {} found", type_name(&stop[0])),
+                );
+                return;
+            };
+            let Some(zoom) = domain.get("zoom") else {
+                self.error(key, "object stop key must have zoom");
+                return;
+            };
+            if !domain.contains_key("value") {
+                self.error(key, "object stop key must have value");
+                return;
+            }
+            let previous = stops.previous_zoom.as_ref().and_then(Json::as_f64);
+            if let (Some(previous), Some(zoom)) = (previous, zoom.as_f64()) {
+                if previous != 0.0 && previous > zoom {
+                    self.error(key, "stop zoom values must appear in ascending order");
+                    return;
+                }
+            }
+            if !stops
+                .previous_zoom
+                .as_ref()
+                .is_some_and(|previous| js_equal(previous, zoom))
+            {
+                stops.previous_zoom = Some(zoom.clone());
+                stops.previous_value = None;
+                stops.domain_values.clear();
+            }
+            self.object(
+                &format!("{key}[0]"),
+                &stop[0],
+                &json!({ "zoom": {} }),
+                Some(Elements {
+                    named: &["zoom", "value"],
+                    star: false,
+                    validate: &mut |validator, spec_key, _, key, value| {
+                        if spec_key == "zoom" {
+                            validator.number(key, value, &json!({}));
+                        } else {
+                            validator.stop_domain_value(stops, key, value);
+                        }
+                    },
+                }),
+            );
+        } else {
+            self.stop_domain_value(stops, &format!("{key}[0]"), &stop[0]);
+        }
+        let output_key = format!("{key}[1]");
+        if maplibre_expr::is_expression(&stop[1]) {
+            self.error(
+                &output_key,
+                "expressions are not allowed in function stops.",
+            );
+            return;
+        }
+        self.validate(&output_key, &stop[1], stops.value_spec, Context::None);
+    }
+
+    fn stop_domain_value(&mut self, stops: &mut Stops<'_>, key: &str, value: &Json) {
+        let value_type = type_name(value);
+        match stops.key_type {
+            None => stops.key_type = Some(value_type),
+            Some(key_type) if key_type != value_type => {
+                self.error(
+                    key,
+                    format!("{value_type} stop domain type must match previous stop domain type {key_type}"),
+                );
+                return;
+            }
+            Some(_) => {}
+        }
+        if !matches!(value_type, "number" | "string" | "boolean") {
+            self.error(
+                key,
+                "stop domain value must be a number, string, or boolean",
+            );
+            return;
+        }
+        let categorical = stops.is("categorical");
+        if value_type != "number" && !categorical {
+            let mut message = format!("number expected, {value_type} found");
+            if supports_property_expression(stops.value_spec) && stops.function_type.is_none() {
+                message.push_str(
+                    "\nIf you intended to use a categorical function, specify `\"type\": \"categorical\"`.",
+                );
+            }
+            self.error(key, message);
+            return;
+        }
+        let number = value.as_f64();
+        if categorical
+            && number.is_some_and(|number| !number.is_finite() || number.floor() != number)
+        {
+            self.error(
+                key,
+                format!("integer expected, found {}", js_display(value)),
+            );
+            return;
+        }
+        match (number, stops.previous_value) {
+            (Some(number), Some(previous)) if !categorical && number < previous => {
+                self.error(key, "stop domain values must appear in ascending order");
+                return;
+            }
+            _ => stops.previous_value = number,
+        }
+        if categorical {
+            if stops.domain_values.iter().any(|seen| js_equal(seen, value)) {
+                self.error(key, "stop domain values must be unique");
+                return;
+            }
+            stops.domain_values.push(value.clone());
+        }
+    }
+}
+
+// Expressions, with the checks MapLibre's `createExpression` and `createPropertyExpression` make on
+// the tree `maplibre-expr` parses and type-checks.
+
+const ZOOM_CURVE_NOT_TOP_LEVEL: &str =
+    "\"zoom\" expression may only be used as input to a top-level \"step\" or \"interpolate\" expression.";
+const CLUSTER_GLOBALS: &str =
+    "\"zoom\" and \"feature-state\" expressions are not supported with cluster properties.";
+/// What [`without_zoom`] reads instead of the zoom: a number, and not a constant.
+const ZOOM_STAND_IN: &str = "\u{0}zoom";
+const ONE_ZOOM_CURVE: &str =
+    "Only one zoom-based \"step\" or \"interpolate\" subexpression may be used in an expression.";
+
+impl Validator<'_> {
+    /// `spec` is the property's, when there is one: it gives the type the expression must produce.
+    fn expression(
+        &mut self,
+        key: &str,
+        value: &Json,
+        spec: Option<&Json>,
+        context: Context<'_>,
+    ) {
+        let expected = spec.and_then(expected_type);
+        let coerce_string = spec.is_some_and(|spec| spec["type"] == "string");
+        let check = |value: &Json| {
+            parse(value).and_then(|expr| typecheck(&expr, expected.as_ref(), coerce_string))
+        };
+        let parsed = match check(value) {
+            // `maplibre-expr` places the zoom in every expression, MapLibre only in properties.
+            Err(error)
+                if matches!(error.kind, ParseErrorKind::Zoom(_))
+                    && !matches!(context, Context::Property { .. }) =>
+            {
+                if matches!(context, Context::ClusterMap | Context::ClusterReduce) {
+                    self.error(key, CLUSTER_GLOBALS);
+                    return;
+                }
+                check(&without_zoom(value))
+            }
+            parsed => parsed,
+        };
+        let expr = match parsed {
+            Ok(expr) => expr,
+            Err(error) => {
+                self.error(&format!("{key}{}", error.key), error.to_string());
+                return;
+            }
+        };
+        match context {
+            Context::Property { layout, name } => {
+                let spec = spec.expect("a property expression has its property's spec");
+                if let Err(message) = property_expression(&expr, spec) {
+                    self.error(key, message);
+                } else if name == "text-font" && !output_defined(&expr) {
+                    self.error(
+                        key,
+                        format!("Invalid data expression for \"{name}\". Output values must be contained as literals within the expression."),
+                    );
+                } else if layout && !global_constant(&expr, &["feature-state"]) {
+                    self.error(
+                        key,
+                        "\"feature-state\" data expressions are not supported with layout properties.",
+                    );
+                }
+            }
+            Context::Filter => {
+                if !global_constant(&expr, &["feature-state"]) {
+                    self.error(
+                        key,
+                        "\"feature-state\" data expressions are not supported with filters.",
+                    );
+                }
+            }
+            Context::ClusterMap | Context::ClusterReduce => {
+                if !global_constant(&expr, &["zoom", "feature-state"]) {
+                    self.error(key, CLUSTER_GLOBALS);
+                }
+            }
+            Context::None => {}
+        }
+    }
+}
+
+/// The expression with every `["zoom"]` read as a number from the feature instead, so it checks
+/// as MapLibre checks a filter or a top-level value: with the zoom anywhere. Literals and `match`
+/// labels are data, not expressions, so they stay as written.
+fn without_zoom(value: &Json) -> Json {
+    match value {
+        Json::Array(items) if items.len() == 1 && items[0] == "zoom" => {
+            json!(["number", ["get", ZOOM_STAND_IN]])
+        }
+        Json::Array(items) if items.first().is_some_and(|head| head == "literal") => value.clone(),
+        // `["match", input, label, output, ..., fallback]`: labels sit at even places before the last.
+        Json::Array(items) if items.first().is_some_and(|head| head == "match") => Json::Array(
+            items
+                .iter()
+                .enumerate()
+                .map(|(index, item)| {
+                    if index >= 2 && index % 2 == 0 && index + 1 < items.len() {
+                        item.clone()
+                    } else {
+                        without_zoom(item)
+                    }
+                })
+                .collect(),
+        ),
+        Json::Array(items) => Json::Array(items.iter().map(without_zoom).collect()),
+        _ => value.clone(),
+    }
+}
+
+/// What `createPropertyExpression` adds to `createExpression`.
+fn property_expression(expr: &Expr, spec: &Json) -> Result<(), &'static str> {
+    if !feature_constant(expr) && !supports_property_expression(spec) {
+        return Err("data expressions not supported");
+    }
+    let zoom_constant = global_constant(expr, &["zoom"]);
+    if !zoom_constant && !supports_zoom_expression(spec) {
+        return Err("zoom expressions not supported");
+    }
+    match zoom_curve(expr) {
+        None if !zoom_constant => Err(ZOOM_CURVE_NOT_TOP_LEVEL),
+        Some(Err(message)) => Err(message),
+        Some(Ok(Expr::Interpolate { .. })) if !supports_interpolation(spec) => {
+            Err("\"interpolate\" expressions cannot be used with this property")
+        }
+        _ => Ok(()),
+    }
+}
+
+/// MapLibre's `getExpectedType`.
+fn expected_type(spec: &Json) -> Option<Type> {
+    fn named(name: &str) -> Option<Type> {
+        Some(match name {
+            "color" => Type::Color,
+            "string" | "enum" => Type::String,
+            "number" => Type::Number,
+            "boolean" => Type::Boolean,
+            "formatted" => Type::Formatted,
+            "padding" => Type::Padding,
+            "numberArray" => Type::NumberArray,
+            "colorArray" => Type::ColorArray,
+            "projectionDefinition" => Type::ProjectionDefinition,
+            "resolvedImage" => Type::ResolvedImage,
+            "variableAnchorOffsetCollection" => Type::VariableAnchorOffsetCollection,
+            _ => return None,
+        })
+    }
+    match spec.get("type")?.as_str()? {
+        "array" => Some(Type::array(
+            spec["value"]
+                .as_str()
+                .and_then(named)
+                .unwrap_or(Type::Value),
+            spec["length"].as_u64().map(|length| length as usize),
+        )),
+        other => named(other),
+    }
+}
+
+/// MapLibre's `isFeatureConstant`.
+fn feature_constant(expr: &Expr) -> bool {
+    match expr {
+        Expr::Call { op, args } => {
+            let reads_feature = (op == "get" && args.len() == 1)
+                || op == "feature-state"
+                || (op == "has" && args.len() == 1)
+                || matches!(op.as_str(), "properties" | "geometry-type" | "id")
+                || op.starts_with("filter-");
+            !reads_feature && args.iter().all(feature_constant)
+        }
+        Expr::Within(_) | Expr::Distance(_) => false,
+        _ => sub_expressions(expr).into_iter().all(feature_constant),
+    }
+}
+
+/// MapLibre's `isGlobalPropertyConstant`. With `["feature-state"]` it is
+/// `isStateConstant`.
+fn global_constant(expr: &Expr, properties: &[&str]) -> bool {
+    match expr {
+        Expr::Call { op, .. } if properties.contains(&op.as_str()) => false,
+        _ => sub_expressions(expr)
+            .into_iter()
+            .all(|child| global_constant(child, properties)),
+    }
+}
+
+/// MapLibre's `findZoomCurve`: the zoom-driven `step` or `interpolate`, or why the zoom is
+/// used where it can't be.
+fn zoom_curve(expr: &Expr) -> Option<Result<&Expr, &'static str>> {
+    let mut result = match expr {
+        Expr::Let { body, .. } => zoom_curve(body),
+        Expr::Call { op, args } if op == "coalesce" => args.iter().find_map(zoom_curve),
+        Expr::Step { input, .. } | Expr::Interpolate { input, .. } if matches!(&**input, Expr::Call { op, .. } if op == "zoom") => {
+            Some(Ok(expr))
+        }
+        _ => None,
+    };
+    if let Some(Err(_)) = result {
+        return result;
+    }
+    for child in sub_expressions(expr) {
+        match (result, zoom_curve(child)) {
+            (_, Some(Err(message))) => result = Some(Err(message)),
+            (None, Some(Ok(_))) => result = Some(Err(ZOOM_CURVE_NOT_TOP_LEVEL)),
+            (Some(Ok(found)), Some(Ok(other))) if !std::ptr::eq(found, other) => {
+                result = Some(Err(ONE_ZOOM_CURVE))
+            }
+            _ => {}
+        }
+    }
+    result
+}
+
+/// Whether every value the expression can produce is written in it: MapLibre's `outputDefined`. A
+/// constant sub-expression counts, as MapLibre has folded it into a literal by then.
+fn output_defined(expr: &Expr) -> bool {
+    if constant(expr) {
+        return true;
+    }
+    match expr {
+        Expr::Literal(_) => true,
+        Expr::Assert(_, inner) | Expr::Coerce(_, inner) => output_defined(inner),
+        Expr::Call { op, args } => match op.as_str() {
+            "case" => args
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| index % 2 == 1 || *index == args.len() - 1)
+                .all(|(_, output)| output_defined(output)),
+            "coalesce" | "array" | "string" | "number" | "boolean" | "object" | "to-boolean"
+            | "to-color" | "to-number" | "to-string" => args.iter().all(output_defined),
+            _ => false,
+        },
+        Expr::Let { body, .. } => output_defined(body),
+        Expr::Match { arms, default, .. } => {
+            arms.iter().all(|(_, output)| output_defined(output)) && output_defined(default)
+        }
+        Expr::Step { output0, stops, .. } => {
+            output_defined(output0) && stops.iter().all(|(_, output)| output_defined(output))
+        }
+        Expr::Interpolate { stops, .. } => stops.iter().all(|(_, output)| output_defined(output)),
+        _ => false,
+    }
+}
+
+/// MapLibre's `isExpressionConstant`, for a tree `maplibre-expr` has not folded.
+fn constant(expr: &Expr) -> bool {
+    fn evaluates_alone(expr: &Expr) -> bool {
+        match expr {
+            Expr::Var(_) | Expr::Within(_) | Expr::Distance(_) | Expr::Collator { .. } => false,
+            Expr::Call { op, .. } if matches!(op.as_str(), "error" | "global-state") => false,
+            _ => sub_expressions(expr).into_iter().all(evaluates_alone),
+        }
+    }
+    evaluates_alone(expr)
+        && feature_constant(expr)
+        && global_constant(
+            expr,
+            &[
+                "zoom",
+                "heatmap-density",
+                "elevation",
+                "line-progress",
+                "accumulated",
+                "is-supported-script",
+            ],
+        )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn is_legacy_filter(filter: &Json) -> bool {
+        matches!(classify_filter(filter), FilterSyntax::Legacy)
+    }
+
+    fn style(layers: Json) -> Json {
+        json!({
+            "version": 8,
+            "sources": {
+                "openmaptiles": { "type": "vector", "url": "https://example.com/tiles.json" },
+                "shade": { "type": "raster", "tiles": ["https://example.com/{z}/{x}/{y}.png"], "tileSize": 256 },
+            },
+            "glyphs": "https://example.com/{fontstack}/{range}.pbf",
+            "layers": layers,
+        })
+    }
+
+    fn fill(paint: Json) -> Json {
+        style(
+            json!([{ "id": "water", "type": "fill", "source": "openmaptiles", "source-layer": "water", "paint": paint }]),
+        )
+    }
+
+    fn assert_valid(style: &Json) {
+        let errors = style_errors(style);
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    #[track_caller]
+    fn assert_error(style: &Json, expected: &str) {
+        let errors = style_errors(style);
+        assert!(
+            errors.iter().any(|error| error.contains(expected)),
+            "expected an error containing {expected:?}, got {errors:#?}"
+        );
+    }
+
+    #[test]
+    fn the_root_needs_version_8_sources_and_layers() {
+        assert_error(
+            &json!({ "version": 7, "sources": {}, "layers": [] }),
+            "version: expected one of [8], 7 found",
+        );
+        assert_error(
+            &json!({ "version": "8", "sources": {}, "layers": [] }),
+            "version: expected one of [8]",
+        );
+        assert_error(
+            &json!({ "version": 8, "layers": [] }),
+            "missing required property \"sources\"",
+        );
+        assert_error(
+            &json!({ "version": 8, "sources": {} }),
+            "missing required property \"layers\"",
+        );
+        assert_error(&json!([]), "object expected, array found");
+        assert_valid(
+            &json!({ "version": 8, "sources": {}, "layers": [], "anything": 1, "metadata": { "x": [1] } }),
+        );
+    }
+
+    #[test]
+    fn root_properties_follow_their_specs() {
+        let mut glyphs = style(json!([]));
+        glyphs["glyphs"] = json!("https://example.com/{range}.pbf");
+        assert_error(
+            &glyphs,
+            "\"glyphs\" url must include a \"{fontstack}\" token",
+        );
+
+        let mut constants = style(json!([]));
+        constants["constants"] = json!({ "@a": 1 });
+        assert_error(&constants, "constants have been deprecated as of v8");
+
+        let mut center = style(json!([]));
+        center["center"] = json!([1]);
+        assert_error(&center, "center: array length 2 expected, length 1 found");
+
+        let mut light = style(json!([]));
+        light["light"] = json!({ "intensity": 2, "color-transition": { "duration": 1 } });
+        assert_error(&light, "2 is greater than the maximum value 1");
+
+        let mut sprite = style(json!([]));
+        sprite["sprite"] = json!([{ "id": "a", "url": "x" }, { "id": "a", "url": "y" }]);
+        assert_error(
+            &sprite,
+            "all the sprites' ids must be unique, but a is duplicated",
+        );
+
+        let mut faces = style(json!([]));
+        faces["font-faces"] =
+            json!({ "Sans": [{ "url": "x", "unicode-range": ["U+0-7F", "U+4??", "U+110000"] }] });
+        let errors = style_errors(&faces);
+        assert_eq!(errors.len(), 1, "{errors:#?}");
+        assert!(errors[0].contains("out of bounds"));
+    }
+
+    #[test]
+    fn layers_follow_their_sources() {
+        assert_error(
+            &style(json!([{ "type": "fill", "source": "openmaptiles", "source-layer": "x" }])),
+            "missing required property \"id\"",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "blob" }])),
+            "layers[0].type: expected one of [",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "fill" }])),
+            "missing required property \"source\"",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "fill", "source": "nope" }])),
+            "source \"nope\" not found",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "fill", "source": "openmaptiles" }])),
+            "must specify a \"source-layer\"",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "raster", "source": "openmaptiles" }])),
+            "requires a raster source",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "fill", "source": "shade" }])),
+            "requires a vector source",
+        );
+        assert_error(
+            &style(
+                json!([{ "id": "a", "type": "background" }, { "id": "a", "type": "background" }]),
+            ),
+            "duplicate layer id \"a\"",
+        );
+        assert_error(
+            &style(json!([{ "id": "a", "type": "background", "minzoom": 30 }])),
+            "30 is greater than the maximum value 24",
+        );
+        assert_valid(&style(json!([
+            { "id": "a", "type": "background", "interactive": true },
+            { "id": "b", "type": "raster", "source": "shade" },
+        ])));
+    }
+
+    #[test]
+    fn properties_follow_their_layer_type() {
+        assert_error(
+            &fill(json!({ "line-color": "red" })),
+            "unknown property \"line-color\"",
+        );
+        assert_error(
+            &fill(json!({ "fill-color": 42 })),
+            "fill-color: color expected, number found",
+        );
+        assert_error(
+            &fill(json!({ "fill-color": "not a colour" })),
+            "color expected, \"not a colour\" found",
+        );
+        assert_error(
+            &fill(json!({ "fill-opacity": 2 })),
+            "2 is greater than the maximum value 1",
+        );
+        assert_error(
+            &fill(json!({ "fill-color": "{colour}" })),
+            "does not support interpolation syntax",
+        );
+        assert_valid(&fill(
+            json!({ "fill-color": "hsl(35, 8%, 85%)", "fill-color-transition": { "duration": 0 } }),
+        ));
+        assert_error(
+            &fill(json!({ "fill-antialias-transition": { "duration": 0 } })),
+            "unknown property \"fill-antialias-transition\"",
+        );
+        let line = |layout: Json| {
+            style(
+                json!([{ "id": "a", "type": "line", "source": "openmaptiles", "source-layer": "x", "layout": layout }]),
+            )
+        };
+        assert_error(
+            &line(json!({ "line-cap": "pointy" })),
+            "expected one of [butt, round, square], \"pointy\" found",
+        );
+        assert_valid(&line(json!({ "line-cap": "round", "visibility": "none" })));
+    }
+
+    #[test]
+    fn expressions_are_parsed_against_their_property() {
+        assert_valid(&fill(json!({
+            "fill-color": ["interpolate", ["linear"], ["zoom"], 5, "red", 10, ["get", "colour"]],
+            "fill-opacity": ["step", ["zoom"], 0, 10, 1],
+        })));
+        assert_error(
+            &fill(json!({ "fill-color": ["+", 1, 2] })),
+            "Expected color but found number",
+        );
+        assert_error(
+            &fill(json!({ "fill-antialias": ["get", "aa"] })),
+            "data expressions not supported",
+        );
+        assert_error(
+            &fill(json!({ "fill-opacity": ["*", ["zoom"], 0.1] })),
+            "\"zoom\" expression may only be used as input to a top-level \"step\" or \"interpolate\" expression.",
+        );
+        assert_error(
+            &fill(
+                json!({ "fill-opacity": ["interpolate", ["linear"], ["zoom"], 1, ["step", ["zoom"], 0, 2, 1], 3, 1] }),
+            ),
+            "Only one zoom-based",
+        );
+        let symbol = |layout: Json| {
+            style(
+                json!([{ "id": "a", "type": "symbol", "source": "openmaptiles", "source-layer": "x", "layout": layout }]),
+            )
+        };
+        assert_error(
+            &symbol(json!({ "text-font": ["get", "font"] })),
+            "Invalid data expression for \"text-font\"",
+        );
+        assert_valid(&symbol(
+            json!({ "text-font": ["step", ["zoom"], ["literal", ["A"]], 10, ["literal", ["B"]]] }),
+        ));
+        assert_error(
+            &symbol(json!({ "text-size": ["feature-state", "size"] })),
+            "\"feature-state\" data expressions are not supported with layout properties.",
+        );
+        assert_error(
+            &symbol(json!({ "visibility": ["step", ["zoom"], "none", 10, "visible"] })),
+            "zoom expressions not supported",
+        );
+    }
+
+    #[test]
+    fn legacy_functions_follow_their_stops() {
+        assert_valid(&fill(
+            json!({ "fill-opacity": { "base": 1.2, "stops": [[5, 0], [10, 1]] } }),
+        ));
+        assert_valid(&fill(
+            json!({ "fill-color": { "property": "class", "type": "categorical", "stops": [["a", "red"], ["b", "blue"]] } }),
+        ));
+        assert_error(
+            &fill(json!({ "fill-opacity": { "stops": [[10, 0], [5, 1]] } })),
+            "stop domain values must appear in ascending order",
+        );
+        assert_error(
+            &fill(json!({ "fill-opacity": { "stops": [] } })),
+            "array must have at least one stop",
+        );
+        assert_error(
+            &fill(json!({ "fill-opacity": { "stops": [[5, 2]] } })),
+            "2 is greater than the maximum value 1",
+        );
+        assert_error(
+            &fill(json!({ "fill-opacity": { "stops": [[5, ["get", "x"]]] } })),
+            "expressions are not allowed in function stops.",
+        );
+        assert_error(
+            &fill(json!({ "fill-antialias": { "property": "x", "stops": [[1, true]] } })),
+            "property functions not supported",
+        );
+        assert_error(
+            &fill(json!({ "fill-color": { "type": "categorical", "stops": [["a", "red"]] } })),
+            "\"property\" property is required",
+        );
+        assert_error(
+            &fill(
+                json!({ "fill-color": { "property": "x", "type": "categorical", "stops": [[1.5, "red"]] } }),
+            ),
+            "integer expected, found 1.5",
+        );
+        assert_error(
+            &fill(
+                json!({ "fill-color": { "property": "x", "type": "categorical", "stops": [["a", "red"], ["a", "blue"]] } }),
+            ),
+            "stop domain values must be unique",
+        );
+        assert_error(
+            &fill(json!({ "fill-opacity": { "stops": [[5, 1]], "bogus": 1 } })),
+            "unknown property \"bogus\"",
+        );
+        assert_valid(&fill(
+            json!({ "fill-opacity": { "property": "h", "stops": [[{ "zoom": 0, "value": 0 }, 0], [{ "zoom": 10, "value": 1 }, 1]] } }),
+        ));
+    }
+
+    #[test]
+    fn filters_are_legacy_or_expressions() {
+        let filtered = |filter: Json| {
+            style(
+                json!([{ "id": "a", "type": "fill", "source": "openmaptiles", "source-layer": "x", "filter": filter }]),
+            )
+        };
+        assert_valid(&filtered(json!([
+            "all",
+            ["==", "class", "lake"],
+            ["!in", "brunnel", "tunnel"],
+            ["has", "name"]
+        ])));
+        assert_valid(&filtered(json!([
+            "all",
+            ["==", ["get", "class"], "lake"],
+            ["has", "name"]
+        ])));
+        assert_valid(&filtered(json!(true)));
+        // A two-element comparison reads as an expression; only under `none` is it a legacy filter.
+        assert_error(
+            &filtered(json!(["==", "class"])),
+            "Expected 2 or 3 arguments",
+        );
+        assert_error(
+            &filtered(json!(["none", ["==", "class"]])),
+            "filter array for operator \"==\" must have 3 elements",
+        );
+        assert_error(
+            &filtered(json!(["<", "$type", "Point"])),
+            "\"$type\" cannot be use with operator \"<\"",
+        );
+        assert_error(
+            &filtered(json!(["==", "$type", "Circle"])),
+            "Polygon], \"Circle\" found",
+        );
+        assert_error(
+            &filtered(json!(["!has"])),
+            "filter array for \"!has\" operator must have 2 elements",
+        );
+        assert_error(
+            &filtered(json!(["==", ["get", "a"]])),
+            "Expected 2 or 3 arguments",
+        );
+        assert_error(
+            &filtered(json!(["==", ["feature-state", "a"], 1])),
+            "not supported with filters",
+        );
+        // A `match` label is data: the zoom elsewhere in the filter leaves it alone.
+        assert_valid(&filtered(json!([
+            "all",
+            ["<", ["zoom"], 10],
+            ["match", ["get", "class"], ["zoom"], true, false]
+        ])));
+
+        assert!(is_legacy_filter(&json!(["none", ["has", "a"]])));
+        assert!(!is_legacy_filter(&json!(["all", ["has", "a"]])));
+        assert!(is_legacy_filter(&json!(["in", "class", "a", "b"])));
+        assert!(!is_legacy_filter(&json!([
+            "in",
+            "class",
+            ["literal", ["a"]]
+        ])));
+    }
+
+    #[test]
+    fn sources_follow_their_type() {
+        let with_source =
+            |source: Json| json!({ "version": 8, "sources": { "s": source }, "layers": [] });
+        assert_error(
+            &with_source(json!({ "url": "x" })),
+            "sources.s: \"type\" is required",
+        );
+        assert_error(
+            &with_source(json!({ "type": "canvas" })),
+            "Please use runtime APIs",
+        );
+        assert_error(
+            &with_source(json!({ "type": "tiles" })),
+            "sources.s.type: expected one of [vector, raster",
+        );
+        assert_error(
+            &with_source(json!({ "type": "raster", "tiles": "x" })),
+            "array expected, string found",
+        );
+        assert_error(
+            &with_source(json!({ "type": "geojson" })),
+            "missing required property \"data\"",
+        );
+        assert_error(
+            &with_source(json!({ "type": "raster-dem", "redFactor": 1 })),
+            "only valid when \"encoding\" is set to \"custom\"",
+        );
+        assert_valid(&with_source(
+            json!({ "type": "vector", "tiles": ["x"], "promoteId": { "a": "id" }, "custom": 1 }),
+        ));
+        assert_valid(&with_source(
+            json!({ "type": "raster-dem", "encoding": "custom", "redFactor": 1 }),
+        ));
+    }
+}

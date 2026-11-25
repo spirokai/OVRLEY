@@ -11,7 +11,7 @@ use crate::activity::schema::ParsedActivity;
 use crate::activity::validate_render_activity;
 use crate::error::{CoreError, CoreResult};
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapSource;
+use ovrley_map::gpu::MapSource;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 

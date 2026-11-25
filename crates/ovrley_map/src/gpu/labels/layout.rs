@@ -2,9 +2,9 @@
 //! either a collision box (a point) or the line it lies along. It runs next to tessellation on the tile
 //! workers, from the same decoded features.
 //!
-//! Names along lines follow MapLibre GL JS (`merge_lines`, `clip_line`, `get_anchors`,
-//! `check_max_angle`, and the glyph walk of `projection.ts`): merging, clipping and choosing anchors run
-//! once per tile, and the walk for every camera. All of it is in tile units on the ground, in `f64`.
+//! Names along lines follow MapLibre's symbol layout: merging lines, clipping them and choosing anchors
+//! run once per tile, and the glyph walk along the line for every camera. All of it is in tile units on
+//! the ground, in `f64`.
 //!
 //! A symbol carries glyph keys, not bitmaps: the atlas gets the bitmaps from the glyph service.
 
@@ -274,7 +274,7 @@ pub(crate) fn lay_out(
                 )
                 .into_iter()
                 .map(|part| {
-                    let anchors = get_anchors(&part, &anchor_style, TILE_UNITS);
+                    let anchors = line_anchors(&part, &anchor_style, TILE_UNITS);
                     (part, anchors)
                 })
                 .collect()
@@ -518,7 +518,7 @@ fn angle_to(a: [f64; 2], b: [f64; 2]) -> f64 {
 /// The anchors along `line` that fit a label whole, spaced evenly. `extent` is the tile's size: a line
 /// that begins outside or on its edge continues from outside, so its labels are spread rather than put at
 /// its start.
-pub(crate) fn get_anchors(line: &[[f64; 2]], style: &AnchorStyle, extent: f64) -> Vec<Anchor> {
+pub(crate) fn line_anchors(line: &[[f64; 2]], style: &AnchorStyle, extent: f64) -> Vec<Anchor> {
     let [x, y] = line[0];
     let continued = x <= 0.0 || x >= extent || y <= 0.0 || y >= extent;
     let mut spacing = style.spacing;
@@ -775,7 +775,7 @@ mod tests {
         let straight: Vec<_> = (0..=10)
             .map(|step| [10.0 + f64::from(step) * 40.0, 50.0])
             .collect();
-        let anchors = get_anchors(&straight, &style, 4096.0);
+        let anchors = line_anchors(&straight, &style, 4096.0);
         assert!(anchors.len() >= 3);
         assert!(anchors
             .iter()
@@ -783,9 +783,9 @@ mod tests {
 
         // A right angle in the middle of the only place a label would fit.
         let corner = [[0.0, 0.0], [50.0, 0.0], [50.0, 50.0]];
-        assert!(get_anchors(&corner, &style, 4096.0).is_empty());
+        assert!(line_anchors(&corner, &style, 4096.0).is_empty());
         // A line shorter than its label gets none.
-        assert!(get_anchors(&[[0.0, 0.0], [30.0, 0.0]], &style, 4096.0).is_empty());
+        assert!(line_anchors(&[[0.0, 0.0], [30.0, 0.0]], &style, 4096.0).is_empty());
     }
 
     #[test]

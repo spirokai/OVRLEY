@@ -139,7 +139,7 @@ pub(crate) fn encode_video(
     controller: &RenderController,
     target: &RenderOutputTarget,
     request: VideoEncodingRequest,
-    map_source: Option<&ovrley_map::MapSource>,
+    map_source: Option<&ovrley_map::gpu::MapSource>,
 ) -> CoreResult<String> {
     controller.check_cancelled()?;
     let size = FrameSize {

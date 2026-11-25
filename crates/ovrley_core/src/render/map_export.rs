@@ -17,8 +17,10 @@ use crate::{
     normalize::ValidatedRenderConfig,
 };
 use ovrley_map::gpu::labels::{GlyphId, GlyphService};
-use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapTileSizer, MeasuredTile};
-use ovrley_map::{MapDataSource, MapSource, MapStyleId, MapStyleInfo, TileId};
+use ovrley_map::gpu::{
+    GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapDataSource, MapSource, MapTileSizer, MeasuredTile,
+};
+use ovrley_map::{MapStyleId, MapStyleInfo, TileId};
 use ovrley_widgets::{
     activity::ActivitySampler,
     error::{WidgetError, WidgetResult},

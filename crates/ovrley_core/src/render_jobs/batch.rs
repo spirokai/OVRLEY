@@ -22,7 +22,7 @@ use crate::media::prepared_video::check_source_freshness;
 use crate::output::{create_parts_directory, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapSource;
+use ovrley_map::gpu::MapSource;
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "code", rename_all = "camelCase")]

@@ -24,7 +24,7 @@ use crate::normalize::{parse_config_json, RenderConfig};
 use crate::output::{RenderOutputKind, RenderOutputTarget};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapSource;
+use ovrley_map::gpu::MapSource;
 
 /// Existing single-render acceptance shape, serialized directly by the shell.
 #[derive(Debug, Serialize)]

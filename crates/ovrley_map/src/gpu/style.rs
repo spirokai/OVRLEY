@@ -15,11 +15,12 @@
 use super::labels::{font_chain, TextAnchor, TextJustify, ONE_EM};
 use super::pipelines::{pattern_index, ShaderDash};
 use super::tile::TILE_UNITS;
-use crate::{data_level, MapLayers, MapStyleBuildings, TILE_SIZE, VECTOR_SOURCE};
+use super::GpuMapConfig;
+use crate::{data_level, sub_expressions, MapLayers, MapStyleBuildings, TILE_SIZE, VECTOR_SOURCE};
 use lyon::tessellation::LineJoin;
 use maplibre_expr::{
-    evaluate, is_expression, parse_filter, parse_property, typecheck, EvaluationContext, Expr,
-    FormatArg, Type, Value,
+    evaluate, is_expression, parse_filter, parse_property, typecheck, EvaluationContext, Expr, Type,
+    Value,
 };
 use serde_json::{json, Value as Json};
 use std::borrow::Cow;
@@ -111,14 +112,14 @@ pub(crate) enum VectorPaint {
     },
 }
 
-/// Parses every layer drawable at `zoom`.
-pub(crate) fn parse_style(
-    style_json: &[u8],
-    toggles: MapLayers,
-    zoom: f64,
-    pixel_ratio: f32,
-    buildings: &MapStyleBuildings,
-) -> Result<ParsedStyle, String> {
+/// Parses every layer `config` draws at its style zoom.
+pub(crate) fn parse_style(style_json: &[u8], config: &GpuMapConfig) -> Result<ParsedStyle, String> {
+    let (toggles, zoom, pixel_ratio, buildings) = (
+        config.spec.layers,
+        config.style_zoom,
+        config.viewport.pixel_ratio(),
+        &config.buildings,
+    );
     let style: Json = serde_json::from_slice(style_json)
         .map_err(|error| format!("Map style is not valid JSON: {error}"))?;
     let layers = style
@@ -143,9 +144,7 @@ pub(crate) fn parse_style(
 
     let mut parsed = ParsedStyle {
         zoom,
-        // A 4096-unit tile spans 512 style pixels on its own level.
-        tile_units_per_pixel: (8.0 * 2_f64.powf(f64::from(data_level(zoom)) - zoom)) as f32
-            / pixel_ratio,
+        tile_units_per_pixel: tile_units_per_px(zoom, pixel_ratio) as f32,
         backgrounds: Vec::new(),
         vector_layers: Vec::new(),
         labels: Vec::new(),
@@ -341,13 +340,21 @@ fn is_drawable(layer: &Json, toggles: MapLayers, zoom: f64) -> bool {
     ) || (layer_type == "symbol" && is_label_source(source_layer)))
         && (layer_type == "background" || layer["source"] == VECTOR_SOURCE)
         && layer["layout"]["visibility"] != "none"
-        && !toggles.hides_layer(layer_type, source_layer)
+        && (toggles.labels || layer_type != "symbol")
+        && (toggles.buildings || source_layer != Some("building"))
         && layer["minzoom"]
             .as_f64()
             .is_none_or(|minzoom| zoom >= minzoom)
         && layer["maxzoom"]
             .as_f64()
             .is_none_or(|maxzoom| zoom < maxzoom)
+}
+
+/// Tile units in one output pixel on the tile level drawn at `zoom`: what line widths tessellate
+/// against and line labels are laid out in.
+fn tile_units_per_px(zoom: f64, pixel_ratio: f32) -> f64 {
+    let level_scale = 2_f64.powf(zoom - f64::from(data_level(zoom)));
+    TILE_UNITS / (f64::from(TILE_SIZE) * f64::from(pixel_ratio) * level_scale)
 }
 
 fn parse_background(layer: &Json, zoom: f64, index: u32) -> Result<BackgroundLayer, String> {
@@ -485,13 +492,13 @@ fn number_property(layer: &Json, name: &str) -> Result<Option<Expr>, String> {
 /// A number property at the view zoom. `default` is MapLibre's for a missing property.
 fn zoom_number(layer: &Json, name: &str, zoom: f64, default: f32) -> Result<f32, String> {
     let value = zoom_value(layer, "paint", name, zoom)?;
-    number(&value, name, f64::from(default)).map(|value| value as f32)
+    number(value.as_ref(), name, f64::from(default)).map(|value| value as f32)
 }
 
 /// A keyword from `layout` at the view zoom, or `None` when the layer doesn't set it.
 fn layout_keyword(layer: &Json, name: &str, zoom: f64) -> Result<Option<String>, String> {
     let value = zoom_value(layer, "layout", name, zoom)?;
-    Ok(keyword(&value, name)?.map(str::to_string))
+    Ok(keyword(value.as_ref(), name)?.map(str::to_string))
 }
 
 /// Whether `line-cap` rounds a dash's ends, which the line shader draws. A line's own ends stay butt
@@ -517,7 +524,7 @@ fn line_join(layer: &Json, zoom: f64) -> Result<LineJoin, String> {
 /// `fill-antialias` at the view zoom. Missing is MapLibre's default of on.
 fn fill_antialias(layer: &Json, zoom: f64) -> Result<bool, String> {
     boolean(
-        &zoom_value(layer, "paint", "fill-antialias", zoom)?,
+        zoom_value(layer, "paint", "fill-antialias", zoom)?.as_ref(),
         "fill-antialias",
         true,
     )
@@ -602,9 +609,8 @@ fn evaluate_at_zoom(expr: &Expr, name: &str, zoom: f64) -> Result<Value, String>
         .map_err(|error| format!("{name}: {error}"))
 }
 
-fn keyword<'a>(value: &'a Option<Value>, name: &str) -> Result<Option<&'a str>, String> {
+fn keyword<'a>(value: Option<&'a Value>, name: &str) -> Result<Option<&'a str>, String> {
     value
-        .as_ref()
         .map(|value| {
             value
                 .as_str()
@@ -613,7 +619,7 @@ fn keyword<'a>(value: &'a Option<Value>, name: &str) -> Result<Option<&'a str>, 
         .transpose()
 }
 
-fn number(value: &Option<Value>, name: &str, default: f64) -> Result<f64, String> {
+fn number(value: Option<&Value>, name: &str, default: f64) -> Result<f64, String> {
     match value {
         None => Ok(default),
         Some(value) => value
@@ -622,7 +628,7 @@ fn number(value: &Option<Value>, name: &str, default: f64) -> Result<f64, String
     }
 }
 
-fn boolean(value: &Option<Value>, name: &str, default: bool) -> Result<bool, String> {
+fn boolean(value: Option<&Value>, name: &str, default: bool) -> Result<bool, String> {
     match value {
         None => Ok(default),
         Some(value) => value
@@ -632,7 +638,7 @@ fn boolean(value: &Option<Value>, name: &str, default: bool) -> Result<bool, Str
 }
 
 /// A pair of numbers, which is zero when the layer doesn't set the property.
-fn pair(value: &Option<Value>, name: &str) -> Result<[f64; 2], String> {
+fn pair(value: Option<&Value>, name: &str) -> Result<[f64; 2], String> {
     match value {
         None => Ok([0.0, 0.0]),
         Some(value) => numbers(value)
@@ -838,76 +844,10 @@ fn is_label_source(source_layer: Option<&str>) -> bool {
 /// Whether evaluating `expr` reads the feature it is evaluated for.
 fn reads_feature(expr: &Expr) -> bool {
     match expr {
-        Expr::Literal(_) | Expr::Var(_) => false,
-        Expr::Call { op, args } => FEATURE_OPERATORS.contains(&op.as_str()) || any_reads(args),
-        Expr::Let { bindings, body } => {
-            any_reads(bindings.iter().map(|(_, value)| value)) || reads_feature(body)
-        }
-        Expr::Match {
-            input,
-            arms,
-            default,
-        } => {
-            reads_feature(input)
-                || any_reads(arms.iter().map(|(_, output)| output))
-                || reads_feature(default)
-        }
-        Expr::Step {
-            input,
-            output0,
-            stops,
-        } => {
-            reads_feature(input)
-                || reads_feature(output0)
-                || any_reads(stops.iter().map(|(_, output)| output))
-        }
-        Expr::Interpolate { input, stops, .. } => {
-            reads_feature(input) || any_reads(stops.iter().map(|(_, output)| output))
-        }
-        Expr::Format(sections) => sections.iter().any(|section: &FormatArg| {
-            let options = [
-                &section.scale,
-                &section.font,
-                &section.text_color,
-                &section.vertical_align,
-            ];
-            reads_feature(&section.content) || options.into_iter().flatten().any(reads_feature)
-        }),
+        Expr::Call { op, .. } if FEATURE_OPERATORS.contains(&op.as_str()) => true,
         Expr::Within(_) | Expr::Distance(_) => true,
-        Expr::Collator {
-            case_sensitive,
-            diacritic_sensitive,
-            locale,
-        } => [case_sensitive, diacritic_sensitive, locale]
-            .into_iter()
-            .flatten()
-            .any(|expr| reads_feature(expr)),
-        Expr::NumberFormat {
-            value,
-            locale,
-            currency,
-            min_fraction_digits,
-            max_fraction_digits,
-            unit,
-        } => {
-            reads_feature(value)
-                || [
-                    locale,
-                    currency,
-                    min_fraction_digits,
-                    max_fraction_digits,
-                    unit,
-                ]
-                .into_iter()
-                .flatten()
-                .any(|expr| reads_feature(expr))
-        }
-        Expr::Assert(_, inner) | Expr::Coerce(_, inner) => reads_feature(inner),
+        _ => sub_expressions(expr).into_iter().any(reads_feature),
     }
-}
-
-fn any_reads<'a>(exprs: impl IntoIterator<Item = &'a Expr>) -> bool {
-    exprs.into_iter().any(reads_feature)
 }
 
 /// A label property that depends on zoom alone, at the view zoom, or `None` when the layer doesn't
@@ -949,13 +889,13 @@ fn parse_label_layer(
     }
     reject_feature_dependent_icon(layer)?;
 
-    let placement = match keyword(&at("symbol-placement")?, "symbol-placement")? {
+    let placement = match keyword(at("symbol-placement")?.as_ref(), "symbol-placement")? {
         None | Some("point") => SymbolPlacement::Point,
         Some("line") => SymbolPlacement::Line,
         Some("line-center") => SymbolPlacement::LineCenter,
         Some(other) => return Err(format!("symbol-placement {other} is not a placement")),
     };
-    let alignment = |name: &str, value: &Option<Value>, auto: Alignment| {
+    let alignment = |name: &str, value: Option<&Value>, auto: Alignment| {
         Ok(match keyword(value, name)? {
             None | Some("auto") => auto,
             Some("map") => Alignment::Map,
@@ -965,7 +905,7 @@ fn parse_label_layer(
     };
     let rotation_alignment = alignment(
         "text-rotation-alignment",
-        &at("text-rotation-alignment")?,
+        at("text-rotation-alignment")?.as_ref(),
         if placement == SymbolPlacement::Point {
             Alignment::Viewport
         } else {
@@ -974,7 +914,7 @@ fn parse_label_layer(
     )?;
     let pitch_alignment = alignment(
         "text-pitch-alignment",
-        &at("text-pitch-alignment")?,
+        at("text-pitch-alignment")?.as_ref(),
         rotation_alignment,
     )?;
     if placement == SymbolPlacement::Point {
@@ -998,7 +938,7 @@ fn parse_label_layer(
         .ok_or_else(|| format!("no font chain for {fonts:?}"))?
         .to_string();
 
-    let uppercase = match keyword(&at("text-transform")?, "text-transform")? {
+    let uppercase = match keyword(at("text-transform")?.as_ref(), "text-transform")? {
         None | Some("none") => false,
         Some("uppercase") => true,
         Some(other) => return Err(format!("text-transform {other} is not supported")),
@@ -1013,7 +953,7 @@ fn parse_label_layer(
     };
 
     let translate_anchor = match keyword(
-        &label_zoom_value(layer, "paint", "text-translate-anchor", zoom)?,
+        label_zoom_value(layer, "paint", "text-translate-anchor", zoom)?.as_ref(),
         "text-translate-anchor",
     )? {
         None | Some("map") => Alignment::Map,
@@ -1021,7 +961,7 @@ fn parse_label_layer(
         Some(other) => return Err(format!("text-translate-anchor {other} is not an anchor")),
     };
     let translate_px = pair(
-        &label_zoom_value(layer, "paint", "text-translate", zoom)?,
+        label_zoom_value(layer, "paint", "text-translate", zoom)?.as_ref(),
         "text-translate",
     )?
     .map(|value| value * ratio);
@@ -1032,13 +972,12 @@ fn parse_label_layer(
         return Err("a line label translated along the viewport is not supported".to_string());
     }
 
-    let line_height_ems = number(&at("text-line-height")?, "text-line-height", 1.2)?;
+    let line_height_ems = number(at("text-line-height")?.as_ref(), "text-line-height", 1.2)?;
     if line_height_ems <= 0.0 {
         return Err("text-line-height must be positive".to_string());
     }
-    let size_px = number(&at("text-size")?, "text-size", 16.0)? * ratio;
-    let units_per_px = TILE_UNITS
-        / (f64::from(TILE_SIZE) * ratio * 2_f64.powf(zoom - f64::from(data_level(zoom))));
+    let size_px = number(at("text-size")?.as_ref(), "text-size", 16.0)? * ratio;
+    let units_per_px = tile_units_per_px(zoom, pixel_ratio);
 
     let (source_layer, filter) = source_and_filter(layer)?;
     Ok(LabelLayer {
@@ -1051,10 +990,14 @@ fn parse_label_layer(
         text_field,
         sort_key: varying_number(layer, "layout", "symbol-sort-key", zoom)?,
         size_px,
-        max_width_ems: number(&at("text-max-width")?, "text-max-width", 10.0)?,
+        max_width_ems: number(at("text-max-width")?.as_ref(), "text-max-width", 10.0)?,
         line_height_ems,
-        letter_spacing_ems: number(&at("text-letter-spacing")?, "text-letter-spacing", 0.0)?,
-        anchor: match keyword(&at("text-anchor")?, "text-anchor")? {
+        letter_spacing_ems: number(
+            at("text-letter-spacing")?.as_ref(),
+            "text-letter-spacing",
+            0.0,
+        )?,
+        anchor: match keyword(at("text-anchor")?.as_ref(), "text-anchor")? {
             None | Some("center") => TextAnchor::Center,
             Some("left") => TextAnchor::Left,
             Some("right") => TextAnchor::Right,
@@ -1066,22 +1009,26 @@ fn parse_label_layer(
             Some("bottom-right") => TextAnchor::BottomRight,
             Some(other) => return Err(format!("text-anchor {other} is not an anchor")),
         },
-        justify: match keyword(&at("text-justify")?, "text-justify")? {
+        justify: match keyword(at("text-justify")?.as_ref(), "text-justify")? {
             None | Some("center") => TextJustify::Center,
             Some("auto") => TextJustify::Auto,
             Some("left") => TextJustify::Left,
             Some("right") => TextJustify::Right,
             Some(other) => return Err(format!("text-justify {other} is not a justification")),
         },
-        offset_ems: pair(&at("text-offset")?, "text-offset")?,
+        offset_ems: pair(at("text-offset")?.as_ref(), "text-offset")?,
         uppercase,
-        padding_px: number(&at("text-padding")?, "text-padding", 2.0)? * ratio,
+        padding_px: number(at("text-padding")?.as_ref(), "text-padding", 2.0)? * ratio,
         translate_px,
         translate_units: translate_px.map(|value| value * units_per_px),
         translate_anchor,
-        allow_overlap: boolean(&at("text-allow-overlap")?, "text-allow-overlap", false)?,
+        allow_overlap: boolean(
+            at("text-allow-overlap")?.as_ref(),
+            "text-allow-overlap",
+            false,
+        )?,
         ignore_placement: boolean(
-            &at("text-ignore-placement")?,
+            at("text-ignore-placement")?.as_ref(),
             "text-ignore-placement",
             false,
         )?,
@@ -1103,9 +1050,13 @@ fn parse_label_layer(
             opacity: varying_number(layer, "paint", "text-opacity", zoom)?,
         },
         line: LineLabel {
-            spacing_px: number(&at("symbol-spacing")?, "symbol-spacing", 250.0)? * ratio,
-            max_angle_deg: number(&at("text-max-angle")?, "text-max-angle", 45.0)?,
-            keep_upright: boolean(&at("text-keep-upright")?, "text-keep-upright", true)?,
+            spacing_px: number(at("symbol-spacing")?.as_ref(), "symbol-spacing", 250.0)? * ratio,
+            max_angle_deg: number(at("text-max-angle")?.as_ref(), "text-max-angle", 45.0)?,
+            keep_upright: boolean(
+                at("text-keep-upright")?.as_ref(),
+                "text-keep-upright",
+                true,
+            )?,
             units_per_px,
             units_per_glyph: size_px / ONE_EM * units_per_px,
         },
@@ -1127,7 +1078,7 @@ fn varying_number(
     if reads_feature(&expr) {
         return Ok(Some(Varying::PerFeature(expr)));
     }
-    number(&Some(evaluate_at_zoom(&expr, name, zoom)?), name, 0.0)
+    number(Some(&evaluate_at_zoom(&expr, name, zoom)?), name, 0.0)
         .map(|value| Some(Varying::Constant(value)))
 }
 

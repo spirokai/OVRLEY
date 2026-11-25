@@ -43,7 +43,7 @@ pub fn render_preview_frame_config(
     parsed_activity: &crate::activity::schema::ParsedActivity,
     second: f64,
     raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
-    map_source: Option<&ovrley_map::MapSource>,
+    map_source: Option<&ovrley_map::gpu::MapSource>,
 ) -> CoreResult<PathBuf> {
     let mut validated =
         crate::normalize::validate_render_config_with_resources(config, raster_resources)?;

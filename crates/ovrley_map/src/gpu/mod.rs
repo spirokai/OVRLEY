@@ -1,13 +1,12 @@
 //! A GPU, per-frame map renderer: vector tiles and 3D buildings drawn from cached MVT.
 //!
-//! The rendering method is ported from maplibre-rs (`maplibre/maplibre-rs` at `96b50a09`, MIT OR
+//! The rendering method follows maplibre-rs (`maplibre/maplibre-rs` at `96b50a09`, MIT OR
 //! Apache-2.0, see `LICENSE-MIT` beside this file). One render pass clears, draws every visible
 //! tile's mask, draws layers × tiles in style order from slices of shared buffers, then buildings.
-//! Its ECS, render graph, schedule and HTTP layer are not ported: this is plain structs and calls.
 //!
-//! Both hosts share the draw path, so they draw the same map. Export loads tiles on threads and reads
-//! frames back, below. Its tile data is fetched and held by the job before its first frame, so a tile
-//! that fails here fails the export rather than drawing a blank patch.
+//! The preview and export draw through the same renderer, so they draw the same map. Tiles load on
+//! worker threads and frames are read back to pixels. Export fetches and holds its tile data before
+//! its first frame, so a tile that fails here fails the export rather than drawing a blank patch.
 //!
 //! The `gpu` feature is the opt-in: without it, `ovrley_map` stays free of `wgpu`.
 
@@ -17,36 +16,29 @@ mod pool;
 mod style;
 mod tile;
 
-pub use pool::{GpuPoolSizes, PoolEntries};
-pub use pool::{MapTileSizer, MeasuredTile};
+pub use pool::{GpuPoolSizes, MapTileSizer, MeasuredTile, PoolEntries};
 
 use crate::{
     data_level, MapCamera, MapLabelDraw, MapRouteDraw, MapRouteLine, MapRoutePoint,
-    MapStyleBuildings, MapStyleSpec, MapViewport, TileId, ViewState, MAX_VIEW_TILES, TILE_SIZE,
+    MapStyleBuildings, MapStyleCatalog, MapStyleId, MapStyleSpec, MapViewport, TileId, ViewState,
+    MAX_VIEW_TILES, TILE_SIZE,
 };
 use cgmath::{Matrix4, Vector3};
-use labels::LabelLayers;
+use labels::{GlyphId, GlyphService, LabelLayers};
 use pipelines::{
     pattern_bind_groups, BackgroundLayerMetadata, FogInstance, Pipelines, RouteInstance,
     RouteVertex, ShaderTileMetadata, ShaderVertex, ShapeMaskInstance, COLOR_FORMAT, DEPTH_FORMAT,
     PATTERN_PERIOD_PX, WATER_STENCIL_BIT,
 };
 use pool::{BufferPool, IndexEntry, FEATURE_METADATA, INDICES, LAYER_METADATA, VERTICES};
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::mem::size_of;
 use std::ops::Range;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
 use style::{parse_style, ParsedStyle};
-use tile::{ExtrusionVertex, LayerKind, PreparedTile, DEFAULT_TOLERANCE, TILE_UNITS};
+use tile::{prepare_tile, ExtrusionVertex, LayerKind, PreparedTile, DEFAULT_TOLERANCE, TILE_UNITS};
 use wgpu::util::DeviceExt;
-use {
-    crate::MapDataSource,
-    labels::{GlyphBitmap, GlyphId},
-    std::collections::BTreeSet,
-    std::sync::atomic::{AtomicUsize, Ordering},
-    std::sync::mpsc,
-    tile::prepare_tile,
-};
 
 const MASK_VERTICES: u32 = 6;
 /// Marks route samples. Tile masks use at most `3 + 14 * 4`, and never run after the route.
@@ -72,6 +64,23 @@ const ROUTE_BOUNDS_MARGIN: f64 = 0.1;
 const KEEP_COMPLETED: f32 = -1.0;
 const KEEP_REMAINING: f32 = 1.0;
 
+/// Where map bytes come from. The shell owns the installed styles, the network and the disk cache.
+pub trait MapDataSource: Send + Sync {
+    /// An installed style's JSON as its file holds it, without any URL rewriting.
+    fn style(&self, style: &MapStyleId) -> Result<Vec<u8>, String>;
+    /// The vector tile at `z/x/y`, with `z` at most 14.
+    fn tile(&self, z: u8, x: u32, y: u32) -> Result<Vec<u8>, String>;
+    /// The bundled map fonts' glyphs, opened once by the shell. Tile threads call it directly.
+    fn glyphs(&self) -> Arc<GlyphService>;
+}
+
+/// What a render's maps draw from: the installed styles, and the bytes behind them.
+#[derive(Clone)]
+pub struct MapSource {
+    pub styles: MapStyleCatalog,
+    pub data: Arc<dyn MapDataSource>,
+}
+
 /// Everything fixed for one renderer's lifetime: what it draws, and on what output.
 #[derive(Clone, Debug)]
 pub struct GpuMapConfig {
@@ -79,33 +88,11 @@ pub struct GpuMapConfig {
     /// Output size and pixel ratio. A higher ratio draws the same map sharper: world size, tile
     /// scale and line widths multiply by it, while tile levels and style values stay on the view zoom.
     pub viewport: MapViewport,
-    /// MSAA samples, 1 or 4.
+    /// MSAA samples, 1 or 4, as the widget validates them.
     pub sample_count: u32,
-    /// Zoom that style values are evaluated at when tiles load, as upstream does at upload.
+    /// Camera zoom that style values are evaluated at when tiles load, once per tile.
     pub style_zoom: f64,
     pub buildings: MapStyleBuildings,
-}
-
-impl GpuMapConfig {
-    /// Reads `style` as this renderer draws it. Fails on configuration no device could use.
-    fn read_style(&self, style: &[u8]) -> Result<ParsedStyle, String> {
-        if self.sample_count != 1 && self.sample_count != 4 {
-            return Err(format!(
-                "Map sample count {} must be 1 or 4",
-                self.sample_count
-            ));
-        }
-        if !self.style_zoom.is_finite() {
-            return Err(format!("Map style zoom {} is not finite", self.style_zoom));
-        }
-        parse_style(
-            style,
-            self.spec.layers,
-            self.style_zoom,
-            self.viewport.pixel_ratio(),
-            &self.buildings,
-        )
-    }
 }
 
 /// One layer of one tile in the frame's draw order.
@@ -132,7 +119,7 @@ struct ExtrusionItem {
     entry: IndexEntry,
 }
 
-/// Which pipeline a render pass has bound, to skip redundant binds as upstream's tracked pass does.
+/// Which pipeline a render pass has bound, to skip redundant binds.
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum BoundPipeline {
     None,
@@ -329,12 +316,7 @@ impl GpuMapRenderer {
     }
 
     fn check_gpu(&self) -> Result<(), String> {
-        match self
-            .gpu_error
-            .lock()
-            .map_err(|error| error.to_string())?
-            .clone()
-        {
+        match self.gpu_error.lock().expect("GPU error lock poisoned").clone() {
             Some(error) => Err(error),
             None => Ok(()),
         }
@@ -467,7 +449,7 @@ impl GpuMapRenderer {
         for shape in self.pattern.shapes() {
             self.masks.push(*shape);
             let tile_range = shape.buffer_range();
-            let stencil_reference = stencil_reference_value_3d(shape.coords);
+            let stencil_reference = stencil_reference(shape.coords);
             for entry in self.ground_pool.layers(shape.coords).into_iter().flatten() {
                 let water = self.water_layers.contains(&entry.layer);
                 self.layer_items.push(LayerItem {
@@ -519,7 +501,7 @@ impl GpuMapRenderer {
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &self.targets.depth,
                 depth_ops: Some(wgpu::Operations {
-                    // Upstream clears to 0.0, but its projection is not reversed.
+                    // The projection is not reversed, so the far plane is 1.0.
                     load: wgpu::LoadOp::Clear(1.0),
                     store: wgpu::StoreOp::Store,
                 }),
@@ -535,7 +517,7 @@ impl GpuMapRenderer {
 
         pass.set_pipeline(&self.pipelines.mask);
         for shape in &self.masks {
-            pass.set_stencil_reference(stencil_reference_value_3d(shape.coords));
+            pass.set_stencil_reference(stencil_reference(shape.coords));
             pass.set_vertex_buffer(0, self.pattern.buffer.slice(shape.buffer_range()));
             pass.draw(0..MASK_VERTICES, 0..1);
         }
@@ -670,14 +652,7 @@ impl Output {
     }
 }
 
-/// The glyph service's bitmap of a glyph, which the atlas is filled from.
-fn service_bitmap(
-    source: &dyn MapDataSource,
-) -> impl Fn(GlyphId) -> Result<Arc<GlyphBitmap>, String> + '_ {
-    move |id| source.glyphs().bitmap(id.face, id.character)
-}
-
-/// Export: tile loading across threads, and frames read back to pixels.
+/// Loading tiles across threads, and drawing frames read back to pixels.
 impl GpuMapRenderer {
     /// Opens a GPU device and reads the style. Fails loudly on invalid configuration, without any
     /// adapter, or when the device cannot hold the pools. Without a GPU, a software rasterizer draws
@@ -687,7 +662,7 @@ impl GpuMapRenderer {
         pools: GpuPoolSizes,
         source: &dyn MapDataSource,
     ) -> Result<Self, String> {
-        let style = config.read_style(&source.style(&config.spec.style)?)?;
+        let style = parse_style(&source.style(&config.spec.style)?, &config)?;
         let adapter = request_adapter()?;
         let adapter_name = adapter_name(&adapter);
         let max_buffer_size = adapter.limits().max_buffer_size;
@@ -748,7 +723,7 @@ impl GpuMapRenderer {
             // An atlas refilled for another view may lack the glyphs of this one's resident tiles.
             if let Some(labels) = &mut self.labels {
                 if labels.atlas_is_partial() {
-                    labels.fill_atlas(&self.queue, &self.loaded, tiles, &service_bitmap(source))?;
+                    labels.fill_atlas(&self.queue, &self.loaded, tiles, &source.glyphs())?;
                 }
             }
             return Ok(true);
@@ -772,7 +747,7 @@ impl GpuMapRenderer {
         source: &dyn MapDataSource,
     ) -> Result<(), String> {
         match &mut self.labels {
-            Some(labels) => labels.preload_atlas(&self.queue, &service_bitmap(source), glyphs),
+            Some(labels) => labels.preload_atlas(&self.queue, &source.glyphs(), glyphs),
             None => Ok(()),
         }
     }
@@ -812,7 +787,7 @@ impl GpuMapRenderer {
                     while let Some(&tile) = pending.get(next.fetch_add(1, Ordering::Relaxed)) {
                         let prepared = source
                             .tile(tile.z, tile.x as u32, tile.y as u32)
-                            .and_then(|bytes| prepare_tile(&bytes, style, Some(glyphs)));
+                            .and_then(|bytes| prepare_tile(&bytes, style, glyphs));
                         // The receiver stops listening at the first failure.
                         if sender.send((tile, prepared)).is_err() {
                             return;
@@ -838,7 +813,7 @@ impl GpuMapRenderer {
         }
         self.drain_evicted();
         if let Some(labels) = &mut self.labels {
-            labels.fill_atlas(&self.queue, &self.loaded, tiles, &service_bitmap(source))?;
+            labels.fill_atlas(&self.queue, &self.loaded, tiles, &glyphs)?;
         }
         self.queue.submit([]);
         self.device
@@ -976,16 +951,10 @@ fn record_gpu_error(slot: &Mutex<Option<String>>, message: String) {
     }
 }
 
-/// Neighbouring tiles never share a value, and tiles from different levels never do.
-const fn stencil_reference_value_3d(tile: TileId) -> u32 {
-    const CASES: u32 = 4;
-    let z = tile.z as u32;
-    match (tile.x % 2 == 0, tile.y % 2 == 0) {
-        (true, true) => z * CASES,
-        (true, false) => 1 + z * CASES,
-        (false, true) => 2 + z * CASES,
-        (false, false) => 3 + z * CASES,
-    }
+/// A tile mask's stencil value. Neighbouring tiles never share a value, and tiles from different
+/// levels never do.
+const fn stencil_reference(tile: TileId) -> u32 {
+    tile.z as u32 * 4 + (tile.x & 1) as u32 * 2 + (tile.y & 1) as u32
 }
 
 /// Tile units to world pixels on this view. The z axis carries metres for extrusions; ground
@@ -1026,8 +995,7 @@ impl TileShape {
     }
 }
 
-/// The tile shapes of one frame and their matrices on the GPU, ported from maplibre-rs
-/// `render/tile_view_pattern/`.
+/// The tile shapes of one frame and their matrices on the GPU.
 struct TileViewPattern {
     shapes: Vec<TileShape>,
     buffer: wgpu::Buffer,
@@ -1058,7 +1026,7 @@ impl TileViewPattern {
     fn generate(&mut self, view: &ViewState, has_tile: impl Fn(TileId) -> bool) {
         self.shapes.clear();
         self.seen.clear();
-        let Some(region) = view.create_view_region(data_level(view.zoom())) else {
+        let Some(region) = view.view_region(data_level(view.zoom())) else {
             return;
         };
         for coords in region.iter() {

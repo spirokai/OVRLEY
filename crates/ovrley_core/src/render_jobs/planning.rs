@@ -44,7 +44,7 @@ use crate::encode::render_settings::ExportMode;
 use crate::output::{plan_batch_output_targets, plan_file_output_target, RenderOutputKind};
 use crate::paths::AppPaths;
 use crate::raster::RasterResourceResolver;
-use ovrley_map::MapSource;
+use ovrley_map::gpu::MapSource;
 use ovrley_widgets::model::scene::{ScenePresentationConfig, ValidatedScenePresentation};
 
 /// Validated once at configuration/acceptance ingress; private fields keep

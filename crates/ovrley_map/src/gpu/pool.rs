@@ -1,32 +1,27 @@
 //! The geometry pools, and how big a job's must be.
 //!
-//! A pool is a ring-buffer like set of GPU buffers, ported from maplibre-rs
-//! `vector/resource/buffer_pool.rs`: one large buffer each for vertices, indices, layer metadata and
-//! feature metadata. Draws bind slices of them, and the oldest layers are evicted for space.
+//! A pool is a ring-buffer like set of GPU buffers: one large buffer each for vertices, indices, layer
+//! metadata and feature metadata. Draws bind slices of them, and the oldest layers are evicted for
+//! space.
 //!
 //! A view that outgrows a pool would evict its own tiles and draw blank patches, and which views do
 //! depends on the area and style, not on zoom or pitch alone. So export measures its tiles first.
 
-use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata};
-use super::tile::{LayerKind, PreparedLayer};
+use super::labels::{GlyphId, GlyphService};
+use super::pipelines::{FillShaderFeatureMetadata, ShaderLayerMetadata, ShaderVertex};
+use super::style::{parse_style, ParsedStyle};
+use super::tile::{prepare_tile, ExtrusionVertex, LayerKind, PreparedLayer};
+use super::{GpuMapConfig, MapDataSource};
 use crate::TileId;
 use bytemuck::Pod;
-use std::collections::{btree_map, BTreeMap, HashMap, VecDeque};
+use std::collections::{btree_map, BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::marker::PhantomData;
 use std::mem::size_of;
 use std::ops::Range;
-use {
-    super::labels::{GlyphId, GlyphService},
-    super::style::ParsedStyle,
-    super::tile::prepare_tile,
-    super::GpuMapConfig,
-    crate::MapDataSource,
-    std::collections::BTreeSet,
-    std::sync::Arc,
-};
+use std::sync::Arc;
 
-/// Entries per geometry pool when a host has not measured: 73 MB of ground buffers. Upstream's
-/// 10 million lost the device on a 512 MB integrated GPU in 3 of 8 runs.
+/// Entries per geometry pool when a host has not measured: 73 MB of ground buffers. Ten million lost
+/// the device on a 512 MB integrated GPU in 3 of 8 runs.
 const DEFAULT_POOL_ENTRIES: u64 = 2_000_000;
 /// Tile layers per pool when a host has not measured.
 const DEFAULT_POOL_LAYERS: u64 = 10 * 1024;
@@ -135,13 +130,10 @@ impl GpuPoolSizes {
         if has_empty_pool {
             return Err("Map pools must not be empty".to_string());
         }
-        let largest_buffer =
-            BufferPool::<super::pipelines::ShaderVertex>::buffer_sizes(self.ground)
-                .into_iter()
-                .chain(BufferPool::<super::tile::ExtrusionVertex>::buffer_sizes(
-                    self.extrusion,
-                ))
-                .fold(0, u64::max);
+        let largest_buffer = BufferPool::<ShaderVertex>::buffer_sizes(self.ground)
+            .into_iter()
+            .chain(BufferPool::<ExtrusionVertex>::buffer_sizes(self.extrusion))
+            .fold(0, u64::max);
         if largest_buffer > max_buffer_size {
             return Err(format!(
                 "This map view needs a {largest_buffer} byte GPU buffer and {adapter_name} allows \
@@ -385,7 +377,7 @@ impl MapTileSizer {
     /// Reads the style a renderer of `config` draws. Fails loudly on an invalid style.
     pub fn new(config: &GpuMapConfig, source: &dyn MapDataSource) -> Result<Self, String> {
         Ok(Self {
-            style: config.read_style(&source.style(&config.spec.style)?)?,
+            style: parse_style(&source.style(&config.spec.style)?, config)?,
             glyphs: source.glyphs(),
         })
     }
@@ -394,7 +386,7 @@ impl MapTileSizer {
     /// glyph they use in the glyph service, so a job that measures all its tiles has them all before
     /// its first frame.
     pub fn measure(&self, bytes: &[u8]) -> Result<MeasuredTile, String> {
-        let prepared = prepare_tile(bytes, &self.style, Some(&*self.glyphs))?;
+        let prepared = prepare_tile(bytes, &self.style, &*self.glyphs)?;
         Ok(MeasuredTile {
             pools: GpuPoolSizes {
                 ground: PoolEntries::of(&prepared.ground),

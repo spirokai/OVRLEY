@@ -1,9 +1,8 @@
-//! Decodes one vector tile and tessellates every style layer it feeds, ported from maplibre-rs
-//! `vector/process_vector.rs` and `vector/tessellation.rs`, and lays out its labels.
+//! Decodes one vector tile, tessellates every style layer it feeds, and lays out its labels.
 //!
-//! 3D buildings come from `fill-extrusion` layers. Nothing exists for them upstream, so they follow
-//! maplibre-rs's shape: tessellated once per tile on a worker, drawn per frame from bound slices.
-//! Geometry rules follow MapLibre's fill-extrusion bucket. Its lighting is anchored to the viewport,
+//! 3D buildings come from `fill-extrusion` layers. Like the ground, they are tessellated once per
+//! tile on a worker and drawn per frame from bound slices. Geometry rules follow MapLibre's
+//! fill-extrusion bucket. Its lighting is anchored to the viewport,
 //! so it is evaluated per frame in `shaders/extrusion.vertex.wgsl` from the normal stored here.
 //!
 //! Tile data is external. A malformed feature is logged and skipped, and a layer that fails is
@@ -53,7 +52,7 @@ const WALL_GRADIENT_FLOOR: f32 = 0.84;
 pub(crate) struct PreparedTile {
     pub(crate) ground: Vec<PreparedLayer<ShaderVertex>>,
     pub(crate) extrusions: Vec<PreparedLayer<ExtrusionVertex>>,
-    /// The tile's labels, which stay on the CPU. Empty without a glyph source to size them.
+    /// The tile's labels, which stay on the CPU.
     pub(crate) labels: Vec<LabelSymbol>,
 }
 
@@ -150,17 +149,16 @@ fn layer_metadata(
     }
 }
 
-/// Decodes `bytes`, tessellates every layer of `style` and lays out its labels. Labels need `glyphs`,
-/// which a host without font files does not have: its tiles carry none.
+/// Decodes `bytes`, tessellates every layer of `style` and lays out its labels with `glyphs`.
 pub(crate) fn prepare_tile(
     bytes: &[u8],
     style: &ParsedStyle,
-    glyphs: Option<&dyn GlyphLookup>,
+    glyphs: &dyn GlyphLookup,
 ) -> Result<PreparedTile, String> {
     let tile = Tile::decode(bytes).map_err(|error| format!("Tile does not decode: {error}"))?;
     let mut decoded = SourceFeatures::new();
     let mut context = EvaluationContext::new().with_zoom(style.zoom);
-    let mut ground = ZeroTessellator::default();
+    let mut ground = GroundTessellator::default();
     let mut prepared = PreparedTile::default();
 
     for layer in &style.vector_layers {
@@ -265,20 +263,17 @@ pub(crate) fn prepare_tile(
         ));
     }
 
-    if let Some(glyphs) = glyphs {
-        for layer in &style.labels {
-            if let Some((features, extent)) =
-                source_features(&mut decoded, &tile, &layer.source_layer)
-            {
-                lay_out(
-                    layer,
-                    features,
-                    *extent,
-                    &mut context,
-                    glyphs,
-                    &mut prepared.labels,
-                )?;
-            }
+    for layer in &style.labels {
+        if let Some((features, extent)) = source_features(&mut decoded, &tile, &layer.source_layer)
+        {
+            lay_out(
+                layer,
+                features,
+                *extent,
+                &mut context,
+                glyphs,
+                &mut prepared.labels,
+            )?;
         }
     }
     Ok(prepared)
@@ -293,7 +288,7 @@ fn arc_tolerance(width: f32) -> f32 {
 /// Calls `visit` with every feature passing `filter`, with `context` set to that feature.
 pub(crate) fn for_each_passing<'a>(
     features: &mut [DecodedFeature<'a>],
-    filter: Option<&maplibre_expr::Expr>,
+    filter: Option<&Expr>,
     context: &mut EvaluationContext,
     mut visit: impl FnMut(&DecodedFeature<'a>, &EvaluationContext),
 ) {
@@ -525,8 +520,8 @@ impl StrokeVertexConstructor<ShaderVertex> for VertexConstructor {
     }
 }
 
-/// Builds tessellations with vectors, driven by geozero.
-struct ZeroTessellator {
+/// Tessellates ground features into one layer's buffers, driven by geozero.
+struct GroundTessellator {
     path_builder: Builder,
     path_open: bool,
     is_point: bool,
@@ -539,7 +534,7 @@ struct ZeroTessellator {
     buffer: VertexBuffers<ShaderVertex, u32>,
 }
 
-impl Default for ZeroTessellator {
+impl Default for GroundTessellator {
     fn default() -> Self {
         Self {
             path_builder: Path::builder(),
@@ -555,7 +550,7 @@ impl Default for ZeroTessellator {
     }
 }
 
-impl ZeroTessellator {
+impl GroundTessellator {
     /// The features of `layer` that `style` draws, each in its colour. `None` when none draws.
     fn tessellate_layer(
         &mut self,
@@ -640,7 +635,6 @@ impl ZeroTessellator {
                 &self.stroke_options,
                 &mut BuffersBuilder::new(&mut self.buffer, VertexConstructor),
             )
-            .map(|_| ())
             .map_err(|error| GeozeroError::Geometry(format!("{error:?}")))
     }
 
@@ -652,12 +646,11 @@ impl ZeroTessellator {
                 &FillOptions::tolerance(DEFAULT_TOLERANCE).with_fill_rule(FillRule::NonZero),
                 &mut BuffersBuilder::new(&mut self.buffer, VertexConstructor),
             )
-            .map(|_| ())
             .map_err(|error| GeozeroError::Geometry(format!("{error:?}")))
     }
 }
 
-impl GeomProcessor for ZeroTessellator {
+impl GeomProcessor for GroundTessellator {
     fn xy(&mut self, x: f64, y: f64, _idx: usize) -> Result<(), GeozeroError> {
         let position = point(x as f32 * self.scale, y as f32 * self.scale);
         if self.is_point {

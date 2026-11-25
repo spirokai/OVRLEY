@@ -6,11 +6,11 @@ use super::text::{Face, FontGlyph, GlyphMetrics};
 use super::{GlyphLookup, GlyphService, LabelSymbol};
 use crate::gpu::style::{parse_style, ParsedStyle};
 use crate::gpu::tile::prepare_tile;
-use crate::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes};
+use crate::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapDataSource};
 use crate::mercator::world_to_lon_lat;
 use crate::{
-    frame_tiles, view_tiles, MapCamera, MapDataSource, MapLabelDraw, MapLayers, MapStyleBuildings,
-    MapStyleId, MapStyleSpec, MapViewport, TileId, LABEL_PLACEMENTS,
+    frame_tiles, view_tiles, MapCamera, MapLabelDraw, MapLayers, MapStyleBuildings, MapStyleId,
+    MapStyleSpec, MapViewport, TileId, LABEL_PLACEMENTS,
 };
 use geozero::mvt::{tile, Message, Tile};
 use serde_json::{json, Value as Json};
@@ -140,22 +140,8 @@ impl GlyphLookup for BoxGlyphs {
 
 /// A style's parse and the symbols a tile lays out under it.
 fn laid_out(style: &[u8], bytes: &[u8]) -> (ParsedStyle, Vec<LabelSymbol>) {
-    let style = parse_style(
-        style,
-        MapLayers {
-            buildings: false,
-            labels: true,
-            paths: true,
-            local_names: false,
-        },
-        ZOOM,
-        1.0,
-        &MapStyleBuildings::None,
-    )
-    .unwrap();
-    let symbols = prepare_tile(bytes, &style, Some(&BoxGlyphs))
-        .unwrap()
-        .labels;
+    let style = parse_style(style, &config(true)).unwrap();
+    let symbols = prepare_tile(bytes, &style, &BoxGlyphs).unwrap().labels;
     (style, symbols)
 }
 
