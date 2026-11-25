@@ -24,7 +24,7 @@ mod testing {
 
     use crate::catalog::{self, Answer, ToolError, ToolResult};
     use crate::link::{SocketLocation, UiJob, Window, WindowClosed};
-    use ovrley_app::lib::template::ThemeColors;
+    use ovrley_app::store::template::ThemeColors;
     use ovrley_app::store::agent::{AgentReply, AgentResult};
     use ovrley_app::store::services::fakes::{fake_services, Fakes};
     use ovrley_app::store::{Dispatcher, Store};
@@ -145,7 +145,7 @@ mod testing {
     }
 
     pub fn with_activity(duration_seconds: f64) -> Store {
-        use ovrley_app::store::slices::media::ActivitySummary;
+        use ovrley_app::store::media::ActivitySummary;
         let mut store = Store::default();
         store.media.activity_summary = Some(ActivitySummary {
             duration_seconds,
@@ -171,7 +171,7 @@ mod testing {
 
     /// A 600 s activity and clips given as id, offset and duration.
     pub fn with_videos(clips: &[(&str, f64, f64)]) -> Store {
-        use ovrley_app::lib::video_program::create_imported_video;
+        use ovrley_app::video::create_imported_video;
         use ovrley_core::media::video_edits::VideoEdits;
         use std::rc::Rc;
 

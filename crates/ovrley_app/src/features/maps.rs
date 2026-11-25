@@ -1,23 +1,25 @@
-//! Maps (phase 5 D9, D10, D11): the installed styles, the preview's frame thread, the GPU alert,
-//! the map view mode, the background tile download and the tile cache row.
+//! Maps: the installed styles, the preview's frame thread, the GPU alert, the map view mode, the
+//! background tile download and the tile cache row.
 //!
 //! - **Styles** are read at startup with the map services; [`initialize`] copies their catalog into
-//!   the store for the style select (`useMapStyleSelect`) and probes the adapter on a worker.
+//!   the store for the style select and probes the adapter on a worker.
 //! - **Frames** come from one map thread, started with the preview's first map ([`frame_factory`]).
 //!   Its wake-ups mark the preview dirty, so the next frame collects what arrived.
-//! - **The tile cache row** (`useMapTileCache`) lives here too, with the rest of the maps' services.
+//! - **The tile cache row** lives here too, with the rest of the maps' services.
 
-use crate::features::overlay_editor::interaction::{hit_widget, map_view_patch, stage_to_scene, PointerModifiers};
-use crate::features::overlay_editor::WheelInput;
-use crate::features::widget_editor::blocks::OptionView;
-use crate::i18n::{catalog as translations, Locale};
-use crate::store::services::{MapAdapterSupport, MapFrameFactory, MapStyleCatalog, Services};
-use crate::store::Store;
-use ovrley_widgets::model::document::merge_widget_data;
-use serde_json::{json, Map, Value};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use ovrley_services::maps::{MapAdapterSupport, MapStyleCatalog};
+use ovrley_widgets::model::document::merge_widget_data;
+use ovrley_widgets::widgets::map::preview::MapFrameFactory;
+use serde_json::{json, Map, Value};
+use crate::features::canvas::WheelInput;
+use crate::features::canvas::interaction::{hit_widget, map_view_patch, stage_to_scene, PointerModifiers};
+use crate::features::widgets::blocks::OptionView;
+use crate::i18n::{catalog as translations, Locale};
+use crate::store::Store;
+use crate::store::services::Services;
 
 /// A wheel's zoom commits once the wheel has been still this long (`WHEEL_COMMIT_DELAY_MS`).
 pub const WHEEL_COMMIT_DELAY: Duration = Duration::from_millis(300);
@@ -29,7 +31,7 @@ pub const DOWNLOAD_SETTLE: Duration = Duration::from_millis(500);
 /// the same tiles.
 const TILE_FIELDS: [&str; 10] = ["width", "height", "camera_mode", "orientation", "pitch", "follow_zoom", "fixed_zoom", "fixed_pan_x", "fixed_pan_y", "show_full_activity"];
 
-/// The maps' hook state.
+/// The maps' state.
 #[derive(Default)]
 pub struct MapsState {
     /// The installed styles, once [`initialize`] has copied them.
@@ -38,19 +40,19 @@ pub struct MapsState {
     pub adapter: Option<MapAdapterSupport>,
     /// The preview's map frames, started with its first map.
     frames: Option<Arc<dyn MapFrameFactory>>,
-    /// The map view mode's gesture (D10).
+    /// The map view mode's gesture.
     pub view: MapViewState,
-    /// The background route download (`createMapDownload`).
+    /// The background route download.
     download: MapDownloadState,
-    /// Settings → Map tile cache (D11).
+    /// Settings → Map tile cache.
     pub tile_cache: MapTileCacheState,
 }
 
-/// `useMapTileCache`'s state.
+/// The tile cache row's state.
 #[derive(Debug, Default)]
 pub struct MapTileCacheState {
     /// The cache's usage, once loaded.
-    pub usage: Option<crate::store::services::CacheUsage>,
+    pub usage: Option<ovrley_services::cache::CacheUsage>,
     /// The slider's value while it drags, and until the command it committed answers.
     pub draft_limit: Option<u64>,
     /// Whether a cache command is running; it disables Clear.
@@ -71,7 +73,7 @@ impl MapTileCacheState {
 #[derive(Default)]
 struct MapDownloadState {
     requested: String,
-    waiting: Option<(Instant, crate::store::services::MapPrepareRequest)>,
+    waiting: Option<(Instant, ovrley_services::maps::MapPrepareRequest)>,
     running: ovrley_services::maps::MapDownload,
 }
 
@@ -81,7 +83,7 @@ impl std::fmt::Debug for MapDownloadState {
     }
 }
 
-/// `useMapViewGesture`'s state: the map the mode is on, the uncommitted patch and a pan drag.
+/// The map the mode is on, the uncommitted patch and a pan drag.
 #[derive(Debug, Default)]
 pub struct MapViewState {
     /// The map in view mode, as the last reconcile saw it, so its patch commits when it ends.
@@ -137,13 +139,13 @@ pub fn frame_factory(
     }
     let post = services.ui_post.clone();
     let frames = services.maps.frames(Arc::new(move || {
-        post.post(Box::new(|store, _| store.preview.mark_dirty()))
+        post.post(Box::new(|store, _| store.preview.mark_dirty()));
     }))?;
     store.maps.frames = Some(frames.clone());
     Ok(frames)
 }
 
-/// `useMapStyleSelect`: the installed styles, and the one a map with `map_style` draws (a style that
+/// The installed styles, and the one a map with `map_style` draws (a style that
 /// is not installed draws the first). Until the styles load, there are none.
 pub fn map_style_select(store: &Store, map_style: Option<&str>) -> (Vec<OptionView>, String) {
     let Some(styles) = &store.maps.styles else {
@@ -164,7 +166,7 @@ pub fn map_style_select(store: &Store, map_style: Option<&str>) -> (Vec<OptionVi
     (options, value)
 }
 
-/// `mapBuildingsAvailable`: seen from straight above a building is only its roof, so buildings
+/// Seen from straight above a building is only its roof, so buildings
 /// need a pitched chase camera.
 pub fn map_buildings_available(data: &Map<String, Value>) -> bool {
     data.get("camera_mode").and_then(Value::as_str) == Some("follow")
@@ -190,7 +192,7 @@ pub fn gpu_alert(store: &Store, locale: Locale) -> Option<String> {
     Some(translations().t_or(locale, key, default).to_string())
 }
 
-// ── The map view mode (D10) ─────────────────────────────────────────────────────────────────────
+// ── The map view mode ──────────────────────────────────────────────────────────────────────────
 
 /// The map in view mode: the single selection, when it is the map the mode was entered on.
 pub fn map_view_widget(store: &Store) -> Option<&str> {
@@ -205,7 +207,7 @@ fn can_pan(data: &Map<String, Value>) -> bool {
 
 fn effective_data(store: &Store, widget_id: &str) -> Option<Map<String, Value>> {
     let theme = store.theme.clone()?;
-    crate::features::widget_preview::preview_widgets(store, &theme).into_iter().find(|widget| widget.id == widget_id).map(|widget| widget.data)
+    crate::features::widgets::preview::preview_widgets(store, &theme).into_iter().find(|widget| widget.id == widget_id).map(|widget| widget.data)
 }
 
 /// A double-click on the canvas enters the view mode of the map under the pointer.
@@ -293,7 +295,7 @@ pub fn wheel(store: &mut Store, wheel: &WheelInput, modifiers: PointerModifiers,
         return false;
     }
     let Some(widget_id) = map_view_widget(store).map(str::to_string) else { return false };
-    let viewport = &store.overlay_editor.viewport;
+    let viewport = &store.canvas.viewport;
     let point = stage_to_scene(store, (wheel.cursor.0 + viewport.scroll_x, wheel.cursor.1 + viewport.scroll_y));
     if hit_widget(store, point).as_deref() != Some(widget_id.as_str()) {
         return false;
@@ -313,7 +315,7 @@ pub fn wheel(store: &mut Store, wheel: &WheelInput, modifiers: PointerModifiers,
 /// Escape leaves the view mode wherever focus is, unless a dialog or popup is open. Returns
 /// whether it did.
 pub fn escape(store: &mut Store) -> bool {
-    if map_view_widget(store).is_none() || crate::features::overlay_editor::keyboard::overlay_open(store) {
+    if map_view_widget(store).is_none() || crate::features::canvas::keyboard::overlay_open(store) {
         return false;
     }
     store.editor.set_map_view_widget_id(None);
@@ -330,8 +332,8 @@ pub fn reset_map_view(store: &mut Store, widget_id: &str) -> Result<(), String> 
 pub fn next_deadline(store: &Store) -> Option<Instant> {
     let wheel = store.maps.view.pending.as_ref().and_then(|pending| pending.wheel_commit);
     let download = store.maps.download.waiting.as_ref().map(|(at, _)| *at);
-    // Sync Doctor's maps: their animations, the settle and the frame throttle (Phase 8 D5).
-    let sync = crate::features::video_sync::maps::next_deadline(store, Instant::now());
+    // Sync Doctor's maps: their animations, the settle and the frame throttle.
+    let sync = crate::features::sync::maps::next_deadline(store, Instant::now());
     wheel.into_iter().chain(download).chain(sync).min()
 }
 
@@ -374,7 +376,7 @@ pub fn update_download(store: &mut Store, maps: &[&Map<String, Value>], scene: &
         return;
     }
     let request = (|| -> Result<_, String> {
-        Ok(crate::store::services::MapPrepareRequest {
+        Ok(ovrley_services::maps::MapPrepareRequest {
             activity: activity.as_ref().clone(),
             widgets: maps.iter().map(|map| serde_json::from_value(Value::Object((*map).clone()))).collect::<Result<_, _>>().map_err(|error| error.to_string())?,
             scene: serde_json::from_value(scene.clone()).map_err(|error| error.to_string())?,
@@ -388,7 +390,7 @@ pub fn update_download(store: &mut Store, maps: &[&Map<String, Value>], scene: &
     }
 }
 
-/// Reconcile step (D10): the mode ends when its map is gone or no longer the single selection, and
+/// Reconcile step: the mode ends when its map is gone or no longer the single selection, and
 /// what it had not committed commits then.
 pub fn reconcile_map_view(store: &mut Store) {
     let current = map_view_widget(store).filter(|id| store.editor.config.widget(id).is_ok()).map(str::to_string);
@@ -402,7 +404,7 @@ pub fn reconcile_map_view(store: &mut Store) {
     }
 }
 
-// ── Settings → Map tile cache (D11) ─────────────────────────────────────────────────────────────
+// ── Settings → Map tile cache ───────────────────────────────────────────────────────────────────
 
 /// The row showed: its usage loads on a worker. A failure goes to the error alert.
 pub fn load_tile_cache(_: &mut Store, services: &mut Services) {
@@ -474,12 +476,12 @@ pub fn clear_tile_cache(store: &mut Store, services: &mut Services) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::features::overlay_editor::interaction::{content_rect, scene_to_stage};
-    use crate::features::overlay_editor::viewport::ViewportMetrics;
-    use crate::features::widget_editor::blocks::CellKind;
-    use crate::features::widget_editor::rules::Input;
-    use crate::features::widget_editor::tests::{cell, editor_with, patch, widget};
-    use crate::features::widget_editor::{edit_field, update_widget_data};
+    use crate::features::canvas::interaction::{content_rect, scene_to_stage};
+    use crate::features::canvas::viewport::ViewportMetrics;
+    use crate::features::widgets::blocks::CellKind;
+    use crate::features::widgets::rules::Input;
+    use crate::features::widgets::tests::{cell, editor_with, patch, widget};
+    use crate::features::widgets::{edit_field, update_widget_data};
     use crate::store::services::fakes::Fakes;
     use crate::store::Dispatcher;
     use ovrley_core::normalize::template::template_manifest;
@@ -500,11 +502,11 @@ mod tests {
             }
             std::thread::sleep(Duration::from_millis(5));
             fakes.ui_post.drain(&dispatcher);
-            dispatcher.dispatch(crate::features::widget_preview::preview_frame);
+            dispatcher.dispatch(crate::features::widgets::preview::preview_frame);
         }
         assert!(dispatcher.with_store(|store| store.preview.presented().contains_key("m")), "the map never rendered");
         dispatcher.dispatch(|store, _| {
-            crate::features::overlay_editor::set_viewport_metrics(
+            crate::features::canvas::set_viewport_metrics(
                 store,
                 ViewportMetrics { editor_width: 1992.0, editor_height: 1152.0, scroll_width: 1992.0, scroll_height: 1104.0, padding: 16.0, scale_factor: 2.0, rem: 16.0 },
             );
@@ -536,7 +538,7 @@ mod tests {
     }
 
     fn edit(dispatcher: &Dispatcher, field: &'static str, input: Input) {
-        dispatcher.dispatch(move |store, services| edit_field(store, services, "m", field, input, false).unwrap());
+        dispatcher.dispatch(move |store, services| edit_field(store, services, "m", field, input, crate::features::widgets::Edit::Commit).unwrap());
     }
 
     /// The map's centre in stage pixels.
@@ -601,7 +603,7 @@ mod tests {
         let zoom = widget(&dispatcher, "m", |data| data["follow_zoom"].as_f64().unwrap());
         let before = dispatcher.with_store(|store| store.history.past.len());
         let start = Instant::now();
-        let cursor = dispatcher.with_store(|store| (point.0 - store.overlay_editor.viewport.scroll_x, point.1 - store.overlay_editor.viewport.scroll_y));
+        let cursor = dispatcher.with_store(|store| (point.0 - store.canvas.viewport.scroll_x, point.1 - store.canvas.viewport.scroll_y));
         let took = mutate(&dispatcher, move |store| wheel(store, &WheelInput { delta_x: 0.0, delta_y: -100.0, cursor }, PointerModifiers::default(), start));
         assert!(took, "an unmodified wheel over the map zooms it");
         assert!(dispatcher.with_store(|store| store.drafts.widget_draft("m").is_some()), "the zoom previews as a draft");
@@ -626,7 +628,7 @@ mod tests {
         let request = {
             let activity = activity.clone();
             move |store: &mut Store, _: &mut Services| {
-                let data = crate::features::widget_preview::preview_widgets(store, store.theme.as_ref().unwrap()).remove(0).data;
+                let data = crate::features::widgets::preview::preview_widgets(store, store.theme.as_ref().unwrap()).remove(0).data;
                 let scene = store.preview.request_scene("m").unwrap().clone();
                 update_download(store, &[&data], &scene, 1.0, Some(&activity));
             }
@@ -680,10 +682,10 @@ mod tests {
     fn a_top_down_map_from_the_drawer_starts_fitted_to_the_route_in_one_undo_step() {
         let (dispatcher, fakes) = map_editor();
         let ride = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../ovrley_core/tests/fixtures/activity/test-ride.fit").to_string_lossy().into_owned();
-        dispatcher.dispatch(move |store, services| crate::features::app_shell::import_activity(store, services, ride, None));
+        dispatcher.dispatch(move |store, services| crate::features::shell::import_activity(store, services, ride, None));
         for _ in 0..2000 {
             fakes.ui_post.drain(&dispatcher);
-            dispatcher.dispatch(crate::features::widget_preview::preview_frame);
+            dispatcher.dispatch(crate::features::widgets::preview::preview_frame);
             if dispatcher.with_store(|store| !store.media.is_processing && store.preview.presented().contains_key("m")) {
                 break;
             }
@@ -694,7 +696,7 @@ mod tests {
         let selection = WidgetSelection { kind: "map".into(), preset: patch(json!({"camera_mode": "fixed"})), ..WidgetSelection::default() };
         let id = std::rc::Rc::new(std::cell::RefCell::new(String::new()));
         let slot = id.clone();
-        dispatcher.dispatch(move |store, services| *slot.borrow_mut() = crate::features::widget_drawer::add_from_drawer(store, services, &selection).unwrap());
+        dispatcher.dispatch(move |store, services| *slot.borrow_mut() = crate::features::widgets::drawer::add_from_drawer(store, services, &selection).unwrap());
         let id = id.borrow().clone();
         dispatcher.with_store(|store| {
             assert_eq!(store.editor.config.widget_ids().len(), added + 1);

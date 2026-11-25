@@ -1,33 +1,24 @@
-//! Port of `features/player/utils/playerTiming.js` and `hooks/usePlaybackEngine.js` (plan D6): the
-//! durations of the timeline, where playback starts, and the timeline clock.
+//! Playback: the durations of the timeline, where playback starts, and the timeline clock.
 //!
 //! The timeline clock is anchored to an [`Instant`] and a timeline second. While it plays,
 //! `ovrley_ui` calls [`playback_tick`] from a repeating timer; a tick quantizes the elapsed time to
 //! the preview's frame rate (the render fps over the widget update rate) and moves the playhead only
 //! when the frame changes. At the end of the timeline it pauses. Scrubs are dispatched as they come;
-//! the preview frame coalesces them (Phase 3 D9).
+//! the preview frame coalesces them.
 //!
-//! Inside the pieces MDK's frames are the clock (Phase 6B): `ovrley_ui` dispatches each as
+//! Inside the pieces MDK's frames are the clock: `ovrley_ui` dispatches each as
 //! [`video_clock_frame`] and the end of each shot as [`video_clock_cut`]. The timeline clock plays
 //! the rest.
 
-use crate::features::app_shell::EditorBackgroundMode;
-use crate::lib::update_rate::container_fps;
-use crate::lib::utils::clamp;
-use crate::lib::video_program::program::{resolve_playback_start, resolve_preview_target, PlaybackSource, PlaybackStart, Program};
-use crate::lib::video_program::SecondsRange;
-use crate::lib::video_program::TelemetryStatus;
-use crate::store::slices::editor::PreviewPlaybackState;
-use crate::store::Store;
 use std::time::{Duration, Instant};
+use crate::features::shell::EditorBackgroundMode;
+use crate::fps::container_fps;
+use crate::store::Store;
+use crate::store::editor::PreviewPlaybackState;
+use crate::video::{SecondsRange, TelemetryStatus};
+use crate::video::program::{resolve_playback_start, resolve_preview_target, PlaybackSource, PlaybackStart, Program};
 
-/// `snapTimelineSecondToFrame`: a timeline second on the nearest frame of a video whose frame
-/// zero sits at `origin_second`.
-pub fn snap_timeline_second_to_frame(second: f64, fps: f64, origin_second: f64) -> f64 {
-    origin_second + crate::js::round((second - origin_second) * fps) / fps
-}
-
-/// `resolvePlaybackSource`: without video playback the timeline clock plays from the playhead.
+/// Without video playback the timeline clock plays from the playhead.
 pub fn resolve_playback_source(should_use_video_playback: bool, playhead_second: f64, program: &Program) -> PlaybackStart {
     if !should_use_video_playback {
         return PlaybackStart { source: PlaybackSource::Timeline, second: playhead_second };
@@ -35,12 +26,12 @@ pub fn resolve_playback_source(should_use_video_playback: bool, playhead_second:
     resolve_playback_start(program, playhead_second)
 }
 
-/// `getTimelineMinimum`: the first second media occupies, never after 0.
+/// The first second media occupies, never after 0.
 pub fn timeline_minimum(video_bounds: Option<SecondsRange>) -> f64 {
     video_bounds.map_or(0.0, |bounds| bounds.start_second.min(0.0))
 }
 
-/// `getTotalPlaybackDuration`: the largest of the activity, the fallback duration (only without
+/// The largest of the activity, the fallback duration (only without
 /// activity and without videos) and the videos' end.
 pub fn total_playback_duration(activity_duration_seconds: Option<f64>, fallback_duration_seconds: f64, video_bounds: Option<SecondsRange>) -> f64 {
     let activity = activity_duration_seconds.unwrap_or(0.0);
@@ -55,7 +46,7 @@ pub fn total_playback_duration(activity_duration_seconds: Option<f64>, fallback_
     content.max(video_end).max(0.0)
 }
 
-/// `createPlaybackAnchor`: where the timeline clock started. A video anchor (`started_at: None`)
+/// Where the timeline clock started. A video anchor (`started_at: None`)
 /// does not advance; pauses and scrubs use it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PlaybackAnchor {
@@ -72,19 +63,17 @@ impl PlaybackAnchor {
         Self { started_at: None, started_second: second }
     }
 
-    /// `getTimelinePlaybackSecond`.
     fn second_at(&self, now: Instant) -> f64 {
         self.started_second + self.started_at.map_or(0.0, |started| now.saturating_duration_since(started).as_secs_f64())
     }
 }
 
-/// The engine's refs.
+/// The timeline clock's state.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PlaybackEngine {
     pub anchor: PlaybackAnchor,
-    /// The last preview frame index the clock published (`previewFrameRef`, -1 as `None`).
+    /// The last preview frame index the clock published.
     frame_index: Option<i64>,
-    /// `previousVideoIdentityRef`.
     video_identity: String,
 }
 
@@ -103,7 +92,7 @@ pub struct PlayerTiming {
     pub has_activity: bool,
     pub clamped_playhead: f64,
     pub should_use_video_playback: bool,
-    /// `getContainerFps(render fps, widget update rate)`.
+    /// The preview's frame rate: the render fps over the widget update rate.
     pub effective_fps: f64,
 }
 
@@ -120,8 +109,8 @@ pub fn player_timing(store: &Store) -> PlayerTiming {
         total_duration,
         timeline_minimum,
         has_activity: has_activity_data && total_duration > 0.0,
-        clamped_playhead: clamp(store.editor.selected_second, timeline_minimum, total_duration),
-        // React's `backgroundMode === 'video' && videoBounds !== null`, and players to play with.
+        clamped_playhead: store.editor.selected_second.max(timeline_minimum).min(total_duration),
+        // The video background, a video timeline, and players to play with.
         should_use_video_playback: store.player.video_clock_available && store.editor_shell.editor_background_mode == EditorBackgroundMode::Video && bounds.is_some(),
         effective_fps: container_fps(store.render_settings.fps, f64::from(store.render_settings.widget_update_rate)),
     }
@@ -185,38 +174,36 @@ pub fn toggle_playback(store: &mut Store, now: Instant) {
     }
 }
 
-/// `resetToStart`.
 pub fn reset_to_start(store: &mut Store) {
     let minimum = player_timing(store).timeline_minimum;
     pause_at_second(store, minimum);
 }
 
-/// `jumpToEnd`.
 pub fn jump_to_end(store: &mut Store) {
     let total = player_timing(store).total_duration;
     pause_at_second(store, total);
 }
 
-/// `stepBySeconds`: paused at the playhead moved by `delta_seconds`, on the timeline.
+/// Paused at the playhead moved by `delta_seconds`, on the timeline.
 pub fn step_by_seconds(store: &mut Store, delta_seconds: f64) {
     let timing = player_timing(store);
-    pause_at_second(store, clamp(timing.clamped_playhead + delta_seconds, timing.timeline_minimum, timing.total_duration));
+    pause_at_second(store, (timing.clamped_playhead + delta_seconds).max(timing.timeline_minimum).min(timing.total_duration));
 }
 
-/// `scrubTo`: a scrub sample, clamped to the timeline.
+/// A scrub sample, clamped to the timeline.
 pub fn scrub_to(store: &mut Store, second: f64) {
     let timing = player_timing(store);
-    let second = clamp(second, timing.timeline_minimum, timing.total_duration);
+    let second = second.max(timing.timeline_minimum).min(timing.total_duration);
     let engine = &mut store.player.playback;
     engine.anchor = PlaybackAnchor::paused(second);
     engine.frame_index = None;
     store.editor.update_preview_scrub(second);
 }
 
-/// `commitScrub`: the final, paused playhead.
+/// The final, paused playhead.
 pub fn commit_scrub(store: &mut Store, second: f64) {
     let timing = player_timing(store);
-    let second = clamp(second, timing.timeline_minimum, timing.total_duration);
+    let second = second.max(timing.timeline_minimum).min(timing.total_duration);
     let engine = &mut store.player.playback;
     engine.anchor = PlaybackAnchor::paused(second);
     engine.frame_index = None;
@@ -247,7 +234,7 @@ pub fn playback_tick(store: &mut Store, now: Instant) -> bool {
     if store.player.playback.frame_index != Some(frame) {
         store.player.playback.frame_index = Some(frame);
         let frame_second = anchor.started_second.max(timing.timeline_minimum + frame as f64 / timing.effective_fps);
-        store.editor.set_selected_second(clamp(frame_second, timing.timeline_minimum, timing.total_duration));
+        store.editor.set_selected_second(frame_second.max(timing.timeline_minimum).min(timing.total_duration));
     }
     true
 }
@@ -256,7 +243,7 @@ fn video_clock_active(store: &Store) -> bool {
     store.editor.preview_playback_state == PreviewPlaybackState::Playing && store.editor.preview_playback_source == PlaybackSource::Video
 }
 
-/// `useVideoPlaybackClock`'s `publishPreviewSecond`: MDK presented `piece_id`'s frame at
+/// MDK presented `piece_id`'s frame at
 /// `source_second`. The playhead follows it once per preview frame, so that the widgets update at
 /// their own rate and not at the video's.
 pub fn video_clock_frame(store: &mut Store, piece_id: &str, source_second: f64) {
@@ -279,7 +266,7 @@ pub fn video_clock_frame(store: &mut Store, piece_id: &str, source_second: f64) 
 
 /// The playing shot ends at `source_second` of its piece. At the piece's end playback continues
 /// where `play` would start there, or, after a shown transition, as many seconds into the next
-/// piece as the blend showed (`resolveContinuation`). Before it, a transition's window begins.
+/// piece as the blend showed. Before it, a transition's window begins.
 pub fn video_clock_cut(store: &mut Store, piece_id: &str, source_second: f64, now: Instant) {
     if !video_clock_active(store) {
         return;
@@ -332,7 +319,7 @@ pub fn next_frame_at(store: &Store) -> Option<Instant> {
     Some(started_at + Duration::from_secs_f64(offset.min(timing.total_duration - engine.anchor.started_second).max(0.0)))
 }
 
-/// The playback effects of the `player` reconcile step, in React's order (D6).
+/// The playback rules of the `player` reconcile step.
 pub fn reconcile_playback(store: &mut Store) {
     reconcile_playback_with(store, player_timing(store), Instant::now());
 }
@@ -344,7 +331,7 @@ fn reconcile_playback_with(store: &mut Store, timing: PlayerTiming, now: Instant
     if !identity.is_empty() && identity != previous && store.editor.selected_second == 0.0 && timing.timeline_minimum < 0.0 {
         store.editor.set_selected_second(timing.timeline_minimum);
     }
-    let timing = PlayerTiming { clamped_playhead: clamp(store.editor.selected_second, timing.timeline_minimum, timing.total_duration), ..timing };
+    let timing = PlayerTiming { clamped_playhead: store.editor.selected_second.max(timing.timeline_minimum).min(timing.total_duration), ..timing };
     // 2. The playhead stays on the timeline while there is something to play.
     if !timing.has_activity {
         store.player.playback.anchor = PlaybackAnchor::paused(timing.timeline_minimum);
@@ -377,17 +364,12 @@ fn reconcile_playback_with(store: &mut Store, timing: PlayerTiming, now: Instant
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::video_program::collection::build_timeline_program;
-    use crate::lib::video_program::fixtures::*;
+    use crate::video::collection::build_timeline_program;
+    use crate::video::fixtures::*;
     use ovrley_core::encode::ffmpeg::transitions::transition_defaults;
 
     fn bounds(start_second: f64, end_second: f64) -> Option<SecondsRange> {
         Some(SecondsRange { start_second, end_second })
-    }
-
-    #[test]
-    fn frames_snap_from_their_origin() {
-        assert!((snap_timeline_second_to_frame(12.38, 30.0, 5.25) - 12.383_333_333_3).abs() < 1e-9);
     }
 
     #[test]
@@ -405,10 +387,10 @@ mod tests {
         assert_eq!(timeline_minimum(None), 0.0);
     }
 
-    use crate::features::player::timeline::reconcile_timeline;
-    use crate::lib::video_program::ImportedVideo;
-    use crate::store::slices::media::ActivitySummary;
-    use crate::store::slices::video_import::tests::store_with;
+    use crate::features::player::reconcile_timeline;
+    use crate::video::ImportedVideo;
+    use crate::store::media::ActivitySummary;
+    use crate::store::videos::tests::store_with;
     use ovrley_core::activity::schema::ParsedActivity;
 
     /// A store with an activity of `duration` seconds and videos at offsets, reconciled.
@@ -582,7 +564,7 @@ mod tests {
 
     #[test]
     fn a_cut_enters_a_rendered_transition_and_leaves_it_into_the_next_piece() {
-        use crate::features::video_preview::transition_proxies::tests::{fade, render_all};
+        use crate::features::player::preview::tests::{fade, render_all};
         let mut store = player(200.0, vec![simple("ride", 60.0, 0), simple("climb", 30.0, 1)], &[("climb", 100.0)], 50.0);
         store.video_import.transition_defaults = fade();
         reconcile_timeline(&mut store);
@@ -600,7 +582,7 @@ mod tests {
         let path = video.path.clone();
         let mut store = on_video(player(8.0, vec![video], &[], 1.0));
         assert_eq!(store.editor.preview_playback_source, PlaybackSource::Video);
-        crate::features::video_preview::preview::playback_failed(&mut store, path, Instant::now());
+        crate::features::player::preview::playback_failed(&mut store, path, Instant::now());
         assert_eq!(state(&store), (PreviewPlaybackState::Playing, PlaybackSource::Timeline, 1.0));
     }
 

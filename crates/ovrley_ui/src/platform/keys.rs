@@ -5,8 +5,8 @@
 //! - On macOS Slint reports ⌘ as `control` and the Control key as `meta`. The matcher's `meta` is
 //!   ⌘ and its `ctrl` the Control key on every platform, so macOS swaps them back.
 
-use ovrley_app::features::overlay_editor::interaction::PointerModifiers;
-use ovrley_app::lib::keyboard_shortcuts::KeyInput;
+use ovrley_app::features::canvas::interaction::PointerModifiers;
+use ovrley_app::shortcuts::KeyInput;
 use slint::platform::Key;
 
 /// Slint's modifier flags, as its key and pointer events carry them.

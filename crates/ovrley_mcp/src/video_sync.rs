@@ -3,11 +3,11 @@
 //! its Manual Sync tab, so the change shows.
 
 use crate::catalog::{Answer, NoArguments, Tool, ToolError, ToolResult};
-use ovrley_app::features::video_sync::matching::MatchScope;
-use ovrley_app::features::video_sync::{self as sync, describe_result, describe_video_sync};
+use ovrley_app::features::sync::matching::MatchScope;
+use ovrley_app::features::sync::{self as sync, describe_result, describe_video_sync};
 use ovrley_app::store::agent::AgentReply;
 use ovrley_app::store::services::Services;
-use ovrley_app::store::slices::manual_video_sync as manual;
+use ovrley_app::features::sync::manual as manual;
 use ovrley_app::store::Store;
 use ovrley_core::media::manual_video_sync::LandmarkKind;
 use schemars::JsonSchema;
@@ -270,8 +270,8 @@ fn apply_candidate(args: CandidateArguments, store: &mut Store, _: &mut Services
 mod tests {
     use super::*;
     use crate::testing::{video_metadata, Editor};
-    use ovrley_app::store::slices::layout::VideoSyncDrawerTab;
-    use ovrley_app::store::slices::media::{ActivitySummary, ImportedActivity};
+    use ovrley_app::features::toolbar::VideoSyncDrawerTab;
+    use ovrley_app::store::media::{ActivitySummary, ImportedActivity};
     use std::sync::Arc;
 
     /// A 100 s moving activity, and a 30 s clip at offset 0 as the sync target.
@@ -293,8 +293,8 @@ mod tests {
         });
         let editor = Editor::with(store, json!({}));
         editor.dispatcher.dispatch(|store, _| {
-            use ovrley_app::lib::video_program::{create_imported_video, VideoEditsMap};
-            use ovrley_app::store::slices::video_import::commit_video_collection;
+            use ovrley_app::video::{create_imported_video, VideoEditsMap};
+            use ovrley_app::store::videos::commit_video_collection;
             let metadata = video_metadata("/videos/clip.mp4", 30.0);
             let clip = create_imported_video(&metadata, "clip".into(), 0).unwrap();
             let edits = VideoEditsMap::from([(

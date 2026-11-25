@@ -24,10 +24,10 @@ enum StepKind {
 }
 
 fn tour() -> Vec<Step> {
-    use ovrley_app::features::app_shell::SettingsSection;
-    use ovrley_app::features::app_update::UpdatePhase;
+    use ovrley_app::features::shell::SettingsSection;
+    use ovrley_app::features::shell::UpdatePhase;
     use ovrley_app::i18n::{change_language_preference, Locale};
-    use ovrley_app::store::slices::layout::LeftDrawerTool;
+    use ovrley_app::features::toolbar::LeftDrawerTool;
     let steps: Vec<(&'static str, StepAction)> = vec![
         // The startup projects dialog opens once its listing arrives; the tour shows it, then
         // dismisses it as the user would.
@@ -43,13 +43,13 @@ fn tour() -> Vec<Step> {
         ("projects-drawer-back", |store, _| store.layout.select_left_drawer_tool(LeftDrawerTool::Activity)),
         ("activity-imported", |store, services| {
             let ride = ovrley_services::runtime::source_repo_root().join("crates/ovrley_core/tests/fixtures/activity/test-ride.fit");
-            ovrley_app::features::app_shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);
+            ovrley_app::features::shell::import_activity(store, services, ride.to_string_lossy().into_owned(), None);
         }),
         ("activity-trimmed", |store, _| {
             let duration = store.media.activity_summary.as_ref().map_or(0.0, |summary| summary.duration_seconds);
             store.media.set_activity_trim(Some(ovrley_core::activity::trim::ActivityTrim { start_second: duration * 0.1, end_second: duration * 0.8 }));
             store.editor.set_selected_second(duration * 0.4);
-            store.player.hovered_lane = Some(ovrley_app::store::slices::video_import::ClipLane::Activity);
+            store.player.hovered_lane = Some(ovrley_app::store::videos::ClipLane::Activity);
         }),
         ("widget-selected", |store, _| {
             store.player.hovered_lane = None;
@@ -63,10 +63,10 @@ fn tour() -> Vec<Step> {
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
             store.template.set_last_saved_template_state(None);
-            ovrley_app::features::template_manager::create_new_template_request(store, services, None);
+            ovrley_app::features::templates::create_new_template_request(store, services, None);
         }),
         ("update-available", |store, services| {
-            ovrley_app::features::template_manager::answer_unsaved_confirm(store, services, ovrley_app::features::app_shell::UnsavedAnswer::Cancel);
+            ovrley_app::features::templates::answer_unsaved_confirm(store, services, ovrley_app::features::shell::UnsavedAnswer::Cancel);
             store.app_update.phase = UpdatePhase::Available(std::sync::Arc::new(SnapshotUpdate));
         }),
         ("update-available-korean", |store, _| store.i18n.language = Locale::Ko),
@@ -81,15 +81,15 @@ fn tour() -> Vec<Step> {
         }),
         ("update-failed", |store, _| store.app_update.phase = UpdatePhase::Failed),
         ("settings-general", |store, services| {
-            ovrley_app::features::app_update::dismiss(store);
-            ovrley_app::features::template_manager::answer_unsaved_confirm(store, services, ovrley_app::features::app_shell::UnsavedAnswer::Cancel);
+            ovrley_app::features::shell::dismiss(store);
+            ovrley_app::features::templates::answer_unsaved_confirm(store, services, ovrley_app::features::shell::UnsavedAnswer::Cancel);
             store.layout.set_left_drawer_pinned(false);
             store.layout.dismiss_left_drawer_overlay();
             store.editor_shell.set_settings_section(SettingsSection::Settings);
             store.editor_shell.open_settings();
         }),
         ("settings-shortcuts", |store, _| store.editor_shell.set_settings_section(SettingsSection::Shortcuts)),
-        ("error-over-dialog", |store, _| store.media.set_error_message("Project save failed [project_error:save_failed]".into())),
+        ("error-over-dialog", |store, _| store.media.set_error_message("Project save failed".into())),
         ("german", |store, services| {
             store.editor_shell.close_settings();
             store.media.set_error_message("ffmpeg exited with status 1:\nInvalid argument".into());
@@ -103,9 +103,9 @@ fn tour() -> Vec<Step> {
         }),
         // The render dialog: the settings without videos, a single render's progress
         // (a session set as acceptance sets it), the settings with two videos, the mismatch screen.
-        ("render-settings", |store, services| ovrley_app::features::render_video::open_render_dialog(store, services)),
+        ("render-settings", |store, services| ovrley_app::features::render::open_render_dialog(store, services)),
         ("render-progress", |store, _| {
-            store.render_dialog.phase = ovrley_app::features::render_video::DialogPhase::Progress;
+            store.render_dialog.phase = ovrley_app::features::render::DialogPhase::Progress;
             store.media.start_render_session(999, "/tmp/overlay.mov".into(), "Starting render...".into());
             store.media.render_progress = ovrley_core::debug::RenderProgress {
                 render_id: 999,
@@ -121,31 +121,31 @@ fn tour() -> Vec<Step> {
         }),
         ("render-videos", |store, services| {
             store.media.clear_render_session();
-            store.render_dialog.phase = ovrley_app::features::render_video::DialogPhase::Closed;
-            ovrley_app::features::render_video::close_render_dialog(store);
+            store.render_dialog.phase = ovrley_app::features::render::DialogPhase::Closed;
+            ovrley_app::features::render::close_render_dialog(store);
             snapshot_videos(store, &[(3840, 2160, 0.0), (3840, 2160, 90.0)]);
-            ovrley_app::features::render_video::open_render_dialog(store, services);
+            ovrley_app::features::render::open_render_dialog(store, services);
         }),
         ("render-mismatch", |store, services| {
-            ovrley_app::features::render_video::close_render_dialog(store);
+            ovrley_app::features::render::close_render_dialog(store);
             snapshot_videos(store, &[(1920, 1080, 0.0)]);
-            ovrley_app::features::render_video::open_render_dialog(store, services);
+            ovrley_app::features::render::open_render_dialog(store, services);
         }),
         ("render-closed", |store, _| {
-            ovrley_app::features::render_video::close_render_dialog(store);
+            ovrley_app::features::render::close_render_dialog(store);
             snapshot_videos(store, &[]);
         }),
         // Sync Doctor: the Autodetect tab over the pair, then the Manual Sync tab with
         // landmarks, a course location and a search.
         ("sync-autodetect", |store, _| {
-            use ovrley_app::store::slices::manual_video_sync as manual;
+            use ovrley_app::features::sync::manual as manual;
             snapshot_videos(store, &[(1920, 1080, 30.0)]);
             manual::select_video_sync_video(store, Some("clip-0".into())).expect("a snapshot clip");
             store.layout.select_left_drawer_tool(LeftDrawerTool::VideoSync);
         }),
         ("sync-manual", |store, services| {
-            use ovrley_app::features::video_sync::{calculate, matching::MatchScope};
-            use ovrley_app::store::slices::manual_video_sync as manual;
+            use ovrley_app::features::sync::{calculate, matching::MatchScope};
+            use ovrley_app::features::sync::manual as manual;
             use ovrley_core::media::manual_video_sync::LandmarkKind;
             store.layout.open_manual_video_sync();
             for (kind, second) in [(LandmarkKind::Stop, 5.0), (LandmarkKind::LeftTurn, 12.0), (LandmarkKind::Location, 20.0)] {
@@ -153,11 +153,11 @@ fn tour() -> Vec<Step> {
             }
             manual::set_detected_location(store, 100.0).expect("a course location");
             store.editor.set_selected_second(40.0);
-            store.editor.timeline_viewport = ovrley_app::store::slices::editor::TimelineViewport { view_start: 0.0, view_end: 120.0 };
+            store.editor.timeline_viewport = ovrley_app::store::editor::TimelineViewport { view_start: 0.0, view_end: 120.0 };
             calculate(store, services, MatchScope::All, None).expect("an eligible search");
         }),
         ("sync-closed", |store, _| {
-            ovrley_app::store::slices::manual_video_sync::reset_video_sync_state(store);
+            ovrley_app::features::sync::manual::reset_video_sync_state(store);
             store.layout.select_left_drawer_tool(LeftDrawerTool::Widgets);
             store.layout.dismiss_left_drawer_overlay();
             snapshot_videos(store, &[]);
@@ -208,7 +208,7 @@ fn tour() -> Vec<Step> {
         StepKind::Action(|store, _| {
             store.agent_session.allow_agent_edits = true;
             store.agent_session.session_opened();
-            store.editor_shell.set_settings_section(ovrley_app::features::app_shell::SettingsSection::Settings);
+            store.editor_shell.set_settings_section(ovrley_app::features::shell::SettingsSection::Settings);
             store.editor_shell.open_settings();
         }),
     ));
@@ -254,7 +254,7 @@ fn snapshot_videos(store: &mut Store, videos: &[(u32, u32, f64)]) {
             resolution: Some(ovrley_core::media::Resolution { width: (*width).into(), height: (*height).into() }),
             ..Default::default()
         };
-        let video = ovrley_app::lib::video_program::create_imported_video(&metadata, format!("clip-{index}"), index as u32).expect("snapshot videos are valid");
+        let video = ovrley_app::video::create_imported_video(&metadata, format!("clip-{index}"), index as u32).expect("snapshot videos are valid");
         edits.insert(video.id.clone(), VideoEdits { offset_seconds: *offset, ..VideoEdits::default() });
         imported.push(video);
     }

@@ -1,24 +1,29 @@
-//! Port of `features/player`: the overlay player's playback, timeline viewport, lanes, gestures and
-//! edits at the playhead (plan D6 to D11, D16).
+//! The overlay player: playback, the timeline viewport, lanes, gestures, edits at the playhead,
+//! filmstrips and the video preview, and the cached timeline they all read.
+
+use std::rc::Rc;
+use std::time::Instant;
+use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
+use crate::activity::{trim_activity_edge, ActivityWindow, TrimEdge};
+use crate::dialogs::filename_from_selected_path;
+use crate::features::canvas::keyboard::overlay_open;
+use crate::features::shell::KeyboardWorkspace;
+use crate::features::toolbar::LeftDrawerTool;
+use crate::shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
+use crate::store::Store;
+use crate::store::media::ActivitySource;
+use crate::video::{ImportedVideo, VideoEditsMap};
+use crate::video::collection::{build_timeline_program, derive_video_warnings, TimelineProgram, VideoDragPreview, VideoWarnings};
 
 pub mod edits;
+pub mod filmstrips;
 pub mod gestures;
 pub mod lanes;
 pub mod playback;
-pub mod timeline;
+pub mod preview;
 pub mod viewport;
 
-use crate::features::app_shell::KeyboardWorkspace;
-use crate::features::overlay_editor::keyboard::overlay_open;
-use crate::lib::keyboard_shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
-use crate::lib::activity::{resolve_activity_window, trim_activity_edge, TrimEdge};
-use crate::lib::file_dialog::filename_from_selected_path;
-use crate::store::slices::layout::LeftDrawerTool;
-use crate::store::slices::media::ActivitySource;
-use crate::store::Store;
-use std::time::Instant;
-
-/// `videoSyncMode`: the video sync drawer is the active tool.
+/// The video sync drawer is the active tool.
 pub fn video_sync_mode(store: &Store) -> bool {
     store.layout.active_left_drawer_tool == LeftDrawerTool::VideoSync
 }
@@ -29,7 +34,7 @@ fn activity_filename(store: &Store) -> Option<String> {
     from_source.or_else(|| store.media.activity_summary.as_ref().and_then(|summary| summary.file_name.clone()))
 }
 
-/// The lanes' view model (`useTimelineClips` as `useOverlayPlayer` composes it).
+/// The lanes' view model.
 pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes::ActivityLaneView>) {
     let timing = playback::player_timing(store);
     let displayed = &store.player.timeline.timeline().displayed;
@@ -42,7 +47,7 @@ pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes:
     let joins = if sync { Vec::new() } else { crate::features::transitions::join_models(displayed, store.i18n.language) };
     let dragged_segment = draft.as_ref().and_then(|draft| {
         let clip = displayed.clips.iter().find(|clip| clip.id() == draft.video_id)?;
-        crate::lib::video_program::edits::segment_before_cut(&clip.edits, &draft.cut_id).ok().map(|key| (draft.video_id.clone(), key))
+        crate::video::edits::segment_before_cut(&clip.edits, &draft.cut_id).ok().map(|key| (draft.video_id.clone(), key))
     });
     let selected = gestures::apply_cut_draft_to_selection(store.video_import.selected_clip.as_ref(), draft.as_ref());
     let inputs = lanes::LaneInputs {
@@ -57,10 +62,10 @@ pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes:
         has_activity: store.media.activity_summary.is_some() && timing.has_activity,
         activity_summary: store.media.activity_summary.as_ref(),
         activity_filename: activity_filename(store),
-        activity_trim: (!sync).then(|| (resolve_activity_window(duration, trim), dragged_edge)),
+        activity_trim: (!sync).then(|| (ActivityWindow::new(duration, trim), dragged_edge)),
         show_cut_markers: !sync,
         dragged_cut: draft.as_ref().map(|draft| (draft.video_id.as_str(), draft.cut_id.as_str())),
-        filmstrips: &store.video_filmstrip,
+        filmstrips: &store.filmstrips,
         joins: &joins,
         dragged_segment: dragged_segment.as_ref().map(|(video, key)| (video.as_str(), key.as_str())),
     };
@@ -68,18 +73,18 @@ pub fn lanes_view(store: &Store) -> (Option<lanes::VideoLaneView>, Option<lanes:
 }
 
 /// The toolbar's `[` and `]` without a video: the activity's part before or after the playhead.
-pub fn trim_activity_at_playhead(store: &mut Store, side: crate::lib::video_program::segments::TrimSide) {
-    use crate::lib::video_program::segments::TrimSide;
+pub fn trim_activity_at_playhead(store: &mut Store, side: crate::video::segments::TrimSide) {
+    use crate::video::segments::TrimSide;
     let edge = if side == TrimSide::Start { TrimEdge::Start } else { TrimEdge::End };
     let second = playback::player_timing(store).clamped_playhead;
     set_activity_trim_edge(store, edge, second);
 }
 
-/// The dialog's answer: the merged part takes the chosen export state (D19). An agent waiting for
+/// The dialog's answer: the merged part takes the chosen export state. An agent waiting for
 /// it gets its reply.
 pub fn resolve_cut_removal(store: &mut Store, excluded: bool) {
     let request = store.video_import.cut_removal_request.clone();
-    let result = crate::store::slices::video_import::resolve_cut_removal(store, excluded);
+    let result = crate::store::videos::resolve_cut_removal(store, excluded);
     if let Some(reply) = store.player.cut_removal_reply.take() {
         reply.send(result.map(|()| serde_json::json!({ "removed": true, "excluded": excluded, "videoId": request.map(|request| request.video_id) })));
     }
@@ -87,7 +92,7 @@ pub fn resolve_cut_removal(store: &mut Store, excluded: bool) {
 
 /// "Keep the cut", Escape or the scrim: the cut stays. A waiting agent learns it.
 pub fn dismiss_cut_removal(store: &mut Store) {
-    crate::store::slices::video_import::dismiss_cut_removal(store);
+    crate::store::videos::dismiss_cut_removal(store);
     if let Some(reply) = store.player.cut_removal_reply.take() {
         reply.send(Ok(serde_json::json!({ "removed": false })));
     }
@@ -100,37 +105,37 @@ fn set_activity_trim_edge(store: &mut Store, edge: TrimEdge, second: f64) {
     store.media.set_activity_trim(trim);
 }
 
-/// The player's hook state (D3, D9): what React keeps in the player hooks' refs and state.
+/// The player's state outside the document.
 #[derive(Debug, Default)]
 pub struct PlayerState {
-    /// The cached timeline (D5).
-    pub timeline: timeline::TimelineCache,
-    /// `usePlaybackEngine`'s refs (D6).
+    /// The cached timeline.
+    pub timeline: TimelineCache,
+    /// The timeline clock.
     pub playback: playback::PlaybackEngine,
-    /// The video players exist, so MDK can be the video clock (Phase 6B D11).
+    /// The video players exist, so MDK can be the video clock.
     pub video_clock_available: bool,
     /// Files MDK could not play this session. Their pieces play on the timeline clock.
     pub unplayable_paths: std::collections::BTreeSet<String>,
-    /// `useTimelineViewport`'s measurements and rule inputs (D7).
+    /// The viewport's measurements and rule inputs.
     pub viewport: viewport::ViewportState,
-    /// A scrub, playhead drag or pan (`useTimelineGestures`, D9).
+    /// A scrub, playhead drag or pan.
     pub surface_gesture: Option<gestures::TimelineGesture>,
-    /// A dragged activity trim handle (`useActivityTrim`, D14).
+    /// A dragged activity trim handle.
     pub trim_drag: Option<gestures::TrimDrag>,
-    /// A dragged clip (`useClipDrag`, D9).
+    /// A dragged clip.
     pub clip_drag: Option<gestures::ClipDrag>,
-    /// A dragged cut marker (`useCutDrag`, D9).
+    /// A dragged cut marker.
     pub cut_drag: Option<gestures::CutDrag>,
     /// The real cut whose "Remove cut" popover is open: `(video id, cut id)`.
     pub cut_popover: Option<(String, String)>,
-    /// The open join's transition panel (D13).
+    /// The open join's transition panel.
     pub join_panel: Option<crate::features::transitions::JoinPanelState>,
-    /// An agent waiting for the user's answer to the cut removal question (D19).
+    /// An agent waiting for the user's answer to the cut removal question.
     pub cut_removal_reply: Option<crate::store::agent::AgentReply>,
-    /// A keyboard nudge of a clip, waiting for its key release (D11).
+    /// A keyboard nudge of a clip, waiting for its key release.
     pub clip_nudge: Option<gestures::ClipNudge>,
     /// The lane whose clip the pointer is over; its tooltip shows.
-    pub hovered_lane: Option<crate::store::slices::video_import::ClipLane>,
+    pub hovered_lane: Option<crate::store::videos::ClipLane>,
 }
 
 impl PlayerState {
@@ -140,22 +145,22 @@ impl PlayerState {
     }
 }
 
-/// The `player` reconcile step: the timeline derivations, then the playback effects (D6) and the
-/// viewport rules (D7), in React's effect order.
+/// The `player` reconcile step: the timeline derivations, then the playback rules and the
+/// viewport rules.
 pub fn reconcile_player(store: &mut Store) {
     // A cut question that went away unanswered (the videos were cleared or replaced) cancels the
     // call that waits on it, which dropping the reply does.
     if store.video_import.cut_removal_request.is_none() {
         store.player.cut_removal_reply = None;
     }
-    // A nudge commits when its clip loses the keyboard (React: the clip's blur).
+    // A nudge commits when its clip loses the keyboard.
     if let Some(nudge) = &store.player.clip_nudge {
         if focused_clip(store).as_ref() != Some(&nudge.lane) {
             gestures::commit_nudge(store);
         }
     }
-    timeline::reconcile_timeline(store);
-    // A join panel closes with its join (React unmounts the marker's popover).
+    reconcile_timeline(store);
+    // A join panel closes with its join.
     if let Some(panel) = &store.player.join_panel {
         if crate::features::transitions::join_model(store, &panel.key).is_none() {
             store.player.join_panel = None;
@@ -166,14 +171,14 @@ pub fn reconcile_player(store: &mut Store) {
     viewport::reconcile_viewport(store, dragging);
 }
 
-/// Removes a video clip (D17): playback pauses first, and the removal runs outside the history,
+/// Removes a video clip: playback pauses first, and the removal runs outside the history,
 /// which is rebased. Without videos the background returns to checker. The preview's players let go of
 /// the file at the next projection.
 pub fn remove_video(store: &mut Store, video_id: &str) -> Result<(), String> {
     playback::pause(store);
-    crate::features::undo_redo::change_video_collection(store, &[], |store| crate::store::slices::video_import::remove_imported_video(store, video_id))?;
+    crate::features::history::change_video_collection(store, &[], |store| crate::store::videos::remove_imported_video(store, video_id))?;
     if !store.video_import.has_videos() {
-        store.editor_shell.set_editor_background_mode(crate::features::app_shell::EditorBackgroundMode::Checker);
+        store.editor_shell.set_editor_background_mode(crate::features::shell::EditorBackgroundMode::Checker);
     }
     // Removing the video ends a cut question about it.
     if store.video_import.cut_removal_request.is_none() {
@@ -184,16 +189,15 @@ pub fn remove_video(store: &mut Store, video_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// The selected clip takes the timeline-clip keys while the player has the keyboard (React: while
-/// the clip has focus, which a press gives it).
-fn focused_clip(store: &Store) -> Option<crate::store::slices::video_import::ClipLane> {
+/// The selected clip takes the timeline-clip keys while the player has the keyboard.
+fn focused_clip(store: &Store) -> Option<crate::store::videos::ClipLane> {
     if store.editor_shell.active_keyboard_workspace != KeyboardWorkspace::Player {
         return None;
     }
     store.video_import.selected_clip.as_ref().map(|selection| selection.lane.clone())
 }
 
-/// The timeline-clip scope (D11): arrows nudge the focused clip (0.1 s, Shift 1 s), Delete and
+/// The timeline-clip scope: arrows nudge the focused clip (0.1 s, Shift 1 s), Delete and
 /// Backspace remove a video clip. Returns whether the key was used.
 pub fn handle_timeline_clip_key(store: &mut Store, input: &KeyInput) -> bool {
     let Some(lane) = focused_clip(store) else { return false };
@@ -224,9 +228,8 @@ pub fn handle_key_release(store: &mut Store, input: &KeyInput) -> bool {
     true
 }
 
-/// `useOverlayPlayer`'s window keys (the player scope, D11). Repeats are ignored, open overlays
-/// block every command, and text fields keep their keys (Phase 2 D7). Returns whether the key was
-/// used.
+/// The player scope's window keys. Repeats are ignored, open overlays block every command, and
+/// text fields keep their keys. Returns whether the key was used.
 pub fn handle_player_key(store: &mut Store, input: &KeyInput, now: Instant) -> bool {
     if input.repeat || overlay_open(store) {
         return false;
@@ -249,7 +252,7 @@ pub fn handle_player_key(store: &mut Store, input: &KeyInput, now: Instant) -> b
         "player.jumpToEnd" if timing.has_activity => playback::jump_to_end(store),
         "player.toggleMute" if has_video => store.editor.toggle_video_mute(),
         "trim.start" | "trim.end" if !sync && has_video => {
-            use crate::lib::video_program::segments::TrimSide;
+            use crate::video::segments::TrimSide;
             let side = if found.command.id == "trim.start" { TrimSide::Start } else { TrimSide::End };
             return edits::trim_at_playhead(store, side);
         }
@@ -261,12 +264,12 @@ pub fn handle_player_key(store: &mut Store, input: &KeyInput, now: Instant) -> b
         "videoEdit.toggleExcluded" if !sync => return edits::toggle_excluded_at_playhead(store),
         "activityTrim.reset" if store.media.activity_trim.is_some() && !sync => store.media.set_activity_trim(None),
         "activityTrim.goToStart" | "activityTrim.goToEnd" if has_activity_data => {
-            let window = resolve_activity_window(duration, store.media.activity_trim);
+            let window = ActivityWindow::new(duration, store.media.activity_trim);
             let second = if found.command.id == "activityTrim.goToStart" { window.start_second } else { window.end_second };
             playback::commit_scrub(store, second);
         }
         "sync.globalNudge" if has_video && has_activity_data => {
-            let _ = crate::store::slices::video_import::shift_video_offsets(store, found.binding.seconds.unwrap_or(0.0), false);
+            let _ = crate::store::videos::shift_video_offsets(store, found.binding.seconds.unwrap_or(0.0), false);
         }
         "timeline.fitAll" if timing.has_activity || has_video => viewport::reset_view(store),
         "timeline.fitMedia" => return viewport::fit_target(store, viewport::FitTargetId::All),
@@ -277,12 +280,84 @@ pub fn handle_player_key(store: &mut Store, input: &KeyInput, now: Instant) -> b
     true
 }
 
+/// The derived timeline.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct VideoTimeline {
+    pub committed: Rc<TimelineProgram>,
+    /// The committed timeline itself without a drag preview.
+    pub displayed: Rc<TimelineProgram>,
+    /// Of the committed clips.
+    pub warnings: Rc<VideoWarnings>,
+}
+
+#[derive(Clone, Debug)]
+struct Inputs {
+    videos: Rc<Vec<ImportedVideo>>,
+    edits: Rc<VideoEditsMap>,
+    defaults: TransitionDefaults,
+    preview: Option<VideoDragPreview>,
+    /// The external activity's duration, which the warnings read.
+    activity_duration_seconds: Option<f64>,
+}
+
+/// The timeline builds, cached on the pointers of their inputs.
+#[derive(Clone, Debug, Default)]
+pub struct TimelineCache {
+    inputs: Option<Inputs>,
+    timeline: VideoTimeline,
+}
+
+impl TimelineCache {
+    pub fn timeline(&self) -> &VideoTimeline {
+        &self.timeline
+    }
+}
+
+fn inputs_of(store: &Store) -> Inputs {
+    Inputs {
+        videos: Rc::clone(&store.video_import.imported_videos),
+        edits: Rc::clone(&store.video_import.video_edits),
+        defaults: store.video_import.transition_defaults.clone(),
+        preview: store.video_import.video_drag_preview.clone(),
+        activity_duration_seconds: store.media.parsed_activity.as_ref().and(store.media.activity_summary.as_ref()).map(|summary| summary.duration_seconds),
+    }
+}
+
+/// Rebuilds what changed: the committed timeline on the collection or the defaults, the displayed
+/// one also on the drag preview, the warnings also on the activity's duration.
+pub fn reconcile_timeline(store: &mut Store) {
+    let next = inputs_of(store);
+    let cache = &mut store.player.timeline;
+    let previous = cache.inputs.as_ref();
+    let committed_changed =
+        previous.is_none_or(|previous| !Rc::ptr_eq(&previous.videos, &next.videos) || !Rc::ptr_eq(&previous.edits, &next.edits) || previous.defaults != next.defaults);
+    let displayed_changed = committed_changed || previous.is_some_and(|previous| previous.preview != next.preview);
+    let warnings_changed = committed_changed || previous.is_some_and(|previous| previous.activity_duration_seconds != next.activity_duration_seconds);
+    if committed_changed {
+        cache.timeline.committed = Rc::new(build_timeline_program(&next.videos, &next.edits, None, &next.defaults));
+    }
+    if displayed_changed {
+        cache.timeline.displayed = match &next.preview {
+            None => Rc::clone(&cache.timeline.committed),
+            Some(preview) => Rc::new(build_timeline_program(&next.videos, &next.edits, Some(preview), &next.defaults)),
+        };
+    }
+    if warnings_changed {
+        let committed = &cache.timeline.committed;
+        cache.timeline.warnings = Rc::new(derive_video_warnings(&committed.clips, &committed.program, next.activity_duration_seconds));
+    }
+    cache.inputs = Some(next);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::store::slices::editor::PreviewPlaybackState;
-    use crate::store::slices::media::ActivitySummary;
+    use crate::store::editor::PreviewPlaybackState;
+    use crate::store::media::ActivitySummary;
     use ovrley_core::activity::schema::ParsedActivity;
+    use crate::video::fixtures::simple;
+    use crate::store::videos::tests::store_with;
+    use crate::store::videos::{set_video_drag_preview, set_video_offset};
 
     fn with_activity(duration_seconds: f64) -> Store {
         let mut store = Store::default();
@@ -331,8 +406,8 @@ mod tests {
 
     #[test]
     fn a_focused_clip_nudges_on_arrows_commits_on_release_and_delete_removes_it() {
-        use crate::lib::video_program::fixtures::simple;
-        use crate::store::slices::video_import::{select_clip, tests::store_with, ClipLane, SelectedClip};
+        use crate::video::fixtures::simple;
+        use crate::store::videos::{select_clip, tests::store_with, ClipLane, SelectedClip};
         let mut store = store_with(vec![simple("ride", 10.0, 0)], &[]);
         store.media.activity_summary = Some(ActivitySummary { duration_seconds: 30.0, ..ActivitySummary::of(&ParsedActivity::default()) });
         reconcile_player(&mut store);
@@ -364,5 +439,30 @@ mod tests {
         assert!(!handle_player_key(&mut store, &repeat, Instant::now()));
         store.editor_shell.settings_open = true;
         assert!(!handle_player_key(&mut store, &key("space"), Instant::now()));
+    }
+
+    #[test]
+    fn one_build_per_change_and_the_displayed_timeline_follows_the_drag() {
+        let mut store = store_with(vec![simple("a", 10.0, 0), simple("b", 10.0, 1)], &[("b", 30.0)]);
+        reconcile_timeline(&mut store);
+        let first = Rc::clone(&store.player.timeline.timeline().committed);
+        assert!(Rc::ptr_eq(&first, &store.player.timeline.timeline().displayed), "without a drag both are one");
+        store.editor.selected_second = 4.0;
+        reconcile_timeline(&mut store);
+        assert!(Rc::ptr_eq(&first, &store.player.timeline.timeline().committed), "an unrelated change rebuilds nothing");
+
+        set_video_drag_preview(&mut store, Some(VideoDragPreview { video_id: Some("b".into()), delta_seconds: -5.0 })).unwrap();
+        reconcile_timeline(&mut store);
+        let timeline = store.player.timeline.timeline();
+        assert!(Rc::ptr_eq(&first, &timeline.committed));
+        assert_eq!(timeline.displayed.clips[1].offset_seconds(), 25.0);
+
+        set_video_offset(&mut store, "b", 25.0, false).unwrap();
+        reconcile_timeline(&mut store);
+        let timeline = store.player.timeline.timeline();
+        assert!(!Rc::ptr_eq(&first, &timeline.committed));
+        assert!(Rc::ptr_eq(&timeline.committed, &timeline.displayed));
+        assert_eq!(timeline.committed.bounds.unwrap().end_second, 35.0);
+        assert!(timeline.warnings["a"].is_empty());
     }
 }

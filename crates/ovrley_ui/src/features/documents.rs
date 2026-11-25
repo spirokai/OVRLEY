@@ -7,13 +7,13 @@ use crate::{
     AppWindow, Choice, ChoiceKind, MissingSourceRole, ProjectCardView, ProjectIntent,
     ProjectNoticeKind, ProjectSourceView, Projects, TemplateManager, UnsavedAnswer,
 };
-use ovrley_app::features::app_shell::{UnsavedAnswer as AppUnsavedAnswer, UnsavedContinuation};
+use ovrley_app::features::shell::{UnsavedAnswer as AppUnsavedAnswer, UnsavedContinuation};
 use ovrley_app::features::projects::{
     self, ProjectNotice, ProjectSourceRow, ProjectStatus, SourceRole,
 };
-use ovrley_app::features::template_manager::{self as manager, template_groups};
+use ovrley_app::features::templates::{self as manager, template_groups};
 use ovrley_app::i18n::catalog;
-use ovrley_app::store::slices::template::TemplateSource;
+use ovrley_app::store::template::TemplateSource;
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_core::commands::TemplateKind;
 use slint::{ComponentHandle, SharedString};
@@ -230,7 +230,7 @@ fn project_templates(window: &AppWindow, store: &Store) {
     );
     set_if_changed(
         global.get_selector_open_serial(),
-        store.template_manager.selector_open_serial,
+        store.templates.selector_open_serial,
         |value| global.set_selector_open_serial(value),
     );
     let confirm_open = matches!(
@@ -257,13 +257,13 @@ fn bind_projects(global: &Projects<'_>, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     global.on_save_project(move || {
         d.dispatch(|store, services| {
-            projects::save_project(store, services, false, None, Box::new(|_, _, _| {}))
+            projects::save_project(store, services, projects::SaveMode::Save, None, Box::new(|_, _, _| {}))
         })
     });
     let d = dispatcher.handle();
     global.on_save_project_as(move || {
         d.dispatch(|store, services| {
-            projects::save_project(store, services, true, None, Box::new(|_, _, _| {}))
+            projects::save_project(store, services, projects::SaveMode::SaveAs, None, Box::new(|_, _, _| {}))
         })
     });
     let d = dispatcher.handle();

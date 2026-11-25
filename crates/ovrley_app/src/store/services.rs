@@ -1,17 +1,24 @@
-//! The side effects an action may ask for (plan D3).
+//! The side effects an action may ask for.
 //!
 //! Actions stay synchronous. What they cannot do in place, they ask of a service held by the
 //! dispatcher. `ovrley_ui` implements the traits with `rfd`, `slint::invoke_from_event_loop`,
 //! `arboard` and the winit window; tests use the in-memory fakes at the end of this module, which
 //! record every call.
 
-use super::{DispatchHandle, SendAction};
-use serde_json::Value;
-use crate::lib::preferences_store::PreferencesStore;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use std::sync::{Arc, Mutex};
+use ovrley_core::encode::ffmpeg::transition_proxy::TransitionProxyRequest;
+use ovrley_core::render_jobs::batch::BatchServiceError;
+use ovrley_core::render_jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
+use ovrley_core::render_jobs::execution::RenderAccepted;
+use ovrley_services::cache::CacheUsage;
+use ovrley_services::maps::{MapAdapterSupport, MapFrameWake, MapPrepareRequest, MapStyleCatalog};
+use ovrley_services::updater::{DownloadProgress, ReleaseUpdate};
+use ovrley_services::video::{Filmstrip, FilmstripHwaccel, FilmstripRequest};
+use ovrley_widgets::widgets::map::preview::MapFrameFactory;
+use serde_json::Value;
+use crate::preferences::PreferencesStore;
+use crate::store::{DispatchHandle, SendAction};
 
 /// A file type a native file dialog offers.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,7 +39,7 @@ impl DialogFilter {
     }
 }
 
-/// A native file dialog to show. Paths are strings, as the React port handles them.
+/// A native file dialog to show.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FileDialogRequest {
     OpenFile {
@@ -99,39 +106,36 @@ impl Workers {
     }
 }
 
-/// The video tools the player uses off the UI thread (phase 4 D12): filmstrips through
-/// `ovrley_services::video`, and codec detection.
+/// The video tools the player uses off the UI thread: filmstrips through `ovrley_services::video`,
+/// and codec detection.
 pub trait VideoTools: Send + Sync {
     /// The strip from the disk cache, or `None` on a miss. Cheap: no decode.
     fn cached_filmstrip(&self, request: &FilmstripRequest) -> Result<Option<Filmstrip>, String>;
     /// The strip from the cache, or decoded (with `hwaccel`, or in software) and cached. `None`
     /// when FFmpeg decodes no frame.
     fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String>;
-    /// `detectCodecs`: the encoders and decoders the bundled FFmpeg offers.
+    /// The encoders and decoders the bundled FFmpeg offers.
     fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String>;
-    /// `preparePreviewVideo`'s probe: the file check, then `probe_video_metadata` (D4). Blocking.
+    /// The file check, then `probe_video_metadata`. Blocking.
     fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String>;
-    /// `getVideoThumbnail`: the first frame as a PNG, or `None` when FFmpeg reads no frame. Blocking;
+    /// The first frame as a PNG, or `None` when FFmpeg reads no frame. Blocking;
     /// each runs an FFmpeg process.
     fn thumbnail(&self, path: &str) -> Option<Vec<u8>>;
-    /// `extractVideoTelemetry`: the video's embedded activity, `None` without one. Blocking.
+    /// The video's embedded activity, `None` without one. Blocking.
     fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String>;
-    /// Renders a join's blend and returns the file's path (Phase 6B D8). Blocking.
+    /// Renders a join's blend and returns the file's path. Blocking.
     fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String>;
     fn remove_transition_proxy(&self, path: &str) -> Result<(), String>;
 }
 
-pub use ovrley_core::encode::ffmpeg::transition_proxy::{TransitionProxyRequest, TransitionProxySource};
-pub use ovrley_services::video::{Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
-
-/// The native video tools: the filmstrip cache in the application cache directory, with the limit
-/// is kept in the settings file, and the bundled FFmpeg.
+/// The video tools: the filmstrip cache in the application cache directory, with its limit kept in
+/// the settings file, and the bundled FFmpeg.
 pub struct NativeVideoTools {
     paths: Arc<ovrley_core::paths::AppPaths>,
     cache: ovrley_services::cache::FilmstripCache,
 }
 
-/// The settings key of the filmstrip cache limit, as the Tauri releases wrote it.
+/// The settings key of the filmstrip cache limit.
 pub const FILMSTRIP_CACHE_LIMIT_KEY: &str = "filmstripCacheLimitBytes";
 
 impl NativeVideoTools {
@@ -190,12 +194,7 @@ impl VideoTools for NativeVideoTools {
     }
 }
 
-pub use ovrley_services::maps::{MapAdapterSupport, MapStyleCatalog};
-pub use ovrley_services::cache::CacheUsage;
-pub use ovrley_services::maps::{MapFrameWake, MapPrepareRequest};
-pub use ovrley_widgets::widgets::map::preview::MapFrameFactory;
-
-/// The maps' data and renderer (phase 5 D9, D11): the installed styles, the preview's frame
+/// The maps' data and renderer: the installed styles, the preview's frame
 /// thread, the background tile download, the tile cache, and the GPU the renderer would use.
 pub trait MapServices: Send + Sync {
     /// The installed styles, read at startup.
@@ -215,7 +214,7 @@ pub trait MapServices: Send + Sync {
     fn map_source(&self) -> Option<ovrley_core::MapSource>;
 }
 
-/// The settings key of the map tile cache limit, as the Tauri releases wrote it.
+/// The settings key of the map tile cache limit.
 pub const MAP_TILE_CACHE_LIMIT_KEY: &str = "mapTileCacheLimitBytes";
 
 /// The native maps over `MapData`, which export uses too.
@@ -224,9 +223,9 @@ pub struct NativeMapServices {
 }
 
 impl NativeMapServices {
-    /// Reads the installed styles and opens the tile cache. The saved
-    /// limit is a behaviour preference, so it stays strict: absent means the default, anything but
-    /// a valid whole number of bytes fails (D11).
+    /// Reads the installed styles and opens the tile cache. The saved limit is a behaviour
+    /// preference, so it stays strict: absent means the default, anything but a valid whole number
+    /// of bytes fails.
     pub fn open(roots: &ovrley_services::runtime::RuntimeRoots, preferences: &PreferencesStore) -> Result<Self, String> {
         use ovrley_services::cache::CacheLimit;
         use ovrley_services::tiles::{TileCache, DEFAULT_TILE_CACHE_LIMIT};
@@ -280,11 +279,7 @@ impl MapServices for NativeMapServices {
     }
 }
 
-pub use ovrley_core::render_jobs::batch::BatchServiceError;
-pub use ovrley_core::render_jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
-pub use ovrley_core::render_jobs::execution::RenderAccepted;
-
-/// The render services (Phase 7 D1, D6): one execution
+/// The render services: one execution
 /// service and one inspection service, called with typed values. Submission, inspection and the
 /// preview frame block, so they run on workers; progress arrives through the mailbox.
 pub trait RenderService: Send + Sync {
@@ -320,7 +315,7 @@ pub trait RenderService: Send + Sync {
         activity: &ovrley_core::activity::schema::ParsedActivity,
         second: f64,
     ) -> Result<String, String>;
-    /// `suggestRenderOutputPath`: a fresh file name in `directory`, else Downloads.
+    /// A fresh file name in `directory`, else Downloads.
     fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String>;
     fn open_output_directory(&self, directory: Option<&str>) -> Result<(), String>;
     /// Opens a rendered file in the system player.
@@ -329,7 +324,7 @@ pub trait RenderService: Send + Sync {
 
 /// The native render services, publishing progress through a [`RenderMailbox`].
 ///
-/// [`RenderMailbox`]: crate::features::render_video::session::RenderMailbox
+/// [`RenderMailbox`]: crate::features::render::session::RenderMailbox
 pub struct NativeRenderService {
     paths: Arc<ovrley_core::paths::AppPaths>,
     execution: ovrley_core::render_jobs::execution::RenderExecutionService,
@@ -339,7 +334,7 @@ pub struct NativeRenderService {
 
 impl NativeRenderService {
     pub fn new(paths: Arc<ovrley_core::paths::AppPaths>, map_source: Option<ovrley_core::MapSource>, ui_post: Arc<dyn UiPost>) -> Self {
-        let mailbox = crate::features::render_video::session::RenderMailbox::new(ui_post);
+        let mailbox = crate::features::render::session::RenderMailbox::new(ui_post);
         Self {
             paths,
             execution: ovrley_core::render_jobs::execution::RenderExecutionService::with_sink(mailbox),
@@ -424,9 +419,7 @@ impl RenderService for NativeRenderService {
     }
 }
 
-use ovrley_services::updater::{DownloadProgress, ReleaseUpdate};
-
-/// An update the check found (Phase 9 D7).
+/// An update the check found.
 pub trait AppUpdate: std::fmt::Debug + Send + Sync {
     fn version(&self) -> &str;
     /// The verified package. Blocking.
@@ -446,7 +439,7 @@ pub struct NativeUpdateService;
 
 impl UpdateService for NativeUpdateService {
     fn check(&self) -> Result<Option<Arc<dyn AppUpdate>>, String> {
-        let update = ovrley_services::updater::check(crate::lib::utils::VERSION)?;
+        let update = ovrley_services::updater::check(crate::features::shell::VERSION)?;
         Ok(update.map(|update| Arc::new(update) as Arc<dyn AppUpdate>))
     }
 }
@@ -520,9 +513,13 @@ impl ServiceParts {
 }
 
 /// In-memory services that record their calls.
+#[cfg(any(test, feature = "test-util"))]
 pub mod fakes {
-    use super::*;
-    use crate::lib::preferences_store::MemorySink;
+    use super::{FileDialogRequest, DialogReply, Dialogs, MapFrameFactory, UiPost, Clipboard, WindowControl, VideoTools, MapServices, RenderService, AppUpdate, UpdateService, Arc, SendAction, MapStyleCatalog, MapAdapterSupport, MapFrameWake, CacheUsage, MapPrepareRequest, AtomicBool, RenderAccepted, BatchAcceptance, BatchServiceError, BatchRenderRequest, BatchSnapshot, Filmstrip, FilmstripHwaccel, FilmstripRequest, TransitionProxyRequest, DownloadProgress, ServiceParts, PreferencesStore};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Mutex;
+    use crate::preferences::MemorySink;
     use serde_json::Value;
 
     #[derive(Clone, Default)]
@@ -626,6 +623,20 @@ pub mod fakes {
         pub maps: Arc<FakeMapServices>,
         pub render: Arc<FakeRenderService>,
         pub updates: Arc<FakeUpdateService>,
+    }
+
+    impl Fakes {
+        /// Runs the posted worker results until `done` holds; panics after five seconds.
+        pub fn settle(&self, dispatcher: &super::super::Dispatcher, done: impl Fn(&super::super::Store) -> bool) {
+            for _ in 0..1000 {
+                self.ui_post.drain(dispatcher);
+                if dispatcher.with_store(&done) {
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            panic!("the store did not reach the expected state");
+        }
     }
 
     /// Maps over the checkout's bundled styles, with frames from a test's factory, a fixed adapter
@@ -742,7 +753,7 @@ pub mod fakes {
     /// Records each call and answers from its queues; the test sends progress through `mailbox`,
     /// as core would.
     pub struct FakeRenderService {
-        pub mailbox: Arc<crate::features::render_video::session::RenderMailbox>,
+        pub mailbox: Arc<crate::features::render::session::RenderMailbox>,
         pub calls: Mutex<Vec<FakeRenderCall>>,
         /// The single submissions' answers; an empty queue accepts with the next render id.
         pub single_results: Mutex<std::collections::VecDeque<ovrley_core::error::CoreResult<RenderAccepted>>>,
@@ -763,7 +774,7 @@ pub mod fakes {
     impl FakeRenderService {
         pub fn new(ui_post: Arc<dyn UiPost>) -> Self {
             Self {
-                mailbox: crate::features::render_video::session::RenderMailbox::new(ui_post),
+                mailbox: crate::features::render::session::RenderMailbox::new(ui_post),
                 calls: Mutex::default(),
                 single_results: Mutex::default(),
                 batch_results: Mutex::default(),
@@ -900,9 +911,9 @@ pub mod fakes {
         }
     }
 
-    /// A strip's table key: its window as `crate::features::video_preview::filmstrips` keys it.
+    /// A strip's table key: its window as `crate::features::player::filmstrips` keys it.
     fn key(request: &FilmstripRequest) -> String {
-        crate::features::video_preview::filmstrips::request_key(request)
+        crate::features::player::filmstrips::request_key(request)
     }
 
     impl VideoTools for FakeVideoTools {

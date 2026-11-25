@@ -15,7 +15,7 @@
 
 use super::{dispatch_ui, APP_WINDOW, UI_DISPATCH};
 use crate::{AppShell, DrawerTool, FocusedField, Player, Toolbar, TransitionSelect};
-use ovrley_app::features::app_shell::{self, DroppedPath};
+use ovrley_app::features::shell::{self, DroppedPath};
 use slint::winit_030::{winit, CustomApplicationHandler, EventResult};
 use slint::ComponentHandle;
 use std::path::PathBuf;
@@ -78,11 +78,11 @@ fn deliver_drop(paths: Vec<PathBuf>) {
             path,
         })
         .collect();
-    dispatch_ui(move |store, services| app_shell::drop_files(store, services, &dropped));
+    dispatch_ui(move |store, services| shell::drop_files(store, services, &dropped));
 }
 
 fn set_hovering(hovering: bool) {
-    dispatch_ui(move |store, _| app_shell::set_file_drag_hovering(store, hovering));
+    dispatch_ui(move |store, _| shell::set_file_drag_hovering(store, hovering));
 }
 
 /// Window chrome, not app state: written to the global directly, like minimise and maximise.
@@ -110,8 +110,8 @@ fn blur_if_pressed_away(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<
     });
 }
 
-fn area(rect: crate::PlacementRect) -> app_shell::Area {
-    app_shell::Area { x: rect.x.into(), y: rect.y.into(), width: rect.width.into(), height: rect.height.into() }
+fn area(rect: crate::PlacementRect) -> shell::Area {
+    shell::Area { x: rect.x.into(), y: rect.y.into(), width: rect.width.into(), height: rect.height.into() }
 }
 
 /// What a press at `point` changes outside Slint's routing: a press outside the player and the
@@ -130,7 +130,7 @@ fn select_workspace(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<f64>
         let in_drawer = toolbar.get_visible() && toolbar.get_active_tool() == DrawerTool::Video && area(shell.get_video_drawer_area()).contains(point);
         let in_panel = toolbar.get_video_panel_shown() && area(shell.get_control_panel_area()).contains(point);
         let keeps = in_player || player.get_keeps_clip_selection() || in_drawer || in_panel || !window.global::<TransitionSelect>().get_open_target().is_empty();
-        let workspace = app_shell::workspace_at(point, area(shell.get_editor_area()), area(shell.get_control_panel_area()), player_area);
+        let workspace = shell::workspace_at(point, area(shell.get_editor_area()), area(shell.get_control_panel_area()), player_area);
         Some((keeps, workspace))
     });
     let Some((keeps, workspace)) = pressed else { return };
@@ -172,7 +172,7 @@ impl CustomApplicationHandler for AppEvents {
             }
             // Losing the window's focus cancels a running gesture.
             WindowEvent::Focused(false) => dispatch_ui(|store, _| {
-                ovrley_app::features::overlay_editor::interaction::cancel_gesture(store);
+                ovrley_app::features::canvas::interaction::cancel_gesture(store);
                 ovrley_app::features::player::gestures::surface_cancel(store);
             }),
             WindowEvent::MouseInput {

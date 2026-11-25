@@ -8,12 +8,12 @@ use crate::{
     AppWindow, Choice, ChoiceKind, DrawerGroupView, DrawerItemView, DrawerOptionView, GradientStop, Icons, InspectorCell, InspectorCellKind, InspectorRow,
     PanelPart, SceneSettings, ShapeToggleView, SwitchRowStyle, WidgetDrawer, WidgetEditor, WidgetRowView,
 };
-use ovrley_app::features::scene_settings as scene;
-use ovrley_app::features::widget_drawer::{self as drawer, drawer_view, DrawerGroupView as AppDrawerGroup};
-use ovrley_app::features::widget_editor::blocks::{self, Block, BlockContent, Cell, CellKind, OptionView, PanelPart as AppPanelPart};
-use ovrley_app::features::widget_editor::rules::Input;
-use ovrley_app::features::widget_editor::{self as editor, font_options, open_widget_id, sidebar_view, SidebarView};
-use ovrley_app::lib::fonts::FontOption;
+use ovrley_app::features::scene as scene;
+use ovrley_app::features::widgets::drawer::{self as drawer, drawer_view, DrawerGroupView as AppDrawerGroup};
+use ovrley_app::features::widgets::blocks::{self, Block, BlockContent, Cell, CellKind, OptionView, PanelPart as AppPanelPart};
+use ovrley_app::features::widgets::rules::Input;
+use ovrley_app::features::widgets::{self as editor, font_options, open_widget_id, sidebar_view, Edit, SidebarView};
+use ovrley_app::features::widgets::FontOption;
 use ovrley_app::store::services::Services;
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
 use slint::{ComponentHandle, Model, ModelRc, SharedString, VecModel};
@@ -328,13 +328,6 @@ fn row_cells(block: &Block) -> &[Cell] {
     }
 }
 
-/// Whether an edit is a draft, which a later commit records as one undo step.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Edit {
-    Draft,
-    Commit,
-}
-
 /// Runs an action against the open widget; its errors are bugs in what the inspector offered.
 fn on_open_widget(dispatch: &DispatchHandle, action: impl FnOnce(&mut Store, &mut Services, &str) -> Result<(), String> + 'static) {
     dispatch.dispatch(move |store, services| {
@@ -348,14 +341,14 @@ fn on_open_widget(dispatch: &DispatchHandle, action: impl FnOnce(&mut Store, &mu
 /// A field edit of the open widget.
 fn edit_widget(dispatch: &DispatchHandle, id: &SharedString, input: Input, edit: Edit) {
     let id = id.to_string();
-    on_open_widget(dispatch, move |store, services, widget_id| editor::edit_field(store, services, widget_id, &id, input, edit == Edit::Draft));
+    on_open_widget(dispatch, move |store, services, widget_id| editor::edit_field(store, services, widget_id, &id, input, edit));
 }
 
 /// A scene settings edit; its errors are bugs in what the panel offered.
 fn edit_scene(dispatch: &DispatchHandle, id: &SharedString, input: Input, edit: Edit) {
     let id = id.to_string();
     dispatch.dispatch(move |store, services| {
-        if let Err(error) = scene::edit(store, services, &id, input, edit == Edit::Draft) {
+        if let Err(error) = scene::edit(store, services, &id, input, edit) {
             log::error!("scene settings: {error}");
         }
     });

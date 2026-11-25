@@ -10,6 +10,8 @@ license = "GPL-3.0-or-later"
 [features]
 # JSON schemas for the MCP tools' arguments; enabled by ovrley_mcp only.
 schema = ["dep:schemars", "ovrley_core/schema"]
+# The in-memory services (`store::services::fakes`) for tests and the headless benchmarks.
+test-util = []
 
 # The benchmarks build their cases from the editor's logic, so their binaries belong to this crate.
 [[bin]]
@@ -21,6 +23,7 @@ bench = false
 [[bin]]
 name = "benchmark_interactions"
 path = "../../benchmarks/widget-interactions/native.rs"
+required-features = ["test-util"]
 test = false
 bench = false
 

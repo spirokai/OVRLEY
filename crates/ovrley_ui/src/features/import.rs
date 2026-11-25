@@ -5,9 +5,9 @@ use crate::features::transitions::transition_index;
 use crate::platform::keys::{key_name, Modifiers};
 use crate::projection::{convert_enum, replace_if_changed, set_if_changed, strings};
 use crate::{AppWindow, ImportFailureView, ImportPhase, ImportRowView, ImportTone, SecondsFieldView, SecondsFields, VideoImport, VideoSyncView};
-use ovrley_app::features::seconds_fields::{self, SecondsField};
-use ovrley_app::features::video_preview::import::{self, ReviewPhase};
-use ovrley_app::features::video_sync::VideoSyncControls;
+use ovrley_app::controls::seconds::{self, SecondsField};
+use ovrley_app::features::import::{self, ReviewPhase};
+use ovrley_app::features::sync::VideoSyncControls;
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
 use ovrley_core::media::video_edits::TimezoneMode;
 use slint::{ComponentHandle, SharedString};
@@ -25,7 +25,7 @@ pub fn timezone_mode(utc: bool) -> TimezoneMode {
 
 /// A keyed field's view.
 pub fn field_view(store: &Store, field: &SecondsField) -> SecondsFieldView {
-    let view = seconds_fields::field_view(store, field);
+    let view = seconds::field_view(store, field);
     SecondsFieldView { key: field.key().into(), text: view.text.into(), preview: view.preview.unwrap_or_default().into(), error: view.error.unwrap_or_default().into() }
 }
 
@@ -138,21 +138,21 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
 
     let fields = window.global::<SecondsFields>();
     let d = dispatcher.handle();
-    fields.on_edited(move |key, text| d.dispatch_with_result(move |store, _| seconds_fields::edited(store, &key, &text)).unwrap_or(false));
+    fields.on_edited(move |key, text| d.dispatch_with_result(move |store, _| seconds::edited(store, &key, &text)).unwrap_or(false));
     let d = dispatcher.handle();
     fields.on_key(move |key, text, alt, control, shift, meta| {
         let input = Modifiers { alt, control, shift, meta }.key_input(&text);
-        d.dispatch_with_result(move |store, _| seconds_fields::key_down(store, &key, &input)).unwrap_or(false)
+        d.dispatch_with_result(move |store, _| seconds::key_down(store, &key, &input)).unwrap_or(false)
     });
     let d = dispatcher.handle();
     fields.on_key_up(move |key, text| {
         let released = key_name(&text);
-        d.dispatch_with_result(move |store, _| seconds_fields::key_up(store, &key, &released)).unwrap_or(false)
+        d.dispatch_with_result(move |store, _| seconds::key_up(store, &key, &released)).unwrap_or(false)
     });
     let d = dispatcher.handle();
-    fields.on_blurred(move |key| d.dispatch(move |store, _| seconds_fields::blurred(store, &key)));
+    fields.on_blurred(move |key| d.dispatch(move |store, _| seconds::blurred(store, &key)));
     let d = dispatcher.handle();
-    fields.on_step(move |key, direction| d.dispatch(move |store, _| seconds_fields::step(store, &key, f64::from(direction))));
+    fields.on_step(move |key, direction| d.dispatch(move |store, _| seconds::step(store, &key, f64::from(direction))));
     let d = dispatcher.handle();
-    fields.on_clear(move |key| d.dispatch(move |store, _| seconds_fields::clear(store, &key)));
+    fields.on_clear(move |key| d.dispatch(move |store, _| seconds::clear(store, &key)));
 }

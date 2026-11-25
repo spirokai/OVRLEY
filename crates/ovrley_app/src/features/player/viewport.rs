@@ -1,16 +1,15 @@
-//! Port of `features/player/utils/timelineViewport.js` and `hooks/useTimelineViewport.js` (plan D7):
-//! fit targets, zoom, pan, playback follow and the tick strip, and the viewport's reconcile rules.
+//! The timeline viewport: fit targets, zoom, pan, playback follow and the tick strip, and the
+//! viewport's reconcile rules.
 //!
-//! The viewport lives in the store (`EditorSlice::timeline_viewport`). The measured width, the
-//! device pixel grid and the rem are hook state, which `ovrley_ui` reports when they change.
+//! The viewport lives in the store (`EditorState::timeline_viewport`). The measured width, the
+//! device pixel grid and the rem are session state, which `ovrley_ui` reports when they change.
 
-use super::playback::{player_timing, timeline_minimum};
+use crate::features::player::playback::{player_timing, timeline_minimum};
+use crate::format::format_clock_duration;
 use crate::i18n::{catalog, Locale};
-use crate::lib::format::format_clock_duration;
-use crate::lib::utils::clamp;
-use crate::lib::video_program::{Clip, SecondsRange};
-use crate::store::slices::editor::{PreviewPlaybackState, TimelineViewport};
 use crate::store::Store;
+use crate::store::editor::{PreviewPlaybackState, TimelineViewport};
+use crate::video::{Clip, SecondsRange};
 
 const VIEWPORT_MATCH_EPSILON_SECONDS: f64 = 0.001;
 const ZOOM_FACTOR: f64 = 1.6;
@@ -22,26 +21,24 @@ const MAX_ZOOM_MAJOR_STEP_SECONDS: f64 = 2.0;
 const FOLLOW_EDGE_PADDING_RATIO: f64 = 0.15;
 const MINOR_TICKS_PER_STEP: usize = 5;
 const NICE_STEPS: [f64; 18] = [0.1, 0.2, 0.5, 1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0, 900.0, 1200.0, 1500.0, 1800.0, 3600.0];
-/// `PX_PER_SECOND_PRECISION`: the scale is quantized so a pan keeps the tick strip.
+/// The scale is quantized so a pan keeps the tick strip.
 const PX_PER_SECOND_PRECISION: f64 = 1e6;
 
 fn viewport(view_start: f64, view_end: f64) -> TimelineViewport {
     TimelineViewport { view_start, view_end }
 }
 
-/// `rangesMatch`.
 pub fn ranges_match(a: TimelineViewport, b: TimelineViewport) -> bool {
     (a.view_start - b.view_start).abs() <= VIEWPORT_MATCH_EPSILON_SECONDS && (a.view_end - b.view_end).abs() <= VIEWPORT_MATCH_EPSILON_SECONDS
 }
 
-/// `clampToView`: keeps a viewport inside `[minimum, total]`.
+/// Keeps a viewport inside `[minimum, total]`.
 pub fn clamp_to_view(view_start: f64, view_end: f64, total_duration: f64, minimum: f64) -> TimelineViewport {
-    let span = clamp(view_end - view_start, 0.0, total_duration - minimum);
-    let start = clamp(view_start, minimum, total_duration - span);
+    let span = (view_end - view_start).max(0.0).min(total_duration - minimum);
+    let start = view_start.max(minimum).min(total_duration - span);
     viewport(start, start + span)
 }
 
-/// `fitToFull`.
 pub fn fit_to_full(total_duration: f64, minimum: f64) -> TimelineViewport {
     viewport(minimum, total_duration)
 }
@@ -53,7 +50,7 @@ fn minimum_zoom_span(width_px: f64) -> f64 {
     MIN_ZOOM_SPAN.max(width_px / TICK_TARGET_PX * MAX_ZOOM_MAJOR_STEP_SECONDS)
 }
 
-/// `getZoomLimits`: `(can zoom in, can zoom out)`.
+/// `(can zoom in, can zoom out)`.
 pub fn zoom_limits(view: TimelineViewport, total_duration: f64, minimum: f64, width_px: f64) -> (bool, bool) {
     let bounds_span = total_duration - minimum;
     let span = view.view_end - view.view_start;
@@ -61,15 +58,15 @@ pub fn zoom_limits(view: TimelineViewport, total_duration: f64, minimum: f64, wi
     (span > min_span + VIEWPORT_MATCH_EPSILON_SECONDS, span < bounds_span - VIEWPORT_MATCH_EPSILON_SECONDS)
 }
 
-/// `zoomRange`: ×1.6 in (`zoom_in`) or out around `pivot`.
+/// ×1.6 in (`zoom_in`) or out around `pivot`.
 pub fn zoom_range(view: TimelineViewport, pivot: f64, zoom_in: bool, total_duration: f64, minimum: f64, width_px: f64) -> TimelineViewport {
     let bounds_span = total_duration - minimum;
     let span = view.view_end - view.view_start;
-    let pivot = clamp(pivot, view.view_start, view.view_end);
+    let pivot = pivot.max(view.view_start).min(view.view_end);
     let ratio = if span > 0.0 { (pivot - view.view_start) / span } else { 0.5 };
     let min_span = minimum_zoom_span(width_px).min(bounds_span);
     let factor = if zoom_in { 1.0 / ZOOM_FACTOR } else { ZOOM_FACTOR };
-    let new_span = clamp(span * factor, min_span, bounds_span);
+    let new_span = (span * factor).max(min_span).min(bounds_span);
     let mut start = pivot - ratio * new_span;
     let mut end = start + new_span;
     if start < minimum {
@@ -83,11 +80,11 @@ pub fn zoom_range(view: TimelineViewport, pivot: f64, zoom_in: bool, total_durat
     viewport(start, end)
 }
 
-/// `fitRangeToViewport`: a range with 4% padding, at least the minimum span, inside the bounds.
+/// A range with 4% padding, at least the minimum span, inside the bounds.
 pub fn fit_range_to_viewport(range_start: f64, range_end: f64, total_duration: f64, minimum: f64, width_px: f64) -> TimelineViewport {
     let bounds_span = total_duration - minimum;
-    let start = clamp(range_start, minimum, total_duration);
-    let end = clamp(start.max(range_end), start, total_duration);
+    let start = range_start.max(minimum).min(total_duration);
+    let end = start.max(range_end).min(total_duration);
     let padding = (end - start) * FIT_PADDING_RATIO;
     let (mut view_start, mut view_end) = (start - padding, end + padding);
     let mut span = view_end - view_start;
@@ -110,7 +107,6 @@ pub fn fit_range_to_viewport(range_start: f64, range_end: f64, total_duration: f
     viewport(view_start, view_end)
 }
 
-/// `panViewport`.
 pub fn pan_viewport(view: TimelineViewport, delta_seconds: f64, total_duration: f64, minimum: f64) -> TimelineViewport {
     let bounds_span = total_duration - minimum;
     if bounds_span == 0.0 {
@@ -122,7 +118,7 @@ pub fn pan_viewport(view: TimelineViewport, delta_seconds: f64, total_duration: 
     clamp_to_view(view.view_start + delta_seconds, view.view_end + delta_seconds, total_duration, minimum)
 }
 
-/// `followPlayhead`: keeps the playhead inside the middle 70% of a zoomed view.
+/// Keeps the playhead inside the middle 70% of a zoomed view.
 pub fn follow_playhead(view: TimelineViewport, playhead: f64, total_duration: f64, minimum: f64) -> TimelineViewport {
     let span = view.view_end - view.view_start;
     if span <= 0.0 || span >= total_duration - minimum {
@@ -138,7 +134,7 @@ pub fn follow_playhead(view: TimelineViewport, playhead: f64, total_duration: f6
     clamp_to_view(start, start + span, total_duration, minimum)
 }
 
-/// `resolveFitVideoClip`: the selected clip, else the clip at the playhead (the earliest where
+/// The selected clip, else the clip at the playhead (the earliest where
 /// clips overlap), else the nearest.
 pub fn resolve_fit_video_clip<'a>(clips: &'a [Clip], selected_video_id: Option<&str>, second: f64) -> Option<&'a Clip> {
     if let Some(selected) = selected_video_id.and_then(|id| clips.iter().find(|clip| clip.id() == id)) {
@@ -188,7 +184,7 @@ pub struct FitTarget {
     pub viewport: TimelineViewport,
 }
 
-/// `buildFitTargets`: Video (one clip), Activity, and All unless one of them covers the timeline.
+/// Video (one clip), Activity, and All unless one of them covers the timeline.
 pub fn build_fit_targets(
     total_duration: f64,
     width_px: f64,
@@ -216,18 +212,16 @@ pub fn build_fit_targets(
     targets
 }
 
-/// `getMatchingFitTargetId`.
 pub fn matching_fit_target(view: TimelineViewport, targets: &[FitTarget]) -> Option<FitTargetId> {
     targets.iter().find(|target| ranges_match(view, target.viewport)).map(|target| target.id)
 }
 
-/// `getTimelineTickStep`: the smallest nice step that keeps labels 90 px apart.
+/// The smallest nice step that keeps labels 90 px apart.
 pub fn timeline_tick_step(px_per_second: f64) -> f64 {
     let target = TICK_TARGET_PX / px_per_second;
     NICE_STEPS.into_iter().find(|step| *step >= target).unwrap_or(NICE_STEPS[NICE_STEPS.len() - 1])
 }
 
-/// `formatTickLabel`.
 pub fn format_tick_label(second: f64, step: f64) -> String {
     if step < 1.0 {
         format!("{second:.1}s")
@@ -244,7 +238,7 @@ pub struct Tick {
     pub label: Option<String>,
 }
 
-/// `computeTimelineTickStrip`: major and minor ticks from a major tick over the width plus one
+/// Major and minor ticks from a major tick over the width plus one
 /// step, so panning within one step only moves the strip.
 pub fn compute_tick_strip(anchor_second: f64, step: f64, px_per_second: f64, width_px: f64) -> (Vec<Tick>, Vec<Tick>) {
     let step_px = step * px_per_second;
@@ -279,7 +273,7 @@ pub fn tick_placement(view: TimelineViewport, width_px: f64) -> Option<TickPlace
     if span <= 0.0 || width_px <= 0.0 {
         return None;
     }
-    let px_per_second = crate::js::round(width_px / span * PX_PER_SECOND_PRECISION) / PX_PER_SECOND_PRECISION;
+    let px_per_second = (width_px / span * PX_PER_SECOND_PRECISION).round() / PX_PER_SECOND_PRECISION;
     let step = timeline_tick_step(px_per_second);
     Some(TickPlacement { px_per_second, step, anchor_second: (view.view_start / step).floor() * step })
 }
@@ -302,19 +296,18 @@ impl Default for TimelineMetrics {
 }
 
 impl TimelineMetrics {
-    /// `snapToScreenPixel`: a timeline-relative x on a screen pixel edge.
+    /// A timeline-relative x on a screen pixel edge.
     pub fn snap_to_screen_pixel(&self, value: f64) -> f64 {
         let origin = self.x * self.scale_factor;
-        (crate::js::round(origin + value * self.scale_factor) - origin) / self.scale_factor
+        ((origin + value * self.scale_factor).round() - origin) / self.scale_factor
     }
 
-    /// `roundToDevicePixel`.
     pub fn round_to_device_pixel(&self, value: f64) -> f64 {
-        crate::js::round(value * self.scale_factor) / self.scale_factor
+        (value * self.scale_factor).round() / self.scale_factor
     }
 }
 
-/// `useTimelineViewport`'s state.
+/// The viewport's measurements and the inputs of its rules.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ViewportState {
     pub metrics: TimelineMetrics,
@@ -391,7 +384,7 @@ pub fn pan_by(store: &mut Store, delta_seconds: f64) {
     set_viewport(store, next);
 }
 
-/// `followSecond`: auto-scroll during a clip drag. Returns the change of the viewport's start, or
+/// Auto-scroll during a clip drag. Returns the change of the viewport's start, or
 /// `None` when it did not move.
 pub fn follow_second(store: &mut Store, second: f64, minimum: f64) -> Option<f64> {
     let previous = store.editor.timeline_viewport;
@@ -406,7 +399,7 @@ pub fn follow_second(store: &mut Store, second: f64, minimum: f64) -> Option<f64
 /// The wheel over the timeline (`timeline.wheelPan`, `timeline.wheelZoom`): a plain wheel pans by
 /// `delta_y / width × span`; Ctrl+wheel zooms around the pointer at `x` (timeline-relative).
 pub fn wheel(store: &mut Store, delta_y: f64, x: f64, ctrl: bool) -> bool {
-    use crate::lib::keyboard_shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
+    use crate::shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
     let input = KeyInput { key: "wheel".into(), ctrl, ..KeyInput::default() };
     let Some(found) = match_keyboard_shortcut(&input, Scope::Player) else { return false };
     let view = store.editor.timeline_viewport;
@@ -423,7 +416,7 @@ pub fn wheel(store: &mut Store, delta_y: f64, x: f64, ctrl: bool) -> bool {
     true
 }
 
-/// The viewport rules of the `player` reconcile step, after the playback effects (D7).
+/// The viewport rules of the `player` reconcile step, after the playback rules.
 pub fn reconcile_viewport(store: &mut Store, dragging: bool) {
     let timing = player_timing(store);
     let minimum = displayed_minimum(store);
@@ -462,7 +455,7 @@ pub fn reconcile_viewport(store: &mut Store, dragging: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::video_program::fixtures::*;
+    use crate::video::fixtures::*;
 
     fn range(start_second: f64, end_second: f64) -> Option<SecondsRange> {
         Some(SecondsRange { start_second, end_second })
@@ -524,7 +517,7 @@ mod tests {
     #[test]
     fn the_video_target_fits_one_clip() {
         let videos = [simple("a", 20.0, 0), simple("b", 10.0, 1), simple("c", 20.0, 2)];
-        let clips = crate::lib::video_program::collection::join_video_edits(&videos, &edits_at(&videos, &[("b", 15.0), ("c", 60.0)]));
+        let clips = crate::video::collection::join_video_edits(&videos, &edits_at(&videos, &[("b", 15.0), ("c", 60.0)]));
         let id = |clip: Option<&Clip>| clip.map(|clip| clip.id().to_string());
         assert_eq!(id(resolve_fit_video_clip(&clips, Some("c"), 5.0)).as_deref(), Some("c"));
         assert_eq!(id(resolve_fit_video_clip(&clips, None, 17.0)).as_deref(), Some("a"));
@@ -558,9 +551,9 @@ mod tests {
     }
 
     use crate::features::player::reconcile_player;
-    use crate::store::slices::media::ActivitySummary;
-    use crate::store::slices::video_import::set_video_offset;
-    use crate::store::slices::video_import::tests::store_with;
+    use crate::store::media::ActivitySummary;
+    use crate::store::videos::set_video_offset;
+    use crate::store::videos::tests::store_with;
     use ovrley_core::activity::schema::ParsedActivity;
 
     fn summary(duration_seconds: f64) -> Option<ActivitySummary> {

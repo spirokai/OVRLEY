@@ -1,101 +1,101 @@
-//! The store and its update loop (parent plan §2; phase 2 D1, D2).
+//! The store and its update loop.
 //!
-//! [`Store`] holds everything the UI shows: the Zustand slices, and the state React keeps in hooks
-//! beyond one render. [`Dispatcher`] owns the store, the services and a queue of actions. One
-//! dispatch runs one action, then the reconcile steps in their fixed order (`reconcile.rs`), then
-//! the UI hook that `ovrley_ui` installs, which runs the projections.
+//! [`Store`] holds everything the UI shows. [`Dispatcher`] owns the store, the services and a
+//! queue of actions. One dispatch runs one action, then the reconcile steps in their fixed order
+//! (`reconcile`), then the history step, then the UI hook that `ovrley_ui` installs, which runs
+//! the projections.
 //!
 //! A dispatch requested while another runs (for example by a Slint `changed` handler a projection
 //! fired) is queued and runs right after, projections included. No `RefCell` borrow is ever taken
 //! twice.
 
-pub mod agent;
-mod reconcile;
-pub mod services;
-pub mod slices;
-
-use crate::features::app_shell::{
-    AgentSessionState, AppBootstrapState, EditorShellState, TrafficLightInsetState, UnsavedChangesConfirmState, WindowCloseGuardState, WindowFileDropState,
-};
-use crate::features::undo_redo::{EditorHistory, UndoableState};
-use crate::features::overlay_editor::drafts::WidgetDraftState;
-use crate::features::toolbar::DrawerPreferenceState;
-use crate::i18n::I18nState;
-use crate::lib::preferences_store::PreferencesStore;
-use services::{ServiceParts, Services};
-use slices::editor::EditorSlice;
-use slices::layout::LayoutSlice;
-use slices::media::MediaSlice;
-use ovrley_core::encode::render_settings::RenderSettings;
-use slices::template::TemplateSlice;
-use slices::video_import::VideoImportSlice;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
+use editor::EditorState;
+use media::MediaState;
+use ovrley_core::encode::render_settings::RenderSettings;
+use services::{ServiceParts, Services};
+use template::TemplateState;
+use videos::VideoImportState;
+use crate::features::{canvas, toolbar};
+use crate::features::canvas::drafts::WidgetDraftState;
+use crate::features::history::{EditorHistory, UndoableState};
+use crate::features::shell::{AgentSessionState, AppBootstrapState, EditorShellState, TrafficLightInsetState, UnsavedChangesConfirmState, WindowCloseGuardState, WindowFileDropState};
+use crate::features::toolbar::{DrawerPreferenceState, LayoutState};
+use crate::i18n::I18nState;
+use crate::preferences::PreferencesStore;
+
+pub mod agent;
+pub mod services;
+pub mod editor;
+pub mod media;
+pub mod template;
+pub mod videos;
 
 /// Everything the UI shows.
 #[derive(Debug, Default)]
 pub struct Store {
-    pub layout: LayoutSlice,
-    pub media: MediaSlice,
-    pub editor: EditorSlice,
-    pub template: TemplateSlice,
-    pub video_import: VideoImportSlice,
-    /// `createRenderSettingsSlice`'s state (phase 4 D15).
+    pub layout: LayoutState,
+    pub media: MediaState,
+    pub editor: EditorState,
+    pub template: TemplateState,
+    pub video_import: VideoImportState,
+    /// The render frame rate and widget update rate.
     pub render_settings: RenderSettings,
-    /// `createManualVideoSyncSlice`'s durable state, which projects save (`manualVideoSync`).
+    /// The manual sync's durable state, which projects save.
     pub manual_video_sync: ovrley_core::media::manual_video_sync::ManualVideoSync,
-    /// `manualVideoSyncDetection`: the activity's events, `None` before the first detection.
-    pub manual_video_sync_detection: Option<std::sync::Arc<crate::features::video_sync::detection::Detection>>,
-    /// `manualVideoSyncResults` (Phase 8 D2).
-    pub manual_video_sync_results: slices::manual_video_sync::CandidateResults,
-    /// `createBatchRenderSlice`'s output folder, which projects save.
-    pub batch_render: slices::batch_render::BatchRenderSlice,
-    /// The timeline filmstrips (phase 4 D12).
-    pub video_filmstrip: slices::video_filmstrip::VideoFilmstripSlice,
-    /// `useVideoImportReview`'s state (Phase 6A D6).
-    pub video_import_review: crate::features::video_preview::import::VideoImportReviewState,
+    /// The activity's events, `None` before the first detection.
+    pub manual_video_sync_detection: Option<std::sync::Arc<crate::features::sync::detection::Detection>>,
+    /// The manual sync's candidate results.
+    pub manual_video_sync_results: crate::features::sync::manual::CandidateResults,
+    /// The separate renders' output folder, which projects save, and the running batch.
+    pub batch_render: crate::features::render::session::BatchRenderState,
+    /// The timeline filmstrips.
+    pub filmstrips: crate::features::player::filmstrips::FilmstripsState,
+    /// The import review.
+    pub video_import_review: crate::features::import::VideoImportReviewState,
     /// The seconds fields of the import dialog, the video drawer and the video panel.
-    pub seconds_fields: crate::features::seconds_fields::SecondsFieldsState,
+    pub seconds_fields: crate::controls::seconds::SecondsFieldsState,
     /// The open `TransitionSelect` popover.
     pub transition_select: Option<crate::features::transitions::TransitionSelectState>,
-    /// `queueTelemetryExtraction`'s queue (D7).
-    pub telemetry_queue: crate::features::video_preview::import::VideoTelemetryQueue,
-    /// `useVideoFilmstripQueue`'s state.
-    pub filmstrip_queue: crate::features::video_preview::filmstrips::FilmstripQueue,
-    /// `createTransitionProxySlice` and its queue (Phase 6B D8).
-    pub transition_proxies: crate::features::video_preview::transition_proxies::TransitionProxies,
-    /// Sync Doctor's hook state (Phase 8).
-    pub video_sync: crate::features::video_sync::VideoSyncWorkspace,
-    /// The player's hook state and cached timeline (phase 4 D3, D5).
+    /// The embedded-telemetry extraction queue.
+    pub telemetry_queue: crate::features::import::VideoTelemetryQueue,
+    /// The filmstrip decode queue.
+    pub filmstrip_queue: crate::features::player::filmstrips::FilmstripQueue,
+    /// The transitions' rendered blends and their queue.
+    pub transition_proxies: crate::features::player::preview::TransitionProxies,
+    /// Sync Doctor's workspace.
+    pub video_sync: crate::features::sync::VideoSyncWorkspace,
+    /// The player's state and cached timeline.
     pub player: crate::features::player::PlayerState,
-    /// The editor history (D6).
+    /// The editor history.
     pub history: EditorHistory,
-    /// `useRenderWorkflow` and the render dialog's hooks (Phase 7 D4, D5).
-    pub render_dialog: crate::features::render_video::RenderDialogState,
-    /// `useProjectLifecycle` and `useProjectDocumentState` (Phase 6A D11).
+    /// The render dialog.
+    pub render_dialog: crate::features::render::RenderDialogState,
+    /// The project lifecycle and document status.
     pub projects: crate::features::projects::ProjectLifecycleState,
-    /// `useUnsavedChangesConfirm` (D15).
+    /// The unsaved-changes question.
     pub unsaved_confirm: UnsavedChangesConfirmState,
-    /// `useWidgetDraftState` (D7).
+    /// The live widget drafts.
     pub drafts: WidgetDraftState,
-    /// `SidebarWidgetsTab`'s state and the font catalog (D16).
-    pub widget_editor: crate::features::widget_editor::WidgetEditorState,
+    /// The widgets tab and the font catalog.
+    pub widgets: crate::features::widgets::WidgetsState,
     /// The theme colours widget fallbacks use; `ovrley_ui` reads them from the Slint theme before
     /// the first dispatch.
-    pub theme: Option<crate::lib::template::ThemeColors>,
-    /// `useOverlayEditorState`'s state: the viewport, and later the selection and gestures.
-    pub overlay_editor: crate::features::overlay_editor::OverlayEditorState,
-    /// The native preview host (D8).
-    pub preview: crate::features::widget_preview::PreviewHost,
-    /// `useSceneSettingsState`'s anchors and the pending label-font edit (phase 5 D8).
-    pub scene_settings: crate::features::scene_settings::SceneSettingsState,
-    /// The maps' styles, adapter and frame thread (phase 5 D9).
+    pub theme: Option<crate::store::template::ThemeColors>,
+    /// The viewport, and later the selection and gestures.
+    pub canvas: crate::features::canvas::CanvasState,
+    /// The widget preview host.
+    pub preview: crate::features::widgets::preview::PreviewHost,
+    /// The scene settings' anchors and the pending label-font edit.
+    pub scene: crate::features::scene::SceneState,
+    /// The maps' styles, adapter and frame thread.
     pub maps: crate::features::maps::MapsState,
-    /// `useTemplateManagement`'s state and the cached durable state.
-    pub template_manager: crate::features::template_manager::TemplateManagerState,
+    /// The template listing, save status and the cached durable state.
+    pub templates: crate::features::templates::TemplatesState,
     pub i18n: I18nState,
-    /// `useDrawerPreference`'s last observed preference.
+    /// The last drawer preference seen.
     pub drawer_preference: DrawerPreferenceState,
     pub bootstrap: AppBootstrapState,
     pub editor_shell: EditorShellState,
@@ -103,20 +103,20 @@ pub struct Store {
     pub traffic_light_inset: TrafficLightInsetState,
     pub file_drop: WindowFileDropState,
     pub agent_session: AgentSessionState,
-    /// `useAppUpdate`'s state (Phase 9 D7).
-    pub app_update: crate::features::app_update::AppUpdateState,
+    /// The update prompt.
+    pub app_update: crate::features::shell::AppUpdateState,
 }
 
 impl Store {
-    /// Reads the preferences the shell needs before its first frame, as `main.jsx` and the startup
-    /// hooks do: the language (`lng`, strict), whether agents may edit (strict), the drawer
-    /// preference (normalized, Q5) and the unit system (strict, D19).
+    /// Reads the preferences the shell needs before its first frame: the language (`lng`,
+    /// strict), whether agents may edit (strict), the drawer preference (repaired to the default
+    /// when malformed) and the unit system (strict).
     pub fn hydrate(preferences: &PreferencesStore) -> Result<Self, String> {
         let mut store = Self::default();
         crate::i18n::hydrate_language_preference(&mut store, preferences)?;
-        crate::features::app_shell::hydrate_agent_preference(&mut store, preferences)?;
+        crate::features::shell::hydrate_agent_preference(&mut store, preferences)?;
         crate::features::toolbar::hydrate_drawer_preference(&mut store, preferences);
-        crate::lib::widget::unit_system::hydrate_unit_system_preference(&mut store, preferences)?;
+        crate::store::editor::hydrate_unit_system_preference(&mut store, preferences)?;
         Ok(store)
     }
 }
@@ -234,7 +234,7 @@ impl Dispatcher {
     }
 
     /// Runs the projections again without an action, for example after a live-preview reload
-    /// rebuilt the UI (D17).
+    /// rebuilt the UI.
     pub fn reproject(&self) {
         if self.0.running.get() {
             return;
@@ -259,9 +259,9 @@ impl Dispatcher {
                 let State { store, services } = &mut *state;
                 let before = UndoableState::of(store);
                 action(store, services);
-                reconcile::run(store, services);
-                // The history step (D6): after the reconcile steps, before the projections.
-                crate::features::undo_redo::record(store, before);
+                reconcile(store, services);
+                // The history step: after the reconcile steps, before the projections.
+                crate::features::history::record(store, before);
             }
             self.project();
         }
@@ -289,11 +289,44 @@ impl Drop for RunningGuard<'_> {
     }
 }
 
+fn reconcile(store: &mut Store, services: &mut Services) {
+    // 1. The drawer preference: persist `{pinned, activeTool}` when it changed.
+    toolbar::persist_drawer_preference(store, services);
+    // 2. The widget drafts: a new document clears the drafts, and a new document or selection
+    //    ends the gesture's patches.
+    canvas::interaction::reconcile_gesture(store);
+    canvas::drafts::reconcile_widget_drafts(store);
+    //    The map view mode ends when its map is gone or deselected, committing its patch.
+    crate::features::maps::reconcile_map_view(store);
+    // 3. The widgets tab's open item holds while a marquee runs.
+    crate::features::widgets::reconcile_open_widget(store);
+    //    The open label's font capabilities, for its weight and italic controls.
+    crate::features::widgets::reconcile_label_typography(store, services);
+    //    A label-font edit of the global defaults applies once its family is known.
+    crate::features::scene::apply_pending_font_edit(store);
+    // 4. The durable template state behind the save status, cached by pointers.
+    crate::features::templates::reconcile_durable_state(store);
+    //    The project status, from the durable state and the project-owned state.
+    crate::features::projects::reconcile_project_status(store);
+    // 5. The player: the cached timeline, the playback rules and the viewport rules.
+    crate::features::player::reconcile_player(store);
+    //    The filmstrips of the clips and the zoom windows the view wants.
+    crate::features::player::filmstrips::reconcile_filmstrips(store, services);
+    //    The blends of the program's transitions.
+    crate::features::player::preview::reconcile_transition_proxies(store, services);
+    //    Sync Doctor: detection and the reruns of a search.
+    crate::features::sync::reconcile_video_sync(store, services);
+    // 6. The preview: marked dirty when one of its inputs changed; `ovrley_ui` runs the frame.
+    crate::features::widgets::preview::reconcile_widget_preview(store);
+    // 7. The render dialog: its codec and update-rate rules, the inspection and the export review.
+    crate::features::render::reconcile_render_dialog(store, services);
+}
+
 #[cfg(test)]
 mod tests {
     use super::services::fakes::fake_services;
     use super::*;
-    use crate::store::slices::layout::LeftDrawerTool;
+    use crate::features::toolbar::LeftDrawerTool;
     use serde_json::json;
 
     fn dispatcher(preferences: serde_json::Value) -> (Dispatcher, services::fakes::Fakes) {

@@ -1,13 +1,13 @@
 //! The tools of the overlay being edited: its widgets and its scene settings.
 
 use crate::catalog::{Answer, NoArguments, Tool, ToolError, ToolResult};
-use ovrley_app::features::overlay_editor::interaction::{self, ResizeTarget};
-use ovrley_app::features::scene_settings;
-use ovrley_app::features::widget_drawer::drawer_view;
-use ovrley_app::features::widget_editor::{self, rules::Input};
-use ovrley_app::features::widget_preview::present_pending_frame;
-use ovrley_app::lib::fonts::FontOption;
-use ovrley_app::lib::update_rate::update_rate_options;
+use ovrley_app::features::canvas::interaction::{self, ResizeTarget};
+use ovrley_app::features::scene;
+use ovrley_app::features::widgets::drawer::drawer_view;
+use ovrley_app::features::widgets::{self, rules::Input};
+use ovrley_app::features::widgets::preview::present_pending_frame;
+use ovrley_app::features::widgets::FontOption;
+use ovrley_app::fps::update_rate_options;
 use ovrley_app::store::agent::{describe_widget, describe_widgets, AbsolutePath, AgentReply};
 use ovrley_app::store::services::Services;
 use ovrley_app::store::Store;
@@ -107,10 +107,10 @@ struct AspectRatioArguments {
 #[serde(deny_unknown_fields)]
 struct SceneSizeArguments {
     /// Whole pixels, up to 7680 (8K).
-    #[schemars(range(max = scene_settings::MAX_SCENE_SIDE))]
+    #[schemars(range(max = scene::MAX_SCENE_SIDE))]
     width: NonZeroU32,
     /// Whole pixels, up to 7680 (8K).
-    #[schemars(range(max = scene_settings::MAX_SCENE_SIDE))]
+    #[schemars(range(max = scene::MAX_SCENE_SIDE))]
     height: NonZeroU32,
 }
 
@@ -259,7 +259,7 @@ pub(crate) fn tools() -> Vec<Tool> {
 
 fn get_widget(args: WidgetArguments, store: &Store, _: &Services) -> ToolResult {
     let mut described = describe_widget(store, &args.widget_id)?;
-    let fields = widget_editor::editable_fields(store, &args.widget_id)?;
+    let fields = widgets::editable_fields(store, &args.widget_id)?;
     described["editorFields"] = Value::Array(fields);
     Ok(described)
 }
@@ -289,13 +289,13 @@ fn add_widget(
             "The drawer offers {kind} as: {options}."
         )));
     }
-    let id = widget_editor::add_widget(store, services, &selection)?;
+    let id = widgets::add_widget(store, services, &selection)?;
     present_pending_frame(store, services);
     Ok(describe_widget(store, &id)?)
 }
 
 fn update_widget(args: UpdateArguments, store: &mut Store, services: &mut Services) -> ToolResult {
-    widget_editor::update_widget_fields(store, services, &args.widget_id, args.fields)?;
+    widgets::update_widget_fields(store, services, &args.widget_id, args.fields)?;
     Ok(describe_widget(store, &args.widget_id)?)
 }
 
@@ -304,7 +304,7 @@ fn move_widget(args: MoveArguments, store: &mut Store, services: &mut Services) 
         ("x".to_string(), number(args.x)),
         ("y".to_string(), number(args.y)),
     ]);
-    widget_editor::update_widget_data(store, &args.widget_id, patch)?;
+    widgets::update_widget_data(store, &args.widget_id, patch)?;
     present_pending_frame(store, services);
     Ok(describe_widget(store, &args.widget_id)?)
 }
@@ -331,7 +331,7 @@ fn rotate_widget(args: RotateArguments, store: &mut Store, services: &mut Servic
 }
 
 fn delete_widget(args: WidgetArguments, store: &mut Store, _: &mut Services) -> ToolResult {
-    widget_editor::delete_widget(store, &args.widget_id)?;
+    widgets::delete_widget(store, &args.widget_id)?;
     Ok(json!({ "widgets": describe_widgets(store) }))
 }
 
@@ -353,7 +353,7 @@ fn set_image(
         reply.send(result.and_then(|()| describe_widget(store, &widget_id)));
     });
     let path = args.path.into();
-    widget_editor::raster::load_raster_image(store, services, &args.widget_id, path, Some(done));
+    widgets::raster::load_raster_image(store, services, &args.widget_id, path, Some(done));
     Ok(Answer::Later)
 }
 
@@ -364,7 +364,7 @@ fn list_fonts(_: NoArguments, store: &Store, _: &Services) -> ToolResult {
             .map(|font| json!({ "id": font.id, "name": font.name }))
             .collect()
     };
-    let fonts = &store.widget_editor.fonts;
+    let fonts = &store.widgets.fonts;
     Ok(json!({ "recommended": list(&fonts.recommended), "system": list(&fonts.system) }))
 }
 
@@ -387,7 +387,7 @@ pub(crate) fn describe_scene(store: &Store) -> Value {
         "width": scene.get("width"),
         "height": scene.get("height"),
         "fps": store.render_settings.fps,
-        "lockedFps": scene_settings::locked_fps(store),
+        "lockedFps": scene::locked_fps(store),
         "widgetUpdateRate": store.render_settings.widget_update_rate,
         "updateRateOptions": update_rate_options(store.render_settings.fps),
         "globalDefaults": *store.template.global_defaults,
@@ -395,7 +395,7 @@ pub(crate) fn describe_scene(store: &Store) -> Value {
 }
 
 /// Answers with the scene once an edit that may wait for a font has ended.
-fn scene_reply(reply: AgentReply) -> scene_settings::FontEditReply {
+fn scene_reply(reply: AgentReply) -> scene::FontEditReply {
     Box::new(move |store, result| reply.send(result.map(|()| describe_scene(store))))
 }
 
@@ -405,11 +405,11 @@ fn set_global_default(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    scene_settings::validate_global_default(&args.key, &args.value)
+    scene::validate_global_default(&args.key, &args.value)
         .map_err(ToolError::InvalidParams)?;
     let done = Some(scene_reply(reply));
     // The result also goes to the reply, now or when the font has been read.
-    let _ = scene_settings::change_global_default(store, services, &args.key, args.value, done);
+    let _ = scene::change_global_default(store, services, &args.key, args.value, done);
     Ok(Answer::Later)
 }
 
@@ -419,7 +419,7 @@ fn reset_global_defaults(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    scene_settings::reset_globals(store, services, Some(scene_reply(reply)));
+    scene::reset_globals(store, services, Some(scene_reply(reply)));
     Ok(Answer::Later)
 }
 
@@ -430,24 +430,24 @@ fn set_aspect_ratio(
 ) -> ToolResult {
     let ratio = Input::Text(args.ratio);
     // The edit's only refusal is a ratio it does not know.
-    scene_settings::edit(store, services, "aspect_ratio", ratio, false)
+    scene::edit(store, services, "aspect_ratio", ratio, ovrley_app::features::widgets::Edit::Commit)
         .map_err(ToolError::InvalidParams)?;
     Ok(describe_scene(store))
 }
 
 fn set_scene_size(args: SceneSizeArguments, store: &mut Store, _: &mut Services) -> ToolResult {
-    scene_settings::set_scene_size(store, args.width.get(), args.height.get())
+    scene::set_scene_size(store, args.width.get(), args.height.get())
         .map_err(ToolError::InvalidParams)?;
     Ok(describe_scene(store))
 }
 
 fn set_fps(args: FpsArguments, store: &mut Store, _: &mut Services) -> ToolResult {
-    if let Some(fps) = scene_settings::locked_fps(store) {
+    if let Some(fps) = scene::locked_fps(store) {
         return Err(ToolError::Failed(format!(
             "A video sets the frame rate to {fps} fps"
         )));
     }
-    scene_settings::set_fps(store, args.fps.get())?;
+    scene::set_fps(store, args.fps.get())?;
     Ok(describe_scene(store))
 }
 
@@ -467,7 +467,7 @@ fn set_update_rate(args: UpdateRateArguments, store: &mut Store, _: &mut Service
 mod tests {
     use super::*;
     use crate::testing::{with_videos, Editor};
-    use ovrley_app::features::undo_redo::HistoryMode;
+    use ovrley_app::features::history::HistoryMode;
     use ovrley_widgets::model::document::OverlayConfig;
 
     fn editor_with(collections: Value) -> Editor {

@@ -1,24 +1,20 @@
-//! `projectSnapshot.js`: the project document the session saves, and the content the project
-//! status compares with the saved baseline.
+//! The project document the session saves, and the content the project status compares with the
+//! saved baseline.
 //!
-//! The document is `ovrley_services::project`'s own type (D1, D2), so what is saved is what
-//! the store holds. Sources are located relative to the project when they sit in its folder.
+//! The document is `ovrley_services::project`'s own type, so what is saved is what the store
+//! holds. Sources are located relative to the project when they sit in its folder.
 
-use crate::features::template_manager::durable_template_state;
-use crate::lib::video_program::video_metadata_snapshot;
-use crate::store::slices::media::ActivitySource;
-use crate::store::Store;
+use std::collections::BTreeMap;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
 use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
-use ovrley_services::project::{
-    create_path_locator, PathLocator, ProjectDocument, ProjectEditor, ProjectLaps, ProjectRender,
-    ProjectSource, ProjectSources, ProjectSync, ProjectTimeline, ProjectVideo, PROJECT_FORMAT,
-    PROJECT_VERSION,
-};
+use ovrley_services::project::{create_path_locator, PROJECT_FORMAT, PROJECT_VERSION, PathLocator, ProjectDocument, ProjectEditor, ProjectLaps, ProjectRender, ProjectSource, ProjectSources, ProjectSync, ProjectTimeline, ProjectVideo};
 use ovrley_widgets::model::document::{canonical_numbers, number};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use crate::features::templates::durable_template_state;
+use crate::store::Store;
+use crate::store::media::ActivitySource;
+use crate::video::video_metadata_snapshot;
 
 /// The preference that remembers the project folder.
 pub const LAST_PROJECT_DIRECTORY_KEY: &str = "last-project-dir";
@@ -36,7 +32,7 @@ pub struct ProjectContent {
     pub render: ProjectRender,
 }
 
-/// The saved baseline (`createProjectDirtyState`): the content and the timeline as last saved.
+/// The saved baseline: the content and the timeline as last saved.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProjectBaseline {
     pub content: ProjectContent,
@@ -111,7 +107,7 @@ fn project_editor(store: &Store) -> Result<ProjectEditor, String> {
     })
 }
 
-/// `createProjectContentSnapshot`. The export mode is `transparent` unless the output is separate
+/// The project content the status compares. The export mode is `transparent` unless the output is separate
 /// or there are videos.
 pub fn project_content(
     store: &Store,
@@ -157,7 +153,7 @@ pub fn project_timeline(store: &Store) -> ProjectTimeline {
     }
 }
 
-/// `createProjectSnapshot`: the version 6 document of the session. The writer fills the raster
+/// The version 6 document of the session. The writer fills the raster
 /// assets.
 pub fn create_project_snapshot(
     store: &Store,
@@ -183,8 +179,8 @@ pub fn create_project_snapshot(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::video_program::fixtures::{video, TestVideo};
-    use crate::lib::video_program::VideoEditsMap;
+    use crate::video::fixtures::{video, TestVideo};
+    use crate::video::VideoEditsMap;
     use ovrley_core::media::video_edits::VideoEdits;
     use std::rc::Rc;
 

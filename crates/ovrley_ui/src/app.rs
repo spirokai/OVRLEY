@@ -5,11 +5,10 @@ use crate::features::{documents, editor, import, playback, player, render, shell
 use crate::platform::gpu::GpuDevice;
 use crate::platform::{self, NativeDialogs, SlintUiPost, SlintWindowControl, SystemClipboard};
 use crate::{AppWindow, Theme};
-use ovrley_app::features::app_shell;
-use ovrley_app::features::video_sync::maps::WheelDevice;
+use ovrley_app::features::sync::maps::WheelDevice;
 use ovrley_app::i18n::Locale;
-use ovrley_app::lib::preferences_store::PreferencesStore;
-use ovrley_app::lib::template::ThemeColors;
+use ovrley_app::preferences::PreferencesStore;
+use ovrley_app::store::template::ThemeColors;
 use ovrley_app::store::services::{MapServices, NativeRenderService, NativeUpdateService, NativeVideoTools, ServiceParts, UiPost};
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
 use ovrley_core::paths::AppPaths;
@@ -161,7 +160,7 @@ pub fn run(startup: Startup) -> Result<Exit, String> {
     // The close guard decides; the window stays until it does.
     let close = dispatcher.handle();
     window.window().on_close_requested(move || {
-        close.dispatch(app_shell::request_close);
+        close.dispatch(ovrley_app::features::shell::request_close);
         slint::CloseRequestResponse::KeepWindowShown
     });
 
@@ -205,13 +204,13 @@ pub fn run(startup: Startup) -> Result<Exit, String> {
 /// catalog, the codecs, the maps, and the last template's restore. The startup screen shows until
 /// the restore has finished, then the startup projects dialog lists the project folder.
 fn bootstrap(store: &mut Store, services: &mut ovrley_app::store::services::Services, distribution: Distribution) {
-    use ovrley_app::features::{app_update, maps, projects, template_manager, video_preview, widget_editor};
-    app_update::check_at_startup(store, services, distribution, cfg!(debug_assertions));
-    template_manager::fetch_templates(store, services, None);
-    widget_editor::load_font_catalog(store, services);
-    video_preview::filmstrips::fetch_available_codecs(store, services);
+    use ovrley_app::features::{maps, player, projects, shell, templates, widgets};
+    shell::check_at_startup(store, services, distribution, cfg!(debug_assertions));
+    templates::fetch_templates(store, services, None);
+    widgets::load_font_catalog(store, services);
+    player::filmstrips::fetch_available_codecs(store, services);
     maps::initialize(store, services);
-    template_manager::restore_last_loaded_template(
+    templates::restore_last_loaded_template(
         store,
         services,
         Box::new(|store, services| {

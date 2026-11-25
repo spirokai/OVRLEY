@@ -5,15 +5,15 @@
 #[path = "../editor.rs"]
 mod editor;
 
-use ovrley_app::features::overlay_editor::interaction::{
+use ovrley_app::features::canvas::interaction::{
     content_rect, handles, pointer_down, pointer_move, pointer_up, scene_to_stage, Handle, PointerModifiers,
 };
-use ovrley_app::features::overlay_editor::set_viewport_metrics;
-use ovrley_app::features::overlay_editor::viewport::ViewportMetrics;
-use ovrley_app::features::undo_redo::HistoryMode;
-use ovrley_app::features::widget_preview::{preview_frame, Presented};
+use ovrley_app::features::canvas::set_viewport_metrics;
+use ovrley_app::features::canvas::viewport::ViewportMetrics;
+use ovrley_app::features::history::HistoryMode;
+use ovrley_app::features::widgets::preview::{preview_frame, Presented};
 use ovrley_app::store::services::fakes::{fake_services, Fakes};
-use ovrley_app::store::slices::media::{ActivitySource, ImportedActivity};
+use ovrley_app::store::media::{ActivitySource, ImportedActivity};
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::model::document::{create_widget_defaults, merge_widget_data, Collection, OverlayConfig, WidgetCreationOptions, WidgetSelection};
@@ -126,7 +126,7 @@ impl Editor {
         dispatcher.dispatch(move |store, _| {
             store.history.set_mode(HistoryMode::Reset);
             store.template.global_defaults = Rc::new(globals);
-            ovrley_app::features::app_shell::activate_parsed_activity(store, ActivitySource::File { path }, imported);
+            ovrley_app::features::shell::activate_parsed_activity(store, ActivitySource::File { path }, imported);
             store.editor.set_config(config);
             store.editor.set_selected_second(PLAYHEAD_SECOND);
             // A 1600 × 1000 editor at density 1.

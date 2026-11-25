@@ -1,22 +1,25 @@
-//! Port of `useTimelineGestures` (plan D9): scrubbing on the axis, dragging the playhead, and
-//! panning on the lane background. Clip, cut and trim drags join here.
+//! Timeline gestures: scrubbing on the axis, dragging the playhead, panning on the lane background,
+//! and the clip, cut and trim drags.
 //!
 //! Slint reports each press, move and release with its x in timeline coordinates; the gesture state
-//! lives here, as the hook's refs do in React. A pressed `TouchArea` keeps the pointer, which stands
-//! in for pointer capture.
+//! lives here. A pressed `TouchArea` keeps the pointer, which stands in for pointer capture.
 
-use super::playback::{commit_scrub, player_timing, scrub_to};
-use super::viewport::pan_by;
-use crate::lib::activity::{resolve_activity_window, trim_activity_edge, TrimEdge};
 use ovrley_core::activity::trim::ActivityTrim;
-use crate::lib::utils::clamp;
-use crate::store::slices::video_import::{ClipLane, SelectedClip};
+use ovrley_core::media::video_edits::{Cut, FIRST_SEGMENT_KEY, SegmentEdits};
+use crate::activity::{trim_activity_edge, ActivityWindow, TrimEdge};
+use crate::features::player::lanes::{EDGE_END, EDGE_START};
+use crate::features::player::playback::{commit_scrub, player_timing, scrub_to};
+use crate::features::player::viewport::pan_by;
 use crate::store::Store;
+use crate::store::videos::{ClipLane, SelectedClip};
+use crate::video::Clip;
+use crate::video::edits::segment_before_cut;
+use crate::video::segments::TrimSide;
 
-/// `DRAG_THRESHOLD_PX`: a cut or trim drag starts after 3 px; a press that does not move is a click.
+/// A cut or trim drag starts after 3 px; a press that does not move is a click.
 pub const DRAG_THRESHOLD_PX: f64 = 3.0;
 
-/// `useActivityTrim`'s gesture: an edge handle of the activity lane follows the pointer, and the
+/// An edge handle of the activity lane follows the pointer, and the
 /// trim is committed once, on release.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrimDrag {
@@ -52,19 +55,19 @@ pub enum TimelineGesture {
     Pan { last_x: f64 },
 }
 
-/// `pointerToSecond`: a timeline x as a second on the timeline.
+/// A timeline x as a second on the timeline.
 pub fn pointer_to_second(store: &Store, x: f64) -> f64 {
     let timing = player_timing(store);
     let view = store.editor.timeline_viewport;
     let span = view.view_end - view.view_start;
     let width = store.player.viewport.metrics.width_px;
     if span <= 0.0 || width <= 0.0 {
-        return clamp(timing.timeline_minimum, timing.timeline_minimum, timing.total_duration);
+        return timing.timeline_minimum.min(timing.total_duration);
     }
-    clamp(view.view_start + x / width * span, timing.timeline_minimum, timing.total_duration)
+    (view.view_start + x / width * span).max(timing.timeline_minimum).min(timing.total_duration)
 }
 
-/// `viewPxToSeconds`: a pixel delta as seconds at the current zoom.
+/// A pixel delta as seconds at the current zoom.
 pub fn view_px_to_seconds(store: &Store, delta_px: f64) -> f64 {
     let view = store.editor.timeline_viewport;
     let span = view.view_end - view.view_start;
@@ -115,8 +118,8 @@ pub fn surface_up(store: &mut Store, x: f64) {
     }
 }
 
-/// The gesture was cancelled (the window lost focus): it ends without a commit, as React's
-/// `cancelScrub` leaves the last scrubbed second.
+/// The gesture was cancelled (the window lost focus): it ends without a commit, leaving the last
+/// scrubbed second.
 pub fn surface_cancel(store: &mut Store) {
     store.player.surface_gesture = None;
     store.player.trim_drag = None;
@@ -129,7 +132,7 @@ const AUTO_SCROLL_MIN_ZOOM_SCALE: f64 = 0.1;
 const AUTO_SCROLL_MAX_VIEW_SPANS_PER_SECOND: f64 = 0.75;
 const AUTO_SCROLL_MAX_FRAME_SECONDS: f64 = 0.05;
 
-/// `resolveLaneMovement`: which clips move for a lane and which edges they snap to. A video lane
+/// Which clips move for a lane and which edges they snap to. A video lane
 /// moves its clip; the activity lane moves every clip the other way, as the activity stays at 0.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LaneMovement {
@@ -149,7 +152,7 @@ impl LaneMovement {
 pub fn lane_movement(store: &Store, lane: &ClipLane) -> LaneMovement {
     let clips = &store.player.timeline.timeline().committed.clips;
     let activity_edges: Vec<f64> = store.media.activity_summary.as_ref().map_or_else(Vec::new, |summary| vec![0.0, summary.duration_seconds]);
-    let span = |clip: &crate::lib::video_program::Clip| (clip.offset_seconds(), clip.duration_seconds());
+    let span = |clip: &crate::video::Clip| (clip.offset_seconds(), clip.duration_seconds());
     match lane.video_id() {
         None => LaneMovement { video_id: None, direction: -1.0, moving: clips.iter().map(span).collect(), fixed_edges: activity_edges },
         Some(video_id) => LaneMovement {
@@ -161,7 +164,7 @@ pub fn lane_movement(store: &Store, lane: &ClipLane) -> LaneMovement {
     }
 }
 
-/// `useClipDrag`'s gesture.
+/// A clip drag.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClipDrag {
     pub movement: LaneMovement,
@@ -175,10 +178,10 @@ pub struct ClipDrag {
     last_scroll: Option<std::time::Instant>,
 }
 
-/// `commitShift`: one clip snaps its start to its own frames, a shared shift snaps the earliest
+/// One clip snaps its start to its own frames, a shared shift snaps the earliest
 /// clip's; an edge snapped onto another edge commits exactly, so touching clips stay touching.
 fn commit_shift(store: &mut Store, movement: &LaneMovement, delta: f64, snapped: bool) {
-    use crate::store::slices::video_import::{set_video_offset, shift_video_offsets};
+    use crate::store::videos::{set_video_offset, shift_video_offsets};
     let clips = &store.player.timeline.timeline().committed.clips;
     let place = |offset: f64, video_id: &str| {
         let target = offset + delta;
@@ -187,18 +190,15 @@ fn commit_shift(store: &mut Store, movement: &LaneMovement, delta: f64, snapped:
         }
         clips.iter().find(|clip| clip.id() == video_id).map_or(target, |clip| clip.fps().frames_to_seconds(clip.fps().seconds_to_frames(target)))
     };
-    match &movement.video_id {
-        Some(video_id) => {
-            let Some((offset, _)) = movement.moving.first() else { return };
-            let next = place(*offset, video_id);
-            let _ = set_video_offset(store, video_id, next, false);
-        }
-        None => {
-            let Some(earliest) = clips.iter().min_by(|left, right| left.offset_seconds().total_cmp(&right.offset_seconds())) else { return };
-            let (offset, id) = (earliest.offset_seconds(), earliest.id().to_string());
-            let shift = place(offset, &id) - offset;
-            let _ = shift_video_offsets(store, shift, false);
-        }
+    if let Some(video_id) = &movement.video_id {
+        let Some((offset, _)) = movement.moving.first() else { return };
+        let next = place(*offset, video_id);
+        let _ = set_video_offset(store, video_id, next, false);
+    } else {
+        let Some(earliest) = clips.iter().min_by(|left, right| left.offset_seconds().total_cmp(&right.offset_seconds())) else { return };
+        let (offset, id) = (earliest.offset_seconds(), earliest.id().to_string());
+        let shift = place(offset, &id) - offset;
+        let _ = shift_video_offsets(store, shift, false);
     }
 }
 
@@ -208,9 +208,9 @@ fn shifted_minimum(store: &Store, movement: &LaneMovement, delta: f64) -> f64 {
     starts.fold(0.0_f64, f64::min)
 }
 
-/// `updateDragOffset`: the drag at a pointer x, snapped, kept after the viewport start.
+/// The drag at a pointer x, snapped, kept after the viewport start.
 fn update_clip_drag(store: &mut Store) {
-    use crate::store::slices::video_import::set_video_drag_preview;
+    use crate::store::videos::set_video_drag_preview;
     let Some(mut drag) = store.player.clip_drag.clone() else { return };
     let view = store.editor.timeline_viewport;
     let width = store.player.viewport.metrics.width_px;
@@ -225,7 +225,7 @@ fn update_clip_drag(store: &mut Store) {
     let changed = next != drag.current_delta || guideline != drag.guideline_second;
     drag.current_delta = next;
     drag.guideline_second = guideline;
-    let preview = crate::lib::video_program::collection::VideoDragPreview { video_id: drag.movement.video_id.clone(), delta_seconds: next };
+    let preview = crate::video::collection::VideoDragPreview { video_id: drag.movement.video_id.clone(), delta_seconds: next };
     store.player.clip_drag = Some(drag);
     if changed {
         let _ = set_video_drag_preview(store, Some(preview));
@@ -234,9 +234,9 @@ fn update_clip_drag(store: &mut Store) {
 
 /// A primary press on a clip with videos: selects it, and starts dragging it at once.
 fn clip_drag_down(store: &mut Store, lane: &ClipLane, x: f64) {
-    use crate::store::slices::video_import::set_video_drag_preview;
+    use crate::store::videos::set_video_drag_preview;
     let movement = lane_movement(store, lane);
-    let preview = crate::lib::video_program::collection::VideoDragPreview { video_id: movement.video_id.clone(), delta_seconds: 0.0 };
+    let preview = crate::video::collection::VideoDragPreview { video_id: movement.video_id.clone(), delta_seconds: 0.0 };
     let _ = set_video_drag_preview(store, Some(preview));
     store.player.clip_drag = Some(ClipDrag { movement, initial_delta: 0.0, current_delta: 0.0, desired_delta: 0.0, start_x: x, pointer_x: x, guideline_second: None, last_scroll: None });
 }
@@ -253,7 +253,7 @@ pub fn clip_move(store: &mut Store, x: f64) {
 
 /// The release commits one offset (one undo step).
 pub fn clip_up(store: &mut Store, x: f64) {
-    use crate::store::slices::video_import::set_video_drag_preview;
+    use crate::store::videos::set_video_drag_preview;
     let Some(drag) = store.player.clip_drag.take() else {
         surface_up(store, x);
         return;
@@ -268,11 +268,11 @@ pub fn clip_up(store: &mut Store, x: f64) {
 /// A cancelled clip drag commits nothing.
 fn clip_cancel(store: &mut Store) {
     if store.player.clip_drag.take().is_some() {
-        let _ = crate::store::slices::video_import::set_video_drag_preview(store, None);
+        let _ = crate::store::videos::set_video_drag_preview(store, None);
     }
 }
 
-/// The pointer's auto-scroll target (`getAutoScrollPointerSecond`): in the outer 15% of the
+/// The pointer's auto-scroll target: in the outer 15% of the
 /// timeline, at up to 0.75 view spans per second scaled by zoom and depth.
 fn auto_scroll_second(store: &Store, pointer_x: f64, elapsed: f64) -> Option<f64> {
     let width = store.player.viewport.metrics.width_px;
@@ -320,7 +320,7 @@ pub fn clip_drag_in_edge_zone(store: &Store) -> bool {
     store.player.clip_drag.as_ref().is_some_and(|drag| auto_scroll_second(store, drag.pointer_x, 0.0).is_some())
 }
 
-/// `useClipDrag`'s keyboard nudge: a transient shift of one lane, committed once.
+/// A transient shift of one lane, committed once.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ClipNudge {
     pub lane: ClipLane,
@@ -328,9 +328,8 @@ pub struct ClipNudge {
     delta_seconds: f64,
 }
 
-/// `nudgeLane`.
 pub fn nudge_lane(store: &mut Store, lane: ClipLane, delta_seconds: f64) {
-    use crate::store::slices::video_import::set_video_drag_preview;
+    use crate::store::videos::set_video_drag_preview;
     if store.player.timeline.timeline().committed.clips.is_empty() {
         return;
     }
@@ -339,27 +338,21 @@ pub fn nudge_lane(store: &mut Store, lane: ClipLane, delta_seconds: f64) {
         _ => ClipNudge { movement: lane_movement(store, &lane), lane, delta_seconds: 0.0 },
     };
     nudge.delta_seconds += nudge.movement.direction * delta_seconds;
-    let preview = crate::lib::video_program::collection::VideoDragPreview { video_id: nudge.movement.video_id.clone(), delta_seconds: nudge.delta_seconds };
+    let preview = crate::video::collection::VideoDragPreview { video_id: nudge.movement.video_id.clone(), delta_seconds: nudge.delta_seconds };
     store.player.clip_nudge = Some(nudge);
     let _ = set_video_drag_preview(store, Some(preview));
 }
 
-/// `commitNudge`: on key release or focus loss.
+/// On key release or focus loss.
 pub fn commit_nudge(store: &mut Store) {
     let Some(nudge) = store.player.clip_nudge.take() else { return };
     commit_shift(store, &nudge.movement, nudge.delta_seconds, false);
-    let _ = crate::store::slices::video_import::set_video_drag_preview(store, None);
+    let _ = crate::store::videos::set_video_drag_preview(store, None);
 }
 
-// --- Cut drags (`utils/cutDrag.js`, `useCutDrag`) ---------------------------------------------
+// --- Cut drags --------------------------------------------------------------------------------
 
-use super::lanes::{EDGE_END, EDGE_START};
-use crate::lib::video_program::edits::segment_before_cut;
-use crate::lib::video_program::segments::TrimSide;
-use crate::lib::video_program::Clip;
-use ovrley_core::media::video_edits::{Cut, SegmentEdits, FIRST_SEGMENT_KEY};
-
-/// `edgeCutSide`: which end an edge cut trims; `None` for a real cut.
+/// Which end an edge cut trims; `None` for a real cut.
 pub fn edge_cut_side(cut_id: &str) -> Option<TrimSide> {
     match cut_id {
         EDGE_START => Some(TrimSide::Start),
@@ -368,7 +361,7 @@ pub fn edge_cut_side(cut_id: &str) -> Option<TrimSide> {
     }
 }
 
-/// `segmentOfCut`: the segment a pressed cut belongs to: the part an edge cut trims into, or the
+/// The segment a pressed cut belongs to: the part an edge cut trims into, or the
 /// part before a cut.
 pub fn segment_of_cut(clip: &Clip, cut_id: &str) -> Result<String, String> {
     match edge_cut_side(cut_id) {
@@ -386,7 +379,7 @@ pub struct CutDraft {
     pub frame: i64,
 }
 
-/// `applyCutDraftToSelection`: a dragged start edge cut hands a selected first segment to the part
+/// A dragged start edge cut hands a selected first segment to the part
 /// it now starts.
 pub fn apply_cut_draft_to_selection(selection: Option<&SelectedClip>, draft: Option<&CutDraft>) -> Option<SelectedClip> {
     let selection = selection?.clone();
@@ -403,7 +396,7 @@ fn cut_bounds(clip: &Clip, cut_id: &str) -> (i64, i64) {
     (if index == 0 { 0 } else { cuts[index - 1].frame }, cuts.get(index + 1).map_or(clip.frame_count(), |cut| cut.frame))
 }
 
-/// `segmentKeptByDroppedCut`: a cut dropped on its neighbour or the clip's end removes the part it
+/// A cut dropped on its neighbour or the clip's end removes the part it
 /// closes up; the part on its other side is kept.
 pub fn segment_kept_by_dropped_cut(clip: &Clip, cut_id: &str, frame: i64) -> Option<String> {
     if edge_cut_side(cut_id).is_some() {
@@ -419,7 +412,7 @@ pub fn segment_kept_by_dropped_cut(clip: &Clip, cut_id: &str, frame: i64) -> Opt
     None
 }
 
-/// `cutSnapEdges`: the clip's ends, its other cuts (not for an edge cut), the other clips' ends and
+/// The clip's ends, its other cuts (not for an edge cut), the other clips' ends and
 /// the activity's.
 pub fn cut_snap_edges(clip: &Clip, cut_id: &str, clips: &[Clip], activity_duration_seconds: f64) -> Vec<f64> {
     let mut edges = vec![clip.offset_seconds(), clip.end_second()];
@@ -433,25 +426,22 @@ pub fn cut_snap_edges(clip: &Clip, cut_id: &str, clips: &[Clip], activity_durati
     edges
 }
 
-/// `clampCutFrame`: a cut stays between its neighbours and may reach them; an edge cut stops before
+/// A cut stays between its neighbours and may reach them; an edge cut stops before
 /// the nearest cut, and back past its edge it trims nothing (`None`).
 pub fn clamp_cut_frame(clip: &Clip, cut_id: &str, frame: i64) -> Option<i64> {
-    match edge_cut_side(cut_id) {
-        Some(side) => {
-            let cuts: Vec<&Cut> = clip.cuts().iter().filter(|cut| cut.id != cut_id).collect();
-            match side {
-                TrimSide::Start => (frame > 0).then(|| frame.min(cuts.first().map_or(clip.frame_count(), |cut| cut.frame) - 1)),
-                TrimSide::End => (frame < clip.frame_count()).then(|| frame.max(cuts.last().map_or(0, |cut| cut.frame) + 1)),
-            }
+    if let Some(side) = edge_cut_side(cut_id) {
+        let cuts: Vec<&Cut> = clip.cuts().iter().filter(|cut| cut.id != cut_id).collect();
+        match side {
+            TrimSide::Start => (frame > 0).then(|| frame.min(cuts.first().map_or(clip.frame_count(), |cut| cut.frame) - 1)),
+            TrimSide::End => (frame < clip.frame_count()).then(|| frame.max(cuts.last().map_or(0, |cut| cut.frame) + 1)),
         }
-        None => {
-            let (lower, upper) = cut_bounds(clip, cut_id);
-            Some(frame.clamp(lower, upper))
-        }
+    } else {
+        let (lower, upper) = cut_bounds(clip, cut_id);
+        Some(frame.clamp(lower, upper))
     }
 }
 
-/// `applyCutDraft`: the clips with a dragged cut at its draft frame; a dragged edge cut shows as a
+/// The clips with a dragged cut at its draft frame; a dragged edge cut shows as a
 /// cut with the outer part excluded.
 pub fn apply_cut_draft(clips: &[Clip], draft: Option<&CutDraft>) -> Vec<Clip> {
     let Some(draft) = draft else { return clips.to_vec() };
@@ -487,7 +477,7 @@ pub fn apply_cut_draft(clips: &[Clip], draft: Option<&CutDraft>) -> Vec<Clip> {
         .collect()
 }
 
-/// `useCutDrag`'s gesture: the cut follows the pointer frame by frame after 3 px and commits once.
+/// The cut follows the pointer frame by frame after 3 px and commits once.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CutDrag {
     pub video_id: String,
@@ -512,7 +502,7 @@ fn committed_clip<'a>(store: &'a Store, video_id: &str) -> Option<&'a Clip> {
 
 /// A press on a cut marker: keeps its clip selected, or selects the pressed cut's segment.
 pub fn cut_down(store: &mut Store, video_id: &str, cut_id: &str, x: f64) {
-    use crate::store::slices::video_import::select_clip;
+    use crate::store::videos::select_clip;
     let Some(clip) = committed_clip(store, video_id) else { return };
     let start_frame = match edge_cut_side(cut_id) {
         Some(TrimSide::Start) => 0,
@@ -563,7 +553,7 @@ pub fn cut_move(store: &mut Store, x: f64) {
 /// closes up, any other cut moves. Returns whether the press was a click (no drag), which opens a
 /// real cut's popover.
 pub fn cut_up(store: &mut Store) -> bool {
-    use crate::store::slices::video_import::{move_cut, request_cut_removal, trim_video};
+    use crate::store::videos::{move_cut, request_cut_removal, trim_video};
     let Some(drag) = store.player.cut_drag.take() else { return false };
     if !drag.moving {
         return true;
@@ -582,19 +572,19 @@ pub fn cut_up(store: &mut Store) -> bool {
     false
 }
 
-/// The segment of a video clip under a timeline x (D8): React reads it from the pressed element.
+/// The segment of a video clip under a timeline x.
 pub fn segment_at(store: &Store, video_id: &str, x: f64) -> Option<String> {
     let second = store.editor.timeline_viewport.view_start + view_px_to_seconds(store, x);
     let displayed = &store.player.timeline.timeline().displayed;
     let clip = displayed.clips.iter().find(|clip| clip.id() == video_id)?;
     let frame = clip.fps().seconds_to_frames(second - clip.offset_seconds()).clamp(0, clip.frame_count() - 1);
-    crate::lib::video_program::segments::list_video_segments(clip).into_iter().find(|segment| frame >= segment.start_frame && frame < segment.end_frame).map(|segment| segment.key)
+    crate::video::segments::list_video_segments(clip).into_iter().find(|segment| frame >= segment.start_frame && frame < segment.end_frame).map(|segment| segment.key)
 }
 
 /// A primary press on a clip: with videos it selects the clip (and a video clip's segment under
 /// the pointer). Without videos a clip cannot move, and the press pans as the lane background's.
 pub fn clip_down(store: &mut Store, lane: ClipLane, x: f64) {
-    use crate::store::slices::video_import::{select_clip, SelectedClip};
+    use crate::store::videos::{select_clip, SelectedClip};
     if !store.video_import.has_videos() {
         surface_down(store, SurfaceGesture::Pan, x);
         return;
@@ -609,7 +599,7 @@ pub fn clip_down(store: &mut Store, lane: ClipLane, x: f64) {
 /// A press on an activity trim handle.
 pub fn trim_down(store: &mut Store, edge: TrimEdge, x: f64) {
     let base = store.media.activity_trim;
-    let window = resolve_activity_window(activity_duration(store), base);
+    let window = ActivityWindow::new(activity_duration(store), base);
     let start_second = if edge == TrimEdge::Start { window.start_second } else { window.end_second };
     store.player.trim_drag = Some(TrimDrag { edge, start_x: x, start_second, base, draft: None });
 }
@@ -645,8 +635,8 @@ pub fn displayed_activity_trim(store: &Store) -> Option<ActivityTrim> {
 mod tests {
     use super::*;
     use crate::features::player::reconcile_player;
-    use crate::store::slices::editor::{PreviewPlaybackState, TimelineViewport};
-    use crate::store::slices::media::ActivitySummary;
+    use crate::store::editor::{PreviewPlaybackState, TimelineViewport};
+    use crate::store::media::ActivitySummary;
     use ovrley_core::activity::schema::ParsedActivity;
 
     fn store() -> Store {
@@ -697,10 +687,10 @@ mod tests {
         assert_eq!(store.media.activity_trim, Some(ActivityTrim { start_second: 10.0, end_second: 100.0 }), "a click commits nothing");
     }
 
-    use crate::lib::video_program::fixtures::*;
-    use crate::store::slices::video_import::tests::store_with;
+    use crate::video::fixtures::*;
+    use crate::store::videos::tests::store_with;
 
-    fn clips_store(videos: Vec<crate::lib::video_program::ImportedVideo>, offsets: &[(&str, f64)]) -> Store {
+    fn clips_store(videos: Vec<crate::video::ImportedVideo>, offsets: &[(&str, f64)]) -> Store {
         let mut store = store_with(videos, offsets);
         store.media.activity_summary = Some(ActivitySummary { duration_seconds: 100.0, ..ActivitySummary::of(&ParsedActivity::default()) });
         store.player.viewport.metrics.width_px = 250.0;
@@ -829,7 +819,7 @@ mod tests {
     #[test]
     fn a_cut_drag_commits_once_and_a_still_press_is_a_click() {
         let mut store = clips_store(vec![simple("ride", 100.0, 0)], &[]);
-        let cut_id = crate::store::slices::video_import::cut_video(&mut store, "ride", 1500).unwrap();
+        let cut_id = crate::store::videos::cut_video(&mut store, "ride", 1500).unwrap();
         reconcile_player(&mut store);
         // 250 px over 100 s: 2.5 px per second. The cut sits at 50 s, 125 px.
         cut_down(&mut store, "ride", &cut_id, 125.0);

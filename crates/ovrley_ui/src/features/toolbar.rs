@@ -7,16 +7,16 @@ use crate::projection::{convert_enum, dispatch_logged, models_equal, replace_if_
 use crate::{
     ActivityLapView, AppWindow, CreationTimeSource, DrawerRowView, DrawerTool, JoinControlView, SelectedVideoView, Toolbar, VideoCardView, VideoExitView, VideoSegmentView,
 };
-use ovrley_app::features::app_shell;
-use ovrley_app::features::seconds_fields::SecondsField;
+use ovrley_app::features::shell;
+use ovrley_app::controls::seconds::SecondsField;
 use ovrley_app::features::toolbar::activity_drawer_view;
-use ovrley_app::features::toolbar::video_drawer::{self, MergeSide, SelectedVideoRow};
+use ovrley_app::features::toolbar::{self, MergeSide, SelectedVideoRow};
 use ovrley_app::features::transitions::JoinModel;
-use ovrley_app::features::video_preview::import;
+use ovrley_app::features::import;
 use ovrley_app::i18n::{catalog, interpolate};
-use ovrley_app::lib::video_program::edits::CreationTimeSource as AppCreationTimeSource;
-use ovrley_app::store::slices::layout::LeftDrawerTool;
-use ovrley_app::store::slices::video_import as videos;
+use ovrley_app::video::edits::CreationTimeSource as AppCreationTimeSource;
+use ovrley_app::features::toolbar::LeftDrawerTool;
+use ovrley_app::store::videos as videos;
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_core::encode::ffmpeg::transitions::NO_TRANSITION;
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
@@ -43,10 +43,10 @@ impl Projection {
     }
 
     fn project_video_panel(&self, toolbar: &Toolbar<'_>, store: &Store) {
-        let shown = video_drawer::video_panel_shown(store);
+        let shown = toolbar::video_panel_shown(store);
         set_if_changed(toolbar.get_video_panel_shown(), shown, |value| toolbar.set_video_panel_shown(value));
         let locale = store.i18n.language;
-        let cards = video_drawer::video_cards(store)
+        let cards = toolbar::video_cards(store)
             .into_iter()
             .map(|card| {
                 let image = card.thumbnail.as_ref().and_then(|bytes| self.thumbnails.image(&card.id, bytes));
@@ -68,7 +68,7 @@ impl Projection {
         }
         let summary = store.media.parsed_activity.as_ref().and(store.media.activity_summary.as_ref());
         let timezone = summary.and_then(|summary| summary.timezone.as_deref());
-        let controls = ovrley_app::features::video_sync::derive_video_sync_controls(&store.video_import.imported_videos, &store.video_import.video_edits, timezone);
+        let controls = ovrley_app::features::sync::derive_video_sync_controls(&store.video_import.imported_videos, &store.video_import.video_edits, timezone);
         set_if_changed(toolbar.get_panel_sync(), sync_view(store, &controls, &SecondsField::PanelTransitionDuration), |value| toolbar.set_panel_sync(value));
         let defaults = &store.video_import.transition_defaults;
         let label = ovrley_app::features::transitions::default_transition_label(&defaults.transition_type, locale);
@@ -158,7 +158,7 @@ fn same_selected(current: &SelectedVideoView, next: &SelectedVideoView) -> bool 
 
 fn project_video_drawer(toolbar: &Toolbar<'_>, store: &Store) {
     set_if_changed(toolbar.get_has_videos(), store.video_import.has_videos(), |value| toolbar.set_has_videos(value));
-    let row = video_drawer::selected_video_row(store);
+    let row = toolbar::selected_video_row(store);
     set_if_changed(toolbar.get_has_selected_video(), row.is_some(), |value| toolbar.set_has_selected_video(value));
     if let Some(row) = row {
         let next = selected_view(store, &row);
@@ -202,9 +202,9 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     toolbar.on_dismiss_overlay(move || d.dispatch(|store, _| store.layout.dismiss_left_drawer_overlay()));
     let d = dispatcher.handle();
-    toolbar.on_load_activity(move || d.dispatch(app_shell::open_activity_dialog));
+    toolbar.on_load_activity(move || d.dispatch(shell::open_activity_dialog));
     let d = dispatcher.handle();
-    toolbar.on_delete_activity(move || dispatch_logged(&d, "activity drawer", |store, _| app_shell::delete_activity(store)));
+    toolbar.on_delete_activity(move || dispatch_logged(&d, "activity drawer", |store, _| shell::delete_activity(store)));
     let d = dispatcher.handle();
     toolbar.on_set_lap_enabled(move |id, enabled| {
         // The table lists the activity's lap ids, which are never negative.
@@ -223,7 +223,7 @@ fn bind_videos(toolbar: &Toolbar<'_>, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     toolbar.on_remove_video(move |id| dispatch_logged(&d, CONTEXT, move |store, _| ovrley_app::features::player::remove_video(store, &id)));
     let d = dispatcher.handle();
-    toolbar.on_locate_video(move |id| d.dispatch(move |store, services| video_drawer::open_locate_dialog(store, services, id.to_string())));
+    toolbar.on_locate_video(move |id| d.dispatch(move |store, services| toolbar::open_locate_dialog(store, services, id.to_string())));
     let d = dispatcher.handle();
     toolbar.on_sync_video(move |id| dispatch_logged(&d, CONTEXT, move |store, _| videos::reset_video_offset(store, &id)));
     let d = dispatcher.handle();
@@ -235,9 +235,9 @@ fn bind_videos(toolbar: &Toolbar<'_>, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     toolbar.on_set_segment_overlay(move |id, key, shows| dispatch_logged(&d, CONTEXT, move |store, _| videos::set_video_segment_skip_overlay(store, &id, &key, !shows)));
     let d = dispatcher.handle();
-    toolbar.on_remove_segment(move |id, key| dispatch_logged(&d, CONTEXT, move |store, _| video_drawer::remove_segment(store, &id, &key)));
+    toolbar.on_remove_segment(move |id, key| dispatch_logged(&d, CONTEXT, move |store, _| toolbar::remove_segment(store, &id, &key)));
     let d = dispatcher.handle();
-    toolbar.on_seek_segment(move |id, key| dispatch_logged(&d, CONTEXT, move |store, _| video_drawer::seek_segment(store, &id, &key)));
+    toolbar.on_seek_segment(move |id, key| dispatch_logged(&d, CONTEXT, move |store, _| toolbar::seek_segment(store, &id, &key)));
     let d = dispatcher.handle();
     toolbar.on_sync_all_videos(move || dispatch_logged(&d, CONTEXT, |store, _| videos::sync_all_videos(store)));
     let d = dispatcher.handle();

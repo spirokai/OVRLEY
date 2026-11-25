@@ -5,21 +5,21 @@ use crate::catalog::{Answer, NoArguments, Tool, ToolError, ToolResult};
 use ovrley_app::features::player::playback::{self, player_timing};
 use ovrley_app::features::player::{edits, reconcile_player};
 use ovrley_app::features::transitions::{self, DEFAULT_TRANSITION_OPTION};
-use ovrley_app::features::video_preview::import::{self, ImportRequest};
+use ovrley_app::features::import::{self, ImportRequest};
 use ovrley_app::i18n::DEFAULT_LOCALE;
-use ovrley_app::lib::activity::{trim_activity_edge, TrimEdge};
-use ovrley_app::lib::file_dialog::filename_from_selected_path;
-use ovrley_app::lib::seconds_input::{snap_seconds, SecondsMode};
-use ovrley_app::lib::video_program::collection::sort_clips_by_timeline;
-use ovrley_app::lib::video_program::edits::CreationTimeSource;
-use ovrley_app::lib::video_program::program::{JoinSide, PlaybackSource};
-use ovrley_app::lib::video_program::segments::{list_video_segments, TrimSide};
-use ovrley_app::lib::video_program::warnings::format_video_warning;
-use ovrley_app::lib::video_program::Clip;
+use ovrley_app::activity::{trim_activity_edge, TrimEdge};
+use ovrley_app::dialogs::filename_from_selected_path;
+use ovrley_app::controls::seconds::{snap_seconds, SecondsMode};
+use ovrley_app::video::collection::sort_clips_by_timeline;
+use ovrley_app::video::edits::CreationTimeSource;
+use ovrley_app::video::program::{JoinSide, PlaybackSource};
+use ovrley_app::video::segments::{list_video_segments, TrimSide};
+use ovrley_app::video::collection::format_video_warning;
+use ovrley_app::video::Clip;
 use ovrley_app::store::agent::{AbsolutePath, AgentReply};
 use ovrley_app::store::services::Services;
-use ovrley_app::store::slices::editor::PreviewPlaybackState;
-use ovrley_app::store::slices::video_import as collection;
+use ovrley_app::store::editor::PreviewPlaybackState;
+use ovrley_app::store::videos as collection;
 use ovrley_app::store::Store;
 use ovrley_core::media::video_edits::TimezoneMode;
 use ovrley_widgets::model::validation::require_positive_f64;
@@ -565,7 +565,7 @@ fn describe_video(store: &Store, video_id: &str) -> ToolResult {
         .media
         .sync_activity()
         .and_then(|activity| activity.timezone);
-    let rows = ovrley_app::features::toolbar::video_drawer::metadata_rows(
+    let rows = ovrley_app::features::toolbar::metadata_rows(
         clip,
         timezone.as_deref(),
         DEFAULT_LOCALE,
@@ -715,7 +715,7 @@ fn locate_video(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    ovrley_app::features::toolbar::video_drawer::locate_missing_video(
+    ovrley_app::features::toolbar::locate_missing_video(
         store,
         services,
         args.video_id,
@@ -880,7 +880,7 @@ fn set_transition_defaults(
     store: &mut Store,
     _: &mut Services,
 ) -> ToolResult {
-    ovrley_app::features::seconds_fields::set_panel_defaults(store, |defaults| {
+    ovrley_app::controls::seconds::set_panel_defaults(store, |defaults| {
         if let Some(name) = args.name {
             defaults.transition_type = name;
         }

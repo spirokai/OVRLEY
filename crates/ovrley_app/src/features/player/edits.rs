@@ -1,16 +1,15 @@
-//! Port of `hooks/useVideoCuts.js` and `utils/videoEditTarget.js` (plan D16): cut, exclude and trim
-//! at the playhead. The target clip is the selected one, else the one the preview shows, else the
-//! earliest under the playhead; exclusion applies to the selected segment, else the segment at the
-//! playhead.
+//! Cut, exclude and trim at the playhead. The target clip is the selected one, else the one the
+//! preview shows, else the earliest under the playhead; exclusion applies to the selected segment,
+//! else the segment at the playhead.
 
-use super::playback::player_timing;
-use crate::lib::video_program::program::resolve_preview_target;
-use crate::lib::video_program::segments::{find_segment_at, list_video_segments, plan_video_trim, resolve_cut_frame, resolve_edit_clip, Segment, TrimPlan, TrimSide};
-use crate::lib::video_program::Clip;
-use crate::store::slices::video_import::{cut_video, move_cut, set_video_segment_excluded, trim_video};
+use crate::features::player::playback::player_timing;
 use crate::store::Store;
+use crate::store::videos::{cut_video, move_cut, set_video_segment_excluded, trim_video};
+use crate::video::Clip;
+use crate::video::program::resolve_preview_target;
+use crate::video::segments::{find_segment_at, list_video_segments, plan_video_trim, resolve_cut_frame, resolve_edit_clip, Segment, TrimPlan, TrimSide};
 
-/// `resolveEditTarget`: the clip commands at the playhead apply to and the clip-local second.
+/// The clip commands at the playhead apply to and the clip-local second.
 pub fn resolve_edit_target(store: &Store) -> Option<(&Clip, f64)> {
     let committed = &store.player.timeline.timeline().committed;
     let second = player_timing(store).clamped_playhead;
@@ -20,7 +19,7 @@ pub fn resolve_edit_target(store: &Store) -> Option<(&Clip, f64)> {
     Some((clip, second - clip.offset_seconds()))
 }
 
-/// `resolveSelectedSegment`: the selected clip's selected segment, if it still exists.
+/// The selected clip's selected segment, if it still exists.
 pub fn resolve_selected_segment(store: &Store) -> Option<(&Clip, Segment)> {
     let selection = store.video_import.selected_clip.as_ref()?;
     let key = selection.segment_key.as_deref()?;
@@ -33,7 +32,7 @@ fn can_trim(store: &Store, side: TrimSide) -> bool {
     resolve_edit_target(store).is_some_and(|(clip, second)| plan_video_trim(clip, side, clip.fps().seconds_to_frames(second)).is_some())
 }
 
-/// The toolbar's state of the commands (`useVideoCuts`'s model).
+/// The toolbar's state of the commands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VideoEditState {
     pub can_cut: bool,
@@ -98,8 +97,8 @@ pub fn trim_clip(store: &mut Store, video_id: &str, side: TrimSide, frame: i64) 
 mod tests {
     use super::*;
     use crate::features::player::reconcile_player;
-    use crate::lib::video_program::fixtures::simple;
-    use crate::store::slices::video_import::{select_clip, tests::store_with, ClipLane, SelectedClip};
+    use crate::video::fixtures::simple;
+    use crate::store::videos::{select_clip, tests::store_with, ClipLane, SelectedClip};
 
     fn store() -> Store {
         let mut store = store_with(vec![simple("a", 10.0, 0), simple("b", 10.0, 1)], &[("b", 5.0)]);

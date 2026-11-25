@@ -1,19 +1,16 @@
-//! Feature modules: the state, actions and hooks of `app/src/features/<name>`.
-pub mod app_shell;
-pub mod app_update;
+//! The app's features: each module holds a feature's state, its actions and the views
+//! `ovrley_ui` projects.
+pub mod canvas;
+pub mod history;
+pub mod import;
 pub mod maps;
-pub mod overlay_editor;
 pub mod player;
 pub mod projects;
-pub mod render_video;
-pub mod scene_settings;
-pub mod seconds_fields;
-pub mod template_manager;
+pub mod render;
+pub mod scene;
+pub mod shell;
+pub mod sync;
+pub mod templates;
 pub mod toolbar;
 pub mod transitions;
-pub mod undo_redo;
-pub mod video_preview;
-pub mod video_sync;
-pub mod widget_drawer;
-pub mod widget_editor;
-pub mod widget_preview;
+pub mod widgets;

@@ -1,37 +1,36 @@
-//! Port of `features/transitions` (plan D13): the model of one join's transition (an override or
-//! the project default, the choices, the override's duration, validation), its labels, and the
-//! picker's options. The animated previews' frames are `ovrley_ui`'s.
+//! The transition of one join: the model (an override or the project default, the choices, the
+//! override's duration, validation), its labels, and the picker's options. The animated previews'
+//! frames are `ovrley_ui`'s.
 
-use crate::i18n::{catalog, interpolate, Locale};
-use crate::js::{number_to_string, to_fixed};
-use crate::lib::seconds_input::{SecondsDisplay, SecondsInputOptions, SecondsInputState, SecondsMode};
-use crate::lib::video_program::collection::TimelineProgram;
-use crate::lib::video_program::program::{find_invalid_transitions, JoinSide, SkippedDefault};
-use ovrley_core::media::video_edits::{Transition, TransitionKind};
-use crate::store::slices::video_import::set_join_transition;
-use crate::store::Store;
 use ovrley_core::encode::ffmpeg::transitions::xfade_transitions;
 use ovrley_core::encode::fps::Fps;
+use ovrley_core::media::video_edits::{Transition, TransitionKind};
+use crate::controls::seconds::{SecondsDisplay, SecondsInputOptions, SecondsInputState, SecondsMode};
+use crate::format::{plain_number, round_decimals};
+use crate::i18n::{catalog, interpolate, Locale};
+use crate::store::Store;
+use crate::store::videos::set_join_transition;
+use crate::video::collection::TimelineProgram;
+use crate::video::program::{find_invalid_transitions, JoinSide, SkippedDefault};
 
-/// `DEFAULT_TRANSITION_OPTION`: the picker's value of "follow the defaults".
+/// The picker's value of "follow the defaults".
 pub const DEFAULT_TRANSITION_OPTION: &str = "default";
 
 fn text(locale: Locale, key: &str, default: &'static str) -> String {
     catalog().t_or(locale, key, default).to_string()
 }
 
-/// `transitionLabel`.
 pub fn transition_label(transition: Transition, locale: Locale) -> String {
     match transition.kind() {
         TransitionKind::HardCut => text(locale, "transitions.none", "No transition"),
         TransitionKind::Xfade(name) => interpolate(
             &text(locale, "transitions.withDuration", "{{type}}, {{seconds}} s"),
-            &[("type", name), ("seconds", &number_to_string(transition.duration_seconds()))],
+            &[("type", name), ("seconds", &plain_number(transition.duration_seconds()))],
         ),
     }
 }
 
-/// `skippedDefaultLabel`: why a join that follows the defaults is a hard cut.
+/// Why a join that follows the defaults is a hard cut.
 pub fn skipped_default_label(skipped: SkippedDefault, locale: Locale) -> String {
     let part = match skipped.side {
         JoinSide::Previous => text(locale, "transitions.partBefore", "the part before"),
@@ -40,11 +39,11 @@ pub fn skipped_default_label(skipped: SkippedDefault, locale: Locale) -> String 
     let room = ((skipped.room_seconds * 10.0).floor() / 10.0).max(0.0);
     interpolate(
         &text(locale, "transitions.skippedDefault", "Default transition skipped: {{part}} this join has room for {{room}} s of transition, not {{seconds}} s."),
-        &[("part", &part), ("room", &number_to_string(room)), ("seconds", &number_to_string(to_fixed(skipped.duration_seconds, 1)))],
+        &[("part", &part), ("room", &plain_number(room)), ("seconds", &plain_number(round_decimals(skipped.duration_seconds, 1)))],
     )
 }
 
-/// `buildJoinTransitionModel`'s presentational model.
+/// A join's transition, as the picker presents it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct JoinModel {
     pub key: String,
@@ -69,7 +68,7 @@ pub struct JoinModel {
     pub from_segment_key: String,
 }
 
-/// `useJoinTransitionModels`: the model of each join of a timeline.
+/// The model of each join of a timeline.
 pub fn join_models(timeline: &TimelineProgram, locale: Locale) -> Vec<JoinModel> {
     let program = &timeline.program;
     let invalid: Vec<String> = find_invalid_transitions(program).into_iter().flat_map(|issue| issue.join_keys).collect();
@@ -114,7 +113,7 @@ pub fn join_model(store: &Store, key: &str) -> Option<JoinModel> {
     join_models(&store.player.timeline.timeline().displayed, store.i18n.language).into_iter().find(|model| model.key == key)
 }
 
-/// `onSelect`: the default (no override), a hard cut, or an `xfade`, which keeps an override's
+/// The default (no override), a hard cut, or an `xfade`, which keeps an override's
 /// duration or starts from the default snapped to the joined frames. One undo step.
 pub fn select_join_transition(store: &mut Store, key: &str, value: &str) -> Result<(), String> {
     set_join(store, key, value, None)
@@ -151,7 +150,7 @@ pub fn join_key_of_segment(store: &Store, video_id: &str, segment_key: &str) -> 
     timeline.displayed.program.joins.iter().find(|join| join.video_id == video_id && join.segment_key == segment_key).map(|join| join.key.clone())
 }
 
-/// `commitDuration`: a typed duration (already snapped to the joined frames) as an override of the
+/// A typed duration (already snapped to the joined frames) as an override of the
 /// effective transition. One undo step.
 pub fn commit_join_duration(store: &mut Store, key: &str, duration_seconds: f64) -> Result<(), String> {
     let model = join_model(store, key).ok_or_else(|| format!("Unknown join: {key}"))?;
@@ -246,8 +245,8 @@ pub fn choose_transition(store: &mut Store, value: &str) -> Result<(), String> {
         TransitionKind::from_name(value)?;
     }
     match select.target {
-        TransitionSelectTarget::ImportDefaults => crate::features::video_preview::import::set_review_transition_defaults(store, |defaults| defaults.transition_type = value.to_string()),
-        TransitionSelectTarget::PanelDefaults => crate::features::seconds_fields::set_panel_defaults(store, |defaults| defaults.transition_type = value.to_string()),
+        TransitionSelectTarget::ImportDefaults => crate::features::import::set_review_transition_defaults(store, |defaults| defaults.transition_type = value.to_string()),
+        TransitionSelectTarget::PanelDefaults => crate::controls::seconds::set_panel_defaults(store, |defaults| defaults.transition_type = value.to_string()),
         TransitionSelectTarget::Join(key) => select_join_transition(store, &key, value),
     }
 }
@@ -265,9 +264,9 @@ pub fn default_transition_label(transition_type: &str, locale: Locale) -> String
 mod tests {
     use super::*;
     use crate::features::player::reconcile_player;
-    use crate::lib::video_program::fixtures::*;
+    use crate::video::fixtures::*;
     use ovrley_core::media::video_edits::SegmentEdits;
-    use crate::store::slices::video_import::tests::store_with;
+    use crate::store::videos::tests::store_with;
     use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
     use std::rc::Rc;
 
@@ -310,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn labels_read_like_react() {
+    fn labels_name_the_transition_and_its_source() {
         let locale = crate::i18n::DEFAULT_LOCALE;
         assert_eq!(transition_label(Transition::xfade("fade", 1.5), locale), "fade, 1.5 s");
         assert_eq!(transition_label(Transition::HARD_CUT, locale), "No transition");

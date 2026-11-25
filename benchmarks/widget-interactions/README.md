@@ -1,7 +1,7 @@
 # Group interaction profiling
 
 ```sh
-cargo build -p ovrley_app --release --bin benchmark_interactions --locked   # the runner never builds
+cargo build -p ovrley_app --release --features test-util --bin benchmark_interactions --locked   # the runner never builds
 pnpm benchmark:interactions
 pnpm benchmark:interactions --label before --frames 300 --burst 4
 pnpm benchmark:interactions --label after --frames 300 --burst 4 --compare debug/benchmarks/widget-interactions/<before-run>/results.json

@@ -9,7 +9,7 @@
 // A release build is a GUI app without a console. `--mcp` uses the pipes its client passes.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use ovrley_app::lib::preferences_store::PreferencesStore;
+use ovrley_app::preferences::PreferencesStore;
 use ovrley_app::store::Store;
 use ovrley_services::runtime::RuntimeRoots;
 use std::process::ExitCode;
@@ -96,9 +96,9 @@ fn start() -> Result<(), String> {
 /// drawer, so it reads the user's file but never writes it.
 fn open_preferences(app_data_dir: &std::path::Path) -> Result<PreferencesStore, String> {
     if cfg!(debug_assertions) && std::env::var_os("OVRLEY_SNAPSHOT").is_some() {
-        let path = app_data_dir.join(ovrley_app::lib::preferences_store::PREFERENCES_FILE_NAME);
-        let values = ovrley_app::lib::preferences_store::read_preferences_file(&path)?;
-        return Ok(PreferencesStore::with_sink(values, Box::new(ovrley_app::lib::preferences_store::MemorySink::default())));
+        let path = app_data_dir.join(ovrley_app::preferences::PREFERENCES_FILE_NAME);
+        let values = ovrley_app::preferences::read_preferences_file(&path)?;
+        return Ok(PreferencesStore::with_sink(values, Box::new(ovrley_app::preferences::MemorySink::default())));
     }
     PreferencesStore::open(app_data_dir)
 }

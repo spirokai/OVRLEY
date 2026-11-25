@@ -1,26 +1,25 @@
-//! Port of `features/player/utils/timelineGeometry.js` and `hooks/useTimelineClips.js` (plan D8):
-//! the timeline's geometry and its lanes as a view model built in Rust. Slint only draws it.
+//! The timeline's geometry and its lanes as a view model built in Rust. Slint only draws it.
 //!
 //! Positions are logical pixels from the timeline's left edge. Zoomed in, a clip can be millions of
 //! pixels wide, which `f32` lengths cannot place exactly, so every box is cut to the visible
 //! timeline (with a margin) here, and what sits inside a box is placed relative to the cut box.
 
-use super::viewport::TimelineMetrics;
+use crate::activity::ActivityWindow;
+use crate::dialogs::filename_from_selected_path;
+use crate::features::player::viewport::TimelineMetrics;
+use crate::features::widgets::activity_attribute_label;
+use crate::format::format_clock_duration;
 use crate::i18n::{catalog, interpolate, Locale};
-use crate::lib::activity::ActivityWindow;
-use crate::lib::file_dialog::filename_from_selected_path;
-use crate::lib::format::format_clock_duration;
-use crate::lib::video_program::collection::sort_clips_by_timeline;
-use crate::lib::video_program::program::Overlap;
-use crate::lib::video_program::segments::list_video_segments;
-use crate::lib::video_program::warnings::{format_video_warning, VideoWarnings};
-use crate::lib::video_program::Clip;
-use crate::lib::widget::activity_attribute_label;
-use crate::store::slices::editor::TimelineViewport;
-use crate::store::slices::media::ActivitySummary;
-use crate::store::slices::video_import::{ClipLane, SelectedClip};
+use crate::store::editor::TimelineViewport;
+use crate::store::media::ActivitySummary;
+use crate::store::videos::{ClipLane, SelectedClip};
+use crate::video::Clip;
+use crate::video::collection::{format_video_warning, sort_clips_by_timeline, VideoWarnings};
+use crate::video::program::Overlap;
+use crate::video::segments::list_video_segments;
+use std::fmt::Write;
 
-/// `SNAP_THRESHOLD_PX`: snap distance on screen.
+/// Snap distance on screen.
 pub const SNAP_THRESHOLD_PX: f64 = 10.0;
 /// `TEXT_HIDE_THRESHOLD_REM`, `EDGE_CUT_MIN_CLIP_REM` and `VIDEO_CLIP_HEIGHT_REM`.
 const TEXT_HIDE_THRESHOLD_REM: f64 = 3.0;
@@ -29,7 +28,7 @@ pub const VIDEO_CLIP_HEIGHT_REM: f64 = 3.0;
 /// Half the width of a cut marker's line (`w-1`).
 const CUT_LINE_HALF_WIDTH_PX: f64 = 2.0;
 
-/// `getClipGeometry`: a clip's x and width in the viewport, `None` when it is not visible.
+/// A clip's x and width in the viewport, `None` when it is not visible.
 pub fn clip_geometry(start_second: f64, duration_seconds: f64, view: TimelineViewport, width_px: f64) -> Option<(f64, f64)> {
     let span = view.view_end - view.view_start;
     let end = start_second + duration_seconds;
@@ -39,7 +38,6 @@ pub fn clip_geometry(start_second: f64, duration_seconds: f64, view: TimelineVie
     Some(((start_second - view.view_start) / span * width_px, duration_seconds / span * width_px))
 }
 
-/// `secondsToViewPx`.
 pub fn seconds_to_view_px(second: f64, view: TimelineViewport, width_px: f64) -> f64 {
     let span = view.view_end - view.view_start;
     if span <= 0.0 || width_px <= 0.0 {
@@ -48,14 +46,14 @@ pub fn seconds_to_view_px(second: f64, view: TimelineViewport, width_px: f64) ->
     (second - view.view_start) / span * width_px
 }
 
-/// `snapClipDelta`'s result: the snapped shift and the edge it snapped to.
+/// The snapped shift and the edge it snapped to.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Snap {
     pub delta: f64,
     pub guideline_second: Option<f64>,
 }
 
-/// `snapClipDelta`: a proposed shift snapped so one moving edge lands on a fixed edge, within
+/// A proposed shift snapped so one moving edge lands on a fixed edge, within
 /// `threshold_px` on screen.
 pub fn snap_clip_delta(proposed_delta: f64, moving_edges: &[f64], fixed_edges: &[f64], view: TimelineViewport, width_px: f64, threshold_px: f64) -> Snap {
     let span = view.view_end - view.view_start;
@@ -97,9 +95,9 @@ pub fn stripes_commands(width: f64, height: f64, stripe: f64, rising: bool) -> S
     while c < width + step {
         let (start, end) = (c - over, c + height + over);
         if rising {
-            commands.push_str(&format!("M {start:.2} {bottom:.2} L {end:.2} {top:.2} "));
+            let _ = write!(commands, "M {start:.2} {bottom:.2} L {end:.2} {top:.2} ");
         } else {
-            commands.push_str(&format!("M {start:.2} {top:.2} L {end:.2} {bottom:.2} "));
+            let _ = write!(commands, "M {start:.2} {top:.2} L {end:.2} {bottom:.2} ");
         }
         c += step;
     }
@@ -170,7 +168,7 @@ pub struct TileView {
     pub width: f64,
     pub clip_x: f64,
     pub clip_width: f64,
-    pub strip: std::sync::Arc<crate::store::slices::video_filmstrip::ReadyStrip>,
+    pub strip: std::sync::Arc<crate::features::player::filmstrips::ReadyStrip>,
     pub sample: u32,
 }
 
@@ -196,7 +194,7 @@ pub enum MarkerTarget {
     /// A cut of a video, or an edge cut (`edge-start`, `edge-end`).
     Cut { video_id: String, cut_id: String },
     /// An edge of the activity trim.
-    ActivityTrim(crate::lib::activity::TrimEdge),
+    ActivityTrim(crate::activity::TrimEdge),
 }
 
 /// A cut marker or an activity trim handle.
@@ -263,12 +261,12 @@ pub struct LaneInputs<'a> {
     pub activity_filename: Option<String>,
     /// The displayed trim window and its dragged edge, or `None` where the trim is not edited
     /// (video sync).
-    pub activity_trim: Option<(ActivityWindow, Option<crate::lib::activity::TrimEdge>)>,
+    pub activity_trim: Option<(ActivityWindow, Option<crate::activity::TrimEdge>)>,
     /// The cut markers show only in the editing workspace.
     pub show_cut_markers: bool,
     /// The cut being dragged: `(video id, cut id)`.
     pub dragged_cut: Option<(&'a str, &'a str)>,
-    pub filmstrips: &'a crate::store::slices::video_filmstrip::VideoFilmstripSlice,
+    pub filmstrips: &'a crate::features::player::filmstrips::FilmstripsState,
     /// The displayed joins' models, or none where joins are not edited (video sync).
     pub joins: &'a [crate::features::transitions::JoinModel],
     /// The segment before a dragged cut, whose join hides until the drop: `(video id, key)`.
@@ -279,7 +277,6 @@ fn text(locale: Locale, key: &str, default: &'static str) -> String {
     catalog().t_or(locale, key, default).to_string()
 }
 
-/// `isEdgeLineInside`.
 fn edge_line_inside(align: MarkerAlign, px: f64, width_px: f64) -> bool {
     match align {
         MarkerAlign::Start => px < CUT_LINE_HALF_WIDTH_PX,
@@ -341,9 +338,9 @@ fn clip_view(input: ClipInput, inputs: &LaneInputs<'_>) -> Option<ClipView> {
     })
 }
 
-/// `clipFilmstripView`: the ready strips of a clip's video once its base strip is ready.
-fn ready_strips(clip: &Clip, inputs: &LaneInputs<'_>) -> Vec<std::sync::Arc<crate::store::slices::video_filmstrip::ReadyStrip>> {
-    use crate::store::slices::video_filmstrip::StripState;
+/// The ready strips of a clip's video once its base strip is ready.
+fn ready_strips(clip: &Clip, inputs: &LaneInputs<'_>) -> Vec<std::sync::Arc<crate::features::player::filmstrips::ReadyStrip>> {
+    use crate::features::player::filmstrips::StripState;
     let Some(strips) = inputs.filmstrips.strips.get(&clip.video.path) else { return Vec::new() };
     if !matches!(strips.get("base"), Some(StripState::Ready(_))) {
         return Vec::new();
@@ -352,7 +349,7 @@ fn ready_strips(clip: &Clip, inputs: &LaneInputs<'_>) -> Vec<std::sync::Arc<crat
 }
 
 fn segment_views(clip: &Clip, inputs: &LaneInputs<'_>, tiles: &mut Vec<TileView>) -> Vec<SegmentView> {
-    use crate::features::video_preview::filmstrips::{list_filmstrip_tiles, tile_width_px};
+    use crate::features::player::filmstrips::{list_filmstrip_tiles, tile_width_px};
     let strips = ready_strips(clip, inputs);
     let span = inputs.view.view_end - inputs.view.view_start;
     let px_per_second = if span > 0.0 { inputs.metrics.width_px / span } else { 0.0 };
@@ -398,7 +395,7 @@ fn segment_views(clip: &Clip, inputs: &LaneInputs<'_>, tiles: &mut Vec<TileView>
         .collect()
 }
 
-/// `activityTrimMasks`: stripes over the visible trimmed-off parts.
+/// Stripes over the visible trimmed-off parts.
 fn activity_masks(window: &ActivityWindow, duration_seconds: f64, inputs: &LaneInputs<'_>) -> Vec<BandView> {
     if !window.is_trimmed || duration_seconds <= 0.0 {
         return Vec::new();
@@ -416,7 +413,7 @@ fn activity_masks(window: &ActivityWindow, duration_seconds: f64, inputs: &LaneI
         .collect()
 }
 
-/// The edge cuts of a clip (`listEdgeCuts`): one per end whose outer part is still exported.
+/// The edge cuts of a clip: one per end whose outer part is still exported.
 pub fn edge_cuts(clip: &Clip) -> Vec<ovrley_core::media::video_edits::Cut> {
     use ovrley_core::media::video_edits::{Cut, FIRST_SEGMENT_KEY};
     let last_key = clip.cuts().last().map_or(FIRST_SEGMENT_KEY, |cut| cut.id.as_str());
@@ -554,7 +551,7 @@ pub fn activity_lane(inputs: &LaneInputs<'_>) -> Option<ActivityLaneView> {
     let summary = inputs.activity_summary?;
     let duration = summary.duration_seconds;
     let mut metrics: Vec<String> = summary.available_metrics.iter().map(|metric| activity_attribute_label(&metric.attribute, inputs.locale)).collect();
-    metrics.sort_by(|left, right| crate::lib::format::compare_text(left, right, inputs.locale));
+    metrics.sort_by(|left, right| crate::format::compare_text(left, right));
     let input = ClipInput {
         lane: ClipLane::Activity,
         start_second: 0.0,
@@ -575,7 +572,7 @@ pub fn activity_lane(inputs: &LaneInputs<'_>) -> Option<ActivityLaneView> {
     let clip_width = clip_geometry(0.0, duration, inputs.view, width_px).map_or(0.0, |(_, width)| width);
     let mut trim_markers = Vec::new();
     if clip_width >= EDGE_CUT_MIN_CLIP_REM * inputs.metrics.rem {
-        use crate::lib::activity::TrimEdge;
+        use crate::activity::TrimEdge;
         for edge in [TrimEdge::Start, TrimEdge::End] {
             let second = if edge == TrimEdge::Start { window.start_second } else { window.end_second };
             if second < inputs.view.view_start || second > inputs.view.view_end {
@@ -611,10 +608,10 @@ pub fn activity_lane(inputs: &LaneInputs<'_>) -> Option<ActivityLaneView> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::activity::TrimEdge;
-    use crate::lib::video_program::collection::join_video_edits;
-    use crate::lib::video_program::fixtures::*;
-    use crate::store::slices::media::{AvailableMetric, MetricSource};
+    use crate::activity::TrimEdge;
+    use crate::video::collection::join_video_edits;
+    use crate::video::fixtures::*;
+    use crate::store::media::{AvailableMetric, MetricSource};
     use ovrley_core::activity::schema::ParsedActivity;
 
     fn view(view_start: f64, view_end: f64) -> TimelineViewport {
@@ -639,7 +636,7 @@ mod tests {
     }
 
     struct Fixture {
-        filmstrips: crate::store::slices::video_filmstrip::VideoFilmstripSlice,
+        filmstrips: crate::features::player::filmstrips::FilmstripsState,
         clips: Vec<Clip>,
         warnings: VideoWarnings,
         summary: ActivitySummary,
@@ -729,7 +726,7 @@ mod tests {
 
     #[test]
     fn a_ready_base_strip_shows_tiles_as_tall_as_the_clip() {
-        use crate::store::slices::video_filmstrip::{ReadyStrip, StripState};
+        use crate::features::player::filmstrips::{ReadyStrip, StripState};
         let mut fixture = fixture();
         let strip = std::sync::Arc::new(ReadyStrip { pixels: std::sync::Arc::new(Vec::new()), width: 85, height: 48, start_seconds: 0.0, spacing_seconds: 20.0, sample_count: 1 });
         fixture.filmstrips.set("C:\\clips\\ride.mp4", "base", StripState::Generating { job: 1 });

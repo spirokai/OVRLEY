@@ -18,13 +18,12 @@ use ovrley_app::features::player::playback::{self, player_timing};
 use ovrley_app::features::player::viewport::{self, compute_tick_strip, fit_targets, matching_fit_target, tick_placement, zoom_limits, FitTargetId, TickPlacement};
 use ovrley_app::features::player::{self as player_feature, edits};
 use ovrley_app::features::transitions;
-use ovrley_app::lib::activity::TrimEdge;
-use ovrley_app::lib::format::format_clock_duration;
-use ovrley_app::lib::utils::clamp;
-use ovrley_app::lib::video_program::segments::TrimSide;
-use ovrley_app::store::slices::editor::PreviewPlaybackState;
-use ovrley_app::store::slices::video_filmstrip::{ReadyStrip, StripState};
-use ovrley_app::store::slices::video_import::ClipLane;
+use ovrley_app::activity::TrimEdge;
+use ovrley_app::format::format_clock_duration;
+use ovrley_app::video::segments::TrimSide;
+use ovrley_app::store::editor::PreviewPlaybackState;
+use ovrley_app::features::player::filmstrips::{ReadyStrip, StripState};
+use ovrley_app::store::videos::ClipLane;
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
 use slint::{ComponentHandle, Image, SharedString};
 use std::cell::{Cell, RefCell};
@@ -124,7 +123,7 @@ impl Projection {
         };
         let dispatch = self.dispatch.clone();
         self.wanted_timer.start(slint::TimerMode::SingleShot, deadline.saturating_duration_since(Instant::now()), move || {
-            dispatch.dispatch(|store, _| ovrley_app::features::video_preview::filmstrips::publish_wanted_windows(store, Instant::now()));
+            dispatch.dispatch(|store, _| ovrley_app::features::player::filmstrips::publish_wanted_windows(store, Instant::now()));
         });
     }
 
@@ -155,7 +154,7 @@ impl Projection {
             .collect();
         // Sprites no strip holds any more are released.
         let live: HashSet<usize> = store
-            .video_filmstrip
+            .filmstrips
             .strips
             .values()
             .flat_map(|strips| strips.values())
@@ -176,7 +175,7 @@ impl Projection {
         set_if_changed(player.get_transport_disabled(), !timing.has_activity, |value| player.set_transport_disabled(value));
         let playing = store.editor.preview_playback_state == PreviewPlaybackState::Playing;
         set_if_changed(player.get_playing(), playing, |value| player.set_playing(value));
-        let current = format_clock_duration(clamp(store.editor.selected_second, timing.timeline_minimum, timing.total_duration));
+        let current = format_clock_duration(store.editor.selected_second.max(timing.timeline_minimum).min(timing.total_duration));
         let label = format!("{current} / {}", format_clock_duration(timing.total_duration));
         set_if_changed(player.get_time_label(), SharedString::from(label), |value| player.set_time_label(value));
         set_if_changed(player.get_has_video(), has_video, |value| player.set_has_video(value));
@@ -550,7 +549,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
         d.dispatch(move |store, _| {
             store.player.cut_popover = None;
             let Some(video_id) = lane.video_id() else { return };
-            if let Err(error) = ovrley_app::store::slices::video_import::request_cut_removal(store, video_id, &cut_id, None) {
+            if let Err(error) = ovrley_app::store::videos::request_cut_removal(store, video_id, &cut_id, None) {
                 log::error!("cut removal: {error}");
             }
         });

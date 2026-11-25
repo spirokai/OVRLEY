@@ -1,5 +1,5 @@
 //! Video playback (`VideoPreview`): MDK's players follow the store, and inside the pieces their
-//! frames are its clock. What to show is `ovrley_app::features::video_preview::preview`'s answer;
+//! frames are its clock. What to show is `ovrley_app::features::player::preview`'s answer;
 //! how to get MDK to show it is decided here.
 //!
 //! Two players take turns: one shows the shot at the playhead, the other waits, paused, on the
@@ -15,9 +15,9 @@ use crate::projection::set_if_changed;
 use crate::platform::gpu::GpuDevice;
 use crate::{AppWindow, VideoPlaceholder, VideoPreview};
 use ovrley_app::features::player::playback;
-use ovrley_app::features::video_preview::preview::{self, Placeholder, Preview, Shot};
-use ovrley_app::lib::video_program::program::PlaybackSource;
-use ovrley_app::store::slices::editor::PreviewPlaybackState;
+use ovrley_app::features::player::preview::{self, Placeholder, Preview, Shot};
+use ovrley_app::video::program::PlaybackSource;
+use ovrley_app::store::editor::PreviewPlaybackState;
 use ovrley_app::store::{DispatchHandle, Store};
 use ovrley_playback::{Callbacks, Event, Renderer, State, Surface};
 use slint::ComponentHandle;
@@ -638,8 +638,8 @@ impl VideoPlayback {
     /// The textures follow the visible surface's size in physical pixels, once it settled, up to
     /// the device's longest side. Sync Doctor's screen is also the scene at its mode's display scale.
     fn follow_size(&mut self, window: &AppWindow, store: &Store) {
-        let (width, height) = ovrley_app::features::overlay_editor::scene_size(store);
-        let scale = (ovrley_app::features::overlay_editor::display_scale(store) * f64::from(window.window().scale_factor()))
+        let (width, height) = ovrley_app::features::canvas::scene_size(store);
+        let scale = (ovrley_app::features::canvas::display_scale(store) * f64::from(window.window().scale_factor()))
             .min(f64::from(self.max_side) / width.max(height));
         let size = ((width * scale).round().max(2.0) as u32, (height * scale).round().max(2.0) as u32);
         if self.slots.iter().all(|slot| slot.surface.size() == size) {

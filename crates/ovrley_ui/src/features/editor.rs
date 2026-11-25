@@ -8,14 +8,14 @@ use crate::{
     AppWindow, BackgroundMode, BadgeView, EditorCursor, GuideLabelView, HandleView, OverlayEditor,
     WidgetView,
 };
-use ovrley_app::features::app_shell::{EditorBackgroundMode, EditorShellState};
+use ovrley_app::features::shell::{EditorBackgroundMode, EditorShellState};
 use ovrley_app::features::maps;
-use ovrley_app::features::overlay_editor::geometry::GuideStyle;
-use ovrley_app::features::overlay_editor::interaction::{
+use ovrley_app::features::canvas::geometry::GuideStyle;
+use ovrley_app::features::canvas::interaction::{
     self, EditorCursor as AppEditorCursor, Handle,
 };
-use ovrley_app::features::overlay_editor::{self as editor, viewport::ViewportMetrics, WheelInput};
-use ovrley_app::features::widget_preview::{present_pending_frame, preview_frame, widget_layer};
+use ovrley_app::features::canvas::{self as editor, viewport::ViewportMetrics, WheelInput};
+use ovrley_app::features::widgets::preview::{present_pending_frame, preview_frame, widget_layer};
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
 use slint::{ComponentHandle, Image, SharedString};
 use std::cell::{Cell, RefCell};
@@ -117,7 +117,7 @@ impl Projection {
         set_if_changed(global.get_scene_height(), px(stage.scene_height), |value| {
             global.set_scene_height(value)
         });
-        let viewport = &store.overlay_editor.viewport;
+        let viewport = &store.canvas.viewport;
         set_if_changed(global.get_scroll_x(), px(viewport.scroll_x), |value| {
             global.set_scroll_x(value)
         });
@@ -272,7 +272,7 @@ fn segments_path(segments: impl IntoIterator<Item = ((f64, f64), (f64, f64))>) -
 /// The selection layer: outlines, handles, the knob line, guides, labels, the marquee and the
 /// badges, in stage pixels.
 fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
-    let metrics = &store.overlay_editor.viewport.metrics;
+    let metrics = &store.canvas.viewport.metrics;
     let handle_scale = editor::viewport::handle_scale(metrics);
     let moveable = 0.75 * handle_scale;
     // The map in view mode draws its outline dashed.
@@ -414,7 +414,7 @@ fn project_selection(global: &OverlayEditor<'_>, store: &Store) {
             x: badge.left as f32,
             y: badge.top as f32,
             rotation: badge.rotation as f32,
-            label: ovrley_app::lib::widget::widget_type_name(&badge.kind, store.i18n.language)
+            label: ovrley_app::features::widgets::widget_type_name(&badge.kind, store.i18n.language)
                 .into(),
             id: badge.id.as_str().into(),
             map: badge.camera_mode.is_some(),
@@ -468,7 +468,7 @@ fn dashed_outline(commands: &mut String, corners: &[(f64, f64); 4], dash: f64) {
 
 /// Scroll-area coordinates to stage coordinates.
 fn stage_point(store: &Store, x: f32, y: f32) -> (f64, f64) {
-    let viewport = &store.overlay_editor.viewport;
+    let viewport = &store.canvas.viewport;
     (
         f64::from(x) + viewport.scroll_x,
         f64::from(y) + viewport.scroll_y,
@@ -501,7 +501,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
                 rem: rem.into(),
             };
             d.dispatch(move |store, _| {
-                if store.overlay_editor.viewport.metrics != metrics {
+                if store.canvas.viewport.metrics != metrics {
                     editor::set_viewport_metrics(store, metrics);
                 }
             });

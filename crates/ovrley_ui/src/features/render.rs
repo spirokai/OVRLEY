@@ -3,11 +3,11 @@
 
 use crate::projection::{models_equal, replace_if_changed, set_if_changed, strings};
 use crate::{AppWindow, Choice, ChoiceKind, RenderProgressView, RenderQueueRow, RenderVideo};
-use ovrley_app::features::render_video::codecs::{Acceleration, OutputFormat};
-use ovrley_app::features::render_video::view::{
+use ovrley_app::features::render::codecs::{Acceleration, OutputFormat};
+use ovrley_app::features::render::view::{
     render_dialog_view, render_notices_view, ProgressView, SelectEntry,
 };
-use ovrley_app::features::render_video::{self as render, DialogPhase};
+use ovrley_app::features::render::{self as render, DialogPhase};
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_core::encode::quality::QualityType;
 use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
@@ -337,7 +337,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     global.on_open_dialog(move || d.dispatch(render::open_render_dialog));
     let d = dispatcher.handle();
-    global.on_open_output_folder(move || d.dispatch(ovrley_app::features::app_shell::open_output_directory));
+    global.on_open_output_folder(move || d.dispatch(ovrley_app::features::shell::open_output_directory));
     let d = dispatcher.handle();
     global.on_render_png(move || d.dispatch(render::render_preview_frame));
     let d = dispatcher.handle();

@@ -8,12 +8,12 @@
 //! The tools about the window as a whole are here: the summary, language, units, drawer, history.
 
 use crate::{documents, overlay, render, timeline, video_sync};
-use ovrley_app::features::undo_redo::{history_enabled, redo, undo};
+use ovrley_app::features::history::{history_enabled, redo, undo};
 use ovrley_app::i18n::{change_language_preference, Locale};
-use ovrley_app::lib::widget::unit_system::change_unit_system_preference;
+use ovrley_app::store::editor::change_unit_system_preference;
 use ovrley_app::store::agent::{describe_activity, describe_template, describe_widgets, AgentReply};
 use ovrley_app::store::services::Services;
-use ovrley_app::store::slices::layout::LeftDrawerTool;
+use ovrley_app::features::toolbar::LeftDrawerTool;
 use ovrley_app::store::Store;
 use ovrley_widgets::model::document::UnitSystem;
 use schemars::JsonSchema;
@@ -338,7 +338,7 @@ fn window_tools() -> Vec<Tool> {
 
 fn summary(_: NoArguments, store: &Store, _: &Services) -> ToolResult {
     Ok(json!({
-        "appVersion": ovrley_app::lib::utils::app_version(),
+        "appVersion": ovrley_app::features::shell::app_version(),
         "language": store.i18n.language,
         "unitSystem": store.editor.unit_system,
         "drawer": describe_drawer(store),
@@ -351,7 +351,7 @@ fn summary(_: NoArguments, store: &Store, _: &Services) -> ToolResult {
         "scene": overlay::describe_scene(store),
         "widgets": describe_widgets(store),
         "history": describe_history(store),
-        "render": ovrley_app::features::render_video::agent::describe_render(store),
+        "render": ovrley_app::features::render::agent::describe_render(store),
         "videoSync": video_sync::summary(store),
     }))
 }
@@ -425,7 +425,7 @@ fn redo_edit(_: NoArguments, store: &mut Store, _: &mut Services) -> ToolResult 
 mod tests {
     use super::*;
     use crate::testing::Editor;
-    use ovrley_app::features::undo_redo::HistoryMode;
+    use ovrley_app::features::history::HistoryMode;
     use ovrley_widgets::model::document::OverlayConfig;
 
     #[test]

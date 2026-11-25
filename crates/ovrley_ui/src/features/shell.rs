@@ -8,16 +8,15 @@ use crate::{
     AlertLayer, AppShell, AppUpdates, AppWindow, Choice, ChoiceKind, SettingsSection,
     ShortcutGroupView, ShortcutOptionView, ShortcutRowView, UndoRedo, UpdatePromptPhase,
 };
-use ovrley_app::features::app_shell::{
-    self, keyboard_shortcut_groups, AppBootstrapState, SettingsSection as AppSettingsSection,
+use ovrley_app::features::shell::{
+    self, keyboard_shortcut_groups, AppBootstrapState, SettingsSection as AppSettingsSection, UpdatePromptView,
 };
-use ovrley_app::features::app_update::{self, UpdatePromptView};
 use ovrley_app::features::maps;
-use ovrley_app::features::undo_redo::{history_enabled, redo, undo};
+use ovrley_app::features::history::{history_enabled, redo, undo};
 use ovrley_app::i18n::{translate_backend_error, Locale, LOCALES};
-use ovrley_app::lib::format::format_cache_bytes;
-use ovrley_app::lib::keyboard_shortcuts::KeyInput;
-use ovrley_app::lib::widget::unit_system::change_unit_system_preference;
+use ovrley_app::format::format_cache_bytes;
+use ovrley_app::shortcuts::KeyInput;
+use ovrley_app::store::editor::change_unit_system_preference;
 use ovrley_app::store::services::WindowControl;
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_widgets::model::document::UnitSystem;
@@ -31,7 +30,7 @@ const MIB: f64 = 1024.0 * 1024.0;
 /// Writes what never changes: the versions, the language list.
 pub fn initialize(window: &AppWindow) {
     let shell = window.global::<AppShell>();
-    shell.set_version(ovrley_app::lib::utils::app_version().into());
+    shell.set_version(ovrley_app::features::shell::app_version().into());
     let languages: Vec<Choice> = LOCALES
         .iter()
         .map(|(locale, label)| Choice {
@@ -44,7 +43,7 @@ pub fn initialize(window: &AppWindow) {
     shell.set_languages(ModelRc::new(VecModel::from(languages)));
     window
         .global::<AppUpdates>()
-        .set_current_version(ovrley_app::lib::utils::VERSION.into());
+        .set_current_version(ovrley_app::features::shell::VERSION.into());
 }
 
 /// Re-translates what Rust chooses at runtime: the shortcut descriptions.
@@ -178,7 +177,7 @@ pub fn project(window: &AppWindow, store: &Store) {
 
 fn project_update_prompt(window: &AppWindow, store: &Store) {
     let global = window.global::<AppUpdates>();
-    let phase = match app_update::update_prompt_view(store) {
+    let phase = match shell::update_prompt_view(store) {
         UpdatePromptView::Hidden => UpdatePromptPhase::Hidden,
         UpdatePromptView::Available {
             version,
@@ -291,7 +290,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     shell.on_set_allow_agent_edits(move |allowed| {
         d.dispatch(move |store, services| {
-            app_shell::set_allow_agent_edits(store, services, allowed)
+            shell::set_allow_agent_edits(store, services, allowed)
         })
     });
 
@@ -305,7 +304,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     };
     shell.on_toggle_maximize_window(move || window_control.toggle_maximize());
     let d = dispatcher.handle();
-    shell.on_close_window(move || d.dispatch(app_shell::request_close));
+    shell.on_close_window(move || d.dispatch(shell::request_close));
 
     let d = dispatcher.handle();
     shell.on_app_key(move |text, alt, control, shift, meta, repeat| {
@@ -320,7 +319,7 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             .key_input(&text)
         };
         d.dispatch_with_result(move |store, services| {
-            app_shell::handle_window_key(store, services, &input)
+            shell::handle_window_key(store, services, &input)
         })
         .unwrap_or(false)
     });
@@ -350,15 +349,15 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
             }
             .key_input(&text)
         };
-        d.dispatch_with_result(move |store, _| app_shell::handle_window_capture_key(store, &input))
+        d.dispatch_with_result(move |store, _| shell::handle_window_capture_key(store, &input))
             .unwrap_or(false)
     });
 
     let d = dispatcher.handle();
-    shell.on_import_activity(move || d.dispatch(app_shell::open_activity_dialog));
+    shell.on_import_activity(move || d.dispatch(shell::open_activity_dialog));
     let d = dispatcher.handle();
     shell.on_import_videos(move || {
-        d.dispatch(ovrley_app::features::video_preview::import::open_video_import_dialog)
+        d.dispatch(ovrley_app::features::import::open_video_import_dialog)
     });
 
     let alert = window.global::<AlertLayer>();
@@ -376,9 +375,9 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
 
     let updates = window.global::<AppUpdates>();
     let d = dispatcher.handle();
-    updates.on_update_now(move || d.dispatch(app_update::install_update));
+    updates.on_update_now(move || d.dispatch(shell::install_update));
     let d = dispatcher.handle();
-    updates.on_dismiss(move || d.dispatch(|store, _| app_update::dismiss(store)));
+    updates.on_dismiss(move || d.dispatch(|store, _| shell::dismiss(store)));
 
     let history = window.global::<UndoRedo>();
     let d = dispatcher.handle();

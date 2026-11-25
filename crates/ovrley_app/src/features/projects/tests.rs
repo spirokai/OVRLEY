@@ -1,12 +1,12 @@
 //! The project lifecycle against real `.oly` files in a temporary folder, with fake dialogs and
-//! video tools (`useProjectLifecycle.test.jsx`, `projectCommands.test.jsx`).
+//! video tools.
 
-use super::*;
-use crate::lib::video_program::fixtures::metadata;
-use crate::store::services::fakes::{fake_services, Fakes, WindowCall};
-use crate::store::Dispatcher;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use crate::features::projects::*;
+use crate::store::Dispatcher;
+use crate::store::services::fakes::{fake_services, Fakes, WindowCall};
+use crate::video::fixtures::metadata;
 
 /// A temporary folder removed when the test ends.
 struct TempDir(PathBuf);
@@ -49,17 +49,6 @@ fn setup(dir: &TempDir) -> (Dispatcher, Fakes) {
     (Dispatcher::new(Store::default(), parts), fakes)
 }
 
-fn settle(dispatcher: &Dispatcher, fakes: &Fakes, done: impl Fn(&Store) -> bool) {
-    for _ in 0..600 {
-        fakes.ui_post.drain(dispatcher);
-        if dispatcher.with_store(&done) {
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(5));
-    }
-    panic!("timed out");
-}
-
 fn idle(store: &Store) -> bool {
     !store.projects.running && !store.projects.loading && store.telemetry_queue.running.is_none()
 }
@@ -84,18 +73,18 @@ fn import_videos(dispatcher: &Dispatcher, fakes: &Fakes, paths: &[String]) {
     for path in paths {
         let path = path.clone();
         dispatcher.dispatch(move |store, services| {
-            crate::features::video_preview::import::start_import(
+            crate::features::import::start_import(
                 store,
                 services,
                 vec![path.clone()],
-                crate::features::video_preview::import::ImportRequest {
+                crate::features::import::ImportRequest {
                     include: Some(vec![path]),
                     ..Default::default()
                 },
             )
             .ok();
         });
-        settle(dispatcher, fakes, |store| {
+        fakes.settle(dispatcher, |store| {
             store.video_import_review.review.is_none() && idle(store)
         });
     }
@@ -110,12 +99,12 @@ fn save_to(dispatcher: &Dispatcher, fakes: &Fakes, path: &str) -> Result<bool, S
         save_project(
             store,
             services,
-            true,
+            SaveMode::SaveAs,
             Some(path),
             Box::new(move |_, _, saved| *slot.borrow_mut() = Some(saved)),
-        )
+        );
     });
-    settle(dispatcher, fakes, |_| result.borrow().is_some());
+    fakes.settle(dispatcher, |_| result.borrow().is_some());
     let saved = result.borrow_mut().take().unwrap();
     saved
 }
@@ -136,7 +125,7 @@ fn open(
     let path = path.to_string();
     dispatcher
         .dispatch(move |store, services| open_project(store, services, path, answer, request));
-    settle(dispatcher, fakes, |store| {
+    fakes.settle(dispatcher, |store| {
         store.projects.missing_source.is_some() || store.unsaved_confirm.is_open() || (idle(store) && !replies.lock().unwrap().is_empty())
     });
     replies
@@ -154,9 +143,9 @@ fn a_saved_project_opens_with_its_videos_activity_and_status() {
     import_videos(&dispatcher, &fakes, &videos);
     let activity = fixture("test-ride.fit");
     dispatcher.dispatch(move |store, services| {
-        crate::features::app_shell::import_activity(store, services, activity, None)
+        crate::features::shell::import_activity(store, services, activity, None);
     });
-    settle(&dispatcher, &fakes, |store| !store.media.is_processing);
+    fakes.settle(&dispatcher, |store| !store.media.is_processing);
     dispatcher.dispatch(|store, _| store.editor.set_selected_second(5.0));
     let saved_offsets = dispatcher.with_store(|store| {
         store
@@ -197,7 +186,7 @@ fn a_saved_project_opens_with_its_videos_activity_and_status() {
         assert!(store.history.past.is_empty(), "the open resets the history");
         assert_eq!(
             store.editor_shell.editor_background_mode,
-            crate::features::app_shell::EditorBackgroundMode::Video
+            crate::features::shell::EditorBackgroundMode::Video
         );
     });
     assert_eq!(status(&dispatcher), ProjectStatus::Saved);
@@ -217,7 +206,7 @@ fn no_baseline_reads_unsaved_until_the_startup_dialog_is_dismissed() {
     let (dispatcher, fakes) = setup(&dir);
     assert_eq!(status(&dispatcher), ProjectStatus::Unsaved);
     dispatcher.dispatch(load_startup_projects);
-    settle(&dispatcher, &fakes, |store| store.projects.startup.open);
+    fakes.settle(&dispatcher, |store| store.projects.startup.open);
     dispatcher.dispatch(|store, _| dismiss_startup_dialog(store));
     assert_eq!(status(&dispatcher), ProjectStatus::New);
     assert!(!dispatcher.with_store(|store| store.projects.startup.open));
@@ -231,7 +220,7 @@ fn the_startup_dialog_lists_the_remembered_folder_and_opens_without_asking() {
     assert_eq!(save_to(&dispatcher, &fakes, &project), Ok(true));
     dispatcher.dispatch(|store, _| store.media.set_lap_enabled(3, false));
     dispatcher.dispatch(load_startup_projects);
-    settle(&dispatcher, &fakes, |store| store.projects.startup.open);
+    fakes.settle(&dispatcher, |store| store.projects.startup.open);
     assert_eq!(
         dispatcher.with_store(|store| store
             .projects
@@ -244,7 +233,7 @@ fn the_startup_dialog_lists_the_remembered_folder_and_opens_without_asking() {
     );
     let path = project.clone();
     dispatcher.dispatch(move |store, services| startup_open_project(store, services, path));
-    settle(&dispatcher, &fakes, idle);
+    fakes.settle(&dispatcher, idle);
     dispatcher.with_store(|store| {
         assert!(
             !store.unsaved_confirm.is_open(),
@@ -302,9 +291,9 @@ fn new_project_save_answer_saves_first() {
     let replies: Replies = Arc::default();
     let agent = reply(&replies);
     dispatcher.dispatch(move |store, services| {
-        new_project(store, services, Some(UnsavedAnswer::Save), Some(agent))
+        new_project(store, services, Some(UnsavedAnswer::Save), Some(agent));
     });
-    settle(&dispatcher, &fakes, |_| !replies.lock().unwrap().is_empty());
+    fakes.settle(&dispatcher, |_| !replies.lock().unwrap().is_empty());
     assert_eq!(
         replies.lock().unwrap()[0].as_ref().unwrap()["created"],
         true
@@ -323,7 +312,7 @@ fn an_agent_cannot_save_a_project_never_saved_through_the_question() {
     let replies: Replies = Arc::default();
     let agent = reply(&replies);
     dispatcher.dispatch(move |store, services| {
-        new_project(store, services, Some(UnsavedAnswer::Save), Some(agent))
+        new_project(store, services, Some(UnsavedAnswer::Save), Some(agent));
     });
     assert_eq!(
         replies.lock().unwrap()[0],
@@ -358,7 +347,7 @@ fn closing_asks_and_each_answer_does_what_it_says() {
     );
     dispatcher.dispatch(request_close);
     dispatcher.dispatch(|store, services| {
-        answer_unsaved_confirm(store, services, UnsavedAnswer::Discard)
+        answer_unsaved_confirm(store, services, UnsavedAnswer::Discard);
     });
     assert_eq!(*fakes.window.calls.borrow(), [WindowCall::Close]);
 }
@@ -373,7 +362,7 @@ fn a_missing_single_video_asks_and_cancel_leaves_the_session() {
     assert_eq!(save_to(&dispatcher, &fakes, &project), Ok(true));
     std::fs::remove_file(&video).unwrap();
     dispatcher.dispatch(|store, services| {
-        new_project(store, services, Some(UnsavedAnswer::Discard), None)
+        new_project(store, services, Some(UnsavedAnswer::Discard), None);
     });
 
     let replies = open(&dispatcher, &fakes, &project, None, false);
@@ -399,7 +388,7 @@ fn a_missing_single_video_asks_and_cancel_leaves_the_session() {
     // Load Anyway loads it as missing, from its saved metadata.
     let replies = open(&dispatcher, &fakes, &project, None, false);
     dispatcher.dispatch(skip_missing_source);
-    settle(&dispatcher, &fakes, |_| !replies.lock().unwrap().is_empty());
+    fakes.settle(&dispatcher, |_| !replies.lock().unwrap().is_empty());
     dispatcher.with_store(|store| {
         assert_eq!(store.video_import.imported_videos.len(), 1);
         assert!(store.video_import.imported_videos[0].missing);
@@ -407,7 +396,7 @@ fn a_missing_single_video_asks_and_cancel_leaves_the_session() {
 
     // An agent skips without asking.
     dispatcher.dispatch(|store, services| {
-        new_project(store, services, Some(UnsavedAnswer::Discard), None)
+        new_project(store, services, Some(UnsavedAnswer::Discard), None);
     });
     let replies = open(&dispatcher, &fakes, &project, None, true);
     assert!(replies.lock().unwrap()[0].is_ok());
@@ -452,7 +441,7 @@ fn locating_a_file_of_another_type_fails_the_load() {
     );
     dispatcher.dispatch(locate_missing_source);
     fakes.dialogs.answer(Some(&moved));
-    settle(&dispatcher, &fakes, |_| !replies.lock().unwrap().is_empty());
+    fakes.settle(&dispatcher, |_| !replies.lock().unwrap().is_empty());
     assert_eq!(
         dispatcher.with_store(|store| store.video_import.imported_videos[0].path.clone()),
         moved
@@ -477,11 +466,11 @@ fn a_failed_load_leaves_the_session_untouched() {
     assert!(replies.lock().unwrap()[0].is_err());
     dispatcher.with_store(|store| {
         assert_eq!(store.editor.selected_second, 2.0);
-        assert!(store
-            .media
-            .error_message
-            .as_deref()
-            .is_some_and(|message| message.starts_with("open project: ")));
+        assert_eq!(
+            store.media.error_message.as_deref(),
+            Some(crate::i18n::catalog().t(crate::i18n::Locale::En, "projects.invalidArchive")),
+            "a malformed archive shows its translated message"
+        );
     });
 }
 
@@ -496,4 +485,11 @@ fn busy_commands_are_refused() {
         new_project(store, services, None, Some(agent));
     });
     assert_eq!(replies.lock().unwrap()[0], Err(BUSY.into()));
+}
+
+#[test]
+fn every_file_failure_has_english_text() {
+    for key in ["projects.archiveTooLarge", "projects.rasterUnavailable", "projects.saveFailed", "projects.invalidArchive"] {
+        assert!(!crate::i18n::catalog().t(crate::i18n::Locale::En, key).is_empty(), "{key}");
+    }
 }

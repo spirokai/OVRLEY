@@ -2,7 +2,7 @@
 //! The window shows what an agent does: a start opens the dialog, which the user can cancel.
 
 use crate::catalog::{Answer, NoArguments, Tool, ToolError, ToolResult};
-use ovrley_app::features::render_video::agent::{self, AgentRenderOptions};
+use ovrley_app::features::render::agent::{self, AgentRenderOptions};
 use ovrley_app::store::agent::AgentReply;
 use ovrley_app::store::services::Services;
 use ovrley_app::store::Store;
@@ -105,10 +105,10 @@ fn cancel(_: NoArguments, store: &mut Store, services: &mut Services) -> ToolRes
 mod tests {
     use super::*;
     use crate::testing::{Editor, Started};
-    use ovrley_app::features::render_video;
-    use ovrley_app::features::video_preview::filmstrips::CodecDetection;
+    use ovrley_app::features::render;
+    use ovrley_app::features::player::filmstrips::CodecDetection;
     use ovrley_app::store::services::fakes::FakeRenderCall;
-    use ovrley_app::store::slices::media::ImportedActivity;
+    use ovrley_app::store::media::ImportedActivity;
     use ovrley_core::debug::{RenderProgress, RenderStatus};
     use ovrley_core::encode::progress::ProgressSink;
     use ovrley_core::error::CoreError;
@@ -228,15 +228,15 @@ mod tests {
         let waiting = start_over_existing_output(&editor);
         editor
             .dispatcher
-            .dispatch(|store, _| render_video::cancel_overwrite(store));
+            .dispatch(|store, _| render::cancel_overwrite(store));
         assert_eq!(editor.finish(waiting), Ok(json!({"started": false})));
 
         // Answered: the overwrite renders.
         editor
             .dispatcher
-            .dispatch(|store, _| render_video::close_render_dialog(store));
+            .dispatch(|store, _| render::close_render_dialog(store));
         let waiting = start_over_existing_output(&editor);
-        editor.dispatcher.dispatch(render_video::confirm_overwrite);
+        editor.dispatcher.dispatch(render::confirm_overwrite);
         assert_eq!(editor.finish(waiting).unwrap()["started"], true);
         assert!(editor.fakes.render.calls().iter().any(|call| matches!(
             call,
@@ -253,7 +253,7 @@ mod tests {
         let waiting = start_over_existing_output(&editor);
         editor
             .dispatcher
-            .dispatch(|store, _| render_video::close_render_dialog(store));
+            .dispatch(|store, _| render::close_render_dialog(store));
         assert_eq!(
             editor.finish(waiting),
             Err(ToolError::Failed(

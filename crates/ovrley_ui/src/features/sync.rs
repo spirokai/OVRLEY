@@ -8,16 +8,16 @@ use crate::{
     AppWindow, CandidateCardView, CandidateListView, Choice, ChoiceKind, EventBandView, LandmarkKind, LandmarkRowView, MatchScope, PointerPhase, TimelineLandmarkView,
     VideoSync, VideoSyncTab,
 };
-use ovrley_app::features::seconds_fields::SecondsField;
-use ovrley_app::features::video_sync::maps::{self, WheelDevice};
-use ovrley_app::features::video_sync::matching::MatchScope as AppMatchScope;
-use ovrley_app::features::video_sync::timeline::{self, BandTone, GraphView};
-use ovrley_app::features::video_sync::{self as sync, CandidateListView as AppCandidateList};
+use ovrley_app::controls::seconds::SecondsField;
+use ovrley_app::features::sync::maps::{self, WheelDevice};
+use ovrley_app::features::sync::matching::MatchScope as AppMatchScope;
+use ovrley_app::features::sync::timeline::{self, BandTone, GraphView};
+use ovrley_app::features::sync::{self as sync, CandidateListView as AppCandidateList};
 use ovrley_app::i18n::{catalog, Locale};
-use ovrley_app::lib::color_picker::{hsl_to_rgb, Hsl};
-use ovrley_app::store::slices::layout::VideoSyncDrawerTab;
-use ovrley_app::store::slices::manual_video_sync::{self as manual, SPEED_THRESHOLD_RANGE, TURN_THRESHOLD_RANGE};
-use ovrley_app::store::slices::video_import as videos;
+use ovrley_app::controls::color::{hsl_to_rgb, Hsl};
+use ovrley_app::features::toolbar::VideoSyncDrawerTab;
+use ovrley_app::features::sync::manual::{self as manual, SPEED_THRESHOLD_RANGE, TURN_THRESHOLD_RANGE};
+use ovrley_app::store::videos as videos;
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_core::media::manual_video_sync::LandmarkKind as AppLandmarkKind;
 use ovrley_widgets::widgets::map::preview::MapFramePixels;
@@ -107,7 +107,7 @@ impl Projection {
 
     fn project_speed(&self, global: &VideoSync<'_>, store: &Store) {
         let readout = store.video_sync.speed.as_ref();
-        let frame = readout.and_then(ovrley_app::features::video_sync::speed_readout::SpeedReadout::frame);
+        let frame = readout.and_then(ovrley_app::features::sync::readout::SpeedReadout::frame);
         set_if_changed(global.get_speed_shown(), frame.is_some(), |value| global.set_speed_shown(value));
         let error = readout.and_then(|readout| readout.error.clone()).unwrap_or_default();
         set_if_changed(global.get_speed_error(), SharedString::from(error), |value| global.set_speed_error(value));
@@ -194,7 +194,7 @@ impl Projection {
         let key = (address, (view.view_start.to_bits(), view.view_end.to_bits()), width.to_bits(), height.to_bits(), language);
         if self.graph.borrow().as_ref() != Some(&key) {
             *self.graph.borrow_mut() = Some(key);
-            project_graph(global, &timeline::graph_view(detection, view, width, height, language), language);
+            project_graph(global, &timeline::graph_view(detection, view, width, height), language);
         }
         let landmarks = timeline::landmark_models(store)
             .into_iter()
@@ -211,8 +211,8 @@ impl Projection {
 }
 
 fn project_screens(global: &VideoSync<'_>, store: &Store) {
-    let (width, height) = ovrley_app::features::overlay_editor::scene_size(store);
-    let scale = ovrley_app::features::overlay_editor::display_scale(store);
+    let (width, height) = ovrley_app::features::canvas::scene_size(store);
+    let scale = ovrley_app::features::canvas::display_scale(store);
     set_if_changed(global.get_screen_width(), (width * scale) as f32, |value| global.set_screen_width(value));
     set_if_changed(global.get_screen_height(), (height * scale) as f32, |value| global.set_screen_height(value));
     set_if_changed(global.get_screen_gap(), (sync::PREVIEW_SCREEN_GAP * scale) as f32, |value| global.set_screen_gap(value));

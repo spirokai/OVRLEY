@@ -56,7 +56,7 @@ fn the_settings_dialog_blocks_shortcuts_and_returns_the_focus() {
 }
 
 fn the_update_dialog_hides_the_startup_dialog_and_blocks_shortcuts() {
-    use ovrley_app::features::app_update::UpdatePhase;
+    use ovrley_app::features::shell::UpdatePhase;
     use ovrley_ui::{AppUpdates, Projects};
     let (window, dispatcher) = window();
     dispatcher.dispatch(|store, _| {

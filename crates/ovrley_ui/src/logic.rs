@@ -8,13 +8,13 @@ use crate::{
     ItemAlignedPlacement, NumberInputLogic, ParsedChannel, ParsedColor, Placement, PlacementAlign,
     PlacementLogic, PlacementRect, PlacementSide, Rgba, StepDirection, SteppedNumber,
 };
-use ovrley_app::hooks::gradient_picker::{self as gp, StopKey, StopKeyResult};
-use ovrley_app::hooks::inline_number_input::{self as inline, InlineBlur};
-use ovrley_app::lib::choice_list::{self as cl, ChoiceKind as AppChoiceKind};
-use ovrley_app::lib::color_picker::{self as cp, ColorFormat as AppColorFormat};
-use ovrley_app::lib::gradient_stops::{self as gs, GradientStop};
-use ovrley_app::lib::number_input::{self as ni, Step, StepDirection as AppStepDirection};
-use ovrley_app::lib::placement::{self as pl, Align, Rect, Side, Size};
+use ovrley_app::controls::gradient::{self as gp, StopKey, StopKeyResult};
+use ovrley_app::controls::number::{self as inline, InlineBlur};
+use ovrley_app::controls::choice::{self as cl, ChoiceKind as AppChoiceKind};
+use ovrley_app::controls::color::{self as cp, ColorFormat as AppColorFormat};
+use ovrley_app::controls::gradient::{self as gs, GradientStop};
+use ovrley_app::controls::number::{self as ni, Step, StepDirection as AppStepDirection};
+use ovrley_app::controls::placement::{self as pl, Align, Rect, Side, Size};
 use ovrley_widgets::model::document::normalize_hex_color;
 use slint::platform::Key;
 use slint::{ComponentHandle, Global, Model, ModelRc, SharedString, VecModel};

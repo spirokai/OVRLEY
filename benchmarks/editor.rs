@@ -1,6 +1,6 @@
 //! What the widget benchmarks take from the editor: its theme and the HUD template's defaults.
 
-use ovrley_app::lib::template::ThemeColors;
+use ovrley_app::store::template::ThemeColors;
 use serde_json::{Map, Value};
 use std::path::Path;
 

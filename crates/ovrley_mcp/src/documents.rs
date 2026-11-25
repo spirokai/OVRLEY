@@ -1,9 +1,9 @@
 //! The tools of what the user opens and saves: projects, templates and the activity file.
 
 use crate::catalog::{Answer, NoArguments, Tool, ToolError, ToolResult};
-use ovrley_app::features::app_shell::{self, UnsavedAnswer};
+use ovrley_app::features::shell::{self, UnsavedAnswer};
 use ovrley_app::features::projects::{self, ProjectOpenRequest};
-use ovrley_app::features::template_manager;
+use ovrley_app::features::templates;
 use ovrley_app::store::agent::{describe_activity, describe_template, AbsolutePath, AgentReply};
 use ovrley_app::store::services::Services;
 use ovrley_app::store::Store;
@@ -267,7 +267,7 @@ fn save_project(
     projects::save_project(
         store,
         services,
-        path.is_some(),
+        if path.is_some() { projects::SaveMode::SaveAs } else { projects::SaveMode::Save },
         path,
         Box::new(move |store, _, saved| reply.send(projects::save_answer(store, saved))),
     );
@@ -276,7 +276,7 @@ fn save_project(
 
 fn list_templates(_: NoArguments, store: &Store, _: &Services) -> ToolResult {
     let templates = &store.template.templates;
-    let groups: Vec<Value> = template_manager::template_groups(templates, "Unknown Resolution")
+    let groups: Vec<Value> = templates::template_groups(templates, "Unknown Resolution")
         .into_iter()
         .map(|group| {
             let templates: Vec<Value> = group
@@ -308,8 +308,8 @@ fn load_template(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    let done = template_manager::reply_with(reply, describe_template);
-    template_manager::load_template(store, services, args.template_id, done);
+    let done = templates::reply_with(reply, describe_template);
+    templates::load_template(store, services, args.template_id, done);
     Ok(Answer::Later)
 }
 
@@ -319,7 +319,7 @@ fn import_template(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    template_manager::import_template(store, services, args.path.into(), Some(reply));
+    templates::import_template(store, services, args.path.into(), Some(reply));
     Ok(Answer::Later)
 }
 
@@ -329,7 +329,7 @@ fn new_template(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    template_manager::create_new_template_request(store, services, Some(reply));
+    templates::create_new_template_request(store, services, Some(reply));
     Ok(Answer::Later)
 }
 
@@ -339,8 +339,8 @@ fn save_template(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    let done = template_manager::reply_with(reply, describe_template);
-    template_manager::save_template(store, services, args.path.into(), done);
+    let done = templates::reply_with(reply, describe_template);
+    templates::save_template(store, services, args.path.into(), done);
     Ok(Answer::Later)
 }
 
@@ -350,12 +350,12 @@ fn import_activity(
     services: &mut Services,
     reply: AgentReply,
 ) -> Result<Answer, ToolError> {
-    app_shell::import_activity(store, services, args.path.into(), Some(reply));
+    shell::import_activity(store, services, args.path.into(), Some(reply));
     Ok(Answer::Later)
 }
 
 fn delete_activity(_: NoArguments, store: &mut Store, _: &mut Services) -> ToolResult {
-    app_shell::delete_activity(store)?;
+    shell::delete_activity(store)?;
     Ok(json!({ "activity": describe_activity(store) }))
 }
 
@@ -403,7 +403,7 @@ mod tests {
         let editor = Editor::new();
         editor
             .dispatcher
-            .dispatch(|store, services| template_manager::fetch_templates(store, services, None));
+            .dispatch(|store, services| templates::fetch_templates(store, services, None));
         editor.until("the template list", || {
             editor
                 .dispatcher
@@ -444,7 +444,7 @@ mod tests {
             .dispatcher
             .with_store(|store| store.unsaved_confirm.is_open()));
         editor.dispatcher.dispatch(|store, services| {
-            template_manager::answer_unsaved_confirm(store, services, UnsavedAnswer::Cancel);
+            templates::answer_unsaved_confirm(store, services, UnsavedAnswer::Cancel);
         });
         assert_eq!(editor.finish(waiting), Ok(json!({"created": false})));
     }

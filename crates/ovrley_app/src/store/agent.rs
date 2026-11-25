@@ -1,12 +1,12 @@
-//! Deferred replies to agent tool calls (Phase 2 D13, Phase 3 D15).
+//! Deferred replies to agent tool calls.
 //!
 //! A tool call is one dispatch. When its result is not known by the end of that dispatch (it waits
 //! for a worker or for the user), the action keeps an [`AgentReply`] and answers later, on the UI
 //! thread. Dropping a reply unanswered answers that the call was cancelled.
 
-use super::slices::media::ActivitySource;
-use super::Store;
 use serde_json::{json, Value};
+use crate::store::Store;
+use crate::store::media::ActivitySource;
 
 /// A tool's result: its value, or the error the agent reads.
 pub type AgentResult = Result<Value, String>;
@@ -112,28 +112,28 @@ pub fn describe_activity(store: &Store) -> Value {
 
 /// The loaded template, as agents read it: its source, its name and its save status.
 pub fn describe_template(store: &Store) -> Value {
-    use super::slices::template::TemplateSource;
+    use super::template::TemplateSource;
     let (source, name) = match &store.template.loaded_template_source {
         Some(TemplateSource::Bundled { template_id }) => (json!({"kind": "bundled", "templateId": template_id}), Some(template_id.clone())),
-        Some(TemplateSource::File { path }) => (json!({"kind": "file", "path": path}), Some(crate::features::template_manager::filename_from_path(Some(path)))),
+        Some(TemplateSource::File { path }) => (json!({"kind": "file", "path": path}), Some(crate::features::templates::filename_from_path(Some(path)))),
         None => (Value::Null, None),
     };
     json!({
         "source": source,
         "name": name,
-        "saveStatus": crate::features::template_manager::save_status(store).name(),
+        "saveStatus": crate::features::templates::save_status(store).name(),
     })
 }
 
 /// The document's widgets, as agents read them: id, type, name, position and whether selected.
 pub fn describe_widgets(store: &Store) -> Value {
-    let widgets: Vec<Value> = crate::lib::widget::build_config_widgets(&store.editor.config)
+    let widgets: Vec<Value> = crate::features::widgets::build_config_widgets(&store.editor.config)
         .into_iter()
         .map(|widget| {
             json!({
                 "id": widget.id,
                 "type": widget.kind,
-                "name": crate::lib::widget::group_widgets_for_sidebar(std::slice::from_ref(&widget), crate::i18n::Locale::En)[0].name,
+                "name": crate::features::widgets::group_widgets_for_sidebar(std::slice::from_ref(&widget), crate::i18n::Locale::En)[0].name,
                 "x": widget.data.get("x"),
                 "y": widget.data.get("y"),
                 "selected": store.editor.selected_widget_ids.contains(&widget.id),
@@ -150,7 +150,7 @@ pub fn describe_widget(store: &Store, widget_id: &str) -> Result<Value, String> 
     let (collection, _) = store.editor.config.find_widget(widget_id)?;
     let kind = collection.widget_type(data)?;
     let definition = ovrley_widgets::model::catalog::catalog().require_widget(&kind)?;
-    let content = crate::features::overlay_editor::interaction::content_rect(store, widget_id)
+    let content = crate::features::canvas::interaction::content_rect(store, widget_id)
         .map(|rect| json!({"left": rect.left, "top": rect.top, "width": rect.width, "height": rect.height}));
     Ok(json!({
         "id": widget_id,

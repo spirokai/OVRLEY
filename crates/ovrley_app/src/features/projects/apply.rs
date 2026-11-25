@@ -1,36 +1,36 @@
-//! A loaded project, or a new one, applied to the store in one action (`projectHydration.js`).
+//! A loaded project, or a new one, applied to the store in one action.
 //!
-//! The callers run these under `HistoryMode::Reset` (`replaceEditorDocument`). Everything that can
+//! The callers run these under `HistoryMode::Reset`. Everything that can
 //! fail is checked while the project is prepared, so applying it never leaves the session half
 //! replaced.
 
-use crate::features::app_shell::{self, activate_parsed_activity};
-use crate::features::player::playback::{pause, timeline_minimum};
-use crate::features::player::viewport::clamp_to_view;
-use crate::lib::activity::{trim_activity_edge, TrimEdge, MIN_ACTIVITY_TRIM_SECONDS};
-use crate::lib::video_program::collection::{sort_clips_by_timeline, timeline_bounds};
-use crate::lib::video_program::segments::fit_cuts_to_frame_count;
-use crate::lib::video_program::{ImportedVideo, VideoEditsMap};
-use crate::store::slices::editor::{PreviewPlaybackState, TimelineViewport};
-use crate::store::slices::media::{ActivitySource, ImportedActivity};
-use crate::store::slices::template::{create_new_template, hydrate_template_state};
-use crate::store::slices::manual_video_sync::{hydrate_video_sync_state, reset_video_sync_state};
-use crate::store::slices::video_import::{clear_imported_videos, commit_video_collection, select_clip, ClipLane, SelectedClip};
-use crate::store::Store;
+use std::rc::Rc;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::transition_defaults;
 use ovrley_core::encode::render_settings::RenderSettings;
 use ovrley_core::media::manual_video_sync::ManualVideoSync;
-use crate::lib::video_program::program::PlaybackSource;
 use ovrley_services::project::{ProjectDocument, ProjectVideo};
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};
-use std::rc::Rc;
+use crate::activity::{trim_activity_edge, MIN_ACTIVITY_TRIM_SECONDS, TrimEdge};
+use crate::features::player::playback::{pause, timeline_minimum};
+use crate::features::player::viewport::clamp_to_view;
+use crate::features::shell::{self, activate_parsed_activity};
+use crate::features::sync::manual::{hydrate_video_sync_state, reset_video_sync_state};
+use crate::store::Store;
+use crate::store::editor::{PreviewPlaybackState, TimelineViewport};
+use crate::store::media::{ActivitySource, ImportedActivity};
+use crate::store::template::{create_new_template, hydrate_template_state};
+use crate::store::videos::{clear_imported_videos, commit_video_collection, select_clip, ClipLane, SelectedClip};
+use crate::video::{ImportedVideo, VideoEditsMap};
+use crate::video::collection::{sort_clips_by_timeline, timeline_bounds};
+use crate::video::program::PlaybackSource;
+use crate::video::segments::fit_cuts_to_frame_count;
 
 /// The timeline a new project starts with when there is no media.
 const NEW_PROJECT_DURATION_SECONDS: f64 = 73.0;
 
-/// `createProjectVideoEdits`: the saved edits of every loaded video, missing ones included. A
+/// The saved edits of every loaded video, missing ones included. A
 /// found file shorter than the saved video keeps only the cuts inside it. An anchor to a video left
 /// out at load (an older project's missing video) goes; the clip keeps its offset.
 pub fn create_project_video_edits(
@@ -59,7 +59,7 @@ pub fn create_project_video_edits(
         .collect()
 }
 
-/// `createProjectManualVideoSync`: when its video was left out at load, its landmarks go and the
+/// When its video was left out at load, its landmarks go and the
 /// first loaded video is selected; a found file shorter than the saved video keeps the landmarks
 /// inside it.
 pub fn create_project_manual_video_sync(
@@ -67,22 +67,16 @@ pub fn create_project_manual_video_sync(
     manual: &ManualVideoSync,
 ) -> ManualVideoSync {
     let mut manual = manual.clone();
-    match videos
-        .iter()
-        .find(|video| Some(&video.id) == manual.video_id.as_ref())
-    {
-        Some(video) => manual
-            .landmarks
-            .retain(|landmark| landmark.video_second() <= video.duration_seconds),
-        None => {
-            manual.video_id = videos.first().map(|video| video.id.clone());
-            manual.landmarks.clear();
-        }
+    if let Some(video) = videos.iter().find(|video| Some(&video.id) == manual.video_id.as_ref()) {
+        manual.landmarks.retain(|landmark| landmark.video_second() <= video.duration_seconds);
+    } else {
+        manual.video_id = videos.first().map(|video| video.id.clone());
+        manual.landmarks.clear();
     }
     manual
 }
 
-/// `resolveDisabledLaps`: laps belong to the activity file; one loaded as absent takes its lap
+/// Laps belong to the activity file; one loaded as absent takes its lap
 /// selection with it.
 pub fn resolve_disabled_laps(
     disabled: &[usize],
@@ -100,7 +94,7 @@ pub fn resolve_disabled_laps(
     Ok(disabled.to_vec())
 }
 
-/// `resolveActivityTrim`: kept inside the loaded activity and at least the minimum length apart; a
+/// Kept inside the loaded activity and at least the minimum length apart; a
 /// trim of an activity that is gone, or too short to trim, goes.
 fn resolve_activity_trim(
     trim: Option<ActivityTrim>,
@@ -117,7 +111,7 @@ fn resolve_activity_trim(
 /// A project read, its sources loaded and its saved state fitted to them, ready to commit.
 pub struct PreparedProject {
     /// The document as read, its editor normalized and its loaded videos described as loaded
-    /// (`describeLoadedVideos`): the saved baseline.
+    ///: the saved baseline.
     pub document: ProjectDocument,
     /// The editor's document through the template ingress, the raster load results attached.
     pub config: OverlayConfig,
@@ -192,7 +186,7 @@ fn apply_owned_state(
     store.media.activity_trim = resolve_activity_trim(document.activity_trim, activity_duration);
     store.batch_render.batch_output_folder = document.render.batch_output_folder;
     store.editor.selected_second =
-        crate::lib::utils::clamp(timeline.playhead_second, minimum, timeline_end);
+        timeline.playhead_second.max(minimum).min(timeline_end);
     store.editor.timeline_viewport = clamp_to_view(
         timeline.view_start,
         timeline.view_end,
@@ -215,8 +209,8 @@ pub fn apply_new_project(store: &mut Store) -> Result<(), String> {
         (Some(_), None) => return Err("the loaded template has no saved widget state".into()),
         (None, _) => None,
     };
-    crate::features::video_preview::import::clear_videos(store);
-    app_shell::clear_activity_file(store);
+    crate::features::import::clear_videos(store);
+    shell::clear_activity_file(store);
     match template {
         Some((source, state)) => hydrate_template_state(
             &mut store.editor,
@@ -250,7 +244,7 @@ pub fn apply_new_project(store: &mut Store) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::lib::video_program::fixtures::{cut, cut_edits, simple};
+    use crate::video::fixtures::{cut, cut_edits, simple};
     use ovrley_core::media::video_edits::{AnchorSide, PlacementAnchor, SegmentEdits, VideoEdits};
     use ovrley_services::project::PathLocator;
 
@@ -354,7 +348,7 @@ mod tests {
         assert_eq!(store.render_settings, RenderSettings::default());
         assert_eq!(store.batch_render.batch_output_folder, None);
         store.template.loaded_template_source =
-            Some(crate::store::slices::template::TemplateSource::File {
+            Some(crate::store::template::TemplateSource::File {
                 path: "/t.json".into(),
             });
         assert!(

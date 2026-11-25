@@ -1,9 +1,9 @@
 //! The fixed cases: one widget per visual variant, with the editor's defaults and effective data.
 
 use crate::editor;
-use ovrley_app::features::widget_preview::{widget_fonts, FontKey};
+use ovrley_app::features::widgets::preview::{widget_fonts, FontKey};
 use ovrley_app::i18n::DEFAULT_LOCALE;
-use ovrley_app::lib::template::editor_effective_config;
+use ovrley_app::store::template::editor_effective_config;
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::model::document::{
     create_widget_defaults, merge_widget_data, number, resolve_active_widget_data, Collection, OverlayConfig, WidgetCreationOptions,

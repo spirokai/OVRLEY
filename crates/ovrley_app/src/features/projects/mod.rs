@@ -1,40 +1,37 @@
-//! The projects feature (D11): `useProjectLifecycle`, `projectOperations`,
-//! `useProjectDocumentState` and `useProjectSourceRecovery`.
+//! Projects: new, open, save and close, the project status, and the recovery of missing sources.
 //!
-//! `.oly` files are read, migrated, validated and written only by `ovrley_services::project`
-//! (D1); the editor part goes through the template ingress. Disk work runs on workers; each result
-//! comes back as an action. Opening, starting new and closing the window ask about unsaved changes
-//! first (Q4: opening asks too, unlike React).
+//! `.oly` files are read, migrated, validated and written only by `ovrley_services::project`; the
+//! editor part goes through the template ingress. Disk work runs on workers; each result comes
+//! back as an action. Opening, starting new and closing the window ask about unsaved changes
+//! first.
 
 pub mod apply;
 pub mod snapshot;
 
-use crate::features::app_shell::{UnsavedAnswer, UnsavedContinuation};
-use crate::features::template_manager::check_document_fonts;
-use crate::features::undo_redo::HistoryMode;
-use crate::features::video_preview::import::{probe_videos, queue_telemetry_extraction};
-use crate::i18n::catalog;
-use crate::lib::file_dialog::{filename_from_selected_path, open_single_path, path_in_directory, save_single_path, DialogOptions};
-use crate::lib::video_program::collection::sort_clips_by_timeline;
-use crate::lib::video_program::{create_missing_video, video_metadata_snapshot, ImportedVideo};
-use crate::store::agent::{AgentReply, AgentResult};
-use crate::store::services::{DialogFilter, Services};
-use crate::store::slices::media::{ActivitySource, ImportedActivity};
-use crate::store::Store;
-use apply::{apply_new_project, apply_project, create_project_manual_video_sync, create_project_video_edits, resolve_disabled_laps, PreparedProject};
-use ovrley_core::normalize::template::create_durable_template_state;
-use ovrley_services::project::{
-    default_project_directory, list_project_files, read_project, write_project, OpenedProject, ProjectEditor, ProjectError, ProjectFileSummary,
-};
-use ovrley_widgets::widgets::raster::error::RasterError;
-use ovrley_widgets::model::document::{canonical_numbers, OverlayConfig};
-use serde_json::{json, Map, Value};
-use snapshot::{create_project_snapshot, project_content, project_timeline, ProjectBaseline, LAST_PROJECT_DIRECTORY_KEY};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
+use apply::{apply_new_project, apply_project, create_project_manual_video_sync, create_project_video_edits, resolve_disabled_laps, PreparedProject};
+use ovrley_core::normalize::template::create_durable_template_state;
+use ovrley_services::project::{default_project_directory, list_project_files, read_project, write_project, OpenedProject, ProjectEditor, ProjectError, ProjectFileSummary};
+use ovrley_widgets::model::document::{canonical_numbers, OverlayConfig};
+use ovrley_widgets::widgets::raster::error::RasterError;
+use serde_json::{json, Map, Value};
+use snapshot::{create_project_snapshot, project_content, project_timeline, LAST_PROJECT_DIRECTORY_KEY, ProjectBaseline};
+use crate::dialogs::{filename_from_selected_path, open_single_path, path_in_directory, save_single_path, DialogOptions};
+use crate::features::history::HistoryMode;
+use crate::features::import::{probe_videos, queue_telemetry_extraction};
+use crate::features::shell::{UnsavedAnswer, UnsavedContinuation};
+use crate::features::templates::check_document_fonts;
+use crate::i18n::catalog;
+use crate::store::Store;
+use crate::store::agent::{AgentReply, AgentResult};
+use crate::store::media::{ActivitySource, ImportedActivity};
+use crate::store::services::{DialogFilter, Services};
+use crate::video::{create_missing_video, video_metadata_snapshot, ImportedVideo};
+use crate::video::collection::sort_clips_by_timeline;
 
-/// `useProjectDocumentState`'s status.
+/// The project status.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProjectStatus {
     /// A pristine project never saved.
@@ -135,7 +132,7 @@ struct StatusKey {
     config: Rc<OverlayConfig>,
     global_defaults: Rc<Map<String, Value>>,
     videos: Rc<Vec<ImportedVideo>>,
-    edits: Rc<crate::lib::video_program::VideoEditsMap>,
+    edits: Rc<crate::video::VideoEditsMap>,
     values: StatusValues,
 }
 
@@ -183,7 +180,7 @@ impl StatusKey {
     }
 }
 
-/// `useProjectLifecycle`'s and `useProjectDocumentState`'s state.
+/// The project lifecycle's state.
 #[derive(Debug, Default)]
 pub struct ProjectLifecycleState {
     pub loaded_project_path: Option<String>,
@@ -227,15 +224,49 @@ fn report(store: &mut Store, key: &str, error: &str) {
     store.media.set_error_message(format!("{operation}: {error}"));
 }
 
-/// A project error tagged for translation; `invalid` names what a malformed project or a failed
-/// file operation means to this operation.
-fn tagged_project_error(error: &ProjectError, invalid: &str) -> String {
-    let code = match error {
-        ProjectError::ArchiveSize => "archive_size",
-        ProjectError::RasterUnavailable(_) => "raster_unavailable",
-        ProjectError::Invalid(_) => invalid,
-    };
-    format!("[project_error:{code}] {error}")
+/// Why a project operation failed.
+#[derive(Debug)]
+enum Failure {
+    /// A project file could not be read or written: the UI shows the translated message of `key`,
+    /// agents read `detail`.
+    File { key: &'static str, detail: String },
+    /// Any other failure, shown after the operation's name.
+    Other(String),
+}
+
+impl Failure {
+    /// A project file error; `invalid_key` names what a malformed project or a failed file
+    /// operation means to this operation.
+    fn file(error: &ProjectError, invalid_key: &'static str) -> Self {
+        let key = match error {
+            ProjectError::ArchiveSize => "projects.archiveTooLarge",
+            ProjectError::RasterUnavailable(_) => "projects.rasterUnavailable",
+            ProjectError::Invalid(_) => invalid_key,
+        };
+        Self::File { key, detail: error.to_string() }
+    }
+
+    fn into_detail(self) -> String {
+        match self {
+            Self::File { detail, .. } | Self::Other(detail) => detail,
+        }
+    }
+
+    fn report(&self, store: &mut Store, operation_key: &str) {
+        match self {
+            Self::File { key, detail } => {
+                log::error!("Failed to {}: {detail}", operation_name(store, operation_key));
+                store.media.set_error_message(catalog().t(store.i18n.language, key).to_string());
+            }
+            Self::Other(message) => report(store, operation_key, message),
+        }
+    }
+}
+
+impl From<String> for Failure {
+    fn from(message: String) -> Self {
+        Self::Other(message)
+    }
 }
 
 /// Busy: a project operation, an activity import, a quiet video import or the renderer runs. Project commands are ignored and their buttons disabled meanwhile.
@@ -244,7 +275,7 @@ pub fn is_busy(store: &Store) -> bool {
         || store.projects.loading
         || store.media.is_processing
         || store.media.importing_video
-        || crate::features::render_video::session::is_renderer_busy(store)
+        || crate::features::render::session::is_renderer_busy(store)
 }
 
 /// The user data root (the project and template folders' parent).
@@ -264,7 +295,7 @@ fn content_unchanged(store: &Store, baseline: &ProjectBaseline) -> bool {
     }
 }
 
-/// `useProjectDocumentState`'s status: the content compared with the baseline, and the playhead
+/// The content compared with the baseline, and the playhead
 /// and viewport with the saved timeline. Uses the cached comparison when its inputs are unchanged.
 pub fn project_status(store: &Store) -> ProjectStatus {
     let Some(baseline) = &store.projects.baseline else { return ProjectStatus::Unsaved };
@@ -295,14 +326,13 @@ pub fn reconcile_project_status(store: &mut Store) {
     store.projects.status_cache = Some((key, same));
 }
 
-/// `markSaved`.
 fn mark_saved(store: &mut Store, path: String, baseline: ProjectBaseline) {
     store.projects.loaded_project_path = Some(path);
     store.projects.baseline = Some(baseline);
     store.projects.baseline_serial += 1;
 }
 
-/// `markNew`: the session as a pristine project never saved.
+/// The session as a pristine project never saved.
 fn mark_new(store: &mut Store) {
     store.projects.loaded_project_path = None;
     store.projects.baseline = match create_project_snapshot(store, None) {
@@ -327,7 +357,7 @@ pub fn describe_project(store: &Store) -> Value {
 
 // --- unsaved changes ----------------------------------------------------------------------------
 
-/// `confirmProjectTransition`: runs `proceed` now without unsaved changes, else with the agent's
+/// Runs `proceed` now without unsaved changes, else with the agent's
 /// answer, else after the user's (the dialog opens with `continuation`).
 fn confirm_transition(store: &mut Store, services: &mut Services, agent_answer: Option<UnsavedAnswer>, continuation: UnsavedContinuation) {
     if !project_status(store).has_unsaved_changes() {
@@ -369,7 +399,7 @@ fn continue_transition(store: &mut Store, services: &mut Services, answer: Unsav
             save_project(
                 store,
                 services,
-                false,
+                SaveMode::Save,
                 None,
                 Box::new(move |store, services, saved| match saved {
                     Ok(true) => proceed(store, services, continuation),
@@ -387,7 +417,7 @@ fn proceed(store: &mut Store, services: &mut Services, continuation: UnsavedCont
         UnsavedContinuation::NewTemplate { .. } => unreachable!("template confirmations are answered by the template manager"),
         UnsavedContinuation::NewProject { reply } => create_project(store, services, reply),
         UnsavedContinuation::OpenProject { path, request } => load_project(store, services, path, request),
-        UnsavedContinuation::CloseWindow => crate::features::render_video::close_window(store, services),
+        UnsavedContinuation::CloseWindow => crate::features::render::close_window(store, services),
     }
 }
 
@@ -420,7 +450,7 @@ fn fail(store: &mut Store, continuation: UnsavedContinuation, error: String) {
 
 // --- new ----------------------------------------------------------------------------------------
 
-/// `handleNewProject`: asks about unsaved changes first; an agent passes its answer, or waits for
+/// Asks about unsaved changes first; an agent passes its answer, or waits for
 /// the user's.
 pub fn new_project(store: &mut Store, services: &mut Services, agent_answer: Option<UnsavedAnswer>, reply: Option<AgentReply>) {
     if is_busy(store) {
@@ -432,7 +462,7 @@ pub fn new_project(store: &mut Store, services: &mut Services, agent_answer: Opt
     confirm_transition(store, services, agent_answer, UnsavedContinuation::NewProject { reply });
 }
 
-/// `createProject`: the new session replaces the history, then becomes the baseline.
+/// The new session replaces the history, then becomes the baseline.
 fn create_project(store: &mut Store, _services: &mut Services, reply: Option<AgentReply>) {
     if is_busy(store) {
         if let Some(reply) = reply {
@@ -460,13 +490,22 @@ fn create_project(store: &mut Store, _services: &mut Services, reply: Option<Age
 /// (already reported).
 pub type SaveDone = Box<dyn FnOnce(&mut Store, &mut Services, Result<bool, String>)>;
 
-/// `save`: Save writes to the loaded project; Save As, or a project never saved, asks for a path
-/// (the loaded path, else `project.oly` in the project folder). An agent passes `path` instead.
-pub fn save_project(store: &mut Store, services: &mut Services, save_as: bool, path: Option<String>, then: SaveDone) {
+/// Save, or Save As.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SaveMode {
+    /// Writes to the loaded project.
+    Save,
+    /// Writes to a new path.
+    SaveAs,
+}
+
+/// Save writes to the loaded project; Save As, or a project never saved, asks for a path (the
+/// loaded path, else `project.oly` in the project folder). An agent passes `path` instead.
+pub fn save_project(store: &mut Store, services: &mut Services, mode: SaveMode, path: Option<String>, then: SaveDone) {
     if is_busy(store) {
         return then(store, services, Err(BUSY.into()));
     }
-    let target = path.or_else(|| (!save_as).then(|| store.projects.loaded_project_path.clone()).flatten());
+    let target = path.or_else(|| (mode == SaveMode::Save).then(|| store.projects.loaded_project_path.clone()).flatten());
     if let Some(target) = target {
         return write_session(store, services, target, then);
     }
@@ -507,10 +546,10 @@ pub fn save_project(store: &mut Store, services: &mut Services, save_as: bool, p
     }
 }
 
-/// `saveProject`: the session's snapshot, written on a worker with its raster images and a
+/// The session's snapshot, written on a worker with its raster images and a
 /// thumbnail; then the baseline, and the notice when an older-format file was kept as a backup.
 fn write_session(store: &mut Store, services: &mut Services, path: String, then: SaveDone) {
-    let prepared = create_project_snapshot(store, Some(&path)).and_then(|document| {
+    let prepared = create_project_snapshot(store, Some(&path)).map_err(Failure::from).and_then(|document| {
         let handles: HashMap<String, String> = store
             .editor
             .config
@@ -523,14 +562,14 @@ fn write_session(store: &mut Store, services: &mut Services, path: String, then:
                 Ok((id, resource.to_string()))
             })
             .collect::<Result<_, String>>()?;
-        let images = services.rasters.owned_assets(handles).map_err(|error| format!("[project_error:raster_unavailable] {error}"))?;
+        let images = services.rasters.owned_assets(handles).map_err(|error| Failure::File { key: "projects.rasterUnavailable", detail: error.clone() })?;
         Ok((document, images))
     });
     let (document, images) = match prepared {
         Ok(prepared) => prepared,
-        Err(error) => {
-            report(store, "projects.saveProject", &error);
-            return then(store, services, Err(error));
+        Err(failure) => {
+            failure.report(store, "projects.saveProject");
+            return then(store, services, Err(failure.into_detail()));
         }
     };
     store.projects.running = true;
@@ -538,7 +577,7 @@ fn write_session(store: &mut Store, services: &mut Services, path: String, then:
     let job = store.projects.park(then);
     services.workers.spawn("project-save", move || {
         let written = write_project(std::path::Path::new(&path), document.clone(), ffmpeg.as_deref(), images)
-            .map_err(|error| tagged_project_error(&error, "save_failed"));
+            .map_err(|error| Failure::file(&error, "projects.saveFailed"));
         Box::new(move |store: &mut Store, services: &mut Services| {
             store.projects.running = false;
             let then = store.projects.resume(job);
@@ -550,9 +589,9 @@ fn write_session(store: &mut Store, services: &mut Services, path: String, then:
                     }
                     then(store, services, Ok(true));
                 }
-                Err(error) => {
-                    report(store, "projects.saveProject", &error);
-                    then(store, services, Err(error));
+                Err(failure) => {
+                    failure.report(store, "projects.saveProject");
+                    then(store, services, Err(failure.into_detail()));
                 }
             }
         })
@@ -602,7 +641,7 @@ pub fn save_answer(store: &Store, saved: Result<bool, String>) -> AgentResult {
 
 // --- open ---------------------------------------------------------------------------------------
 
-/// `handleOpenProject`: the file dialog, then the open of the chosen project, which asks about
+/// The file dialog, then the open of the chosen project, which asks about
 /// unsaved changes. A cancelled dialog asks nothing.
 pub fn open_project_dialog(store: &mut Store, services: &mut Services) {
     if is_busy(store) {
@@ -645,7 +684,7 @@ pub fn open_project(store: &mut Store, services: &mut Services, path: String, ag
     confirm_transition(store, services, agent_answer, UnsavedContinuation::OpenProject { path, request });
 }
 
-/// `loadProject`: read on a worker, resolve the sources (asking about a missing activity or single
+/// Read on a worker, resolve the sources (asking about a missing activity or single
 /// video), prepare the activity and the videos on a worker, then commit in one action that resets
 /// the history. Any failure before the commit leaves the session as it was.
 fn load_project(store: &mut Store, services: &mut Services, path: String, request: ProjectOpenRequest) {
@@ -669,15 +708,15 @@ fn load_project(store: &mut Store, services: &mut Services, path: String, reques
                 };
                 resolve_sources(store, services, pending);
             }
-            Err(error) => fail_load(store, request, error),
+            Err(failure) => fail_load(store, request, failure),
         })
     });
 }
 
 /// The read, the editor through the template ingress with its raster results attached, the fonts
 /// checked, and which source files exist.
-fn read_and_normalize(rasters: &ovrley_services::rasters::RasterResources, paths: &ovrley_core::paths::AppPaths, path: &str) -> Result<ReadProject, String> {
-    let mut read = read_project(rasters, std::path::Path::new(path)).map_err(|error| tagged_project_error(&error, "invalid_archive"))?;
+fn read_and_normalize(rasters: &ovrley_services::rasters::RasterResources, paths: &ovrley_core::paths::AppPaths, path: &str) -> Result<ReadProject, Failure> {
+    let mut read = read_project(rasters, std::path::Path::new(path)).map_err(|error| Failure::file(&error, "projects.invalidArchive"))?;
     let editor = &read.project.editor;
     let config = OverlayConfig::from_value(&editor.config)?;
     let durable = create_durable_template_state(&config, Some(&editor.global_defaults)).map_err(|error| error.to_string())?;
@@ -704,7 +743,7 @@ fn read_and_normalize(rasters: &ovrley_services::rasters::RasterResources, paths
     })
 }
 
-/// `attachRasterLoadResults`: each raster with an image gets its resource or its error.
+/// Each raster with an image gets its resource or its error.
 fn attach_raster_load_results(config: &mut OverlayConfig, results: &HashMap<String, Result<String, RasterError>>) -> Result<(), String> {
     for raster in &mut config.rasters {
         if raster.get("path").is_none_or(Value::is_null) {
@@ -719,7 +758,7 @@ fn attach_raster_load_results(config: &mut OverlayConfig, results: &HashMap<Stri
     Ok(())
 }
 
-/// `resolveProjectSources`: the activity, then the videos. A missing activity, or the video of a
+/// The activity, then the videos. A missing activity, or the video of a
 /// single-video project, asks to be located, loaded as absent, or the load cancelled; the missing
 /// videos of a project with several load as missing without asking.
 fn resolve_sources(store: &mut Store, services: &mut Services, mut pending: PendingLoad) {
@@ -771,8 +810,8 @@ fn record_source(pending: &mut PendingLoad, role: SourceRole, path: Option<Strin
 pub fn locate_missing_source(store: &mut Store, services: &mut Services) {
     let Some(missing) = &store.projects.missing_source else { return };
     let filter = match missing.role {
-        SourceRole::Activity => crate::features::app_shell::activity_dialog_filter(),
-        SourceRole::Video => DialogFilter::new("Video", &crate::features::video_preview::import::VIDEO_EXTENSIONS),
+        SourceRole::Activity => crate::features::shell::activity_dialog_filter(),
+        SourceRole::Video => DialogFilter::new("Video", &crate::features::import::VIDEO_EXTENSIONS),
     };
     let accepted = filter.extensions.clone();
     let opened = open_single_path(
@@ -788,7 +827,7 @@ pub fn locate_missing_source(store: &mut Store, services: &mut Services) {
                     SourceRole::Activity => "activity",
                     SourceRole::Video => "video",
                 };
-                return fail_load(store, missing.pending.request, format!("Selected file is not a supported {role} source"));
+                return fail_load(store, missing.pending.request, format!("Selected file is not a supported {role} source").into());
             }
             let mut pending = missing.pending;
             record_source(&mut pending, missing.role, Some(path));
@@ -859,7 +898,7 @@ fn prepare_project(store: &mut Store, services: &mut Services, pending: PendingL
             let edits = create_project_video_edits(&loaded, &document.sources.videos)?;
             let manual_video_sync = create_project_manual_video_sync(&loaded, &document.sync.manual);
             let disabled_laps = resolve_disabled_laps(&document.laps.disabled, activity.as_ref().map(|(_, activity)| activity))?;
-            // `describeLoadedVideos`: metadata learned from a probe is not a change the user made.
+            // Metadata learned from a probe is not a change the user made.
             for video in &mut document.sources.videos {
                 if let Some(loaded) = loaded.iter().find(|candidate| candidate.id == video.id) {
                     video.metadata = Some(video_metadata_snapshot(loaded));
@@ -879,13 +918,13 @@ fn prepare_project(store: &mut Store, services: &mut Services, pending: PendingL
         })();
         Box::new(move |store: &mut Store, services: &mut Services| match prepared {
             Ok(prepared) => commit_project(store, services, path, request, prepared),
-            Err(error) => fail_load(store, request, error),
+            Err(error) => fail_load(store, request, error.into()),
         })
     });
 }
 
-/// `applyPreparedProjectState` under `replaceEditorDocument`, then the background, telemetry, the
-/// baseline and the legacy folder's notice.
+/// Applies a prepared project as the new document, then the background, telemetry, the baseline
+/// and the legacy folder's notice.
 fn commit_project(store: &mut Store, services: &mut Services, path: String, request: ProjectOpenRequest, prepared: PreparedProject) {
     let legacy_folder = prepared.legacy_batch_video_folder.clone();
     let baseline = ProjectBaseline::of(prepared.document.clone());
@@ -894,7 +933,7 @@ fn commit_project(store: &mut Store, services: &mut Services, path: String, requ
     store.history.set_mode(HistoryMode::Reset);
     apply_project(store, prepared);
     if has_videos {
-        store.editor_shell.set_editor_background_mode(crate::features::app_shell::EditorBackgroundMode::Video);
+        store.editor_shell.set_editor_background_mode(crate::features::shell::EditorBackgroundMode::Video);
     }
     queue_telemetry_extraction(store, services, &found_ids);
     mark_saved(store, path, baseline);
@@ -905,9 +944,9 @@ fn commit_project(store: &mut Store, services: &mut Services, path: String, requ
     end_load(store, request, Ok(answer));
 }
 
-fn fail_load(store: &mut Store, request: ProjectOpenRequest, error: String) {
-    report(store, "projects.openProject", &error);
-    end_load(store, request, Err(error));
+fn fail_load(store: &mut Store, request: ProjectOpenRequest, failure: Failure) {
+    failure.report(store, "projects.openProject");
+    end_load(store, request, Err(failure.into_detail()));
 }
 
 /// Ends a load: the startup dialog reopens when its open did not succeed.
@@ -934,7 +973,7 @@ pub fn list_projects(
 ) {
     let remembered = match directory {
         Some(directory) => Ok(Some(directory)),
-        None => services.preferences.get_optional_path(LAST_PROJECT_DIRECTORY_KEY).map(|path| path.map(|path| path.to_string_lossy().into_owned())),
+        None => services.preferences.optional_path(LAST_PROJECT_DIRECTORY_KEY).map(|path| path.map(|path| path.to_string_lossy().into_owned())),
     };
     let root = user_data_root(services);
     services.workers.spawn("project-list", move || {
@@ -998,7 +1037,7 @@ pub fn startup_open_project(store: &mut Store, services: &mut Services, path: St
 
 // --- close --------------------------------------------------------------------------------------
 
-/// `useWindowCloseGuard` with the project check: unsaved changes ask first; a request while one is
+/// The window's close request with the project check: unsaved changes ask first; a request while one is
 /// handled, or while a confirmation is open, is ignored.
 pub fn request_close(store: &mut Store, services: &mut Services) {
     if store.close_guard.handling_close || store.unsaved_confirm.is_open() {
