@@ -162,6 +162,17 @@ fn planned_frames(metadata: &crate::media::SourceVideoMetadata) -> Option<u64> {
         .ok()
 }
 
+/// Whether the clip's GPS time came from a DJI Action remote (`DJI AC00x`),
+/// whose GPS clock text is model dependent, so the container's metadata time
+/// outranks it.
+fn defers_to_container_time(metadata: &crate::media::SourceVideoMetadata) -> bool {
+    metadata.camera_type.as_deref() == Some("DJI")
+        && metadata
+            .camera_model
+            .as_deref()
+            .is_some_and(|model| model.starts_with("DJI AC00"))
+}
+
 /// ffprobe owns the timing (duration, where the video starts, and whether the
 /// nominal frame rate holds); every other field it only fills where
 /// telemetry-parser left a gap.
@@ -184,6 +195,18 @@ fn merge_ffprobe_metadata(
         metadata.fps_den = ffprobe_metadata.fps_den;
     }
     metadata.video_start_offset = ffprobe_metadata.video_start_offset;
+    // DJI Action cameras write a true UTC container time, which outranks
+    // their model-dependent GPS clock. It is reported as absolute
+    // (`timecode`), never as zone-ambiguous `ffprobe` metadata.
+    let container_time = matches!(
+        ffprobe_metadata.time_source.as_deref(),
+        Some("ffprobe" | "timecode")
+    );
+    if container_time && defers_to_container_time(&metadata) {
+        metadata.sync_time = ffprobe_metadata.sync_time.clone();
+        metadata.creation_time = ffprobe_metadata.creation_time.clone();
+        metadata.time_source = Some("timecode".to_string());
+    }
     if metadata.sync_time.is_none() {
         metadata.sync_time = ffprobe_metadata
             .sync_time
@@ -283,5 +306,64 @@ mod tests {
             metadata(117.513333, 1056900, 17627),
         );
         assert_eq!((merged.fps_num, merged.fps_den), (Some(60000), Some(1001)));
+    }
+
+    fn dji_metadata(camera_model: &str, time: &str, time_source: &str) -> SourceVideoMetadata {
+        serde_json::from_value(serde_json::json!({
+            "path": "clip.mp4",
+            "hasAudio": false,
+            "creationTime": time,
+            "syncTime": time,
+            "cameraType": "DJI",
+            "cameraModel": camera_model,
+            "timeSource": time_source,
+        }))
+        .unwrap()
+    }
+
+    const GPS: &str = "2026-11-08T18:33:56+00:00";
+    const CONTAINER: &str = "2026-11-07T18:33:50.000Z";
+
+    #[test]
+    fn ac004_container_time_outranks_gps() {
+        let merged = merge_ffprobe_metadata(
+            dji_metadata("DJI AC004", GPS, "gps"),
+            dji_metadata("", CONTAINER, "timecode"),
+        );
+        assert_eq!(merged.sync_time.as_deref(), Some(CONTAINER));
+        assert_eq!(merged.creation_time.as_deref(), Some(CONTAINER));
+        assert_eq!(merged.time_source.as_deref(), Some("timecode"));
+    }
+
+    #[test]
+    fn ac004_gps_outranks_file_mtime() {
+        let merged = merge_ffprobe_metadata(
+            dji_metadata("DJI AC004", GPS, "gps"),
+            dji_metadata("", CONTAINER, "file_mtime"),
+        );
+        assert_eq!(merged.sync_time.as_deref(), Some(GPS));
+        assert_eq!(merged.time_source.as_deref(), Some("gps"));
+    }
+
+    #[test]
+    fn every_ac00x_model_prefers_container_time() {
+        for model in ["DJI AC003", "DJI AC004", "DJI AC006"] {
+            let merged = merge_ffprobe_metadata(
+                dji_metadata(model, GPS, "gps"),
+                dji_metadata("", CONTAINER, "ffprobe"),
+            );
+            assert_eq!(merged.sync_time.as_deref(), Some(CONTAINER), "{model}");
+            assert_eq!(merged.time_source.as_deref(), Some("timecode"), "{model}");
+        }
+    }
+
+    #[test]
+    fn other_dji_cameras_keep_gps() {
+        let merged = merge_ffprobe_metadata(
+            dji_metadata("Osmo 360", GPS, "gps"),
+            dji_metadata("", CONTAINER, "timecode"),
+        );
+        assert_eq!(merged.sync_time.as_deref(), Some(GPS));
+        assert_eq!(merged.time_source.as_deref(), Some("gps"));
     }
 }

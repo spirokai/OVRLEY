@@ -5,19 +5,14 @@
 //! one place avoids subtle drift between GPS row expansion, sync-time
 //! derivation, and vendor fallback parsers.
 
-use chrono::{DateTime, NaiveDateTime, TimeDelta, TimeZone, Utc};
+use chrono::{NaiveDateTime, TimeDelta, TimeZone, Utc};
 use chrono_tz::Tz;
 use telemetry_parser::util::SampleInfo;
 
 const DJI_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
-/// How far DJI GPS clock text runs ahead of UTC unless the container clock
-/// says otherwise: `UTC+8` wall-clock time, wherever the clip was recorded.
-const DJI_DEFAULT_CLOCK_OFFSET: TimeDelta = TimeDelta::hours(8);
-
-/// Largest gap between the container clock and a reading of the GPS clock
-/// text for the container clock to be trusted to choose that reading.
-const DJI_MAX_REFERENCE_ERROR: TimeDelta = TimeDelta::hours(2);
+/// DJI's factory clock zone, which some camera models write GPS time in.
+const DJI_UTC_PLUS_8: TimeDelta = TimeDelta::hours(8);
 
 /// Distributes a sub-frame telemetry row within its enclosing parser sample.
 ///
@@ -83,69 +78,77 @@ pub(crate) fn gpsu_millis_to_video_start_rfc3339(
 }
 
 /// Parses DJI GPS clock text (`YYYY-MM-DD HH:MM:SS`, no zone designator).
+/// What zone the text is in depends on the camera model; see [`DjiGpsClock`].
 pub(crate) fn parse_dji_timestamp(text: &str) -> Option<NaiveDateTime> {
     NaiveDateTime::parse_from_str(text, DJI_TIMESTAMP_FORMAT).ok()
 }
 
-/// Decides how far a clip's DJI GPS clock text runs ahead of UTC.
+/// How a DJI camera model writes its zone-less GPS clock text.
 ///
-/// DJI firmware disagrees on what the zone-less text means. Most clips store
-/// `UTC+8` wall-clock time wherever they were recorded; some store local time
-/// of day at the GPS position with a calendar date that can be a day off. The
-/// text alone cannot tell these apart, so `UTC+8` stays the default.
-///
-/// `reference` is the container `creation_time` advanced to the first fix.
-/// When it lies within [`DJI_MAX_REFERENCE_ERROR`] of a reading, the closest
-/// reading wins: `UTC+8`, or local time at `gps_tz` on the text's date `±1`
-/// day. A missing or unreliable camera clock never moves the result away from
-/// `UTC+8`. Decided once per clip from `first_fix`, the offset is applied to
-/// every sample, keeping the GPS clock's exact seconds.
-pub(crate) fn dji_clock_offset(
-    first_fix: NaiveDateTime,
-    gps_tz: Option<Tz>,
-    reference: Option<DateTime<Utc>>,
-) -> TimeDelta {
-    let Some(reference) = reference else {
-        return DJI_DEFAULT_CLOCK_OFFSET;
-    };
-    let error = |offset: TimeDelta| ((first_fix - offset).and_utc() - reference).abs();
-    // Both readings of a repeated DST hour stay candidates.
-    let local_offsets = gps_tz.into_iter().flat_map(|tz| {
-        [-1, 0, 1]
-            .into_iter()
-            .filter_map(move |days| first_fix.checked_add_signed(TimeDelta::days(days)))
-            .flat_map(move |shifted| {
-                let local = tz.from_local_datetime(&shifted);
-                [local.earliest(), local.latest()]
-            })
-            .flatten()
-            .map(move |local| first_fix - local.naive_utc())
-    });
-    let closest = std::iter::once(DJI_DEFAULT_CLOCK_OFFSET)
-        .chain(local_offsets)
-        .min_by_key(|offset| error(*offset))
-        .unwrap_or(DJI_DEFAULT_CLOCK_OFFSET);
-    if error(closest) <= DJI_MAX_REFERENCE_ERROR {
-        closest
-    } else {
-        DJI_DEFAULT_CLOCK_OFFSET
+/// GPS convention is UTC, but DJI firmware formats the text itself and the
+/// zone varies by model. The text carries no zone marker, so the model's
+/// device string (`DJI AC00x`) decides how to read it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DjiGpsClock {
+    /// UTC. Osmo Action 4 (`DJI AC003`) and every model not listed below.
+    Utc,
+    /// UTC+8 wall-clock time wherever the clip was recorded. Osmo Action 6
+    /// (`DJI AC006`).
+    UtcPlus8,
+    /// Local time of day at the GPS position, carrying the UTC+8 calendar
+    /// date. Osmo Action 5 Pro (`DJI AC004`).
+    LocalTimeUtcPlus8Date,
+}
+
+impl DjiGpsClock {
+    pub(crate) fn for_device(device_name: Option<&str>) -> Self {
+        match device_name {
+            Some("DJI AC006") => Self::UtcPlus8,
+            Some("DJI AC004") => Self::LocalTimeUtcPlus8Date,
+            _ => Self::Utc,
+        }
+    }
+
+    /// How far the clock text runs ahead of UTC, decided once per clip from
+    /// its first fix so every sample keeps the GPS clock's exact seconds.
+    ///
+    /// [`Self::LocalTimeUtcPlus8Date`] needs the timezone at the fix; when the
+    /// coordinates resolve to none (e.g. open sea), the text is read as UTC.
+    pub(crate) fn offset(self, first_fix: NaiveDateTime, gps_tz: Option<Tz>) -> TimeDelta {
+        match self {
+            Self::Utc => TimeDelta::zero(),
+            Self::UtcPlus8 => DJI_UTC_PLUS_8,
+            Self::LocalTimeUtcPlus8Date => gps_tz
+                .and_then(|tz| local_time_utc_plus_8_date_offset(first_fix, tz))
+                .unwrap_or_else(TimeDelta::zero),
+        }
     }
 }
 
+/// Reads `first_fix` as local time of day at `tz` on whichever calendar day
+/// (the written date or the day before) falls on the written date in UTC+8.
+fn local_time_utc_plus_8_date_offset(first_fix: NaiveDateTime, tz: Tz) -> Option<TimeDelta> {
+    [0, -1]
+        .into_iter()
+        .filter_map(|days| first_fix.checked_add_signed(TimeDelta::days(days)))
+        .flat_map(|local| {
+            let local = tz.from_local_datetime(&local);
+            // Both readings of a repeated DST hour stay candidates.
+            [local.earliest(), local.latest()]
+        })
+        .flatten()
+        .map(|local| local.naive_utc())
+        .find(|utc| (*utc + DJI_UTC_PLUS_8).date() == first_fix.date())
+        .map(|utc| first_fix - utc)
+}
+
 /// Converts DJI GPS clock text to UTC RFC 3339 text using the clip's offset
-/// from [`dji_clock_offset`].
+/// from [`DjiGpsClock::offset`].
 pub(crate) fn dji_timestamp_to_rfc3339(
     timestamp: NaiveDateTime,
     clock_offset: TimeDelta,
 ) -> String {
     (timestamp - clock_offset).and_utc().to_rfc3339()
-}
-
-pub(crate) fn advance_utc_by_ms(base: DateTime<Utc>, offset_ms: f64) -> DateTime<Utc> {
-    if !offset_ms.is_finite() {
-        return base;
-    }
-    base + TimeDelta::milliseconds(offset_ms.round() as i64)
 }
 
 #[cfg(test)]
@@ -168,29 +171,53 @@ mod tests {
         );
     }
 
-    fn utc(text: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(text)
-            .unwrap()
-            .with_timezone(&Utc)
+    fn dji_utc(device_name: &str, text: &str, gps_tz: Option<Tz>) -> String {
+        let timestamp = parse_dji_timestamp(text).unwrap();
+        let offset = DjiGpsClock::for_device(Some(device_name)).offset(timestamp, gps_tz);
+        dji_timestamp_to_rfc3339(timestamp, offset)
     }
 
     #[test]
-    fn dji_clock_offset_keeps_utc_plus_8_when_container_clock_agrees() {
-        let first_fix = parse_dji_timestamp("2026-07-28 01:46:15").unwrap();
-        let reference = Some(utc("2026-07-27T17:46:07Z"));
+    fn dji_osmo_action_4_gps_clock_is_utc() {
         assert_eq!(
-            dji_clock_offset(first_fix, Some(Tz::America__Los_Angeles), reference),
-            TimeDelta::hours(8)
+            dji_utc("DJI AC003", "2026-08-31 07:13:53", Some(Tz::Europe__Warsaw)),
+            "2026-08-31T07:13:53+00:00"
         );
     }
 
     #[test]
-    fn dji_clock_offset_ignores_unreliable_container_clock() {
-        let first_fix = parse_dji_timestamp("2026-11-08 10:33:56").unwrap();
-        let reference = Some(utc("2020-01-01T00:00:00Z"));
+    fn dji_osmo_action_6_gps_clock_is_utc_plus_8() {
         assert_eq!(
-            dji_clock_offset(first_fix, Some(Tz::America__Los_Angeles), reference),
-            TimeDelta::hours(8)
+            dji_utc(
+                "DJI AC006",
+                "2026-07-28 01:46:15",
+                Some(Tz::America__Los_Angeles)
+            ),
+            "2026-07-27T17:46:15+00:00"
+        );
+    }
+
+    #[test]
+    fn dji_osmo_action_5_pro_gps_clock_is_local_time_with_utc_plus_8_date() {
+        assert_eq!(
+            dji_utc(
+                "DJI AC004",
+                "2026-11-08 10:33:56",
+                Some(Tz::America__Los_Angeles)
+            ),
+            "2026-11-07T18:33:56+00:00"
+        );
+    }
+
+    #[test]
+    fn dji_unknown_model_gps_clock_is_utc() {
+        assert_eq!(
+            dji_utc(
+                "DJI AC009",
+                "2026-07-28 01:46:15",
+                Some(Tz::America__Los_Angeles)
+            ),
+            "2026-07-28T01:46:15+00:00"
         );
     }
 

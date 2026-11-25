@@ -3656,6 +3656,7 @@ fn rolling_chart_matches_export_pixels_slides_with_the_playhead_and_validates_at
         ("series", json!([{"metric": "speed", "label": "A", "color": "#ffffff"}, {"metric": "speed", "label": "B", "color": "#000000"}])),
         ("series", json!([{"metric": "bogus", "label": "A", "color": "#ffffff"}])),
         ("series", json!([{"metric": "speed", "label": " ", "color": "#ffffff"}])),
+        ("series", json!([{"metric": "speed", "color": "#ffffff"}])), // A shown legend needs its label.
         ("series", json!([{"metric": "speed", "label": "A", "color": "white"}])),
         ("window_seconds", json!(4)),
         ("window_seconds", json!(301)),

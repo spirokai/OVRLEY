@@ -25,11 +25,11 @@ use skia_safe::{
 };
 use std::collections::BTreeMap;
 
-/// One plotted metric. `label` is the legend text the editor localized when the metric was picked.
+/// One plotted metric. `label` is legend text the host localizes at render time; templates omit it.
 #[derive(Clone, Debug, PartialEq, Deserialize, Serialize)]
 pub struct ChartSeriesConfig {
     pub metric: MetricKind,
-    pub label: String,
+    pub label: Option<String>,
     pub color: String,
 }
 
@@ -68,7 +68,7 @@ pub struct RollingChartConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidatedChartSeries {
     pub metric: MetricKind,
-    pub label: String,
+    pub label: Option<String>,
     pub color: String,
 }
 
@@ -146,7 +146,7 @@ pub fn validate_rolling_chart(
         if series.iter().any(|plotted| plotted.metric == item.metric) {
             return Err(invalid(&field("metric"), "metric is already plotted"));
         }
-        if item.label.trim().is_empty() {
+        if item.label.as_deref().is_some_and(|label| label.trim().is_empty()) {
             return Err(invalid(&field("label"), "must name the metric"));
         }
         series.push(ValidatedChartSeries {
@@ -277,9 +277,15 @@ pub fn layout_legend(
         .series
         .iter()
         .map(|series| {
-            let blob = TextBlob::from_str(&series.label, &font)
+            let label = series.label.as_deref().ok_or_else(|| {
+                WidgetError::Config(format!(
+                    "rolling chart legend: {} needs a label",
+                    series.metric.as_str()
+                ))
+            })?;
+            let blob = TextBlob::from_str(label, &font)
                 .ok_or_else(|| WidgetError::Render("unable to lay out chart legend".into()))?;
-            let (advance, ink) = font.measure_str(&series.label, None);
+            let (advance, ink) = font.measure_str(label, None);
             Ok((blob, advance, ink))
         })
         .collect::<WidgetResult<Vec<_>>>()?;

@@ -12,17 +12,15 @@
 //!       [`clip_clock_offset`], [`first_device_info`].
 //! Does not own: wire-format decoding (see [`super::protobuf`]), inspection
 //!       (see [`super::inspect`]), FFmpeg integration (see [`super`]), or the
-//!       GPS clock-to-UTC rules (see [`crate::media::time`]).
+//!       per-model GPS clock rules (see [`crate::media::time`]).
 
-use chrono::{DateTime, NaiveDateTime, TimeDelta, Utc};
+use chrono::{NaiveDateTime, TimeDelta};
 use chrono_tz::Tz;
 
 use super::protobuf::{get_f32, get_f64, get_string, get_submessage, get_varint};
 use super::{DjiAc004Sample, DjiAc004Telemetry, DEFAULT_SAMPLE_RATE_HZ};
 use crate::media::telemetry_math::g_force_from_components;
-use crate::media::time::{
-    advance_utc_by_ms, dji_clock_offset, dji_timestamp_to_rfc3339, parse_dji_timestamp,
-};
+use crate::media::time::{dji_timestamp_to_rfc3339, parse_dji_timestamp, DjiGpsClock};
 use crate::media::timezone::timezone_for_coordinates;
 
 /// Parses raw concatenated DJI metadata samples into structured telemetry.
@@ -31,21 +29,20 @@ use crate::media::timezone::timezone_for_coordinates;
 /// AC004 samples are protobuf messages wrapped in top-level field `3`; the GPS
 /// payload lives under `f3.f4`. Unknown fields are skipped so new camera fields
 /// do not break extraction of the stable GPS subset.
-///
-/// `creation_time` is the video's creation timestamp, when known; it decides
-/// how the GPS clock text maps to UTC (see [`dji_clock_offset`]).
-pub fn parse_raw_metadata(
-    raw_data: &[u8],
-    creation_time: Option<DateTime<Utc>>,
-) -> Option<DjiAc004Telemetry> {
+pub fn parse_raw_metadata(raw_data: &[u8]) -> Option<DjiAc004Telemetry> {
     let device_info = first_device_info(raw_data);
     let sample_rate_hz = device_info
         .as_ref()
         .and_then(|info| info.sample_rate_hz)
         .filter(|rate| rate.is_finite() && *rate > 0.0);
     let sample_rate = sample_rate_hz.unwrap_or(DEFAULT_SAMPLE_RATE_HZ);
+    let gps_clock = DjiGpsClock::for_device(
+        device_info
+            .as_ref()
+            .and_then(|info| info.device_name.as_deref()),
+    );
 
-    let clock_offset = clip_clock_offset(raw_data, sample_rate, creation_time)?;
+    let clock_offset = clip_clock_offset(raw_data, gps_clock)?;
     let points: Vec<_> = top_level_samples(raw_data)
         .enumerate()
         .filter_map(|(frame_index, sample_data)| {
@@ -92,22 +89,15 @@ fn media_time_ms(frame_index: usize, sample_rate: f64) -> f64 {
     frame_index as f64 * 1000.0 / sample_rate
 }
 
-/// Decides the clip's GPS clock offset once, from its first valid fix.
+/// Decides the clip's GPS clock offset once, from its first valid fix and the
+/// timezone at that fix's coordinates.
 ///
 /// Returns `None` when the stream has no valid fix at all.
-fn clip_clock_offset(
-    raw_data: &[u8],
-    sample_rate: f64,
-    creation_time: Option<DateTime<Utc>>,
-) -> Option<TimeDelta> {
-    let (frame_index, fix) = top_level_samples(raw_data)
-        .enumerate()
-        .find_map(|(frame_index, sample_data)| Some((frame_index, read_gps_fix(sample_data)?)))?;
+fn clip_clock_offset(raw_data: &[u8], gps_clock: DjiGpsClock) -> Option<TimeDelta> {
+    let fix = top_level_samples(raw_data).find_map(read_gps_fix)?;
     let gps_tz = timezone_for_coordinates(fix.longitude, fix.latitude)
         .and_then(|name| name.parse::<Tz>().ok());
-    let reference =
-        creation_time.map(|time| advance_utc_by_ms(time, media_time_ms(frame_index, sample_rate)));
-    Some(dji_clock_offset(fix.timestamp, gps_tz, reference))
+    Some(gps_clock.offset(fix.timestamp, gps_tz))
 }
 
 /// The validated GPS fix subset (`f4.f2`) of one sample.
@@ -115,7 +105,7 @@ struct GpsFix {
     latitude: f64,
     longitude: f64,
     altitude: f64,
-    /// Zone-less GPS clock text; see [`dji_clock_offset`].
+    /// Zone-less GPS clock text; see [`DjiGpsClock`].
     timestamp: NaiveDateTime,
 }
 

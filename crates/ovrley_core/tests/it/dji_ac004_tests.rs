@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use ovrley_core::media::dji_ac004::{extract_from_video, parse_raw_metadata};
 use ovrley_core::media::mp4_telemetry;
 use std::path::Path;
@@ -93,21 +92,21 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
 #[test]
 fn parse_raw_metadata_extracts_ac004_gps_points() {
     let raw = top_level_sample(sample_payload(
-        "DJI AC004",
+        "DJI AC003",
         25.0,
         1,
         50.087_465,
         14.421_254,
         312_400,
-        "2026-03-15 23:58:14",
+        "2026-03-15 15:58:14",
         3.0,
         4.0,
         Some((0.0, 0.0, 1.5)),
     ));
 
-    let telemetry = parse_raw_metadata(&raw, None).expect("expected AC004 telemetry");
+    let telemetry = parse_raw_metadata(&raw).expect("expected AC004 telemetry");
 
-    assert_eq!(telemetry.device_name.as_deref(), Some("DJI AC004"));
+    assert_eq!(telemetry.device_name.as_deref(), Some("DJI AC003"));
     assert_eq!(telemetry.sample_rate_hz, Some(25.0));
     assert_eq!(
         telemetry.sync_time.as_deref(),
@@ -128,60 +127,33 @@ fn parse_raw_metadata_extracts_ac004_gps_points() {
 }
 
 #[test]
-fn parse_raw_metadata_uses_creation_time_to_correct_ac004_day_roll() {
-    let raw = top_level_sample(sample_payload(
-        "DJI AC004",
-        59.94,
-        1,
-        36.586_589_6,
-        -121.755_676_2,
-        201_433,
-        "2026-11-08 10:33:56",
-        0.0,
-        0.0,
-        None,
-    ));
-    let reference = DateTime::parse_from_rfc3339("2026-11-07T19:10:33.000000Z")
-        .unwrap()
-        .with_timezone(&Utc);
-
-    let telemetry = parse_raw_metadata(&raw, Some(reference)).expect("expected AC004 telemetry");
-
-    assert_eq!(
-        telemetry.sync_time.as_deref(),
-        Some("2026-11-07T18:33:56+00:00")
-    );
-    assert_eq!(telemetry.samples[0].timestamp, "2026-11-07T18:33:56+00:00");
-}
-
-#[test]
 fn parse_raw_metadata_uses_sample_rate_for_relative_timing() {
     let mut raw = top_level_sample(sample_payload(
-        "DJI AC004",
+        "DJI AC003",
         50.0,
         1,
         50.0,
         14.0,
         100_000,
-        "2026-03-15 23:58:14",
+        "2026-03-15 15:58:14",
         0.0,
         0.0,
         None,
     ));
     raw.extend(top_level_sample(sample_payload(
-        "DJI AC004",
+        "DJI AC003",
         50.0,
         1,
         50.1,
         14.1,
         101_000,
-        "2026-03-15 23:58:14",
+        "2026-03-15 15:58:14",
         0.0,
         0.0,
         None,
     )));
 
-    let telemetry = parse_raw_metadata(&raw, None).expect("expected AC004 telemetry");
+    let telemetry = parse_raw_metadata(&raw).expect("expected AC004 telemetry");
 
     assert_eq!(telemetry.samples.len(), 2);
     assert_eq!(telemetry.samples[0].timestamp_ms, 0.0);
@@ -191,19 +163,19 @@ fn parse_raw_metadata_uses_sample_rate_for_relative_timing() {
 #[test]
 fn parse_raw_metadata_rejects_samples_without_gps_fix() {
     let raw = top_level_sample(sample_payload(
-        "DJI AC004",
+        "DJI AC003",
         25.0,
         0,
         50.087_465,
         14.421_254,
         312_400,
-        "2026-03-15 23:58:14",
+        "2026-03-15 15:58:14",
         3.0,
         4.0,
         None,
     ));
 
-    assert!(parse_raw_metadata(&raw, None).is_none());
+    assert!(parse_raw_metadata(&raw).is_none());
 }
 
 fn sample_payload(
