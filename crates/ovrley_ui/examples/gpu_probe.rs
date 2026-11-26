@@ -14,13 +14,21 @@
 //! - `slint`: the app's backend selection (`platform::select_backend`) and a window whose only
 //!   change per frame is a 2 px playhead moving 7 px. `fps` 0 never changes it.
 //! - `slint-sw`: the same on Skia's software renderer (partial rendering).
+//! - `slint-video`: the app's backend selection and the video at `PROBE_VIDEO=<path>` playing
+//!   (muted, from `PROBE_IDLE` on) into one 1920×1080 `ovrley_playback` texture, shown as the app
+//!   shows it (`slint::Image::try_from` set on each frame) in an image that fills the window but a
+//!   24 px margin. Frames come at the video's rate; `fps` is unused. The counterpart of the zgui
+//!   probe's `video` (benchmarks/zgui-probe). It reports the frames Slint rendered.
+//!   `PROBE_VIDEO_HIDDEN=1` draws the video into its texture and never shows it: MDK's cost alone.
 //! - `busy` adds ~900 text labels and shadowed rounded rectangles that never change.
 //!
-//! `PROBE_SECONDS` (default 14) closes the window after that long. `PROBE_SIZE=<w>x<h>` makes a
+//! `PROBE_SECONDS` (default 30) closes the window after that long. `PROBE_SIZE=<w>x<h>` makes a
 //! window of that size instead of maximizing. `PROBE_IDLE=<s>` keeps the window still for that
 //! long before the frames start (to measure DWM against its own baseline).
 //!
-//! The probe prints frames and CPU time; GPU time comes from outside. Run with
+//! The probe prints frames and CPU time; GPU time comes from outside.
+//! `node benchmarks/zgui-probe/gpu-sample.mjs <probe command…>` reads it on macOS (ioreg) and on
+//! Windows (the counters below) and prints GPU ms per frame. By hand, run with
 //! `WGPU_VALIDATION=0 WGPU_DEBUG=0` (debug builds otherwise turn on the D3D12 debug layer or the
 //! Vulkan validation layers).
 //! - Windows: read the process's `\GPU Engine(pid_<pid>_*engtype_3D)\Running Time` counter
@@ -39,6 +47,8 @@ slint::slint! {
     export component Probe inherits Window {
         in property <length> playhead-x: 0px;
         in property <bool> busy: false;
+        in property <bool> video: false;
+        in property <image> frame;
         out property <length> view-width: root.width;
         background: #1b1b1f;
         if busy: Rectangle {
@@ -62,6 +72,14 @@ slint::slint! {
                 drop-shadow-color: #00000080;
             }
         }
+        if video: Image {
+            x: 24px;
+            y: 24px;
+            width: root.width - 48px;
+            height: root.height - 48px;
+            source: root.frame;
+            image-fit: fill;
+        }
         Rectangle {
             x: root.playhead-x;
             y: 0;
@@ -76,7 +94,7 @@ fn seconds() -> Duration {
     Duration::from_secs(
         std::env::var("PROBE_SECONDS")
             .ok()
-            .map_or(14, |value| value.parse().expect("PROBE_SECONDS")),
+            .map_or(30, |value| value.parse().expect("PROBE_SECONDS")),
     )
 }
 
@@ -133,6 +151,7 @@ fn main() {
         #[cfg(windows)]
         "d3d-dirty" => raw::run(raw::Kind::D3dDirty, fps),
         "slint" | "slint-sw" => run_slint(mode == "slint-sw", fps, busy),
+        "slint-video" => video::run(),
         other => panic!("unknown mode {other}"),
     }
 }
@@ -808,6 +827,112 @@ mod raw {
             fn drop(&mut self) {
                 self.wait();
             }
+        }
+    }
+}
+
+/// `slint-video`: the app's playback path, without the app.
+mod video {
+    use super::{fixed_size, idle, seconds, Probe};
+    use ovrley_playback::{Callbacks, Event, Renderer, State, Surface};
+    use slint::ComponentHandle;
+    use std::cell::{Cell, RefCell};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    /// The texture MDK draws into, as in the zgui probe.
+    const FRAME: (u32, u32) = (1920, 1080);
+
+    thread_local! {
+        /// The playback and the window it shows in. UI thread only, as `ovrley_playback` requires.
+        static PLAYBACK: RefCell<Option<(Surface, slint::Weak<Probe>)>> = const { RefCell::new(None) };
+        /// Video frames set on the window, and frames Slint rendered, since the last report.
+        static SHOWN: Cell<u32> = const { Cell::new(0) };
+        static RENDERED: Cell<u32> = const { Cell::new(0) };
+    }
+
+    pub fn run() {
+        let gpu = ovrley_ui::platform::select_backend()
+            .expect("the app's backend")
+            .expect("a shared GPU device");
+        let window = Probe::new().expect("window");
+        window.set_video(true);
+        if let Some((width, height)) = fixed_size() {
+            window.window().set_size(slint::PhysicalSize::new(width, height));
+        }
+        window
+            .window()
+            .set_rendering_notifier(|state, _| {
+                if matches!(state, slint::RenderingState::AfterRendering) {
+                    RENDERED.set(RENDERED.get() + 1);
+                }
+            })
+            .expect("a rendering notifier");
+        let path = std::env::var("PROBE_VIDEO").expect("PROBE_VIDEO=<path>");
+        let renderer = Renderer::new(&gpu.device, &gpu.queue).expect("MDK on this device");
+        let mut surface = Surface::new(&renderer, FRAME).expect("the video texture");
+        surface.load(&path, 0.0, callbacks());
+        PLAYBACK.with_borrow_mut(|playback| *playback = Some((surface, window.as_weak())));
+
+        slint::Timer::single_shot(idle(), || {
+            println!("probe: frames start");
+            PLAYBACK.with_borrow(|playback| {
+                if let Some(player) = playback.as_ref().and_then(|(surface, _)| surface.player()) {
+                    player.set_muted(true);
+                    player.set_state(State::Playing);
+                }
+            });
+        });
+        let report = slint::Timer::default();
+        report.start(slint::TimerMode::Repeated, Duration::from_secs(1), || {
+            let shown = SHOWN.replace(0);
+            let rendered = RENDERED.replace(0);
+            if shown > 0 || rendered > 0 {
+                println!("probe: {rendered} frames ({shown} video frames drawn)");
+            }
+        });
+        slint::Timer::single_shot(seconds(), || {
+            PLAYBACK.with_borrow_mut(|playback| *playback = None);
+            slint::quit_event_loop().expect("quit");
+        });
+        window.run().expect("run");
+    }
+
+    /// As the app's: posts coalesce while one is pending, and the frame is drawn on the UI thread
+    /// and set as a new image (Slint never counts two texture images as equal, so it repaints).
+    fn callbacks() -> Callbacks {
+        let pending = Arc::new(AtomicBool::new(false));
+        let hidden = std::env::var_os("PROBE_VIDEO_HIDDEN").is_some();
+        Callbacks {
+            render: Box::new(move || {
+                if pending.swap(true, Ordering::AcqRel) {
+                    return;
+                }
+                let pending = Arc::clone(&pending);
+                let _ = slint::invoke_from_event_loop(move || {
+                    pending.store(false, Ordering::Release);
+                    PLAYBACK.with_borrow(|playback| {
+                        let Some((surface, window)) = playback.as_ref() else { return };
+                        if surface.render().is_none() {
+                            return;
+                        }
+                        SHOWN.set(SHOWN.get() + 1);
+                        if hidden {
+                            return;
+                        }
+                        let Some(window) = window.upgrade() else { return };
+                        let image = slint::Image::try_from(surface.texture().clone())
+                            .expect("an Rgba8Unorm texture with TEXTURE_BINDING | RENDER_ATTACHMENT");
+                        window.set_frame(image);
+                    });
+                });
+            }),
+            event: Box::new(|event| {
+                if event == Event::Failed {
+                    eprintln!("probe: the video cannot be played");
+                }
+            }),
         }
     }
 }

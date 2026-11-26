@@ -1,0 +1,37 @@
+# A spike, not product code: the frame cost of zgui next to `ovrley_ui`'s `gpu_probe` example.
+# Its own workspace, so that zgui's dependencies (Stylo, vello, parley) never enter the app's
+# Cargo.lock. See README.md.
+[package]
+name = "zgui-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+build = "build.rs"
+
+[workspace]
+
+[dependencies]
+# The revision the spike was written against: the published 0.1.0 has neither the frame report
+# nor the native swap chains.
+zgui = { git = "https://github.com/zortax/zgui", rev = "ee29c7dc66206eb04ba7bcf514058a278c9070ba" }
+# `video`: the device opened the app's way and given to zgui, and a vector rasteriser for the
+# renderer built here (zgui's own factory attaches one too).
+zgui-render-wgpu = { git = "https://github.com/zortax/zgui", rev = "ee29c7dc66206eb04ba7bcf514058a278c9070ba" }
+zgui-render-vector-vello = { git = "https://github.com/zortax/zgui", rev = "ee29c7dc66206eb04ba7bcf514058a278c9070ba" }
+# `video`: MDK into textures of that device, as the app plays video.
+ovrley_playback = { path = "../../crates/ovrley_playback" }
+pollster = "0.4"
+
+# zgui's own workspace patches its font collection; a git dependency does not carry that over.
+[patch.crates-io]
+fontique = { git = "https://github.com/zortax/zgui", rev = "ee29c7dc66206eb04ba7bcf514058a278c9070ba" }
+
+# zgui does its style, layout and paint on the CPU; unoptimised numbers would say nothing.
+[profile.dev]
+opt-level = 3
+debug = "line-tables-only"
+
+# As the app's root manifest: wgpu-core's debug lock tracing keeps a thread-local, and `video`'s
+# device is dropped from a thread-local at exit, after that one is gone, which aborts the process.
+[profile.dev.package.wgpu-core]
+debug-assertions = false

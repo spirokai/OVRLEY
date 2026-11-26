@@ -15,14 +15,14 @@ cpp = "0.5"
 log = "0.4"
 pollster = "0.4"
 thiserror = "2"
-# Pinned to the host's wgpu, whose device it draws on.
-wgpu = { version = "=30.0.1", default-features = false, features = ["std"] }
+# The host's wgpu, whose device it draws on: Cargo.lock holds the app on the one version Slint uses.
+wgpu = { version = "30.0.1", default-features = false, features = ["std"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-wgpu = { version = "=30.0.1", default-features = false, features = ["metal"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["metal"] }
 
 [target.'cfg(windows)'.dependencies]
-wgpu = { version = "=30.0.1", default-features = false, features = ["dx12"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["dx12"] }
 # The D3D11 device, and the textures and fence it shares with DX12. wgpu-hal's version.
 windows = { version = "0.62", default-features = false, features = [
   "std",
@@ -36,7 +36,7 @@ windows = { version = "0.62", default-features = false, features = [
 ] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-wgpu = { version = "=30.0.1", default-features = false, features = ["vulkan"] }
+wgpu = { version = "30.0.1", default-features = false, features = ["vulkan"] }
 # The Vulkan–OpenGL bridge. ash at wgpu-hal's version; EGL loaded at run time (libEGL.so.1), so any
 # vendor's driver behind glvnd serves it.
 ash = "0.38"
