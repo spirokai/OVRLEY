@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
-use ovrley_core::commands::{parse_and_validate_config, validate_config_value};
+use ovrley_core::config::{parse_config_json, parse_config_value, validate_render_config};
 use ovrley_core::error::CoreResult;
-use ovrley_core::normalize::{
+use ovrley_core::config::{
     validate_ffmpeg_config, ValidatedFfmpegConfig, ValidatedRenderConfig,
 };
 use ovrley_widgets::widgets::value::ValidatedValue;
@@ -27,6 +27,16 @@ pub fn explicit_scene_json() -> Value {
         "custom_export_range_active": false,
         "ffmpeg": {}
     })
+}
+
+/// Parses and validates a render config JSON string.
+pub fn parse_and_validate_config(config_json: &str) -> CoreResult<ValidatedRenderConfig> {
+    validate_render_config(parse_config_json(config_json)?, None)
+}
+
+/// Validates a render config value.
+pub fn validate_config_value(config_value: &Value) -> CoreResult<ValidatedRenderConfig> {
+    validate_render_config(parse_config_value(config_value)?, None)
 }
 
 pub fn validated_config_from_json(config_json: &str) -> ValidatedRenderConfig {

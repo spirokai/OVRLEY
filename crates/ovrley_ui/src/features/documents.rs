@@ -15,7 +15,7 @@ use ovrley_app::features::templates::{self as manager, template_groups};
 use ovrley_app::i18n::catalog;
 use ovrley_app::store::template::TemplateSource;
 use ovrley_app::store::{Dispatcher, Store};
-use ovrley_core::commands::TemplateKind;
+use ovrley_core::template::TemplateKind;
 use slint::{ComponentHandle, SharedString};
 
 convert_enum!(UnsavedAnswer <=> AppUnsavedAnswer { Save, Discard, Cancel });

@@ -17,7 +17,7 @@ pub use ovrley_map::{MapStyleCatalog, MapStyleInfo};
 
 use crate::tiles::{TileCache, TileCoordinates};
 use ovrley_core::render::download_preview_tiles;
-use ovrley_core::CoreError;
+use ovrley_core::error::CoreError;
 use ovrley_map::gpu::{GpuMapConfig, GpuMapRenderer, GpuPoolSizes, MapDataSource, MapSource};
 use ovrley_map::{read_style_file, MapStyleBuildings, MapStyleId};
 use ovrley_widgets::activity::ActivitySampler;

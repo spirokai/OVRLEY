@@ -7,7 +7,7 @@
 //! are compared as milliseconds of the naive UTC date `{clock}Z`.
 
 use chrono::{DateTime, NaiveDateTime, Utc};
-use ovrley_core::media::video_edits::TimezoneMode;
+use ovrley_core::media::edits::TimezoneMode;
 use crate::i18n::{catalog, Locale};
 
 /// Why a video could not be placed against the activity, or that it lies outside it. Translated

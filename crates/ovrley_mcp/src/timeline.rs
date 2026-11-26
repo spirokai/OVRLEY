@@ -21,7 +21,7 @@ use ovrley_app::store::services::Services;
 use ovrley_app::store::editor::PreviewPlaybackState;
 use ovrley_app::store::videos as collection;
 use ovrley_app::store::Store;
-use ovrley_core::media::video_edits::TimezoneMode;
+use ovrley_core::media::edits::TimezoneMode;
 use ovrley_widgets::model::validation::require_positive_f64;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -1146,7 +1146,7 @@ mod tests {
     }
 
     fn probe(editor: &Editor, path: &str, creation_time: &str) {
-        let metadata = ovrley_core::media::SourceVideoMetadata {
+        let metadata = ovrley_core::media::probe::SourceVideoMetadata {
             creation_time: Some(creation_time.into()),
             time_source: Some("gps".into()),
             ..video_metadata(path, 10.0)

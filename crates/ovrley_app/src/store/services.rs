@@ -7,10 +7,10 @@
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use ovrley_core::encode::ffmpeg::transition_proxy::TransitionProxyRequest;
-use ovrley_core::render_jobs::batch::BatchServiceError;
-use ovrley_core::render_jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
-use ovrley_core::render_jobs::execution::RenderAccepted;
+use ovrley_core::encode::ffmpeg::transitions::TransitionProxyRequest;
+use ovrley_core::jobs::batch::BatchServiceError;
+use ovrley_core::jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
+use ovrley_core::jobs::execution::RenderAccepted;
 use ovrley_services::cache::CacheUsage;
 use ovrley_services::maps::{MapAdapterSupport, MapFrameWake, MapPrepareRequest, MapStyleCatalog};
 use ovrley_services::updater::{DownloadProgress, ReleaseUpdate};
@@ -117,12 +117,12 @@ pub trait VideoTools: Send + Sync {
     /// The encoders and decoders the bundled FFmpeg offers.
     fn detect_codecs(&self) -> Result<ovrley_core::encode::ffmpeg::detect::AvailableCodecs, String>;
     /// The file check, then `probe_video_metadata`. Blocking.
-    fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String>;
+    fn probe(&self, path: &str) -> Result<ovrley_core::media::probe::SourceVideoMetadata, String>;
     /// The first frame as a PNG, or `None` when FFmpeg reads no frame. Blocking;
     /// each runs an FFmpeg process.
     fn thumbnail(&self, path: &str) -> Option<Vec<u8>>;
     /// The video's embedded activity, `None` without one. Blocking.
-    fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String>;
+    fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::schema::ParsedActivity>, String>;
     /// Renders a join's blend and returns the file's path. Blocking.
     fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String>;
     fn remove_transition_proxy(&self, path: &str) -> Result<(), String>;
@@ -158,7 +158,7 @@ impl VideoTools for NativeVideoTools {
     }
 
     fn filmstrip(&self, request: &FilmstripRequest, hwaccel: Option<FilmstripHwaccel>) -> Result<Option<Filmstrip>, String> {
-        let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&self.paths.repo_root).map_err(|error| error.to_string())?;
+        let ffmpeg = ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&self.paths.repo_root).map_err(|error| error.to_string())?;
         ovrley_services::video::filmstrip(&self.cache, &ffmpeg, request, hwaccel)
     }
 
@@ -166,31 +166,31 @@ impl VideoTools for NativeVideoTools {
         ovrley_core::encode::ffmpeg::detect::detect_codecs(&self.paths.repo_root).map_err(|error| error.to_string())
     }
 
-    fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String> {
+    fn probe(&self, path: &str) -> Result<ovrley_core::media::probe::SourceVideoMetadata, String> {
         let metadata = std::fs::metadata(path).map_err(|error| format!("Failed to read video file metadata: {error}"))?;
         if !metadata.is_file() {
             return Err(format!("Video path is not a file: {path}"));
         }
-        ovrley_core::media::prepared_video::probe_video_metadata(&self.paths, path).map_err(|error| error.to_string())
+        ovrley_core::media::probe::probe_video_metadata(&self.paths, path).map_err(|error| error.to_string())
     }
 
     fn thumbnail(&self, path: &str) -> Option<Vec<u8>> {
-        let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&self.paths.repo_root).ok()?;
+        let ffmpeg = ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&self.paths.repo_root).ok()?;
         ovrley_services::video::thumbnail(&ffmpeg, std::path::Path::new(path))
     }
 
-    fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
-        ovrley_core::commands::extract_video_telemetry(&self.paths, path).map_err(|error| error.to_string())
+    fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::schema::ParsedActivity>, String> {
+        ovrley_core::media::telemetry::extract_activity(&self.paths.repo_root, path).map_err(|error| error.to_string())
     }
 
     fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String> {
-        ovrley_core::encode::ffmpeg::transition_proxy::render_transition_proxy(&self.paths, request)
+        ovrley_core::encode::ffmpeg::transitions::render_transition_proxy(&self.paths, request)
             .map(|path| path.to_string_lossy().into_owned())
             .map_err(|error| error.to_string())
     }
 
     fn remove_transition_proxy(&self, path: &str) -> Result<(), String> {
-        ovrley_core::encode::ffmpeg::transition_proxy::remove_transition_proxy(std::path::Path::new(path)).map_err(|error| error.to_string())
+        ovrley_core::encode::ffmpeg::transitions::remove_transition_proxy(std::path::Path::new(path)).map_err(|error| error.to_string())
     }
 }
 
@@ -211,7 +211,7 @@ pub trait MapServices: Send + Sync {
     fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String>;
     fn clear_tile_cache(&self) -> Result<CacheUsage, String>;
     /// The map data renders draw route maps with; `None` in tests.
-    fn map_source(&self) -> Option<ovrley_core::MapSource>;
+    fn map_source(&self) -> Option<ovrley_map::gpu::MapSource>;
 }
 
 /// The settings key of the map tile cache limit.
@@ -274,7 +274,7 @@ impl MapServices for NativeMapServices {
         self.data.tiles().clear()
     }
 
-    fn map_source(&self) -> Option<ovrley_core::MapSource> {
+    fn map_source(&self) -> Option<ovrley_map::gpu::MapSource> {
         Some(self.data.map_source())
     }
 }
@@ -286,7 +286,7 @@ pub trait RenderService: Send + Sync {
     fn submit_single(
         &self,
         resources: &ovrley_services::rasters::RasterResources,
-        config: ovrley_core::normalize::RenderConfig,
+        config: ovrley_core::config::RenderConfig,
         activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
         output_path: &str,
         overwrite: bool,
@@ -299,7 +299,7 @@ pub trait RenderService: Send + Sync {
     fn busy(&self) -> bool;
     /// The single render's latest progress, read once after acceptance: events published before
     /// the session started in the store were dropped as another render's.
-    fn progress(&self) -> ovrley_core::debug::RenderProgress;
+    fn progress(&self) -> ovrley_core::encode::progress::RenderProgress;
     /// A batch's latest snapshot, read once after acceptance for the same reason.
     fn batch_snapshot(&self, batch_id: &str) -> Result<BatchSnapshot, BatchServiceError>;
     /// A new inspection session's id.
@@ -311,12 +311,12 @@ pub trait RenderService: Send + Sync {
     fn render_preview_frame(
         &self,
         resources: &ovrley_services::rasters::RasterResources,
-        config: ovrley_core::normalize::RenderConfig,
+        config: ovrley_core::config::RenderConfig,
         activity: &ovrley_core::activity::schema::ParsedActivity,
         second: f64,
     ) -> Result<String, String>;
     /// A fresh file name in `directory`, else Downloads.
-    fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String>;
+    fn suggest_output_path(&self, kind: ovrley_core::encode::settings::ExportMode, directory: Option<&str>) -> Result<String, String>;
     fn open_output_directory(&self, directory: Option<&str>) -> Result<(), String>;
     /// Opens a rendered file in the system player.
     fn open_file(&self, path: &str) -> Result<(), String>;
@@ -327,18 +327,18 @@ pub trait RenderService: Send + Sync {
 /// [`RenderMailbox`]: crate::features::render::session::RenderMailbox
 pub struct NativeRenderService {
     paths: Arc<ovrley_core::paths::AppPaths>,
-    execution: ovrley_core::render_jobs::execution::RenderExecutionService,
-    inspection: ovrley_core::render_jobs::inspection::VideoInspectionService,
-    map_source: Option<ovrley_core::MapSource>,
+    execution: ovrley_core::jobs::execution::RenderExecutionService,
+    inspection: ovrley_core::jobs::inspection::VideoInspectionService,
+    map_source: Option<ovrley_map::gpu::MapSource>,
 }
 
 impl NativeRenderService {
-    pub fn new(paths: Arc<ovrley_core::paths::AppPaths>, map_source: Option<ovrley_core::MapSource>, ui_post: Arc<dyn UiPost>) -> Self {
+    pub fn new(paths: Arc<ovrley_core::paths::AppPaths>, map_source: Option<ovrley_map::gpu::MapSource>, ui_post: Arc<dyn UiPost>) -> Self {
         let mailbox = crate::features::render::session::RenderMailbox::new(ui_post);
         Self {
             paths,
-            execution: ovrley_core::render_jobs::execution::RenderExecutionService::with_sink(mailbox),
-            inspection: ovrley_core::render_jobs::inspection::VideoInspectionService::default(),
+            execution: ovrley_core::jobs::execution::RenderExecutionService::with_sink(mailbox),
+            inspection: ovrley_core::jobs::inspection::VideoInspectionService::default(),
             map_source,
         }
     }
@@ -348,7 +348,7 @@ impl RenderService for NativeRenderService {
     fn submit_single(
         &self,
         resources: &ovrley_services::rasters::RasterResources,
-        config: ovrley_core::normalize::RenderConfig,
+        config: ovrley_core::config::RenderConfig,
         activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
         output_path: &str,
         overwrite: bool,
@@ -372,7 +372,7 @@ impl RenderService for NativeRenderService {
         self.execution.progress().busy
     }
 
-    fn progress(&self) -> ovrley_core::debug::RenderProgress {
+    fn progress(&self) -> ovrley_core::encode::progress::RenderProgress {
         self.execution.progress()
     }
 
@@ -395,27 +395,27 @@ impl RenderService for NativeRenderService {
     fn render_preview_frame(
         &self,
         resources: &ovrley_services::rasters::RasterResources,
-        config: ovrley_core::normalize::RenderConfig,
+        config: ovrley_core::config::RenderConfig,
         activity: &ovrley_core::activity::schema::ParsedActivity,
         second: f64,
     ) -> Result<String, String> {
-        ovrley_core::commands::render_preview_frame_config(&self.paths, config, activity, second, Some(resources), self.map_source.as_ref())
+        ovrley_core::render::render_preview_frame(&self.paths, config, activity, second, Some(resources), self.map_source.as_ref())
             .map(|path| path.display().to_string())
             .map_err(|error| error.to_string())
     }
 
-    fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String> {
+    fn suggest_output_path(&self, kind: ovrley_core::encode::settings::ExportMode, directory: Option<&str>) -> Result<String, String> {
         ovrley_core::output::suggest_output_path(&self.paths, kind, directory.map(std::path::Path::new))
             .map(|path| path.display().to_string())
             .map_err(|error| error.to_string())
     }
 
     fn open_output_directory(&self, directory: Option<&str>) -> Result<(), String> {
-        ovrley_core::commands::open_output_directory(&self.paths, directory).map_err(|error| error.to_string())
+        ovrley_core::output::open_output_directory(&self.paths, directory).map_err(|error| error.to_string())
     }
 
     fn open_file(&self, path: &str) -> Result<(), String> {
-        ovrley_core::commands::open_rendered_video(path).map_err(|error| error.to_string())
+        ovrley_core::output::open_rendered_video(path).map_err(|error| error.to_string())
     }
 }
 
@@ -730,7 +730,7 @@ pub mod fakes {
             Ok(*usage)
         }
 
-        fn map_source(&self) -> Option<ovrley_core::MapSource> {
+        fn map_source(&self) -> Option<ovrley_map::gpu::MapSource> {
             None
         }
     }
@@ -759,14 +759,14 @@ pub mod fakes {
         pub single_results: Mutex<std::collections::VecDeque<ovrley_core::error::CoreResult<RenderAccepted>>>,
         pub batch_results: Mutex<std::collections::VecDeque<Result<BatchAcceptance, BatchServiceError>>>,
         /// The submitted single configs and batch requests, newest last.
-        pub singles: Mutex<Vec<ovrley_core::normalize::RenderConfig>>,
+        pub singles: Mutex<Vec<ovrley_core::config::RenderConfig>>,
         pub batches: Mutex<Vec<BatchRenderRequest>>,
         /// Inspections by path; an unknown path fails.
         pub sources: Mutex<std::collections::HashMap<String, Result<String, String>>>,
         pub cancel_snapshot: Mutex<Option<BatchSnapshot>>,
         pub busy: std::sync::atomic::AtomicBool,
         /// What `progress` and `batch_snapshot` read.
-        pub progress: Mutex<ovrley_core::debug::RenderProgress>,
+        pub progress: Mutex<ovrley_core::encode::progress::RenderProgress>,
         pub batch_snapshots: Mutex<std::collections::HashMap<String, BatchSnapshot>>,
         next_id: std::sync::atomic::AtomicU64,
     }
@@ -802,7 +802,7 @@ pub mod fakes {
         fn submit_single(
             &self,
             _resources: &ovrley_services::rasters::RasterResources,
-            config: ovrley_core::normalize::RenderConfig,
+            config: ovrley_core::config::RenderConfig,
             _activity: Arc<ovrley_core::activity::schema::ParsedActivity>,
             output_path: &str,
             overwrite: bool,
@@ -835,7 +835,7 @@ pub mod fakes {
             self.busy.load(std::sync::atomic::Ordering::SeqCst)
         }
 
-        fn progress(&self) -> ovrley_core::debug::RenderProgress {
+        fn progress(&self) -> ovrley_core::encode::progress::RenderProgress {
             self.progress.lock().unwrap().clone()
         }
 
@@ -862,7 +862,7 @@ pub mod fakes {
         fn render_preview_frame(
             &self,
             _resources: &ovrley_services::rasters::RasterResources,
-            _config: ovrley_core::normalize::RenderConfig,
+            _config: ovrley_core::config::RenderConfig,
             _activity: &ovrley_core::activity::schema::ParsedActivity,
             second: f64,
         ) -> Result<String, String> {
@@ -870,7 +870,7 @@ pub mod fakes {
             Ok("/downloads/preview_frame.png".into())
         }
 
-        fn suggest_output_path(&self, kind: ovrley_core::output::RenderOutputKind, directory: Option<&str>) -> Result<String, String> {
+        fn suggest_output_path(&self, kind: ovrley_core::encode::settings::ExportMode, directory: Option<&str>) -> Result<String, String> {
             Ok(format!("{}/{}_1.{}", directory.unwrap_or("/downloads"), kind.filename_prefix(), kind.extension()))
         }
 
@@ -894,19 +894,19 @@ pub mod fakes {
         pub decoded: Mutex<std::collections::HashMap<String, Filmstrip>>,
         pub decodes: Mutex<Vec<(String, Option<FilmstripHwaccel>)>>,
         pub codecs: Mutex<ovrley_core::encode::ffmpeg::detect::AvailableCodecs>,
-        pub probes: Mutex<std::collections::HashMap<String, Result<ovrley_core::media::SourceVideoMetadata, String>>>,
+        pub probes: Mutex<std::collections::HashMap<String, Result<ovrley_core::media::probe::SourceVideoMetadata, String>>>,
         pub thumbnails: Mutex<std::collections::HashMap<String, Vec<u8>>>,
         /// How long a thumbnail takes, so a test sees them overlap.
         pub thumbnail_delay: Mutex<std::time::Duration>,
         pub thumbnails_running: std::sync::atomic::AtomicUsize,
         pub thumbnails_peak: std::sync::atomic::AtomicUsize,
-        pub telemetry: Mutex<std::collections::HashMap<String, Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String>>>,
+        pub telemetry: Mutex<std::collections::HashMap<String, Result<Option<ovrley_core::activity::schema::ParsedActivity>, String>>>,
         pub telemetry_calls: Mutex<Vec<String>>,
     }
 
     impl FakeVideoTools {
         /// A probe of `path` that succeeds.
-        pub fn add_video(&self, path: &str, metadata: ovrley_core::media::SourceVideoMetadata) {
+        pub fn add_video(&self, path: &str, metadata: ovrley_core::media::probe::SourceVideoMetadata) {
             self.probes.lock().unwrap().insert(path.to_string(), Ok(metadata));
         }
     }
@@ -930,7 +930,7 @@ pub mod fakes {
             Ok(self.codecs.lock().unwrap().clone())
         }
 
-        fn probe(&self, path: &str) -> Result<ovrley_core::media::SourceVideoMetadata, String> {
+        fn probe(&self, path: &str) -> Result<ovrley_core::media::probe::SourceVideoMetadata, String> {
             self.probes.lock().unwrap().get(path).cloned().unwrap_or_else(|| Err(format!("Video path is not a file: {path}")))
         }
 
@@ -944,7 +944,7 @@ pub mod fakes {
             self.thumbnails.lock().unwrap().get(path).cloned()
         }
 
-        fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::finalize::FinalizeActivityResponse>, String> {
+        fn extract_telemetry(&self, path: &str) -> Result<Option<ovrley_core::activity::schema::ParsedActivity>, String> {
             self.telemetry_calls.lock().unwrap().push(path.to_string());
             self.telemetry.lock().unwrap().get(path).cloned().unwrap_or(Ok(None))
         }

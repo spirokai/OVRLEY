@@ -7,19 +7,21 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
-use super::diagnostics::EncoderMonitor;
+use super::process::EncoderMonitor;
 use super::{run_frame_pipeline, VideoEncoding};
 use crate::activity::schema::ParsedActivity;
 use crate::activity::{parse_activity_json, validate_render_activity};
-use crate::debug::RenderProfiler;
-use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use crate::diagnostics::RenderProfiler;
+use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::ffmpeg::composite::CompositeEncoding;
 use crate::encode::progress::RenderController;
-use crate::normalize::{parse_template_value, RenderConfig};
-use crate::output::{RenderOutputKind, RenderOutputTarget};
+use crate::config::RenderConfig;
+use crate::template::parse_template_value;
+use crate::encode::settings::ExportMode;
+use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
 use crate::render::{AtlasPlan, ExportWidgets, FrameSize, SlotPlacement};
-use crate::render_jobs::planning::{
+use crate::jobs::planning::{
     plan_single_render, resolve_single_composite_source, PlannedVideoRender, VideoRenderModePlan,
 };
 
@@ -73,7 +75,7 @@ fn config(activity_end: f64) -> RenderConfig {
     scene.fps = 30.0;
     scene.composite_video_path = Some(fixtures().join("video").join("test-1080p.mp4").to_string_lossy().into_owned());
     // Near-lossless, so frames compare overlay pixels rather than rate-control decisions.
-    scene.quality_type = Some(crate::encode::quality::QualityType::Quality);
+    scene.quality_type = Some(crate::encode::settings::QualityType::Quality);
     scene.quality_value = Some(1.0);
     scene.composite_sync_offset = Some(sync_offset);
     scene.composite_video_fps_num = Some(30000);
@@ -134,7 +136,7 @@ fn export_transparent(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     };
     let label = if planned { "planned" } else { "full-frame" };
     let output = paths.downloads_dir.join(format!("atlas-transparent-{label}.mov"));
-    let target = RenderOutputTarget::validate(output.to_str().unwrap(), RenderOutputKind::Transparent, true).unwrap();
+    let target = RenderOutputTarget::validate(output.to_str().unwrap(), ExportMode::Transparent, true).unwrap();
     let encoding = VideoEncoding::Transparent(render);
     let prepared = export.prepare_atlas(atlas.clone(), &mut profiler).unwrap();
     let frame_plan = encoding.frame_plan(prepared, size, target.path(), "rgba");
@@ -189,7 +191,7 @@ fn export(paths: &AppPaths, planned: bool) -> (AtlasPlan, PathBuf) {
     };
     let label = if planned { "planned" } else { "full-frame" };
     let output = paths.downloads_dir.join(format!("atlas-export-{label}.mp4"));
-    let target = RenderOutputTarget::validate(output.to_str().unwrap(), RenderOutputKind::Composite, true).unwrap();
+    let target = RenderOutputTarget::validate(output.to_str().unwrap(), ExportMode::Composite, true).unwrap();
     let encoding = VideoEncoding::Composite(
         CompositeEncoding::new(size, render, &atlas, source.has_audio, source.audio_bit_rate, source.rotation_degrees, source.color, &target).unwrap(),
     );

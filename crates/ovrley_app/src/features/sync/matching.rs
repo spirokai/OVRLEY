@@ -3,7 +3,7 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use ovrley_core::media::manual_video_sync::{Landmark, LandmarkKind};
+use ovrley_core::media::sync::{Landmark, LandmarkKind};
 use crate::features::sync::detection::{DETECTED_LOCATION_ID, Detection, TurnDirection};
 use crate::format::compare_text;
 

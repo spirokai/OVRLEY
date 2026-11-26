@@ -10,7 +10,7 @@
 //! [`FIRST_SEGMENT_KEY`] for the first one. A video without cuts is one segment, so excluding a
 //! whole video and excluding a part of it are the same edit.
 //!
-//! The edits themselves (`VideoEdits` and its parts) are `ovrley_core::media::video_edits`, which
+//! The edits themselves (`VideoEdits` and its parts) are `ovrley_core::media::edits`, which
 //! projects read and write.
 
 pub mod collection;
@@ -21,9 +21,9 @@ pub mod sync;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::media::SourceVideoMetadata;
-use ovrley_core::media::video_edits::{Cut, SegmentEdits, VideoEdits, VideoMetadataSnapshot, VideoResolution};
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::media::probe::SourceVideoMetadata;
+use ovrley_core::media::edits::{Cut, SegmentEdits, VideoEdits, VideoMetadataSnapshot, VideoResolution};
 use sync::SyncWarning;
 use crate::store::media::ImportedActivity;
 
@@ -268,8 +268,8 @@ pub fn next_import_order(videos: &[ImportedVideo]) -> u32 {
 pub(crate) mod fixtures {
     //! Test videos and edits.
     use super::*;
-    use ovrley_core::media::Resolution as ProbedResolution;
-    use ovrley_core::media::video_edits::FIRST_SEGMENT_KEY;
+    use ovrley_core::media::probe::Resolution as ProbedResolution;
+    use ovrley_core::media::edits::FIRST_SEGMENT_KEY;
 
     pub struct TestVideo {
         pub id: &'static str,

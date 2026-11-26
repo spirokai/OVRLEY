@@ -2,10 +2,10 @@ use chrono::{
     Duration, Local, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, SecondsFormat,
     TimeZone, Utc,
 };
-use ovrley_core::activity::csv::{parse_csv_activity_path, parse_csv_activity_reader};
+use ovrley_core::import::csv::{parse_path, parse_reader};
 use ovrley_core::activity::interpolate::densify_activity;
 use ovrley_core::activity::trim::trim_activity;
-use ovrley_core::normalize::RenderDataRequirements;
+use ovrley_core::config::RenderDataRequirements;
 use std::io::Cursor;
 
 #[test]
@@ -15,9 +15,8 @@ fn trackaddict_gps_updates_preserve_sparse_gps_and_dense_acceleration() {
 0.1,0,10.0,20.0,100.0,36.0,90.0,0.2\n\
 1.0,1,10.1,20.1,110.0,72.0,100.0,0.3\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "trackaddict.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "trackaddict.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.1, 1.0]);
     assert_eq!(
@@ -63,7 +62,7 @@ fn trackaddict_rejects_malformed_gps_update_values() {
 0.0,1,10.0,20.0\n\
 0.1,true,10.0,20.0\n";
 
-    let error = parse_csv_activity_reader(Cursor::new(csv), "trackaddict.csv").unwrap_err();
+    let error = parse_reader(Cursor::new(csv), "trackaddict.csv").unwrap_err();
 
     assert!(
         error
@@ -79,9 +78,8 @@ fn gps_update_does_not_mask_independently_sampled_vehicle_speed() {
 0.0,1,10.0,0.1\n\
 0.1,0,11.0,0.2\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "mixed-rate.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "mixed-rate.csv")
+        .unwrap();
 
     assert_eq!(activity.speed, vec![Some(10.0), Some(11.0)]);
     assert_eq!(activity.g_force_x.len(), 2);
@@ -138,8 +136,8 @@ fn racebox_reader_produces_canonical_activity_columns() {
 1,10.000,34.4889022,-80.5974243,147.8,5.46\n\
 2,10.040,34.4889018,-80.5974241,147.9,7.20\n";
 
-    let response = parse_csv_activity_reader(Cursor::new(csv), "racebox.csv").unwrap();
-    let activity = response.parsed_activity;
+    let response = parse_reader(Cursor::new(csv), "racebox.csv").unwrap();
+    let activity = response;
 
     assert_eq!(activity.file_format.as_deref(), Some("csv"));
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.04]);
@@ -206,9 +204,8 @@ fn maps_explicit_utc_and_paired_elapsed_absolute_timing_semantically() {
     let utc_csv = "UTC Time,Speed\n\
 1700000000.250,36\n\
 1700000001.750,72\n";
-    let utc_activity = parse_csv_activity_reader(Cursor::new(utc_csv), "utc.csv")
-        .unwrap()
-        .parsed_activity;
+    let utc_activity = parse_reader(Cursor::new(utc_csv), "utc.csv")
+        .unwrap();
 
     assert_eq!(utc_activity.sample_elapsed_seconds, vec![0.0, 1.5]);
     assert_eq!(
@@ -226,9 +223,8 @@ fn maps_explicit_utc_and_paired_elapsed_absolute_timing_semantically() {
     let paired_csv = "Time (s),Elapsed time (s),Speed\n\
 1700000000.250,42.5,36\n\
 1700000001.750,44.0,72\n";
-    let paired_activity = parse_csv_activity_reader(Cursor::new(paired_csv), "paired.csv")
-        .unwrap()
-        .parsed_activity;
+    let paired_activity = parse_reader(Cursor::new(paired_csv), "paired.csv")
+        .unwrap();
 
     assert_eq!(paired_activity.sample_elapsed_seconds, vec![0.0, 1.5]);
     assert_eq!(
@@ -243,9 +239,8 @@ fn parses_explicit_offset_timestamps_without_numeric_guessing() {
 2026-07-13T18:58:59.125+02:00,36\n\
 2026-07-13T18:59:00.625+02:00,72\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "rfc3339.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "rfc3339.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.5]);
     assert_eq!(
@@ -259,9 +254,8 @@ fn keeps_bare_numeric_timestamps_elapsed_and_invalid_local_metadata_optional() {
     let bare_csv = "Timestamp,Speed\n\
 1700000000,36\n\
 1700000001,72\n";
-    let bare_activity = parse_csv_activity_reader(Cursor::new(bare_csv), "bare.csv")
-        .unwrap()
-        .parsed_activity;
+    let bare_activity = parse_reader(Cursor::new(bare_csv), "bare.csv")
+        .unwrap();
 
     assert_eq!(bare_activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert!(bare_activity.sync_time.is_none());
@@ -272,9 +266,8 @@ Elapsed time (ms),Speed\n\
 5000,36\n\
 6500,72\n";
     let explicit_activity =
-        parse_csv_activity_reader(Cursor::new(explicit_csv), "explicit-elapsed.csv")
-            .unwrap()
-            .parsed_activity;
+        parse_reader(Cursor::new(explicit_csv), "explicit-elapsed.csv")
+            .unwrap();
 
     assert_eq!(explicit_activity.sample_elapsed_seconds, vec![0.0, 1.5]);
     assert!(explicit_activity.sync_time.is_none());
@@ -285,9 +278,8 @@ Time,UTC Time,Speed\n\
 0,invalid,36\n\
 1,invalid,72\n";
     let malformed_utc_activity =
-        parse_csv_activity_reader(Cursor::new(malformed_utc_csv), "malformed-utc.csv")
-            .unwrap()
-            .parsed_activity;
+        parse_reader(Cursor::new(malformed_utc_csv), "malformed-utc.csv")
+            .unwrap();
 
     let malformed_utc_local = NaiveDate::from_ymd_opt(2026, 2, 14)
         .unwrap()
@@ -306,9 +298,8 @@ Session,CMP Full\n\
 Time,Speed\n\
 0,36\n\
 1,72\n";
-    let aim_activity = parse_csv_activity_reader(Cursor::new(aim_csv), "aim.csv")
-        .unwrap()
-        .parsed_activity;
+    let aim_activity = parse_reader(Cursor::new(aim_csv), "aim.csv")
+        .unwrap();
     let aim_local = NaiveDate::from_ymd_opt(2026, 2, 14)
         .unwrap()
         .and_time(NaiveTime::from_hms_opt(8, 30, 0).unwrap());
@@ -326,9 +317,8 @@ Timestamp (s),Speed\n\
 61141,36\n\
 61142,72\n";
     let racechrono_activity =
-        parse_csv_activity_reader(Cursor::new(racechrono_csv), "racechrono-v1.csv")
-            .unwrap()
-            .parsed_activity;
+        parse_reader(Cursor::new(racechrono_csv), "racechrono-v1.csv")
+            .unwrap();
     let racechrono_local = NaiveDate::from_ymd_opt(2026, 7, 13)
         .unwrap()
         .and_time(NaiveTime::from_hms_opt(16, 59, 1).unwrap());
@@ -350,9 +340,8 @@ Time,Speed,GEAR,PEDAL POS\n\
 s,mph,gear,%\n\
 0.000,10.0,1,25.0\n\
 0.050,12.0,2,50.0\n";
-    let activity = parse_csv_activity_reader(Cursor::new(aim_csv), "11.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(aim_csv), "11.csv")
+        .unwrap();
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.05]);
     assert_eq!(activity.gear_position, gear_numbers(&[1.0, 2.0]));
     assert_eq!(activity.throttle_position, vec![Some(25.0), Some(50.0)]);
@@ -374,9 +363,8 @@ fn local_preamble_timestamps_respect_dst_transitions_and_reject_non_unique_start
             example.start.format("%A, %B %d, %Y"),
             example.start.format("%I:%M %p"),
         );
-        let activity = parse_csv_activity_reader(Cursor::new(csv), "dst-crossing.csv")
-            .unwrap()
-            .parsed_activity;
+        let activity = parse_reader(Cursor::new(csv), "dst-crossing.csv")
+            .unwrap();
         let expected_end = (example.start.with_timezone(&Utc) + Duration::hours(4))
             .to_rfc3339_opts(SecondsFormat::Millis, true);
 
@@ -388,9 +376,8 @@ fn local_preamble_timestamps_respect_dst_transitions_and_reject_non_unique_start
             example.non_unique.format("%I:%M %p"),
         );
         let invalid_activity =
-            parse_csv_activity_reader(Cursor::new(invalid_csv), "dst-invalid.csv")
-                .unwrap()
-                .parsed_activity;
+            parse_reader(Cursor::new(invalid_csv), "dst-invalid.csv")
+                .unwrap();
 
         assert!(invalid_activity.time.iter().all(Option::is_none));
         assert!(invalid_activity.sync_time.is_none());
@@ -404,9 +391,8 @@ fn coalesces_equal_time_rows_before_rebasing_distance() {
 10,,110,\n\
 11,7,120,34.2\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "duplicates.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "duplicates.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.speed, vec![Some(5.0), Some(7.0)]);
@@ -428,9 +414,8 @@ fn generic_distance_headers_remain_cumulative_distance() {
 0,3,0.0,0.0\n\
 1,11,0.0,0.0001\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "generic-distance.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "generic-distance.csv")
+        .unwrap();
 
     assert_eq!(activity.distance, vec![Some(0.0), Some(8.0)]);
     assert_eq!(activity.distance_to_home.first(), Some(&Some(0.0)));
@@ -443,9 +428,8 @@ fn airdata_distance_pair_maps_home_distance_and_mileage_consistently() {
 0,53.4881644,-1.2102215,100,0,10,100,90\n\
 1000,53.4881645,-1.2102216,101,1,20,130,100\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "airdata.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "airdata.csv")
+        .unwrap();
 
     assert_eq!(activity.distance, vec![Some(0.0), Some(9.144)]);
     assert_eq!(activity.distance_to_home, vec![Some(3.048), Some(6.096)]);
@@ -459,7 +443,7 @@ fn unprofiled_distance_and_mileage_headers_are_rejected_as_ambiguous() {
 0,1,2,0.0\n\
 1,3,4,0.1\n";
 
-    let error = parse_csv_activity_reader(Cursor::new(csv), "ambiguous-distance.csv").unwrap_err();
+    let error = parse_reader(Cursor::new(csv), "ambiguous-distance.csv").unwrap_err();
 
     assert!(error
         .to_string()
@@ -472,9 +456,8 @@ fn explicit_distance_to_home_rejects_negative_observations() {
 0,-1,0.0\n\
 1,2,0.0\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "distance-to-home.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "distance-to-home.csv")
+        .unwrap();
 
     assert_eq!(activity.distance_to_home, vec![None, Some(2.0)]);
 }
@@ -486,7 +469,7 @@ fn rejects_unplaced_and_decreasing_rows_with_source_context() {
 ,,72\n\
 2,1700000002,90\n";
     let missing_error =
-        parse_csv_activity_reader(Cursor::new(missing_csv), "missing-time.csv").unwrap_err();
+        parse_reader(Cursor::new(missing_csv), "missing-time.csv").unwrap_err();
 
     assert!(missing_error.to_string().contains("missing-time.csv"));
     assert!(missing_error.to_string().contains("CSV row 3"));
@@ -498,7 +481,7 @@ fn rejects_unplaced_and_decreasing_rows_with_source_context() {
 5,36\n\
 4,72\n";
     let decreasing_error =
-        parse_csv_activity_reader(Cursor::new(decreasing_csv), "decreasing.csv").unwrap_err();
+        parse_reader(Cursor::new(decreasing_csv), "decreasing.csv").unwrap_err();
 
     assert!(decreasing_error.to_string().contains("decreasing.csv"));
     assert!(decreasing_error.to_string().contains("CSV row 3"));
@@ -512,9 +495,8 @@ fn aligns_absolute_fallback_rows_to_the_selected_elapsed_basis() {
 ,1700000001.750,72\n\
 45.5,1700000003.250,90\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "mixed-timing.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "mixed-timing.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.5, 3.0]);
 }
@@ -525,9 +507,8 @@ fn duplicate_elapsed_candidates_select_the_first_source_with_valid_values() {
 invalid,10.000,34.4,-80.5,147.8,5.46\n\
 invalid,10.040,34.4,-80.5,147.8,5.61\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "duplicate-time.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "duplicate-time.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.04]);
 }
@@ -538,9 +519,8 @@ fn malformed_metric_observations_become_missing_without_repairing_bounded_values
 0,91,-181,-1,-1,101,-1,-1,N/A\n\
 1,45,90,5,1000,50,25,361,36\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "missing-observations.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "missing-observations.csv")
+        .unwrap();
 
     assert_eq!(
         activity.course,
@@ -558,7 +538,7 @@ fn malformed_metric_observations_become_missing_without_repairing_bounded_values
 fn unusable_headers_and_repeated_header_rows_report_file_and_record_context() {
     let unusable = "Exporter,Example\nTime,8:30 AM\n";
     let unusable_error =
-        parse_csv_activity_reader(Cursor::new(unusable), "unusable.csv").unwrap_err();
+        parse_reader(Cursor::new(unusable), "unusable.csv").unwrap_err();
 
     assert!(unusable_error.to_string().contains("unusable.csv"));
     assert!(unusable_error
@@ -567,7 +547,7 @@ fn unusable_headers_and_repeated_header_rows_report_file_and_record_context() {
 
     let ambiguous = "Time,Speed\n0,36\nTime,Speed\n1,72\n";
     let ambiguous_error =
-        parse_csv_activity_reader(Cursor::new(ambiguous), "two-headers.csv").unwrap_err();
+        parse_reader(Cursor::new(ambiguous), "two-headers.csv").unwrap_err();
 
     assert!(ambiguous_error.to_string().contains("two-headers.csv"));
     assert!(ambiguous_error
@@ -580,8 +560,8 @@ fn racebox_fixture_imports_through_the_path_entry_point() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/sample Racebox.csv");
 
-    let response = parse_csv_activity_path(&fixture, None).unwrap();
-    let activity = response.parsed_activity;
+    let response = parse_path(&fixture, None).unwrap();
+    let activity = response;
 
     assert_eq!(activity.file_name.as_deref(), Some("sample Racebox.csv"));
     assert_eq!(activity.sample_elapsed_seconds.first(), Some(&0.0));
@@ -627,9 +607,8 @@ fn csv_lap_values_normalize_positive_integer_labels_and_reject_other_values() {
 8,10,-\n\
 9,10,null\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "laps.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "laps.csv")
+        .unwrap();
 
     assert_eq!(activity.lap_number, vec![0, 0, 1, 1, 2, -1, -1, -1, -1, -1]);
     assert_eq!(activity.lap_durations_seconds, vec![2.0, 2.0, 1.0, 4.0]);
@@ -643,18 +622,15 @@ fn csv_command_returns_the_native_path_response() {
     let repo_root =
         std::env::temp_dir().join(format!("ovrley-csv-debug-test-{}", std::process::id()));
     let paths = ovrley_core::paths::AppPaths::from_repo_root(repo_root.clone());
-    let response = ovrley_core::activity::csv::parse_csv_activity_path(&fixture, Some(&paths.repo_root)).unwrap();
-    // debug_payload is Some only in debug builds
-    if cfg!(not(debug_assertions)) {
-        assert!(response.debug_payload.is_none());
-    } else {
-        assert!(response.debug_payload.is_some());
+    let response = ovrley_core::import::csv::parse_path(&fixture, Some(&paths.repo_root)).unwrap();
+    // The debug file is written only in debug builds.
+    if cfg!(debug_assertions) {
         assert!(repo_root
             .join("debug/activities/sample Racebox-parse-debug.json")
             .is_file());
         std::fs::remove_dir_all(repo_root).unwrap();
     }
-    let activity = response.parsed_activity;
+    let activity = response;
 
     assert_eq!(activity.file_name.as_deref(), Some("sample Racebox.csv"));
     assert_eq!(activity.file_format.as_deref(), Some("csv"));
@@ -670,9 +646,8 @@ Time,GPS Latitude (deg),GPS Longitude (deg),GPS Speed (mph),GPS Altitude (ft),GP
 5,34.0,-80.0,10,100,361\n\
 6,34.1,-80.1,20,110,-1\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "preamble.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "preamble.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.speed, vec![Some(4.4704), Some(8.9408)]);
@@ -687,9 +662,8 @@ s,km/h,m,#\n\
 0,36,12,2\n\
 1,72,15,3\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "units.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "units.csv")
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.speed, vec![Some(10.0), Some(20.0)]);
@@ -703,9 +677,8 @@ fn ignores_bad_units_and_uses_metric_source_priority() {
 0,20,-1,3,30,1,900\n\
 1,21,-2,4,31,1.5,901\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "sources.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "sources.csv")
+        .unwrap();
 
     assert_eq!(activity.speed, vec![Some(3.0), Some(4.0)]);
     assert_eq!(activity.distance, vec![Some(0.0), Some(500.0)]);
@@ -718,9 +691,8 @@ s,knots,km/h,m/s\n\
 0,20,36,5\n\
 1,21,72,6\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "conflict.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "conflict.csv")
+        .unwrap();
 
     assert_eq!(activity.speed, vec![Some(5.0), Some(6.0)]);
 }
@@ -732,7 +704,7 @@ knots,knots\n\
 0,10\n\
 1,11\n";
 
-    let error = parse_csv_activity_reader(Cursor::new(csv), "not-units.csv").unwrap_err();
+    let error = parse_reader(Cursor::new(csv), "not-units.csv").unwrap_err();
 
     assert!(error
         .to_string()
@@ -745,9 +717,8 @@ fn vehicle_gear_outranks_calculated_gear() {
 0,1,52-34\n\
 1,2,50-34\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "gear.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "gear.csv")
+        .unwrap();
 
     assert_eq!(
         activity.gear_position,
@@ -761,9 +732,8 @@ fn qualified_sources_use_metric_specific_priority() {
 0,10,20,30,40,100,200,9,3,4,5,-,999\n\
 1,11,21,31,41,110,220,12,6,7,8,-,999\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "priorities.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "priorities.csv")
+        .unwrap();
 
     assert_eq!(
         activity.course,
@@ -779,9 +749,8 @@ fn vehicle_sources_and_accelerator_pedals_win_and_controls_normalize_by_column()
 0,1000,3000,2000,80,25,10,0,2,3,-12.5\n\
 1,1100,3100,2100,90,50,20,1,3,4,8.25\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "vehicle.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "vehicle.csv")
+        .unwrap();
 
     assert_eq!(activity.rpm, vec![Some(3000.0), Some(3100.0)]);
     assert!(activity.cadence.is_empty());
@@ -806,9 +775,8 @@ fn vehicle_sources_and_accelerator_pedals_win_and_controls_normalize_by_column()
 0,0,0\n\
 1,1,1\n\
 2,0,1\n";
-    let activity = parse_csv_activity_reader(Cursor::new(ambiguous), "binary.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(ambiguous), "binary.csv")
+        .unwrap();
 
     assert_eq!(
         activity.throttle_position,
@@ -822,9 +790,8 @@ fn vehicle_sources_and_accelerator_pedals_win_and_controls_normalize_by_column()
     let declared = "Time,Throttle %,Brake on/off\n\
 0,1,0\n\
 1,2,1\n";
-    let activity = parse_csv_activity_reader(Cursor::new(declared), "declared-controls.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(declared), "declared-controls.csv")
+        .unwrap();
 
     assert_eq!(activity.throttle_position, vec![Some(1.0), Some(2.0)]);
     assert_eq!(activity.brake_position, vec![Some(0.0), Some(100.0)]);
@@ -836,9 +803,8 @@ fn acceleration_axes_preserve_signs_and_scalar_uses_the_agreed_precedence() {
         "Time,Lateral acceleration (G),Longitudinal acceleration (G),Lean angle (deg)\n\
 0,-3,4,-20\n\
 1,5,-12,15\n";
-    let semantic = parse_csv_activity_reader(Cursor::new(semantic_csv), "semantic.csv")
-        .unwrap()
-        .parsed_activity;
+    let semantic = parse_reader(Cursor::new(semantic_csv), "semantic.csv")
+        .unwrap();
 
     assert_eq!(semantic.g_force_x, vec![Some(-3.0), Some(5.0)]);
     assert_eq!(semantic.g_force_y, vec![Some(4.0), Some(-12.0)]);
@@ -848,9 +814,8 @@ fn acceleration_axes_preserve_signs_and_scalar_uses_the_agreed_precedence() {
     let literal_csv = "Time,Accel X (G),Accel Y (G),Accel Z (G)\n\
 0,0,0,1\n\
 1,-1,2,-2\n";
-    let literal = parse_csv_activity_reader(Cursor::new(literal_csv), "literal.csv")
-        .unwrap()
-        .parsed_activity;
+    let literal = parse_reader(Cursor::new(literal_csv), "literal.csv")
+        .unwrap();
 
     assert_eq!(literal.g_force_x, vec![Some(0.0), Some(-1.0)]);
     assert_eq!(literal.g_force_y, vec![Some(0.0), Some(2.0)]);
@@ -862,18 +827,16 @@ fn acceleration_axes_preserve_signs_and_scalar_uses_the_agreed_precedence() {
         "Time,Combined acceleration (G),Lateral acceleration (G),Longitudinal acceleration (G)\n\
 0,0.25,3,4\n\
 1,0.5,5,12\n";
-    let direct = parse_csv_activity_reader(Cursor::new(direct_csv), "direct.csv")
-        .unwrap()
-        .parsed_activity;
+    let direct = parse_reader(Cursor::new(direct_csv), "direct.csv")
+        .unwrap();
 
     assert_eq!(direct.g_force, vec![Some(0.25), Some(0.5)]);
 
     let priority_csv = "Time,Lateral acceleration (G),Longitudinal acceleration (G),GPS X acceleration (G),GPS Y acceleration (G),GPS Z acceleration (G),X acceleration (G) *acc,Y acceleration (G) *acc,Z acceleration (G) *acc\n\
 0,3,4,10,20,30,-1,-2,-3\n\
 1,5,12,40,50,60,-4,-5,-6\n";
-    let priority = parse_csv_activity_reader(Cursor::new(priority_csv), "axis-priority.csv")
-        .unwrap()
-        .parsed_activity;
+    let priority = parse_reader(Cursor::new(priority_csv), "axis-priority.csv")
+        .unwrap();
 
     assert_eq!(priority.g_force_x, vec![Some(-1.0), Some(-4.0)]);
     assert_eq!(priority.g_force_y, vec![Some(-2.0), Some(-5.0)]);
@@ -1120,9 +1083,8 @@ fn parse_fixture(name: &str) -> ovrley_core::activity::schema::ParsedActivity {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity")
         .join(name);
-    parse_csv_activity_path(&path, None)
+    parse_path(&path, None)
         .unwrap()
-        .parsed_activity
 }
 
 fn assert_close(actual: Option<f64>, expected: f64) {
@@ -1214,9 +1176,8 @@ fn airdata_datetime_utc_column_is_parsed_as_absolute_timestamps() {
 100,2026-07-14 11:45:06,53.4881645,-1.2102216,101,1,20,130,100\n\
 200,2026-07-14 11:45:06,53.4881646,-1.2102217,102,2,30,160,110\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "airdata-datetime.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "airdata-datetime.csv")
+        .unwrap();
 
     assert_eq!(activity.time.len(), 3);
     assert_eq!(activity.time[0], None);
@@ -1266,9 +1227,8 @@ fn torque_pro_header_variants_map_throttle_and_trip_distance() {
 Wed Aug 05 18:57:56 GMT+01:00 2026,8.25,0\n\
 Wed Aug 05 18:57:57 GMT+01:00 2026,12.5,1.5\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "torque-headers.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "torque-headers.csv")
+        .unwrap();
 
     assert_eq!(activity.throttle_position, vec![Some(8.25), Some(12.5)]);
     assert_eq!(activity.distance, vec![Some(0.0), Some(1500.0)]);
@@ -1281,9 +1241,8 @@ fn engine_load_header_variants_map_to_percent() {
 0,23.5,-\n\
 1,45,50\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "engine-load.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "engine-load.csv")
+        .unwrap();
 
     assert_eq!(activity.engine_load, vec![Some(23.5), Some(45.0)]);
 }
@@ -1294,9 +1253,8 @@ fn vehicle_power_populates_engine_power_without_cycling_calories() {
 0,12345,12,20\n\
 1,23456,23,30\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "vehicle-power.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "vehicle-power.csv")
+        .unwrap();
 
     assert_eq!(activity.engine_power, vec![Some(12_345.0), Some(23_456.0)]);
     assert!(activity.power.is_empty());
@@ -1311,9 +1269,8 @@ fn vehicle_power_aliases_and_units_convert_to_engine_power() {
     let torque_pro_hp = "Time,Horsepower (At the wheels)(hp)\n0,10\n1,20\n";
 
     let parse = |csv: &str| {
-        parse_csv_activity_reader(Cursor::new(csv), "vehicle-power-alias.csv")
+        parse_reader(Cursor::new(csv), "vehicle-power-alias.csv")
             .unwrap()
-            .parsed_activity
     };
 
     assert_eq!(
@@ -1333,9 +1290,8 @@ fn vehicle_power_aliases_and_units_convert_to_engine_power() {
 #[test]
 fn engine_power_preserves_negative_and_missing_samples_through_densification() {
     let csv = "Time,Estimated Power (kW)\n0,-10\n1,\n2,5\n";
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "signed-engine-power.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "signed-engine-power.csv")
+        .unwrap();
     assert_eq!(
         activity.engine_power,
         vec![Some(-10_000.0), None, Some(5_000.0)]
@@ -1366,9 +1322,8 @@ fn estimated_torque_and_foot_pound_variants_preserve_signed_values() {
         "foot pounds",
     ] {
         let csv = format!("Time,Estimated Torque ({unit})\n0,-10\n1,\n");
-        let activity = parse_csv_activity_reader(Cursor::new(csv), "torque.csv")
-            .unwrap()
-            .parsed_activity;
+        let activity = parse_reader(Cursor::new(csv), "torque.csv")
+            .unwrap();
         assert_close(activity.torque[0], -13.558_179_483_314_004);
         assert_eq!(activity.torque[1], None);
     }
@@ -1376,7 +1331,7 @@ fn estimated_torque_and_foot_pound_variants_preserve_signed_values() {
 
 mod lap_timing_fixture_tests {
     use super::*;
-    use ovrley_core::activity::vbo::parse_vbo_activity_path;
+    use ovrley_core::import::{csv, vbo};
 
     struct LapExpectations {
         fixture: &'static str,
@@ -1395,14 +1350,12 @@ mod lap_timing_fixture_tests {
             .join(expectations.fixture);
         match expectations.extraction {
             FixtureKind::Csv => {
-                parse_csv_activity_path(&path, None)
+                csv::parse_path(&path, None)
                     .unwrap()
-                    .parsed_activity
             }
             FixtureKind::Vbo => {
-                parse_vbo_activity_path(&path, None)
+                vbo::parse_path(&path, None)
                     .unwrap()
-                    .parsed_activity
             }
         }
     }
@@ -1588,9 +1541,8 @@ Time,Lap,Latitude,Longitude\n\
 1,1,10.1,20.1\n\
 2,2,10.2,20.2\n\
 3,2,10.3,20.3\n";
-        let activity = parse_csv_activity_reader(Cursor::new(csv), "explicit-laps.csv")
-            .unwrap()
-            .parsed_activity;
+        let activity = parse_reader(Cursor::new(csv), "explicit-laps.csv")
+            .unwrap();
 
         assert_eq!(activity.lap_start_elapsed_seconds, vec![0.0, 2.0]);
         assert_eq!(activity.lap_durations_seconds, vec![2.0, 1.0]);
@@ -1731,9 +1683,8 @@ fn coolant_temperature_headers_map_to_celsius() {
     let logger = "Time,WaterTemp\n0,88\n1,89\n";
 
     let parse = |csv: &str| {
-        parse_csv_activity_reader(Cursor::new(csv.to_owned()), "coolant.csv")
+        parse_reader(Cursor::new(csv.to_owned()), "coolant.csv")
             .unwrap()
-            .parsed_activity
             .coolant_temperature
     };
 
@@ -1746,9 +1697,8 @@ fn coolant_temperature_headers_map_to_celsius() {
 #[test]
 fn boost_pressure_headers_convert_to_gauge_kilopascals() {
     let parse = |csv: &str| {
-        parse_csv_activity_reader(Cursor::new(csv.to_owned()), "boost.csv")
+        parse_reader(Cursor::new(csv.to_owned()), "boost.csv")
             .unwrap()
-            .parsed_activity
             .boost_pressure
     };
 
@@ -1771,9 +1721,8 @@ fn shearwater_water_temperature_stays_water_temperature() {
 0,1.0,0.21,0.21,0.0,18\n\
 10,2.0,0.25,0.21,0.0,17\n";
 
-    let activity = parse_csv_activity_reader(Cursor::new(csv), "dive.csv")
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(csv), "dive.csv")
+        .unwrap();
 
     assert_eq!(activity.water_temperature, vec![Some(18.0), Some(17.0)]);
     assert!(activity.coolant_temperature.iter().all(Option::is_none));

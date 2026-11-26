@@ -7,11 +7,12 @@
 
 use crate::common;
 
-use ovrley_core::commands::{parse_and_validate_config, validate_template_contents};
-use ovrley_core::normalize::parse_config_value;
-use ovrley_core::normalize::TEMPLATE_FILE_VERSION;
+use crate::common::seam::parse_and_validate_config;
+use ovrley_core::template::validate_template_contents;
+use ovrley_core::config::parse_config_value;
+use ovrley_core::template::TEMPLATE_FILE_VERSION;
 use ovrley_widgets::widgets::value::ValidatedValue;
-use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
+use ovrley_core::jobs::planning::{plan_single_render, VideoRenderModePlan};
 use ovrley_widgets::widgets::value::ContentAlignment;
 use serde_json::json;
 
@@ -54,7 +55,7 @@ fn composite_settings_are_normalized_into_the_render_plan() {
     };
     assert_eq!(
         render.quality,
-        ovrley_core::encode::quality::EncodingQuality::Bitrate(60.0)
+        ovrley_core::encode::settings::EncodingQuality::Bitrate(60.0)
     );
     assert_eq!(render.coverage.start, 300.0);
     assert_eq!(render.coverage.end, 310.0);
@@ -66,7 +67,7 @@ fn composite_settings_are_normalized_into_the_render_plan() {
 
 #[test]
 fn rejects_zero_composite_widget_update_rate() {
-    let raw = ovrley_core::normalize::parse_config_json(
+    let raw = ovrley_core::config::parse_config_json(
         r##"{
             "scene": {
                 "fps": 30,
@@ -205,7 +206,7 @@ fn validates_the_canonical_text_alignment_contract() {
                 speed.as_object_mut().unwrap().remove("content_alignment");
             }
         }
-        let result = ovrley_core::commands::validate_config_value(&json!({
+        let result = crate::common::seam::validate_config_value(&json!({
             "scene": common::seam::explicit_scene_json(),
             "labels": [],
             "values": [speed],
@@ -266,7 +267,7 @@ fn time_requires_its_canonical_formatting_fields() {
         time["show_hundredths"] = json!(false);
         time.as_object_mut().unwrap().remove(missing_field);
 
-        let result = ovrley_core::commands::validate_config_value(&json!({
+        let result = crate::common::seam::validate_config_value(&json!({
             "scene": common::seam::explicit_scene_json(),
             "labels": [],
             "values": [time],
@@ -288,7 +289,7 @@ fn time_requires_its_canonical_formatting_fields() {
     time["time_mode"] = json!("daytime");
     time["elapsed_origin"] = json!("activity");
     time["show_hundredths"] = json!(false);
-    let result = ovrley_core::commands::validate_config_value(&json!({
+    let result = crate::common::seam::validate_config_value(&json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
         "values": [time],
@@ -310,7 +311,7 @@ fn time_requires_its_canonical_formatting_fields() {
     time["elapsed_origin"] = json!("activity");
     time["show_hundredths"] = json!(false);
     time["time_format"] = json!("%H:%M");
-    let result = ovrley_core::commands::validate_config_value(&json!({
+    let result = crate::common::seam::validate_config_value(&json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
         "values": [time],
@@ -444,7 +445,7 @@ fn rejects_malformed_new_metric_display_variants() {
         }
         metric_value[field] = value;
 
-        let result = ovrley_core::commands::validate_config_value(&json!({
+        let result = crate::common::seam::validate_config_value(&json!({
             "scene": common::seam::explicit_scene_json(),
             "labels": [],
             "values": [metric_value],
@@ -472,7 +473,7 @@ fn rejects_new_display_variants_on_the_wrong_metric() {
         let mut speed = common::builders::speed_value_json();
         speed[field] = value;
 
-        let result = ovrley_core::commands::validate_config_value(&json!({
+        let result = crate::common::seam::validate_config_value(&json!({
             "scene": common::seam::explicit_scene_json(),
             "labels": [],
             "values": [speed],

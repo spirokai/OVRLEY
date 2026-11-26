@@ -414,8 +414,8 @@ fn activity_masks(window: &ActivityWindow, duration_seconds: f64, inputs: &LaneI
 }
 
 /// The edge cuts of a clip: one per end whose outer part is still exported.
-pub fn edge_cuts(clip: &Clip) -> Vec<ovrley_core::media::video_edits::Cut> {
-    use ovrley_core::media::video_edits::{Cut, FIRST_SEGMENT_KEY};
+pub fn edge_cuts(clip: &Clip) -> Vec<ovrley_core::media::edits::Cut> {
+    use ovrley_core::media::edits::{Cut, FIRST_SEGMENT_KEY};
     let last_key = clip.cuts().last().map_or(FIRST_SEGMENT_KEY, |cut| cut.id.as_str());
     let mut cuts = Vec::new();
     if !clip.segment(FIRST_SEGMENT_KEY).excluded {

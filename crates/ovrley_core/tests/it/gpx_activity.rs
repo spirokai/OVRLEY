@@ -1,4 +1,4 @@
-use ovrley_core::activity::parsers::gpx::extract_gpx_activity;
+use ovrley_core::import::gpx::extract;
 
 const EXPORTER_GPX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="SpringBoot Export" xmlns="http://www.topografix.com/GPX/1/1" xmlns:ext="http://example.com/location/ext">
@@ -37,14 +37,14 @@ const EXPORTER_GPX: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 </gpx>"#;
 
 fn error_message(gpx: &str) -> String {
-    extract_gpx_activity(gpx.as_bytes(), "error.gpx")
+    extract(gpx.as_bytes(), "error.gpx")
         .unwrap_err()
         .to_string()
 }
 
 #[test]
 fn maps_exporter_extensions_into_canonical_fields() {
-    let activity = extract_gpx_activity(EXPORTER_GPX.as_bytes(), "session.gpx").unwrap();
+    let activity = extract(EXPORTER_GPX.as_bytes(), "session.gpx").unwrap();
 
     assert_eq!(activity.file_name, "session.gpx");
     assert_eq!(activity.file_format, "gpx");
@@ -99,7 +99,7 @@ fn strict_extensions_fail_when_unreadable() {
 fn comment_2d_speed_backs_up_missing_extension_speed() {
     let gpx = "<gpx><trkpt><cmt>alt: 1; 2dSpeed: 4.5</cmt></trkpt>\
         <trkpt><cmt>2dSpeed: 4.5</cmt><extensions><speed>9</speed></extensions></trkpt></gpx>";
-    let activity = extract_gpx_activity(gpx.as_bytes(), "speed.gpx").unwrap();
+    let activity = extract(gpx.as_bytes(), "speed.gpx").unwrap();
 
     assert_eq!(activity.raw_samples[0].speed, Some(4.5));
     assert_eq!(activity.raw_samples[1].speed, Some(9.0));
@@ -125,7 +125,7 @@ fn vehicle_obd_tags_win_over_garmin_water_temperature() {
         "<gpxtpx:TrackPointExtension><gpxtpx:wtemp>57.9</gpxtpx:wtemp></gpxtpx:TrackPointExtension>\
          <obd:telemetry><obd:boost>26.14</obd:boost><obd:coolant_temp_c>57.96</obd:coolant_temp_c></obd:telemetry>",
     );
-    let activity = extract_gpx_activity(gpx.as_bytes(), "obd.gpx").unwrap();
+    let activity = extract(gpx.as_bytes(), "obd.gpx").unwrap();
 
     assert_eq!(activity.raw_samples[0].coolant_temperature, Some(57.96));
     assert_eq!(activity.raw_samples[0].boost_pressure, Some(26.14));
@@ -136,7 +136,7 @@ fn garmin_water_temperature_fills_coolant_without_obd_tags() {
     let gpx = vehicle_gpx(
         "<gpxtpx:TrackPointExtension><gpxtpx:wtemp>57.9</gpxtpx:wtemp></gpxtpx:TrackPointExtension>",
     );
-    let activity = extract_gpx_activity(gpx.as_bytes(), "garmin.gpx").unwrap();
+    let activity = extract(gpx.as_bytes(), "garmin.gpx").unwrap();
 
     assert_eq!(activity.raw_samples[0].coolant_temperature, Some(57.9));
     assert_eq!(activity.raw_samples[0].boost_pressure, None);

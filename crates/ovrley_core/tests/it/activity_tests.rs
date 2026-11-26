@@ -4,11 +4,12 @@ use crate::common;
 
 use std::fs;
 
-use ovrley_core::activity::finalize::finalize_raw_activity_json;
+use ovrley_core::error::CoreResult;
+use ovrley_core::import::finalize::finalize_samples;
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::parse_and_validate_config;
-use ovrley_core::normalize::RenderDataRequirements;
+use ovrley_core::activity::{build_dense_report, parse_activity_json};
+use crate::common::seam::parse_and_validate_config;
+use ovrley_core::config::RenderDataRequirements;
 
 fn full_scene(fps: f64, start: f64, end: f64) -> serde_json::Value {
     let mut scene = common::builders::scene_json();
@@ -26,8 +27,12 @@ fn time_value() -> String {
     r##"{"value":"time","x":0,"y":0,"font":"f","font_size":12.0,"color":"#ffffff","opacity":1.0,"show_icon":false,"icon_color":"#000000","icon_size":1.0,"icon_offset_x":0.0,"icon_offset_y":0.0,"show_units":false,"unit_color":"#000000","display_unit":"","prefix":"","suffix":"","time_mode":"daytime","format":"time-24","hours_offset":0,"elapsed_origin":"activity","show_hundredths":false,"decimals":0,"content_alignment":"left"}"##.to_string()
 }
 
+fn finalize_json(raw_activity: &str) -> CoreResult<ParsedActivity> {
+    finalize_samples(&serde_json::from_str(raw_activity)?, None)
+}
+
 #[test]
-fn finalizes_raw_activity_with_idle_gap_debug_payload() {
+fn finalizes_raw_activity_with_idle_gaps() {
     let raw_activity = serde_json::json!({
         "file_name": "raw-regression.fit",
         "file_format": "fit",
@@ -66,8 +71,7 @@ fn finalizes_raw_activity_with_idle_gap_debug_payload() {
         }
     });
 
-    let response = finalize_raw_activity_json(&raw_activity.to_string(), None).unwrap();
-    let activity = response.parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string()).unwrap();
 
     assert_eq!(activity.file_name.as_deref(), Some("raw-regression.fit"));
     assert_eq!(activity.file_format.as_deref(), Some("fit"));
@@ -109,25 +113,6 @@ fn finalizes_raw_activity_with_idle_gap_debug_payload() {
     assert_eq!(coverage["distance"]["availableCount"], 6);
     assert_eq!(coverage["gps_coordinates"]["source"], "direct");
     assert_eq!(coverage["gps_coordinates"]["availableCount"], 6);
-
-    let debug_payload = response
-        .debug_payload
-        .expect("debug builds must return parser diagnostics");
-    assert_eq!(debug_payload["file_name"], "raw-regression.fit");
-    assert_eq!(debug_payload["file_format"], "fit");
-    assert_eq!(debug_payload["idle_gap_fill"]["inserted_sample_count"], 3);
-    assert_eq!(
-        debug_payload["idle_gap_fill"]["detected_gaps"][0]["gap_seconds"],
-        4.0
-    );
-    assert_eq!(
-        debug_payload["idle_gap_fill"]["detected_gaps"][0]["inserted_samples"],
-        3
-    );
-    assert_eq!(
-        debug_payload["parsed_activity"]["metadata"]["inserted_idle_sample_count"],
-        3
-    );
 }
 
 #[test]
@@ -161,9 +146,8 @@ fn finalizes_raw_activity_axis_g_force_and_lean_angle_samples() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     assert_eq!(activity.distance, vec![Some(0.0), Some(12.5)]);
     assert_eq!(activity.lap_number, vec![0, 1]);
@@ -194,9 +178,8 @@ fn merges_raw_samples_that_share_an_instant() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(
@@ -230,9 +213,8 @@ fn finalizes_raw_activity_with_default_derived_speed_smoothing_when_map_is_empty
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     assert_eq!(activity.speed[0], None);
     assert!(activity.speed.iter().flatten().all(|speed| *speed > 0.0 && *speed < 40.0));
@@ -269,9 +251,8 @@ fn ingress_altitude_smoothing_turns_a_stepped_climb_into_a_steady_vertical_speed
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     // The 1 s window is cut short within two passes of half a window from either end, which flattens
     // the climb there. Everywhere else the smoothed altitude reads as the true 8 m/s.
@@ -307,9 +288,8 @@ fn finalizes_raw_activity_with_srt_style_zero_phase_smoothing() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     assert_ne!(
         activity.speed,
@@ -358,9 +338,8 @@ fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
         }
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     assert_eq!(activity.heading[0], Some(350.0));
     for heading in activity.heading.iter().flatten() {
@@ -376,9 +355,8 @@ fn finalizes_raw_activity_with_circular_ema_without_heading_wrap_glitch() {
 fn finalizes_igc_raw_activity_fixture() {
     let raw_activity_json =
         fs::read_to_string(common::test_config::igc_raw_activity_path()).unwrap();
-    let activity = finalize_raw_activity_json(&raw_activity_json, None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity_json)
+        .unwrap();
 
     let n = activity.sample_elapsed_seconds.len();
     assert!(n > 0, "expected IGC elapsed samples");
@@ -410,7 +388,7 @@ fn builds_dense_report_for_full_fixture() {
         .to_string(),
     )
     .unwrap();
-    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+    let report = build_dense_report(&activity, &config).unwrap();
 
     assert_eq!(report.frame_count, 140160);
     assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
@@ -440,7 +418,7 @@ fn trims_non_integer_window_across_multiple_fps() {
             .to_string(),
         )
         .unwrap();
-        let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+        let report = build_dense_report(&activity, &config).unwrap();
         assert_eq!(report.frame_count, expected_frames);
         assert_eq!(report.frame_elapsed_seconds.first().copied(), Some(0.0));
         assert!(
@@ -481,7 +459,7 @@ fn only_densifies_series_requested_by_template() {
     )
     .unwrap();
 
-    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+    let report = build_dense_report(&activity, &config).unwrap();
 
     assert_eq!(report.series.speed.len(), report.frame_count);
     assert!(report.series.elevation.is_empty());
@@ -517,7 +495,7 @@ fn trimmed_exports_keep_absolute_distance_progress() {
     )
     .unwrap();
 
-    let report = build_dense_activity_report_validated(&activity, &config).unwrap();
+    let report = build_dense_report(&activity, &config).unwrap();
 
     let first_progress = report
         .frame_distance_progress
@@ -610,9 +588,8 @@ fn finalization_emits_calories_and_distance_to_home_series() {
         ]
     });
 
-    let activity = finalize_raw_activity_json(&raw_activity.to_string(), None)
-        .unwrap()
-        .parsed_activity;
+    let activity = finalize_json(&raw_activity.to_string())
+        .unwrap();
 
     assert_eq!(activity.calories, vec![Some(100.0), Some(150.0)]);
     assert_eq!(activity.distance_to_home.first(), Some(&Some(0.0)));
@@ -630,7 +607,7 @@ fn finalization_rejects_out_of_range_gps_coordinates() {
         ]
     });
 
-    let error = finalize_raw_activity_json(&raw_activity.to_string(), None).unwrap_err();
+    let error = finalize_json(&raw_activity.to_string()).unwrap_err();
     assert!(error.to_string().contains("Invalid latitude"));
 }
 

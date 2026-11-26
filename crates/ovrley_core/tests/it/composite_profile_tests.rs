@@ -11,7 +11,7 @@
 //! - Non-canonical external names bypassing ingress validation
 
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId, COMPOSITE_CODECS};
-use ovrley_core::encode::ffmpeg::composite_profiles::composite_profile;
+use ovrley_core::encode::ffmpeg::profiles::composite_profile;
 use serde_json::json;
 
 use crate::common;

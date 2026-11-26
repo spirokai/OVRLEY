@@ -23,9 +23,9 @@ pub struct ImportedActivity {
 impl ImportedActivity {
     /// An activity from `ovrley_core`'s import or a video's embedded telemetry, with the preview's
     /// serialized copy. Blocking: runs on a worker.
-    pub fn from_response(response: ovrley_core::activity::finalize::FinalizeActivityResponse) -> Result<Self, String> {
-        let preview_bytes = serde_json::to_vec(&response.parsed_activity).map_err(|error| error.to_string())?;
-        Ok(Self { activity: Arc::new(response.parsed_activity), preview_bytes: Arc::new(preview_bytes) })
+    pub fn from_activity(activity: ovrley_core::activity::schema::ParsedActivity) -> Result<Self, String> {
+        let preview_bytes = serde_json::to_vec(&activity).map_err(|error| error.to_string())?;
+        Ok(Self { activity: Arc::new(activity), preview_bytes: Arc::new(preview_bytes) })
     }
 }
 
@@ -153,7 +153,7 @@ pub struct MediaState {
     pub active_render_id: Option<u64>,
     pub active_render_output_path: Option<String>,
     /// The single render's progress: core's type, the panel derives its percentages.
-    pub render_progress: ovrley_core::debug::RenderProgress,
+    pub render_progress: ovrley_core::encode::progress::RenderProgress,
 }
 
 impl MediaState {
@@ -170,7 +170,7 @@ impl MediaState {
 
     /// The accepted single render, `rendering` with its first message.
     pub fn start_render_session(&mut self, render_id: u64, output_path: String, message: String) {
-        use ovrley_core::debug::{RenderProgress, RenderStatus};
+        use ovrley_core::encode::progress::{RenderProgress, RenderStatus};
         self.active_render_id = Some(render_id);
         self.active_render_output_path = Some(output_path);
         self.rendering_video = true;

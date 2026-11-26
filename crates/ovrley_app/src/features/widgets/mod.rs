@@ -574,7 +574,7 @@ pub fn update_widget_fields(store: &mut Store, services: &mut Services, widget_i
     let previous = std::rc::Rc::clone(&store.editor.config);
     let had_error = store.preview.error.is_some();
     update_widget_data(store, widget_id, patch)?;
-    let durable = ovrley_core::normalize::template::create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults));
+    let durable = ovrley_core::template::create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults));
     let rendered = durable.map_err(|error| error.to_string()).and_then(|_| {
         crate::features::widgets::preview::present_pending_frame(store, services);
         match &store.preview.error {
@@ -598,7 +598,7 @@ pub(crate) mod tests {
     use crate::store::template::ThemeColors;
     use crate::store::services::fakes::{fake_services, Fakes};
     use crate::store::Dispatcher;
-    use ovrley_core::normalize::template::template_manifest;
+    use ovrley_core::template::template_manifest;
     use ovrley_widgets::model::document::{OverlayConfig, UnitSystem};
     use serde_json::json;
 

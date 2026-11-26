@@ -1,7 +1,7 @@
 use crate::common;
 
-use ovrley_core::commands::validate_config_value;
-use ovrley_core::normalize::parse_config_value;
+use crate::common::seam::validate_config_value;
+use ovrley_core::config::parse_config_value;
 use ovrley_widgets::model::catalog::BackdropType;
 use serde_json::json;
 
@@ -359,9 +359,9 @@ fn export_frame_applies_circle_fill_alpha_multipliers() {
 }
 
 #[test]
-fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
+fn preview_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
     use ovrley_widgets::preview::PreviewSession;
-    for mut backdrop in [rectangle_backdrop_json("wasm-rect", "#abcdef80"), circle_backdrop_json("wasm-circle", "#abcdef80")] {
+    for mut backdrop in [rectangle_backdrop_json("preview-rect", "#abcdef80"), circle_backdrop_json("preview-circle", "#abcdef80")] {
         backdrop["x"] = json!(20.25);
         backdrop["y"] = json!(30.5);
         backdrop["border_thickness"] = json!(2.25);
@@ -420,7 +420,7 @@ fn wasm_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
 }
 
 #[test]
-fn wasm_backdrop_resize_keeps_opposite_corners_and_fractional_dimensions() {
+fn preview_backdrop_resize_keeps_opposite_corners_and_fractional_dimensions() {
     use ovrley_widgets::preview::PreviewSession;
     for backdrop in [rectangle_backdrop_json("resize-rect", "#ff0000"), circle_backdrop_json("resize-circle", "#ff0000")] {
         let mut scene = small_scene_json(96, 96);

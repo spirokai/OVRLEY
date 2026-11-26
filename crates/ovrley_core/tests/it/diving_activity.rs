@@ -1,18 +1,14 @@
-use ovrley_core::activity::{
-    parsers::subsurface::parse_subsurface_activity_reader,
-    parsers::uddf::parse_uddf_activity_reader, schema::ParsedActivity,
-};
+use ovrley_core::activity::schema::ParsedActivity;
+use ovrley_core::import::dive::{parse_subsurface_reader, parse_uddf_reader};
 
 fn uddf(text: &str) -> ParsedActivity {
-    parse_uddf_activity_reader(text.as_bytes(), "dive.uddf", None)
+    parse_uddf_reader(text.as_bytes(), "dive.uddf", None)
         .unwrap()
-        .parsed_activity
 }
 
 fn subsurface(text: &str) -> ParsedActivity {
-    parse_subsurface_activity_reader(text.as_bytes(), "dive.ssrf", None)
+    parse_subsurface_reader(text.as_bytes(), "dive.ssrf", None)
         .unwrap()
-        .parsed_activity
 }
 
 fn close(value: Option<f64>, expected: f64) {

@@ -1,45 +1,24 @@
-//! Activity ingestion and frame-density preparation.
-//!
-//! The frontend supplies parsed GPX/FIT activity data as JSON. This module
-//! accepts both the plain `ParsedActivity` shape and the debug wrapper shape,
-//! validates the render window against the activity duration, and returns a
-//! dense per-frame report containing only the telemetry series required by the
-//! selected template.
+//! The canonical activity and its preparation for rendering: ingress normalization, timeline
+//! validation, scene trimming and per-frame densification of the series a template needs.
 
-/// Native CSV extraction into canonical activity columns.
-pub mod csv;
-/// Backend-owned post-processing from raw extraction samples to ParsedActivity.
-pub mod finalize;
-/// Interpolation helpers used for numeric, coordinate, and timestamp series.
 pub mod interpolate;
-/// Canonical lap-timing derivation, validation, and queries.
-pub(crate) mod lap_timing;
-/// Native activity file extraction into the canonical raw activity contract.
-pub mod parsers;
-/// Native column access, source bounds, and shared widget sampling.
+pub(crate) mod laps;
 pub mod sampling;
-/// Serializable activity payloads and internal dense/trimmed report types.
 pub mod schema;
-/// On-demand running splits for a configured split length.
 pub mod splits;
-/// Scene-window trimming for parsed activity samples.
 pub mod trim;
-/// Native Racelogic VBOX extraction into canonical activity columns.
-pub mod vbo;
 
 use crate::activity::interpolate::{densify_activity, frame_timeline_for_fps};
 use crate::activity::schema::{DebugPayload, DenseActivityReport, ParsedActivity};
 use crate::activity::trim::trim_activity;
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::ValidatedRenderConfig;
+use crate::config::ValidatedRenderConfig;
 use chrono_tz::Tz;
 use serde_json::Value;
 
-/// Parses frontend activity JSON from either production or debug payload shapes.
+/// Parses and normalizes an activity JSON document. A debug dump of the import, which wraps the
+/// activity under `parsed_activity`, is accepted too, so dumps can feed tools and tests.
 pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
-    // Debug exports wrap the real payload under `parsed_activity`; production
-    // calls pass the payload directly. Accept both to keep diagnostics reusable
-    // in tests and local tooling.
     let value: Value = serde_json::from_str(input)
         .map_err(|error| CoreError::Activity(format!("Invalid parsedActivity JSON: {error}")))?;
 
@@ -57,51 +36,6 @@ pub fn parse_activity_json(input: &str) -> CoreResult<ParsedActivity> {
     normalize_parsed_activity(activity)
 }
 
-/// The activity file extensions OVRLEY imports, lowercase. The file dialogs offer them
-/// case-insensitively, and the drop classifier uses the same list.
-pub const ACTIVITY_EXTENSIONS: [&str; 10] = [
-    "gpx", "fit", "tcx", "srt", "igc", "csv", "vbo", "uddf", "ssrf", "xml",
-];
-
-/// The one activity import entry: picks the parser by the file's extension, case-insensitively,
-/// and returns the finalized activity without its debug payload.
-pub fn import_activity_path(
-    paths: &crate::paths::AppPaths,
-    path: &str,
-) -> CoreResult<crate::activity::finalize::FinalizeActivityResponse> {
-    use std::path::Path;
-    let filename = path
-        .rsplit(['/', '\\'])
-        .next()
-        .filter(|name| !name.is_empty())
-        .ok_or_else(|| CoreError::Activity(format!("Invalid activity path: {path}")))?;
-    let extension = filename
-        .rsplit('.')
-        .next()
-        .unwrap_or_default()
-        .to_ascii_lowercase();
-    let file = Path::new(path);
-    let repo_root = Some(paths.repo_root.as_path());
-    let mut response = match extension.as_str() {
-        "csv" => csv::parse_csv_activity_path(file, repo_root),
-        "fit" => parsers::fit::parse_fit_activity_path(file, repo_root),
-        "gpx" => parsers::gpx::parse_gpx_activity_path(file, repo_root),
-        "igc" => parsers::igc::parse_igc_activity_path(file, repo_root),
-        "srt" => parsers::srt::parse_srt_activity_path(file, repo_root),
-        "ssrf" | "xml" => parsers::subsurface::parse_subsurface_activity_path(file, repo_root),
-        "tcx" => parsers::tcx::parse_tcx_activity_path(file, repo_root),
-        "uddf" => parsers::uddf::parse_uddf_activity_path(file, repo_root),
-        "vbo" => vbo::parse_vbo_activity_path(file, repo_root),
-        _ => {
-            return Err(CoreError::Activity(format!(
-                "Unsupported activity file format: {filename}"
-            )))
-        }
-    }?;
-    response.debug_payload = None;
-    Ok(response)
-}
-
 /// JSON ingress of an activity inside a request (batch submission): deserialized, then
 /// normalized once, and shared from there on.
 pub(crate) fn deserialize_parsed_activity<'de, D: serde::Deserializer<'de>>(
@@ -113,14 +47,15 @@ pub(crate) fn deserialize_parsed_activity<'de, D: serde::Deserializer<'de>>(
         .map_err(serde::de::Error::custom)
 }
 
-/// Shared ingress for already deserialized activity, including batch submission.
+/// Normalizes a deserialized activity: its timezone and lap timing.
 pub fn normalize_parsed_activity(mut activity: ParsedActivity) -> CoreResult<ParsedActivity> {
     activity.timezone = parse_activity_timezone(&activity.metadata)?;
-    lap_timing::validate_lap_timing_contract(&activity)?;
+    laps::validate(&activity)?;
     Ok(activity)
 }
 
-/// Activity is external data; reject an unusable timeline at its owning ingress.
+/// Checks that the activity has a renderable timeline (at least two finite, non-decreasing
+/// samples ending after zero) and returns its end.
 pub fn validate_render_activity(activity: &ParsedActivity) -> CoreResult<f64> {
     let activity_end = activity.trim_end_seconds.max(
         activity
@@ -167,35 +102,19 @@ fn parse_activity_timezone(metadata: &Value) -> CoreResult<Option<Tz>> {
     })
 }
 
-/// Trims and densifies parsed activity data for a validated render config.
-pub fn build_dense_activity_report_validated(
+/// Trims an activity to the validated scene window and densifies it at the scene frame rate.
+pub fn build_dense_report(
     activity: &ParsedActivity,
     config: &ValidatedRenderConfig,
 ) -> CoreResult<DenseActivityReport> {
-    let requirements = config.render_data_requirements();
-    let trimmed = trim_activity(
-        activity,
-        config.scene.start,
-        config.scene.end,
-        &requirements,
-    )?;
-    let duration = trimmed
-        .sample_elapsed_seconds
-        .last()
-        .copied()
-        .ok_or_else(|| CoreError::Activity("Trimmed activity has no timeline".to_string()))?;
-    let frame_elapsed_seconds = frame_timeline_for_fps(duration, config.scene.fps)?;
-    Ok(densify_activity(
-        &trimmed,
-        frame_elapsed_seconds,
-        &requirements,
-    ))
+    let frames = frame_timeline_for_fps(config.scene.end - config.scene.start, config.scene.fps)?;
+    build_dense_report_for_timeline(activity, config, frames)
 }
 
-/// Trims activity through the validated scene window and densifies it on a
-/// planner-owned frame timeline. Fractional coverage may start between frame
-/// ticks; a positive overlap between ticks may have no covered frames.
-pub(crate) fn build_dense_activity_report_for_timeline(
+/// Trims an activity to the validated scene window and densifies it on a planned frame
+/// timeline. Fractional coverage may start between frame ticks; a positive overlap between
+/// ticks may have no covered frames.
+pub(crate) fn build_dense_report_for_timeline(
     activity: &ParsedActivity,
     config: &ValidatedRenderConfig,
     frame_elapsed_seconds: Vec<f64>,

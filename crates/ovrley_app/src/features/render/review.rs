@@ -6,9 +6,9 @@
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
-use ovrley_core::media::video_edits::Transition;
-use ovrley_core::render_jobs::contracts::{BatchRenderOutput, BatchRenderPiece, BatchTransition};
+use ovrley_core::encode::settings::{ExportMode, OutputMode};
+use ovrley_core::media::edits::Transition;
+use ovrley_core::jobs::contracts::{BatchRenderOutput, BatchRenderPiece, BatchTransition};
 use crate::dialogs::filename_from_selected_path;
 use crate::features::render::codecs::is_qsv_full_codec;
 use crate::format::{format_clock_duration, format_video_creation_time};
@@ -432,8 +432,8 @@ mod tests {
         cut, cut_edits, edits_at, excluded, metadata, video, TestVideo,
     };
     use crate::video::{create_imported_video, ImportedVideo};
-    use ovrley_core::media::video_edits::{SegmentEdits, FIRST_SEGMENT_KEY};
-    use ovrley_core::render_jobs::contracts::BatchTransition;
+    use ovrley_core::media::edits::{SegmentEdits, FIRST_SEGMENT_KEY};
+    use ovrley_core::jobs::contracts::BatchTransition;
 
     fn defaults() -> TransitionDefaults {
         TransitionDefaults {
@@ -678,7 +678,7 @@ mod tests {
     fn an_encoder_keeping_the_display_rotation_joins_only_one_rotation() {
         // Coded portrait and rotated: the same display resolution as ride.
         let turned = create_imported_video(
-            &ovrley_core::media::SourceVideoMetadata {
+            &ovrley_core::media::probe::SourceVideoMetadata {
                 rotation_degrees: Some(90),
                 ..metadata("/videos/turned.mp4", 30.0, (30, 1), 1080, 1920)
             },

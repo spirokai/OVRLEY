@@ -1,29 +1,32 @@
 //! Native overlay rendering: every widget draws through the export host of the shared
 //! widget engine, for video frames and for preview PNGs alike.
-mod atlas;
-mod engine;
-mod map_export;
-pub mod surface;
 
 use crate::{
+    activity::build_dense_report,
     activity::schema::{DenseActivityReport, ParsedActivity},
-    debug::{RenderProfiler, TimingBucket},
+    diagnostics::{RenderProfiler, TimingBucket},
     encode::progress::RenderController,
     error::{CoreError, CoreResult},
-    normalize::{ValidatedRenderConfig, ValidatedSceneConfig},
+    config::{ValidatedRenderConfig, ValidatedSceneConfig},
     paths::AppPaths,
 };
 use ovrley_map::gpu::MapSource;
 use std::{
     collections::BTreeMap,
-    path::{Path, PathBuf},
-    time::Instant,
+    path::PathBuf,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
-use surface::{wrap_native_surface, write_surface_png};
-
 pub use atlas::{AtlasPlan, AtlasSlot, SlotPlacement};
 pub use engine::{ExportWidgets, PreparedAtlas, WorkerWidgets};
-pub use map_export::{download_preview_tiles, ExportMapJob};
+pub use maps::{download_preview_tiles, ExportMapJob};
+use skia_safe::{surfaces, Borrows, EncodedImageFormat, ImageInfo, Surface};
+use std::path::Path;
+
+mod atlas;
+mod engine;
+mod maps;
+
+
 
 /// Canonical dimensions for a rendered video frame.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -151,28 +154,40 @@ pub fn render_preview_frames(
     })
 }
 
-/// Renders one preview PNG for activity `second`.
+/// Renders the frame at `second` of a render config to a transparent PNG in Downloads and returns
+/// its path.
 pub fn render_preview_frame(
     paths: &AppPaths,
-    config: &ValidatedRenderConfig,
-    activity: &ParsedActivity,
-    dense: &DenseActivityReport,
+    config: crate::config::RenderConfig,
+    parsed_activity: &crate::activity::schema::ParsedActivity,
     second: f64,
-    out_path: &Path,
-    map_source: Option<&MapSource>,
-) -> CoreResult<PreviewRenderReport> {
+    raster_resources: Option<&dyn crate::raster::RasterResourceResolver>,
+    map_source: Option<&ovrley_map::gpu::MapSource>,
+) -> CoreResult<PathBuf> {
+    let mut validated =
+        crate::config::validate_render_config(config, raster_resources)?;
+    validated.scene.narrow_to_frame(second);
+    let dense_activity = build_dense_report(parsed_activity, &validated)?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| CoreError::Encode(format!("Failed to read system time: {error}")))?
+        .as_nanos();
+    let second_label = format!("{second:.3}").replace('.', "_");
+    let out_path = paths
+        .downloads_dir
+        .join(format!("preview_frame_{timestamp}_t{second_label}.png"));
+    let frame = PreviewFrame { second, out_path };
     render_preview_frames(
         paths,
-        config,
-        activity,
-        dense,
-        &[PreviewFrame {
-            second,
-            out_path: out_path.to_path_buf(),
-        }],
+        &validated,
+        parsed_activity,
+        &dense_activity,
+        std::slice::from_ref(&frame),
         map_source,
-    )
+    )?;
+    Ok(frame.out_path)
 }
+
 
 fn frame_index_for_second(
     scene: &ValidatedSceneConfig,
@@ -185,4 +200,51 @@ fn frame_index_for_second(
     let relative_second = (second - scene.start).clamp(0.0, scene.end - scene.start);
     let index = (relative_second * scene.fps).round() as isize;
     index.clamp(0, activity.frame_count.saturating_sub(1) as isize) as usize
+}
+
+/// Creates an owned Skia raster surface using Skia's native 32-bit format.
+pub fn create_surface(width: u32, height: u32) -> CoreResult<Surface> {
+    surfaces::raster_n32_premul((width as i32, height as i32)).ok_or_else(|| {
+        CoreError::Render(format!("Failed to create raster surface {width}x{height}"))
+    })
+}
+
+/// Builds image metadata for the RGBA buffers used by the video pipeline.
+pub fn native_n32_image_info(width: u32, height: u32) -> ImageInfo {
+    ImageInfo::new(
+        (width as i32, height as i32),
+        skia_safe::ColorType::RGBA8888,
+        skia_safe::AlphaType::Unpremul,
+        None,
+    )
+}
+
+/// Wraps caller-owned RGBA pixels in a Skia surface.
+///
+/// The returned surface borrows `pixels`, so drawing writes directly into the
+/// encoder buffer without an intermediate copy.
+pub fn wrap_native_surface<'pixels>(
+    width: u32,
+    height: u32,
+    pixels: &'pixels mut [u8],
+) -> CoreResult<Borrows<'pixels, Surface>> {
+    let info = native_n32_image_info(width, height);
+    let row_bytes = (width as usize) * 4;
+    surfaces::wrap_pixels(&info, pixels, row_bytes, None).ok_or_else(|| {
+        CoreError::Render(format!(
+            "Failed to wrap native n32 surface {width}x{height}"
+        ))
+    })
+}
+
+/// Encodes a Skia surface snapshot as PNG and writes it to `path`.
+pub fn write_surface_png(surface: &mut Surface, path: &Path) -> CoreResult<()> {
+    let image = surface.image_snapshot();
+    let data = image
+        .encode(None, EncodedImageFormat::PNG, 100)
+        .ok_or_else(|| CoreError::Render("Failed to encode preview PNG".into()))?;
+    std::fs::write(path, data.as_bytes()).map_err(|source| CoreError::Io {
+        path: path.to_path_buf(),
+        source,
+    })
 }

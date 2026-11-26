@@ -10,7 +10,7 @@
 //! edit with arguments the UI never sends fails with an error.
 
 use std::collections::{BTreeSet, HashMap};
-use ovrley_core::media::video_edits::{AnchorSide, Cut, FIRST_SEGMENT_KEY, OffsetSource, PlacementAnchor, SegmentEdits, TimezoneMode, Transition, VideoEdits};
+use ovrley_core::media::edits::{AnchorSide, Cut, FIRST_SEGMENT_KEY, OffsetSource, PlacementAnchor, SegmentEdits, TimezoneMode, Transition, VideoEdits};
 use crate::video::{new_id, ImportedVideo, VideoEditsMap};
 use crate::video::collection::{join_video_edits, sort_clips_by_timeline};
 use crate::video::segments::TrimSide;
@@ -528,7 +528,7 @@ pub fn segment_before_cut(edits: &VideoEdits, cut_id: &str) -> Result<String, St
 #[cfg(test)]
 mod tests {
     use super::super::fixtures::*;
-    use ovrley_core::media::video_edits::{AnchorSide, PlacementAnchor, TransitionKind};
+    use ovrley_core::media::edits::{AnchorSide, PlacementAnchor, TransitionKind};
     use super::*;
 
     struct Owned {

@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
-use ovrley_core::media::mp4_telemetry;
 
 #[test]
 #[ignore = "requires video fixtures under tests/fixtures/video/"]
@@ -31,7 +30,7 @@ fn extract_activity_from_telemetry_fixtures() {
             .and_then(|s| s.to_str())
             .unwrap_or("video");
 
-        let response = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+        let response = ovrley_core::media::telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
             .unwrap_or_else(|err| panic!("{stem}: extraction failed: {err}"))
             .unwrap_or_else(|| panic!("{stem}: expected activity, got None"));
 
@@ -42,7 +41,7 @@ fn extract_activity_from_telemetry_fixtures() {
         )
         .unwrap();
 
-        let activity = &response.parsed_activity;
+        let activity = &response;
 
         // ── Quality assertions ──────────────────────────────────
 

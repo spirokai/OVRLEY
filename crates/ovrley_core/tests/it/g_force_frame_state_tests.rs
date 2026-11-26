@@ -3,7 +3,7 @@
 use ovrley_core::activity::interpolate::densify_activity;
 use ovrley_core::activity::schema::{DenseActivityReport, ParsedActivity};
 use ovrley_core::activity::trim::trim_activity;
-use ovrley_core::normalize::{RenderDataRequirements, ValidatedSceneConfig};
+use ovrley_core::config::{RenderDataRequirements, ValidatedSceneConfig};
 use ovrley_widgets::widgets::g_force::{derive_max_g, g_force_frame_state, GForceSample, prepare_g_force_cache as prepare_g_force_cache_layout, GForceCache, GForceAxis, ValidatedGForceWidget};
 use serde::Deserialize;
 

@@ -1,29 +1,7 @@
-//! Source media probing and embedded telemetry extraction.
-//!
-//! This module reads imported source media. It does not own rendering, output
-//! encoding, or FFmpeg encode pipelines.
+//! Imported source videos: their probed metadata, the user's edits, the manual sync state and
+//! embedded telemetry. Rendering and output encoding live in [`crate::encode`].
 
-/// DJI Action AC004 metadata fallback extraction.
-pub mod dji_ac004;
-/// The manual video sync's durable state.
-pub mod manual_video_sync;
-/// MP4 embedded telemetry and telemetry-first metadata extraction.
-pub mod mp4_telemetry;
-/// Intermediate telemetry sample shape and payload checks.
-pub mod native_sample;
-/// Shared metadata preparation and source file freshness.
-pub mod prepared_video;
-/// Shared source video metadata contract.
-pub mod source_video_metadata;
-/// Shared math utilities for telemetry processing.
-pub mod telemetry_math;
-/// Shared time conversion and media-relative timestamp helpers.
-pub mod time;
-/// GPS-coordinate timezone lookup for media telemetry.
-pub mod timezone;
-/// The user's edits of a video and the metadata a project saves about it.
-pub mod video_edits;
-/// MP4/MOV metadata extraction via ffprobe.
-pub mod video_probe;
-
-pub use source_video_metadata::{Resolution, SourceVideoMetadata};
+pub mod edits;
+pub mod probe;
+pub mod sync;
+pub mod telemetry;

@@ -3,8 +3,8 @@
 //! frames are `ovrley_ui`'s.
 
 use ovrley_core::encode::ffmpeg::transitions::xfade_transitions;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::media::video_edits::{Transition, TransitionKind};
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::media::edits::{Transition, TransitionKind};
 use crate::controls::seconds::{SecondsDisplay, SecondsInputOptions, SecondsInputState, SecondsMode};
 use crate::format::{plain_number, round_decimals};
 use crate::i18n::{catalog, interpolate, Locale};
@@ -265,7 +265,7 @@ mod tests {
     use super::*;
     use crate::features::player::reconcile_player;
     use crate::video::fixtures::*;
-    use ovrley_core::media::video_edits::SegmentEdits;
+    use ovrley_core::media::edits::SegmentEdits;
     use crate::store::videos::tests::store_with;
     use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
     use std::rc::Rc;

@@ -15,18 +15,19 @@ use crate::common::test_config;
 use anyhow::{anyhow, bail, Context, Result};
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{
-    build_dense_activity_report_validated, parse_activity_json, validate_render_activity,
+    build_dense_report, parse_activity_json, validate_render_activity,
 };
-use ovrley_core::commands::validate_config_value;
-use ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use crate::common::seam::validate_config_value;
+use ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::media::{video_probe::probe_video, SourceVideoMetadata};
-use ovrley_core::normalize::parse_config_value;
-use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
+use ovrley_core::media::probe::{probe_video, SourceVideoMetadata};
+use ovrley_core::config::parse_config_value;
+use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render::render_preview_frame;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::plan_single_render;
+use ovrley_core::render::{render_preview_frames, PreviewFrame};
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::plan_single_render;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::fs;
@@ -203,19 +204,21 @@ fn run_frame_case(case: &FrameCase) -> Result<()> {
     )?;
     let validated =
         validate_config_value(&config_value).context("failed to validate frame config")?;
-    let dense_activity = build_dense_activity_report_validated(&activity, &validated)
+    let dense_activity = build_dense_report(&activity, &validated)
         .context("failed to build dense activity for frame case")?;
     let actual_path = runtime
         .artifacts_dir
         .join(format!("{}_preview.png", case.name));
 
-    render_preview_frame(
+    render_preview_frames(
         &runtime.app_paths,
         &validated,
         &activity,
         &dense_activity,
-        f64::from(case.second),
-        &actual_path,
+        &[PreviewFrame {
+            second: f64::from(case.second),
+            out_path: actual_path.clone(),
+        }],
         None,
     )
     .context("preview render failed")?;
@@ -262,7 +265,7 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
         .join(format!("custom-{}.mov", case.name));
     let output_target = RenderOutputTarget::validate(
         output_path.to_str().unwrap(),
-        RenderOutputKind::Transparent,
+        ExportMode::Transparent,
         false,
     )?;
     let outcome = execution.render(&runtime.app_paths, plan, &activity, &output_target);
@@ -300,10 +303,10 @@ fn run_transparent_video_case(case: &TransparentVideoCase) -> Result<()> {
 /// 3. Plan and execute through the canonical render seam.
 /// 4. Validate output metadata and compare selected decoded frames.
 fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
-    // ── Phase 1: prepare isolated runtime sandbox ────────────────────
+    // Prepare isolated runtime sandbox.
     let runtime = prepare_case_runtime("composite", &case.name)?;
 
-    // ── Phase 2: probe source video to get its real FPS/duration ────
+    // Probe source video to get its real FPS/duration.
     let source_video = fixtures_root().join(&case.source_video);
     ensure_source_video_exists(&source_video)?;
     let source_metadata = probe_video(
@@ -321,7 +324,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
         .duration
         .ok_or_else(|| anyhow!("source video is missing duration metadata"))?;
 
-    // ── Phase 3: load fixtures and apply case-specific scene timing ──
+    // Load fixtures and apply case-specific scene timing.
     let activity = load_activity(&case.activity)?;
     let mut config_value = load_mutable_config_value(&case.config)?;
     set_scene_window(
@@ -362,7 +365,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     );
     scene.insert("composite_widget_update_rate".to_string(), json!(1));
 
-    // ── Phase 4: plan the render and reserve execution ──
+    // Plan the render and reserve execution.
     let plan = plan_single_render(
         parse_config_value(&config_value)?,
         validate_render_activity(&activity)?,
@@ -373,14 +376,14 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     let controller = RenderController::default();
     let execution = RenderExecutionService::with_controller(controller.clone());
 
-    // ── Phase 5: dispatch composite render through public entry point ──
+    // Dispatch composite render through public entry point.
     let output_path = runtime
         .app_paths
         .downloads_dir
         .join(format!("custom-{}.mp4", case.name));
     let output_target = RenderOutputTarget::validate(
         output_path.to_str().unwrap(),
-        RenderOutputKind::Composite,
+        ExportMode::Composite,
         false,
     )?;
     let outcome = execution.render(&runtime.app_paths, plan, &activity, &output_target);
@@ -388,7 +391,7 @@ fn run_composite_video_case(case: &CompositeVideoCase) -> Result<()> {
     let output_path = output_target.path().to_path_buf();
     assert_nonempty_output(&output_path)?;
 
-    // ── Phase 6: validate output metadata and compare decoded frames ──
+    // Validate output metadata and compare decoded frames.
     let output_metadata = probe_video(&runtime.app_paths.repo_root, &output_path.to_string_lossy())
         .context("failed to probe composite output")?;
     let expected_audio = if case.expect_source_audio_passthrough {
@@ -624,13 +627,13 @@ fn compare_or_record_png(
     baseline_path: &Path,
     failure_dir: &Path,
 ) -> Result<()> {
-    // ── Phase 1: ensure baseline directory exists ────────────────────
+    // Ensure baseline directory exists.
     if let Some(parent) = baseline_path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;
     }
 
-    // ── Phase 2: record mode — copy actual over baseline and return ──
+    // Record mode — copy actual over baseline and return.
     if should_record_baselines() {
         fs::copy(actual_path, baseline_path).with_context(|| {
             format!(
@@ -646,7 +649,7 @@ fn compare_or_record_png(
         return Ok(());
     }
 
-    // ── Phase 3: compare mode — ensure baseline exists ──────────────
+    // Compare mode — ensure baseline exists.
     if !baseline_path.is_file() {
         bail!(
             "missing baseline for {case_label}: {}. Record baselines with `OVRLEY_RECORD_BASELINES=1 cargo test -p ovrley_core --test it render_baseline_suite:: -- --ignored --nocapture`.",
@@ -654,12 +657,12 @@ fn compare_or_record_png(
         );
     }
 
-    // ── Phase 4: decode both images to raw RGBA ─────────────────────
+    // Decode both images to raw RGBA.
     let repo_root = test_config::repo_git_root();
     let actual = decode_png_to_rgba(&repo_root, actual_path)?;
     let baseline = decode_png_to_rgba(&repo_root, baseline_path)?;
 
-    // ── Phase 5: check dimension equality ───────────────────────────
+    // Check dimension equality.
     if (actual.width, actual.height) != (baseline.width, baseline.height) {
         let mismatch_dir = failure_dir.join(sanitize_case_label(case_label));
         fs::create_dir_all(&mismatch_dir)
@@ -673,7 +676,7 @@ fn compare_or_record_png(
         );
     }
 
-    // ── Phase 6: per-pixel comparison — build diff image and parity stats ──
+    // Per-pixel comparison — build diff image and parity stats.
     let width = actual.width;
     let height = actual.height;
     let mut stats = ParityStats {
@@ -707,7 +710,7 @@ fn compare_or_record_png(
         return Ok(());
     }
 
-    // ── Phase 7: produce mismatch artifacts only on failure ─────────
+    // Produce mismatch artifacts only on failure.
     let mismatch_dir = failure_dir.join(sanitize_case_label(case_label));
     fs::create_dir_all(&mismatch_dir)
         .with_context(|| format!("failed to create {}", mismatch_dir.display()))?;
@@ -849,6 +852,7 @@ fn write_rgba_png(
 }
 
 /// Validates the key video metadata fields we use as baseline invariants.
+#[expect(clippy::too_many_arguments, reason = "test fixture parameters")]
 fn assert_video_metadata(
     metadata: &SourceVideoMetadata,
     expected_width: u32,

@@ -8,17 +8,17 @@
 //! the audio is encoded once from the original sources (`acrossfade` at
 //! transitions). Transparent segments use intra-only MOV codecs, join with hard
 //! cuts only and are concatenated as MOV directly.
-//! [`crate::encode::pipeline::assemble`] runs these commands.
+//! [`crate::encode::pipeline`] runs these commands.
 
 use std::path::{Path, PathBuf};
 
 use super::catalog::{CompositeCodecId, CompositeFilterStackKind};
 use super::composite::derive_composite_input_window;
-use super::composite_filters::format_seconds_arg;
-use super::composite_profiles::composite_profile;
+use super::composite::format_seconds_arg;
+use super::profiles::composite_profile;
 use super::transitions::{acrossfade_filter, blended_audio_chain, xfade_filter};
-use crate::encode::fps::Fps;
-use crate::encode::quality::{rate_control_args, EncodingQuality};
+use crate::encode::timing::Fps;
+use crate::encode::settings::{rate_control_args, EncodingQuality};
 
 /// The rendered segments of one output and how to join them.
 #[derive(Clone, Debug, PartialEq)]
@@ -333,7 +333,7 @@ fn push_concat_input(args: &mut Vec<String>, assembly: &OutputAssembly) {
 /// One audio stream per piece, each exactly as long as the piece's video, joined
 /// in order: `acrossfade` over a transition's duration, `concat` at a hard cut.
 /// Pieces with a source read inputs 1.. in order.
-pub fn audio_graph(audio: &AssemblyAudio) -> String {
+fn audio_graph(audio: &AssemblyAudio) -> String {
     let mut input = 0;
     let mut chains = Vec::with_capacity(2 * audio.pieces.len());
     for (index, piece) in audio.pieces.iter().enumerate() {
@@ -389,7 +389,7 @@ pub fn probe_output_args(target: &Path) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::encode::quality::EncodingQuality;
+    use crate::encode::settings::EncodingQuality;
 
     fn software(hevc: bool) -> TransitionEncoding {
         TransitionEncoding::for_codec(

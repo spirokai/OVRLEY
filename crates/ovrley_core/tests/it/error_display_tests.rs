@@ -9,10 +9,10 @@
 //! Unit test. No I/O, no fixtures — pure string assertion.
 //!
 //! ## Regressions guarded
-//! - Error variant messages changing format (frontend string matching)
+//! - Error variant messages changing format
 //! - CoreError losing source context (path, stderr) in Display output
 
-use ovrley_core::CoreError;
+use ovrley_core::error::CoreError;
 use std::path::PathBuf;
 
 #[test]

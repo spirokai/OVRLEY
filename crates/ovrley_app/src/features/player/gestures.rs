@@ -5,7 +5,7 @@
 //! lives here. A pressed `TouchArea` keeps the pointer, which stands in for pointer capture.
 
 use ovrley_core::activity::trim::ActivityTrim;
-use ovrley_core::media::video_edits::{Cut, FIRST_SEGMENT_KEY, SegmentEdits};
+use ovrley_core::media::edits::{Cut, FIRST_SEGMENT_KEY, SegmentEdits};
 use crate::activity::{trim_activity_edge, ActivityWindow, TrimEdge};
 use crate::features::player::lanes::{EDGE_END, EDGE_START};
 use crate::features::player::playback::{commit_scrub, player_timing, scrub_to};
@@ -793,7 +793,7 @@ mod tests {
         assert_eq!(segment_kept_by_dropped_cut(&twice, "last", 100).as_deref(), Some("last"));
         assert_eq!(segment_kept_by_dropped_cut(&twice, "last", 300).as_deref(), Some("first"));
         assert_eq!(segment_kept_by_dropped_cut(&twice, "first", 150), None);
-        let other = clip(simple("other", 5.0, 1), ovrley_core::media::video_edits::VideoEdits { offset_seconds: 120.0, ..Default::default() });
+        let other = clip(simple("other", 5.0, 1), ovrley_core::media::edits::VideoEdits { offset_seconds: 120.0, ..Default::default() });
         let clips = [twice.clone(), other];
         assert_eq!(cut_snap_edges(&twice, "first", &clips, 300.0), [100.0, 110.0, 100.0 + 200.0 / 30.0, 120.0, 125.0, 0.0, 300.0]);
         assert_eq!(cut_snap_edges(&twice, EDGE_START, &clips, 0.0), [100.0, 110.0, 120.0, 125.0]);

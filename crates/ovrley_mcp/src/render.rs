@@ -109,7 +109,7 @@ mod tests {
     use ovrley_app::features::player::filmstrips::CodecDetection;
     use ovrley_app::store::services::fakes::FakeRenderCall;
     use ovrley_app::store::media::ImportedActivity;
-    use ovrley_core::debug::{RenderProgress, RenderStatus};
+    use ovrley_core::encode::progress::{RenderProgress, RenderStatus};
     use ovrley_core::encode::progress::ProgressSink;
     use ovrley_core::error::CoreError;
     use ovrley_widgets::model::document::OverlayConfig;

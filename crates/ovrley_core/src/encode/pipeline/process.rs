@@ -7,19 +7,21 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
-
 use crate::error::{CoreError, CoreResult};
-
-use super::buffers::FrameBuffer;
-use super::buffers::FrameBufferPool;
-use super::diagnostics::EncoderMonitor;
+use super::frames::FrameBuffer;
+use super::frames::FrameBufferPool;
 use super::FramePipelinePlan;
-use crate::debug::{RenderProfiler, TimingBucket};
-use crate::encode::ffmpeg::process::{spawn, terminate, POLL_INTERVAL, TERMINATE_TIMEOUT};
+use crate::diagnostics::{RenderProfiler, TimingBucket};
+use crate::encode::ffmpeg::{spawn, terminate, POLL_INTERVAL, TERMINATE_TIMEOUT};
 use std::collections::BTreeMap;
 use std::io::Write;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::mpsc::Receiver;
+use std::collections::VecDeque;
+use std::io::{BufRead, BufReader};
+use std::process::ChildStderr;
+use std::sync::atomic::AtomicU32;
+use crate::encode::ffmpeg::composite::CompositeEncoding;
 
 /// Single source of truth for whether the pipeline should stop and why.
 ///
@@ -50,7 +52,7 @@ impl PipelineShutdown {
         self.is_cancelled() || self.failed.load(Ordering::Acquire)
     }
 
-    pub(crate) fn is_cancelled(&self) -> bool {
+    fn is_cancelled(&self) -> bool {
         self.session_cancel.load(Ordering::Relaxed)
     }
 
@@ -58,7 +60,7 @@ impl PipelineShutdown {
         self.record_failure(error, false);
     }
 
-    pub(crate) fn signal_writer_failure(&self, error: CoreError) {
+    fn signal_writer_failure(&self, error: CoreError) {
         self.record_failure(error, true);
     }
 
@@ -244,7 +246,7 @@ impl PipelineProcesses {
         &mut self,
         producer: CoreResult<T>,
         encoding: &super::VideoEncoding,
-        monitor: &super::diagnostics::EncoderMonitor,
+        monitor: &super::process::EncoderMonitor,
     ) -> CoreResult<PipelineOutcome<T>> {
         let producer = match producer {
             Ok(value) => Some(value),
@@ -306,7 +308,7 @@ impl PipelineProcesses {
         if !status.success() {
             return Err(CoreError::Ffmpeg {
                 status,
-                stderr: super::diagnostics::stderr_tail(&monitor.stderr()),
+                stderr: super::process::stderr_tail(&monitor.stderr()),
             });
         }
         Ok(PipelineOutcome {
@@ -412,7 +414,7 @@ pub(crate) struct WriterResult {
 }
 
 /// Writes queued frame buffers into ffmpeg stdin and returns buffers to the pool.
-pub(crate) fn writer_worker(
+fn writer_worker(
     stdin: impl Write,
     receiver: Receiver<FrameBuffer>,
     buffers: Arc<FrameBufferPool>,
@@ -501,6 +503,117 @@ fn writer_worker_inner(
     })
 }
 
+const STDERR_LINE_LIMIT: usize = 200;
+
+#[derive(Default)]
+pub(crate) struct EncoderMonitor {
+    encoded_frames: AtomicU32,
+    lines: Mutex<VecDeque<String>>,
+}
+
+impl EncoderMonitor {
+    pub(crate) fn encoded_frames(&self) -> u32 {
+        self.encoded_frames.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn stderr(&self) -> String {
+        self.lines
+            .lock()
+            .expect("FFmpeg stderr mutex poisoned")
+            .iter()
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    pub(crate) fn read(&self, stderr: ChildStderr) {
+        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+            if let Some(frame) = parse_frame(&line) {
+                self.encoded_frames.store(frame, Ordering::Relaxed);
+            }
+            let mut lines = self.lines.lock().expect("FFmpeg stderr mutex poisoned");
+            if lines.len() == STDERR_LINE_LIMIT {
+                lines.pop_front();
+            }
+            lines.push_back(line);
+        }
+    }
+}
+
+fn parse_frame(line: &str) -> Option<u32> {
+    let start = line.find("frame=")? + "frame=".len();
+    line[start..].split_whitespace().next()?.parse().ok()
+}
+
+/// Confirms that FFmpeg finalized a usable output file on success.
+///
+/// A successful process exit without a non-empty video is treated as a render
+/// failure because callers need a playable artifact, not just a clean status.
+pub fn verify_successful_output(output_path: &Path) -> CoreResult<()> {
+    let metadata = std::fs::metadata(output_path).map_err(|error| CoreError::Io {
+        path: output_path.to_path_buf(),
+        source: error,
+    })?;
+    if metadata.len() == 0 {
+        return Err(CoreError::Encode(format!(
+            "Render finished but output file is empty: {}",
+            output_path.display()
+        )));
+    }
+    Ok(())
+}
+
+/// Returns whether an overlay write error indicates FFmpeg closed the pipe.
+///
+/// Broken-pipe wording varies by platform, so this uses the common error text
+/// and OS error fragment instead of matching a single exact message.
+pub fn is_pipe_write_error(error: &str) -> bool {
+    let lower = error.to_lowercase();
+    lower.contains("failed writing composite overlay frame")
+        && (lower.contains("broken pipe")
+            || lower.contains("pipe is being closed")
+            || lower.contains("os error 32")
+            || lower.contains("os error 109")
+            || lower.contains("os error 232"))
+}
+
+/// Formats a pipe-write failure with FFmpeg status and stderr diagnostics.
+///
+/// This makes early FFmpeg exits distinguishable from renderer bugs while still
+/// preserving the underlying write error and recent encoder output.
+pub fn format_pipe_write_failure(
+    error: String,
+    status: std::process::ExitStatus,
+    stderr: &str,
+    plan: &CompositeEncoding,
+) -> String {
+    let mut message = format!(
+        "{error}. FFmpeg terminated before all overlay frames were written (status {status}) for profile {}.",
+        plan.ffmpeg_settings.codec_id.metadata().profile_name
+    );
+    if let Some(fallback) = plan.ffmpeg_settings.codec_id.metadata().fallback_profile {
+        message.push_str(&format!(
+            "\nSafe fallback profile available: {}. This explicit experimental render was not silently retried.",
+            fallback.metadata().profile_name
+        ));
+    }
+    // The cause comes first: a filter graph with many atlas slots is long.
+    if !stderr.trim().is_empty() {
+        message.push_str("\nFFmpeg stderr:\n");
+        message.push_str(&stderr_tail(stderr));
+    }
+    message.push_str("\nFilter graph:\n");
+    message.push_str(&plan.ffmpeg_settings.filter_complex);
+    message
+}
+
+/// Returns the final part of FFmpeg stderr for concise error messages.
+pub fn stderr_tail(stderr: &str) -> String {
+    let lines = stderr.lines().collect::<Vec<_>>();
+    let start = lines.len().saturating_sub(30);
+    lines[start..].join("\n")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -521,12 +634,12 @@ mod tests {
             }
         }
         for panic in [false, true] {
-            let channels = super::super::buffers::ParallelFramePoolPlan::for_resources(
+            let channels = super::super::frames::ParallelFramePoolPlan::for_resources(
                 crate::render::FrameSize {
                     width: 2,
                     height: 2,
                 },
-                crate::encode::overlay_format::OverlayPixelFormat::Rgba,
+                crate::encode::overlay::OverlayPixelFormat::Rgba,
                 std::num::NonZeroUsize::new(1).unwrap(),
                 2,
             )
@@ -579,5 +692,13 @@ mod tests {
         shutdown.signal_writer_failure(CoreError::Encode("pipe closed during cancellation".into()));
         assert!(shutdown.check().is_err());
         assert!(shutdown.failure.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn reads_padded_ffmpeg_progress_without_confusing_other_logs() {
+        assert_eq!(parse_frame("frame=  123 fps=30"), Some(123));
+        assert_eq!(parse_frame("frame=456"), Some(456));
+        assert_eq!(parse_frame("frame=unknown"), None);
+        assert_eq!(parse_frame("video:123kB audio:0kB"), None);
     }
 }

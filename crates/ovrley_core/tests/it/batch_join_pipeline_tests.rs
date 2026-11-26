@@ -13,13 +13,13 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::debug::RenderProgress;
+use ovrley_core::encode::progress::RenderProgress;
 use ovrley_core::encode::progress::ProgressSink;
-use ovrley_core::media::prepared_video::InspectedVideoSource;
+use ovrley_core::media::probe::InspectedVideoSource;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::contracts::*;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::inspection::VideoInspectionService;
+use ovrley_core::jobs::contracts::*;
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::inspection::VideoInspectionService;
 use serde_json::{json, Value};
 
 const WAIT: Duration = Duration::from_secs(120);
@@ -56,7 +56,7 @@ impl Workspace {
             }
         }
         let ffmpeg =
-            ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
+            ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
         let inspection = VideoInspectionService::default();
         let inspection_id = inspection.create_session().inspection_id;
         Self {
@@ -105,7 +105,7 @@ impl Workspace {
 
     fn request(
         &self,
-        export_mode: ovrley_core::encode::render_settings::ExportMode,
+        export_mode: ovrley_core::encode::settings::ExportMode,
         destination: BatchDestination,
         outputs: Vec<BatchRenderOutput>,
     ) -> BatchRenderRequest {
@@ -129,16 +129,16 @@ impl Workspace {
             encoding: BatchEncodingSettings {
                 export_mode,
                 export_codec: match export_mode {
-                    ovrley_core::encode::render_settings::ExportMode::Composite => "libx264",
-                    ovrley_core::encode::render_settings::ExportMode::Transparent => "qtrle",
+                    ovrley_core::encode::settings::ExportMode::Composite => "libx264",
+                    ovrley_core::encode::settings::ExportMode::Transparent => "qtrle",
                 }
                 .into(),
                 fps: 30,
                 update_rate: match export_mode {
-                    ovrley_core::encode::render_settings::ExportMode::Composite => 1,
-                    ovrley_core::encode::render_settings::ExportMode::Transparent => 2,
+                    ovrley_core::encode::settings::ExportMode::Composite => 1,
+                    ovrley_core::encode::settings::ExportMode::Transparent => 2,
                 },
-                quality_type: ovrley_core::encode::quality::QualityType::Bitrate,
+                quality_type: ovrley_core::encode::settings::QualityType::Bitrate,
                 quality_value: 1.0,
                 qsv_full_init_args: None,
             },
@@ -256,7 +256,7 @@ fn a_combined_composite_joins_pieces_of_sources_with_and_without_audio() {
     let target = workspace.paths.downloads_dir.join("joined.mp4");
     // 45 + 60 + 30 frames; the silent and last pieces reach their sources' ends.
     let request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
         BatchDestination::File {
             path: target.to_str().unwrap().into(),
             overwrite: false,
@@ -305,7 +305,7 @@ fn joined_outputs_without_any_audio_have_no_audio_track() {
     let workspace = Workspace::new("batch-join-silent");
     let silent = workspace.source("silent.mp4", 2.0, false);
     let request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
         BatchDestination::SourceNamed {
             directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
         },
@@ -334,7 +334,7 @@ fn a_separate_transparent_output_joins_its_pieces_as_mov() {
     let workspace = Workspace::new("batch-join-transparent");
     let source = workspace.source("ride.mp4", 3.0, true);
     let request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Transparent,
+        ovrley_core::encode::settings::ExportMode::Transparent,
         BatchDestination::SourceNamed {
             directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
         },
@@ -365,7 +365,7 @@ fn joined_hevc_keeps_the_apple_compatible_sample_entry() {
     let workspace = Workspace::new("batch-join-hevc");
     let source = workspace.source("ride.mp4", 2.0, true);
     let mut request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
         BatchDestination::SourceNamed {
             directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
         },
@@ -407,7 +407,7 @@ fn transitions_shorten_the_joined_video_and_audio_by_their_durations() {
     let target = workspace.paths.downloads_dir.join("joined.mp4");
     // 45 + 60 + 30 frames; a 15-frame wipe, then a hard cut.
     let request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
         BatchDestination::File {
             path: target.to_str().unwrap().into(),
             overwrite: false,
@@ -452,7 +452,7 @@ fn hevc_transitions_at_deleted_parts_encode_with_the_output_encoder() {
     let workspace = Workspace::new("batch-join-hevc-transitions");
     let source = workspace.source("ride.mp4", 3.0, true);
     let mut request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
         BatchDestination::SourceNamed {
             directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
         },
@@ -488,7 +488,7 @@ fn hevc_transitions_at_deleted_parts_encode_with_the_output_encoder() {
 
 #[test]
 fn transition_proxies_blend_the_join_at_preview_size() {
-    use ovrley_core::encode::ffmpeg::transition_proxy::{
+    use ovrley_core::encode::ffmpeg::transitions::{
         clear_transition_proxies, remove_transition_proxy, render_transition_proxy,
         TransitionProxyRequest, TransitionProxySource,
     };
@@ -589,7 +589,7 @@ fn sources_with_edit_lists_or_late_video_join_with_their_planned_frames() {
                 .downloads_dir
                 .join(format!("joined-{joins}.mp4"));
             let request = workspace.request(
-                ovrley_core::encode::render_settings::ExportMode::Composite,
+                ovrley_core::encode::settings::ExportMode::Composite,
                 BatchDestination::File {
                     path: target.to_str().unwrap().into(),
                     overwrite: false,
@@ -681,7 +681,7 @@ fn a_source_repeating_a_timestamp_joins_with_its_planned_frames() {
     let frames = (base_piece.end_frame + piece.end_frame).to_string();
     let target = workspace.paths.downloads_dir.join("joined.mp4");
     let request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
         BatchDestination::File {
             path: target.to_str().unwrap().into(),
             overwrite: false,
@@ -725,7 +725,7 @@ fn frames_without_activity_coverage_keep_only_raster_widgets() {
         .unwrap();
     assert!(generated.status.success());
     let mut request = workspace.request(
-        ovrley_core::encode::render_settings::ExportMode::Transparent,
+        ovrley_core::encode::settings::ExportMode::Transparent,
         BatchDestination::SourceNamed {
             directory: workspace.paths.downloads_dir.to_str().unwrap().into(),
         },

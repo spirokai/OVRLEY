@@ -7,7 +7,7 @@
 use std::collections::BTreeMap;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
+use ovrley_core::encode::settings::{ExportMode, OutputMode};
 use ovrley_services::project::{create_path_locator, PROJECT_FORMAT, PROJECT_VERSION, PathLocator, ProjectDocument, ProjectEditor, ProjectLaps, ProjectRender, ProjectSource, ProjectSources, ProjectSync, ProjectTimeline, ProjectVideo};
 use ovrley_widgets::model::document::{canonical_numbers, number};
 use serde_json::Value;
@@ -181,7 +181,7 @@ mod tests {
     use super::*;
     use crate::video::fixtures::{video, TestVideo};
     use crate::video::VideoEditsMap;
-    use ovrley_core::media::video_edits::VideoEdits;
+    use ovrley_core::media::edits::VideoEdits;
     use std::rc::Rc;
 
     fn with_videos(paths: &[(&'static str, &'static str, u32)]) -> Store {

@@ -19,7 +19,7 @@ use ovrley_app::features::toolbar::VideoSyncDrawerTab;
 use ovrley_app::features::sync::manual::{self as manual, SPEED_THRESHOLD_RANGE, TURN_THRESHOLD_RANGE};
 use ovrley_app::store::videos as videos;
 use ovrley_app::store::{Dispatcher, Store};
-use ovrley_core::media::manual_video_sync::LandmarkKind as AppLandmarkKind;
+use ovrley_core::media::sync::LandmarkKind as AppLandmarkKind;
 use ovrley_widgets::widgets::map::preview::MapFramePixels;
 use slint::{ComponentHandle, Image, ModelRc, SharedPixelBuffer, SharedString, VecModel};
 use std::cell::{Cell, RefCell};

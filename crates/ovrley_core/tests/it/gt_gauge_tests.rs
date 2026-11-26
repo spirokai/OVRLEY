@@ -2,7 +2,7 @@ use crate::common;
 
 use ovrley_core::activity::schema::DenseActivityReport;
 use ovrley_core::fonts::NativeFonts;
-use ovrley_core::normalize::{validate_render_config, RenderConfig};
+use ovrley_core::config::{validate_render_config, RenderConfig};
 use ovrley_widgets::model::catalog::{DisplayType, MetricKind, TrackFillStyle};
 use ovrley_widgets::widgets::gauges::arc::{arc_point, gt_gauge_geometry, gt_start_end_angles};
 use ovrley_widgets::widgets::gauges::GaugeLayout;
@@ -164,7 +164,7 @@ fn rendered_layout(
 
 fn validate_single(
     value: serde_json::Value,
-) -> Result<ovrley_core::normalize::ValidatedRenderConfig, ovrley_core::CoreError> {
+) -> Result<ovrley_core::config::ValidatedRenderConfig, ovrley_core::error::CoreError> {
     let mut scene = common::builders::scene_json();
     scene["scale"] = serde_json::json!(1);
     scene["shadow_strength"] = serde_json::json!(0);
@@ -176,7 +176,7 @@ fn validate_single(
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    })
+    }, None)
 }
 
 fn full_gt_gauge_config() -> serde_json::Value {

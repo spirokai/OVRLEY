@@ -1,8 +1,8 @@
 use crate::common;
 
 use ovrley_core::activity::schema::DenseActivityReport;
-use ovrley_core::normalize::RenderConfig;
-use ovrley_core::normalize::validate_render_config;
+use ovrley_core::config::RenderConfig;
+use ovrley_core::config::validate_render_config;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
     arc_gauge_geometry, arc_point, arc_radius, arc_start_end_angles,
@@ -158,7 +158,7 @@ fn gradient_fill_follows_the_arc_from_its_start_to_its_end() {
 
 fn validate_single_arc(
     value: serde_json::Value,
-) -> Result<ovrley_core::normalize::ValidatedRenderConfig, ovrley_core::CoreError> {
+) -> Result<ovrley_core::config::ValidatedRenderConfig, ovrley_core::error::CoreError> {
     validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
@@ -167,7 +167,7 @@ fn validate_single_arc(
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    })
+    }, None)
 }
 
 fn full_arc_gauge_config(x: i32, y: i32) -> serde_json::Value {

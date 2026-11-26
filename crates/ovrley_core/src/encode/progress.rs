@@ -4,9 +4,8 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
-
-use crate::debug::{RenderProgress, RenderStatus};
 use crate::error::{CoreError, CoreResult};
+use serde::Serialize;
 
 /// Number of initial `record` calls to skip before reporting estimates.
 const WARMUP_FRAMES: u32 = 5;
@@ -37,8 +36,7 @@ const ETA_DEADBAND_FRACTION: f64 = 0.0002;
 const PROGRESS_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Minimum spacing between frame-count publications (~30 Hz): smooth for a progress bar, and far
-/// below a fast render's frame rate. Status changes publish at once; the Tauri sink throttles its
-/// IPC further, to 10 Hz.
+/// below a fast render's frame rate. Status changes publish at once.
 const FRAME_COUNT_EMIT_MIN_INTERVAL: Duration = Duration::from_millis(33);
 
 /// Rolling-window throughput estimator.
@@ -201,7 +199,7 @@ impl Default for ProgressEstimator {
 pub trait ProgressSink: Send + Sync {
     fn emit_progress(&self, progress: &RenderProgress);
 
-    fn emit_batch_progress(&self, _event: &crate::render_jobs::contracts::BatchRenderEvent) {}
+    fn emit_batch_progress(&self, _event: &crate::jobs::contracts::BatchRenderEvent) {}
 }
 
 /// No-op sink for `RenderController::default()` and tests.
@@ -516,6 +514,73 @@ impl RenderController {
     /// Returns the shared cancellation flag for internal worker coordination.
     pub fn cancel_flag(&self) -> Arc<AtomicBool> {
         self.cancel_flag.clone()
+    }
+}
+
+/// Where a render is in its lifecycle; serialized as the lowercase name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RenderStatus {
+    Idle,
+    Preparing,
+    Rendering,
+    Cancelling,
+    Complete,
+    Error,
+    Cancelled,
+}
+
+impl RenderStatus {
+    /// Complete, error or cancelled: the render ended and its cleanup finished.
+    pub fn is_terminal(self) -> bool {
+        matches!(self, Self::Complete | Self::Error | Self::Cancelled)
+    }
+}
+
+/// A render progress snapshot. [`RenderController`] keeps the current one behind its lock and
+/// hands out clones.
+#[derive(Clone, Debug, Serialize)]
+pub struct RenderProgress {
+    /// Monotonically increasing identifier for the current render session.
+    pub render_id: u64,
+    /// True until the accepted operation's worker and pipeline cleanup finish.
+    pub busy: bool,
+    /// Output-equivalent planned work traversed by the producer.
+    pub current: u32,
+    /// Actual frames produced, before output-rate expansion.
+    pub rendered: u32,
+    /// Total number of frames expected in the encoded output.
+    pub total: u32,
+    /// Output frames confirmed by the encoder (zero until confirmed).
+    pub encoded: u32,
+    pub status: RenderStatus,
+    /// Human-readable status message shown by the UI.
+    pub message: String,
+    /// Estimated remaining render seconds, when enough samples exist.
+    pub estimated_seconds_remaining: Option<u64>,
+    /// Estimated final output frame production rate, when enough samples exist.
+    pub rendering_fps: Option<f64>,
+    /// Final output filename after a successful render.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub filename: Option<String>,
+}
+
+impl Default for RenderProgress {
+    /// Creates the idle progress state used before any render starts.
+    fn default() -> Self {
+        Self {
+            render_id: 0,
+            busy: false,
+            current: 0,
+            rendered: 0,
+            total: 0,
+            encoded: 0,
+            status: RenderStatus::Idle,
+            message: String::new(),
+            estimated_seconds_remaining: None,
+            rendering_fps: None,
+            filename: None,
+        }
     }
 }
 

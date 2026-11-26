@@ -4,7 +4,7 @@
 //! export derives a table per configured length and the editor requests them by activity id.
 //! Splits count from the activity's distance origin, not the scene trim.
 
-use super::finalize::smoothing::{smoothing_window_for_seconds, zero_phase_smooth};
+use crate::import::finalize::{smoothing_window_for_seconds, zero_phase_smooth};
 use super::schema::ParsedActivity;
 use ovrley_widgets::widgets::splits_run::{CompletedSplit, SplitLength, SplitTable};
 

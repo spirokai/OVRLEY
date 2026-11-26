@@ -3,7 +3,7 @@
 use ovrley_core::activity::{
     interpolate::densify_activity, schema::ParsedActivity, trim::trim_activity,
 };
-use ovrley_core::normalize::RenderDataRequirements;
+use ovrley_core::config::RenderDataRequirements;
 use ovrley_widgets::model::telemetry::{ActivitySeries, InterpolationKind, NumericActivity};
 use serde_json::json;
 

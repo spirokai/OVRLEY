@@ -2,11 +2,11 @@
 //! --run and --run-preview render frames.
 use ovrley_core::{
     activity::{
-        build_dense_activity_report_validated, parse_activity_json, splits::derive_split_table,
+        build_dense_report, parse_activity_json, splits::derive_split_table,
         validate_render_activity,
     },
-    commands::parse_and_validate_config,
-    debug::RenderProfiler,
+    config::{parse_config_json, validate_render_config},
+    diagnostics::RenderProfiler,
     fonts::preview_font_resource,
     paths::AppPaths,
     render::{ExportWidgets, FrameSize},
@@ -85,7 +85,7 @@ fn main() -> Result<(), String> {
         .cases
         .iter()
         .map(|case| {
-            parse_and_validate_config(&case.config.to_string())
+            parse_config_json(&case.config.to_string()).and_then(|config| validate_render_config(config, None))
                 .map_err(|e| format!("{}: {e}", case.id))
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -158,7 +158,7 @@ fn main() -> Result<(), String> {
                 .map_err(|e| e.to_string())?;
         validate_render_activity(&activity).map_err(|e| e.to_string())?;
         let dense =
-            build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+            build_dense_report(&activity, &config).map_err(|e| e.to_string())?;
         if dense.frame_count < plan.warmup + plan.frames {
             return Err(format!("{}: insufficient native frames", case.id));
         }

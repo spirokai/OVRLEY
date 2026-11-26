@@ -1,7 +1,7 @@
 //! Route geometry from a validated config and an activity, through core's ingress.
 
 use ovrley_core::activity::parse_activity_json;
-use ovrley_core::normalize::{parse_config_json, validate_route_plots};
+use ovrley_core::config::{parse_config_json, validate_route_plots};
 use ovrley_widgets::widgets::route::geometry::RouteGeometry;
 
 /// The builder returns valid geometry for a minimal activity with course points.

@@ -1,10 +1,10 @@
-use ovrley_core::activity::finalize::finalize_raw_activity;
-use ovrley_core::activity::parsers::srt::extract_srt_activity;
+use ovrley_core::import::finalize::finalize_samples;
+use ovrley_core::import::srt;
 use ovrley_core::activity::schema::{RawActivity, RawSample};
 use std::path::Path;
 
 fn extract(srt: &str) -> RawActivity {
-    extract_srt_activity(srt.as_bytes(), "flight.srt").unwrap()
+    srt::extract(srt.as_bytes(), "flight.srt").unwrap()
 }
 
 fn first_sample(srt: &str) -> RawSample {
@@ -15,7 +15,7 @@ fn first_sample(srt: &str) -> RawSample {
 fn reads_bracketed_telemetry_with_a_naive_camera_timestamp() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/DJI_20260714124521_0235_D.SRT");
-    let activity = extract_srt_activity(&std::fs::read(path).unwrap(), "flight.SRT").unwrap();
+    let activity = srt::extract(&std::fs::read(path).unwrap(), "flight.SRT").unwrap();
     let sample = &activity.raw_samples[2];
 
     assert_eq!(activity.file_format, "srt");
@@ -69,8 +69,8 @@ fn reads_camera_time_in_the_gps_timezone_and_keeps_zulu_time_absolute() {
         let srt = format!(
             "1\n00:00:00,000 --> 00:00:00,033\n{date}\n[latitude: 41.424724] [longitude: 2.234156]\n"
         );
-        let response = finalize_raw_activity(&extract(&srt), None).unwrap();
-        response.parsed_activity.time[0].clone().unwrap()
+        let response = finalize_samples(&extract(&srt), None).unwrap();
+        response.time[0].clone().unwrap()
     };
 
     assert_eq!(
@@ -178,7 +178,7 @@ fn keeps_cues_without_cue_times_and_drops_cues_without_telemetry() {
 #[test]
 fn rejects_files_without_telemetry() {
     for srt in ["", "1\n"] {
-        let error = extract_srt_activity(srt.as_bytes(), "empty.srt").unwrap_err();
+        let error = srt::extract(srt.as_bytes(), "empty.srt").unwrap_err();
         assert!(error.to_string().contains("does not contain any telemetry"));
     }
 }

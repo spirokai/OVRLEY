@@ -106,10 +106,10 @@ struct AspectRatioArguments {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct SceneSizeArguments {
-    /// Whole pixels, up to 7680 (8K).
+    /// Whole pixels, up to 8200 (8K).
     #[schemars(range(max = scene::MAX_SCENE_SIDE))]
     width: NonZeroU32,
-    /// Whole pixels, up to 7680 (8K).
+    /// Whole pixels, up to 8200 (8K).
     #[schemars(range(max = scene::MAX_SCENE_SIDE))]
     height: NonZeroU32,
 }
@@ -237,7 +237,7 @@ pub(crate) fn tools() -> Vec<Tool> {
         Tool::edit(
             "scene_size_set",
             "Set the scene size",
-            "Sets the overlay's width and height in pixels, up to 7680 each (8K). One undo step.",
+            "Sets the overlay's width and height in pixels, up to 8200 each (8K). One undo step.",
             set_scene_size,
         ),
         Tool::edit(
@@ -459,7 +459,7 @@ fn set_update_rate(args: UpdateRateArguments, store: &mut Store, _: &mut Service
             "At {fps} fps the update rate is one of {options:?}"
         )));
     }
-    store.render_settings.set_widget_update_rate(args.rate)?;
+    store.render_settings.set_widget_update_rate(args.rate).map_err(|error| error.to_string())?;
     Ok(describe_scene(store))
 }
 
@@ -629,7 +629,7 @@ mod tests {
             (&scene["width"], &scene["height"]),
             (&json!(1280), &json!(720))
         );
-        editor.invalid("scene_size_set", json!({"width": 7681, "height": 720}));
+        editor.invalid("scene_size_set", json!({"width": scene::MAX_SCENE_SIDE + 1, "height": 720}));
         let scene = editor.ok("fps_set", json!({"fps": 60}));
         assert_eq!(scene["updateRateOptions"], json!([1, 2, 6, 10]));
         let scene = editor.ok("widget_update_rate_set", json!({"rate": 6}));

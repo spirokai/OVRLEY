@@ -1,0 +1,419 @@
+//! Native render ownership. One worker prepares and executes the operation;
+//! pipeline guards clean up before its reservation publishes the outcome.
+//! The service joins the worker before reuse and on drop.
+
+use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
+
+use serde::Serialize;
+
+use app_nap::RenderActivity;
+use super::batch::BatchState;
+use super::planning::{
+    plan_single_render, resolve_single_composite_source, PlannedVideoRender, VideoRenderModePlan,
+};
+use crate::activity::schema::{DenseActivityReport, ParsedActivity};
+use crate::activity::{parse_activity_json, validate_render_activity};
+use crate::encode::progress::RenderProgress;
+use crate::encode::pipeline::{encode_video, VideoEncodingRequest};
+use crate::encode::progress::{ProgressSink, RenderController};
+use crate::error::{CoreError, CoreResult};
+use crate::config::{parse_config_json, RenderConfig};
+use crate::encode::settings::ExportMode;
+use crate::output::RenderOutputTarget;
+use crate::paths::AppPaths;
+use crate::raster::RasterResourceResolver;
+use ovrley_map::gpu::MapSource;
+
+/// Existing single-render acceptance shape, serialized directly by the shell.
+#[derive(Debug, Serialize)]
+pub struct RenderAccepted {
+    pub started: bool,
+    pub render_id: u64,
+    #[serde(rename = "outputPath")]
+    pub output_path: PathBuf,
+}
+
+/// Owns the background worker; progress events never supervise execution.
+pub struct RenderExecutionService {
+    pub(crate) controller: RenderController,
+    pub(crate) batch: Arc<BatchState>,
+    worker: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Default for RenderExecutionService {
+    fn default() -> Self {
+        Self::with_controller(RenderController::default())
+    }
+}
+
+impl RenderExecutionService {
+    pub fn with_sink(sink: Arc<dyn ProgressSink>) -> Self {
+        Self::with_controller(RenderController::with_sink(sink))
+    }
+
+    /// Allows standalone pipeline callers to observe the same controller.
+    pub fn with_controller(controller: RenderController) -> Self {
+        let batch = Arc::new(BatchState::new(controller.sink()));
+        Self {
+            controller,
+            batch,
+            worker: Mutex::new(None),
+        }
+    }
+
+    pub fn progress(&self) -> RenderProgress {
+        self.controller.progress()
+    }
+
+    pub fn cancel(&self) -> bool {
+        self.controller.cancel()
+    }
+
+    /// Synchronous entry for native tools and tests, with the same reservation,
+    /// panic handling and finalization as background submissions.
+    pub fn render(
+        &self,
+        paths: &AppPaths,
+        plan: PlannedVideoRender,
+        activity: &ParsedActivity,
+        target: &RenderOutputTarget,
+    ) -> CoreResult<String> {
+        run_operation(self.reserve()?, |session| {
+            session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
+            execute_render(paths, plan, Some(activity), session, target)
+        })
+    }
+
+    /// Held across preparation, cleanup, and all items of an eventual batch.
+    pub fn reserve(&self) -> CoreResult<RendererReservation> {
+        self.reserve_with_sink(self.controller.sink())
+    }
+
+    /// Each reservation has one progress destination: the single-render sink
+    /// or internal batch state. Pipeline code uses the same controller API.
+    pub(crate) fn reserve_with_sink(
+        &self,
+        sink: Arc<dyn ProgressSink>,
+    ) -> CoreResult<RendererReservation> {
+        let render_id = self.controller.reserve(sink)?;
+        let reservation = RendererReservation {
+            controller: self.controller.clone(),
+            render_id,
+            finalized: false,
+        };
+        // A previous worker may still be publishing its terminal batch result
+        // after releasing the controller. Join it before accepting new inputs.
+        if let Some(previous) = self
+            .worker
+            .lock()
+            .expect("render worker mutex poisoned")
+            .take()
+        {
+            previous.join().expect("render worker panicked");
+        }
+        Ok(reservation)
+    }
+
+    /// The JSON entry: parses the config, and the activity once the output
+    /// is accepted, then submits as [`Self::submit_single_config`] does.
+    #[expect(clippy::too_many_arguments, reason = "each argument is a separate part of the render request")]
+    pub fn submit_single(
+        &self,
+        paths: &AppPaths,
+        config_json: &str,
+        parsed_activity_json: &str,
+        output_path: &str,
+        overwrite: bool,
+        resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<MapSource>,
+    ) -> CoreResult<RenderAccepted> {
+        self.submit_single_with(
+            paths,
+            parse_config_json(config_json)?,
+            || parse_activity_json(parsed_activity_json).map(Arc::new),
+            output_path,
+            overwrite,
+            resources,
+            map_source,
+        )
+    }
+
+    /// Validates the config, the output and the activity's timeline and pins resources at
+    /// submission ingress. Dense activity, source probing and native rendering stay on the
+    /// worker. The activity is shared with the caller, never copied.
+    #[expect(clippy::too_many_arguments, reason = "each argument is a separate part of the render request")]
+    pub fn submit_single_config(
+        &self,
+        paths: &AppPaths,
+        config: RenderConfig,
+        activity: Arc<ParsedActivity>,
+        output_path: &str,
+        overwrite: bool,
+        resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<MapSource>,
+    ) -> CoreResult<RenderAccepted> {
+        self.submit_single_with(
+            paths,
+            config,
+            || Ok(activity),
+            output_path,
+            overwrite,
+            resources,
+            map_source,
+        )
+    }
+
+    /// The output is rejected before the activity is read.
+    #[expect(clippy::too_many_arguments, reason = "each argument is a separate part of the render request")]
+    fn submit_single_with(
+        &self,
+        paths: &AppPaths,
+        config: RenderConfig,
+        activity: impl FnOnce() -> CoreResult<Arc<ParsedActivity>>,
+        output_path: &str,
+        overwrite: bool,
+        resources: Option<&dyn RasterResourceResolver>,
+        map_source: Option<MapSource>,
+    ) -> CoreResult<RenderAccepted> {
+        let kind = if config.scene.composite_video_path.is_some() {
+            ExportMode::Composite
+        } else {
+            ExportMode::Transparent
+        };
+        let target = RenderOutputTarget::validate(output_path, kind, overwrite)?;
+        let activity = activity()?;
+        let end = validate_render_activity(&activity)?;
+        let plan = plan_single_render(config, end, resources, map_source)?;
+        let reservation = self.reserve()?;
+        let accepted = RenderAccepted {
+            started: true,
+            render_id: reservation.render_id,
+            output_path: target.path().to_path_buf(),
+        };
+        let paths = paths.clone();
+        self.dispatch(
+            reservation,
+            move |session| {
+                session.begin_item(plan.planned_frames(), "Preparing video assets...")?;
+                execute_render(&paths, plan, Some(&activity), session, &target)
+            },
+            |_| {},
+        )?;
+        Ok(accepted)
+    }
+
+    /// Dispatches an operation returning its actual outcome after cleanup.
+    pub fn dispatch<T, F, C>(
+        &self,
+        reservation: RendererReservation,
+        operation: F,
+        completed: C,
+    ) -> CoreResult<()>
+    where
+        T: Clone + Into<Option<String>> + Send + 'static,
+        F: FnOnce(&RendererReservation) -> CoreResult<T> + Send + 'static,
+        C: FnOnce(&CoreResult<T>) + Send + 'static,
+    {
+        assert!(
+            self.controller.shares_state(&reservation.controller),
+            "the reservation must belong to this execution service"
+        );
+        let mut worker = self.worker.lock().expect("render worker mutex poisoned");
+        assert!(worker.is_none(), "reservation joins the previous worker");
+        *worker = Some(
+            thread::Builder::new()
+                .name("render-operation".into())
+                .spawn(move || {
+                    let outcome = run_operation(reservation, operation);
+                    completed(&outcome);
+                })
+                .map_err(|error| {
+                    CoreError::Encode(format!("Could not start render worker: {error}"))
+                })?,
+        );
+        Ok(())
+    }
+}
+
+fn run_operation<T, F>(reservation: RendererReservation, operation: F) -> CoreResult<T>
+where
+    T: Clone + Into<Option<String>>,
+    F: FnOnce(&RendererReservation) -> CoreResult<T>,
+{
+    // Accepted inputs leave scope before the reservation is released, including
+    // cancellation before preparation and unwinding.
+    let session = &reservation;
+    let outcome = catch_unwind(AssertUnwindSafe(move || {
+        session.check_cancelled()?;
+        // Prevent App Nap for the whole operation, including every batch item
+        // and native cleanup. Released on success, error, cancellation or panic.
+        let _activity = RenderActivity::begin("Rendering video");
+        operation(session)
+    }))
+    .unwrap_or_else(|_| Err(CoreError::Encode("Render operation worker panicked".into())));
+    reservation.complete(outcome)
+}
+
+impl Drop for RenderExecutionService {
+    fn drop(&mut self) {
+        if let Some(worker) = self
+            .worker
+            .get_mut()
+            .expect("render worker mutex poisoned")
+            .take()
+        {
+            if worker.join().is_err() {
+                log::error!("Render worker panicked during service shutdown");
+            }
+        }
+    }
+}
+
+/// Unique session owner; item resets preserve cancellation and reservation.
+pub struct RendererReservation {
+    controller: RenderController,
+    render_id: u64,
+    finalized: bool,
+}
+
+impl RendererReservation {
+    pub(crate) fn render_id(&self) -> u64 {
+        self.render_id
+    }
+    pub fn controller(&self) -> &RenderController {
+        &self.controller
+    }
+
+    pub fn check_cancelled(&self) -> CoreResult<()> {
+        self.controller.check_cancelled()
+    }
+
+    pub fn begin_item(&self, total_frames: u32, message: &str) -> CoreResult<()> {
+        self.controller.begin_item(total_frames, message)
+    }
+
+    /// Returns the synchronous operation's actual result and finalizes once.
+    /// Cancellation arriving after a successful pipeline has preserved its
+    /// output cannot turn that completed output into an interrupted one.
+    pub fn complete<T: Clone + Into<Option<String>>>(
+        mut self,
+        outcome: CoreResult<T>,
+    ) -> CoreResult<T> {
+        self.finalized = true;
+        match &outcome {
+            Ok(filename) => self.controller.finish_success(filename.clone().into()),
+            Err(error) => self
+                .controller
+                .finish_error(error.to_string(), matches!(error, CoreError::Cancelled)),
+        }
+        outcome
+    }
+}
+
+impl Drop for RendererReservation {
+    fn drop(&mut self) {
+        if !self.finalized {
+            self.controller
+                .finish_error("Render operation ended without an outcome".into(), false);
+        }
+    }
+}
+
+/// Executes a finalized single or batch plan. The caller owns item start and
+/// the reservation; pipelines return only after native cleanup.
+/// Renders one planned video. Without an activity (a video without telemetry)
+/// no frame samples activity data and the plan must contain static widgets only.
+pub(crate) fn execute_render(
+    paths: &AppPaths,
+    plan: PlannedVideoRender,
+    activity: Option<&ParsedActivity>,
+    session: &RendererReservation,
+    target: &RenderOutputTarget,
+) -> CoreResult<String> {
+    session.check_cancelled()?;
+    let dense = match activity {
+        Some(activity) => plan.prepare_activity(activity)?,
+        None => DenseActivityReport::without_activity(),
+    };
+    session.check_cancelled()?;
+    let map_source = plan.map_source;
+    let request = match plan.mode {
+        VideoRenderModePlan::Composite {
+            mut render,
+            source_metadata,
+        } => {
+            let source = match source_metadata {
+                Some(metadata) => metadata,
+                None => resolve_single_composite_source(
+                    paths,
+                    &mut render,
+                    plan.config.scene.presentation.width,
+                    plan.config.scene.presentation.height,
+                )?,
+            };
+            session.check_cancelled()?;
+            VideoEncodingRequest::Composite { render, source }
+        }
+        VideoRenderModePlan::Transparent(render) => VideoEncodingRequest::Transparent(render),
+    };
+    encode_video(
+        paths,
+        &plan.config,
+        activity,
+        &dense,
+        session.controller(),
+        target,
+        request,
+        map_source.as_ref(),
+    )
+}
+
+/// Keeps macOS from applying App Nap while a render runs: the worker holds the activity through
+/// preparation, encoding and cleanup. UserInitiated also prevents idle system sleep; display
+/// sleep stays allowed.
+#[cfg(target_os = "macos")]
+mod app_nap {
+    use objc2::rc::Retained;
+    use objc2::runtime::{NSObjectProtocol, ProtocolObject};
+    use objc2_foundation::{NSActivityOptions, NSProcessInfo, NSString};
+
+    #[must_use = "hold the activity until rendering and cleanup finish"]
+    pub struct RenderActivity(Retained<ProtocolObject<dyn NSObjectProtocol>>);
+
+    impl RenderActivity {
+        pub fn begin(reason: &str) -> Self {
+            let token = NSProcessInfo::processInfo().beginActivityWithOptions_reason(
+                NSActivityOptions::UserInitiated,
+                &NSString::from_str(reason),
+            );
+            log::info!("Render activity started: {reason}");
+            Self(token)
+        }
+    }
+
+    impl Drop for RenderActivity {
+        fn drop(&mut self) {
+            // SAFETY: this token came from the process singleton's beginActivity
+            // and is ended exactly once, before its retained reference is released.
+            unsafe { NSProcessInfo::processInfo().endActivity(&self.0) };
+            log::info!("Render activity ended");
+        }
+    }
+}
+
+/// App Nap is specific to macOS; other platforms need no activity assertion.
+#[cfg(not(target_os = "macos"))]
+mod app_nap {
+    /// App Nap is specific to macOS; other platforms need no activity assertion.
+    #[must_use = "hold the activity until rendering and cleanup finish"]
+    pub struct RenderActivity;
+
+    impl RenderActivity {
+        pub fn begin(_reason: &str) -> Self {
+            Self
+        }
+    }
+}

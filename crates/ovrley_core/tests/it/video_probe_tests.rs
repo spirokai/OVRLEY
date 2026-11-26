@@ -22,10 +22,10 @@
 
 use serde_json::json;
 
-use ovrley_core::media::video_probe::{
+use ovrley_core::media::probe::{
     metadata_from_ffprobe_json, read_video_start_offset, read_video_stream_duration, timecode_sync_time,
 };
-use ovrley_core::media::{Resolution, SourceVideoMetadata};
+use ovrley_core::media::probe::{Resolution, SourceVideoMetadata};
 
 use crate::common;
 
@@ -101,7 +101,7 @@ fn the_video_start_offset_counts_from_the_file_start() {
 }
 
 #[test]
-fn source_video_metadata_serializes_sync_and_legacy_creation_fields() {
+fn source_video_metadata_serializes_sync_and_creation_fields() {
     let metadata = SourceVideoMetadata {
         path: "clip.mp4".to_string(),
         duration: Some(12.5),

@@ -8,7 +8,7 @@
 //!   bounds, captured when the drag starts. Changing the labels' font, and the reset, wait for the
 //!   family's capabilities and apply only if the document is still the same.
 
-use ovrley_core::normalize::template::template_manifest;
+use ovrley_core::template::template_manifest;
 use ovrley_widgets::model::document::{is_color_field_key, round_half_up, normalize_hex_color, number};
 use serde_json::{Map, Value};
 use crate::features::widgets::{font_options, request_font_capabilities};
@@ -657,6 +657,7 @@ pub fn set_fps(store: &mut Store, fps: u32) -> Result<(), String> {
     store
         .render_settings
         .set_fps_and_update_rate(f64::from(fps), rate)
+        .map_err(|error| error.to_string())
 }
 
 /// The labels' font waits for its family's capabilities, answering `reply`
@@ -950,7 +951,7 @@ pub fn edit(
             let rate: u32 = text(&input)?
                 .parse()
                 .map_err(|_| format!("{id} takes a whole rate"))?;
-            store.render_settings.set_widget_update_rate(rate)
+            store.render_settings.set_widget_update_rate(rate).map_err(|error| error.to_string())
         }
         "reset_globals" => {
             reset_globals(store, services, None);
@@ -1067,7 +1068,7 @@ mod tests {
 
         run(&dispatcher, "width", Input::Text("76800".into()));
         dispatcher
-            .with_store(|store| assert_eq!(scene_size(store).0, 7680, "a typed size stops at 8K"));
+            .with_store(|store| assert_eq!(scene_size(store).0, u64::from(MAX_SCENE_SIDE), "a typed size stops at the limit"));
         run(&dispatcher, "width", Input::Text("1,280".into()));
         run(&dispatcher, "height", Input::Text("0720".into()));
         dispatcher.dispatch(|store, _| set_fps(store, 60).unwrap());

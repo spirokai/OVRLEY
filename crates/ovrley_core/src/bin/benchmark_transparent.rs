@@ -6,18 +6,17 @@
 //!
 //! The binary uses a fixed 60-second activity window (300s–360s) and cooldown
 //! sleeps between codec groups to reduce thermal bias.
-//!
-//! Does not own: rendering or encoding — delegates to `ovrley_core`.
 
 use ovrley_core::activity::{parse_activity_json, validate_render_activity};
-use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::config::{parse_config_json, validate_render_config};
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::normalize::parse_config_value;
-use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
+use ovrley_core::config::parse_config_value;
+use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::plan_single_render;
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::plan_single_render;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -25,12 +24,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use ovrley_core::benchmark_common::{
+use ovrley_core::cli::{
     average_successful_runs, file_size_mb, is_transparent_codec_available, prevent_sleep,
     sleep_between_benchmark_groups, sleep_between_benchmark_runs, summarize_run_outcome,
     CommonRunMetrics,
 };
-use ovrley_core::bin_common::{
+use ovrley_core::cli::{
     format_mmss, read_optional_arg, read_positional, repo_root, resolve_path, unix_timestamp,
 };
 
@@ -133,7 +132,7 @@ struct BenchmarkOutput {
 
 /// Runs the transparent overlay encoding benchmark across all available codecs.
 ///
-/// # Phases
+/// # Steps
 ///
 /// 1. **Setup** — parse CLI args, prevent system sleep, resolve paths, detect
 ///    available codecs, load activity and template.
@@ -146,7 +145,7 @@ struct BenchmarkOutput {
 /// 4. **Output** — aggregate results into `BenchmarkOutput` and write to
 ///    `debug/benchmarks/transparent.json`.
 fn main() -> Result<(), String> {
-    // -- Phase 1: setup and codec detection --
+    // Setup and codec detection.
     let args: Vec<String> = std::env::args().collect();
     let (activity_path, template_path) = parse_args(&args)?;
 
@@ -202,14 +201,14 @@ fn main() -> Result<(), String> {
     set_scene_window(&mut base_config_value, 300.0, 360.0)?;
     let base_config_str = serde_json::to_string(&base_config_value)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
-    let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
+    let base_validated = parse_config_json(&base_config_str).and_then(|config| validate_render_config(config, None)).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.presentation.width;
     let res_height = base_validated.scene.presentation.height;
     let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate.get());
 
     let mut results = BTreeMap::new();
 
-    // -- Phase 2: iterate over every transparent codec profile --
+    // Iterate over every transparent codec profile.
     for (codec_index, codec_name) in TRANSPARENT_CODECS.iter().enumerate() {
         println!("\n=== Codec: {codec_name} ===");
 
@@ -233,7 +232,7 @@ fn main() -> Result<(), String> {
         let mut runs = Vec::with_capacity(3);
         let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
-        // -- Phase 3: run 3 full transparent render iterations for this codec --
+        // Run 3 full transparent render iterations for this codec.
         for run_num in 1..=3 {
             print!("    Run {run_num}/3... ");
 
@@ -262,7 +261,7 @@ fn main() -> Result<(), String> {
                 .join(format!("benchmark-{codec_name}-{run_num}.mov"));
             let output_target = RenderOutputTarget::validate(
                 output_path.to_str().unwrap(),
-                RenderOutputKind::Transparent,
+                ExportMode::Transparent,
                 true,
             );
             let render_result =
@@ -346,7 +345,7 @@ fn main() -> Result<(), String> {
         );
     }
 
-    // -- Phase 4: serialize results and write to debug/benchmarks/transparent.json --
+    // Serialize results and write to debug/benchmarks/transparent.json.
     let output = BenchmarkOutput {
         generated_at: unix_timestamp(),
         template: template_name,

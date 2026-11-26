@@ -13,9 +13,9 @@ use detection::{create_sync_input, detect_activity_events, DetectionSettings, Lo
 use manual::CandidateStatus;
 use matching::{match_candidates, MatchScope};
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::media::manual_video_sync::{LandmarkKind, MAX_MANUAL_LANDMARKS};
-use ovrley_core::media::video_edits::TimezoneMode;
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::media::sync::{LandmarkKind, MAX_MANUAL_LANDMARKS};
+use ovrley_core::media::edits::TimezoneMode;
 use crate::i18n::catalog;
 use crate::store::Store;
 use crate::store::agent::AgentReply;
@@ -281,7 +281,7 @@ fn candidate_list(store: &Store, scope: MatchScope, applied_offset: f64) -> Cand
 
 pub fn drawer_view(store: &Store) -> DrawerView {
     let language = store.i18n.language;
-    let mut landmarks: Vec<&ovrley_core::media::manual_video_sync::Landmark> = store.manual_video_sync.landmarks.iter().collect();
+    let mut landmarks: Vec<&ovrley_core::media::sync::Landmark> = store.manual_video_sync.landmarks.iter().collect();
     landmarks.sort_by(|left, right| left.video_second().total_cmp(&right.video_second()).then_with(|| crate::format::compare_text(left.id(), right.id())));
     let detection = store.manual_video_sync_detection.as_deref();
     let counts = detection.map_or_else(DetectionCounts::default, |detection| DetectionCounts {

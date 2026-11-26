@@ -18,7 +18,7 @@
 use crate::cache::FilmstripCache;
 use image::codecs::jpeg::JpegEncoder;
 use image::{ExtendedColorType, RgbImage};
-use ovrley_core::encode::ffmpeg::binary::configure_ffmpeg_command;
+use ovrley_core::encode::ffmpeg::configure_ffmpeg_command;
 use std::ffi::OsString;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -843,7 +843,7 @@ mod tests {
     }
 
     fn repo_ffmpeg() -> PathBuf {
-        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&crate::runtime::source_repo_root())
+        ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&crate::runtime::source_repo_root())
             .unwrap()
     }
 

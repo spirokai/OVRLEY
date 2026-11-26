@@ -11,7 +11,7 @@ fn gauge_bounds_preserve_source_extrema_outside_export_window() {
     use ovrley_core::activity::interpolate::{densify_activity, frame_timeline_for_fps};
     use ovrley_core::activity::schema::ParsedActivity;
     use ovrley_core::activity::trim::trim_activity;
-    use ovrley_core::normalize::RenderDataRequirements;
+    use ovrley_core::config::RenderDataRequirements;
     use ovrley_widgets::model::catalog::MetricKind;
 
     let activity: ParsedActivity = serde_json::from_value(serde_json::json!({

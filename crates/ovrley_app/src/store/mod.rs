@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
 use editor::EditorState;
 use media::MediaState;
-use ovrley_core::encode::render_settings::RenderSettings;
+use ovrley_core::encode::settings::RenderSettings;
 use services::{ServiceParts, Services};
 use template::TemplateState;
 use videos::VideoImportState;
@@ -44,7 +44,7 @@ pub struct Store {
     /// The render frame rate and widget update rate.
     pub render_settings: RenderSettings,
     /// The manual sync's durable state, which projects save.
-    pub manual_video_sync: ovrley_core::media::manual_video_sync::ManualVideoSync,
+    pub manual_video_sync: ovrley_core::media::sync::ManualVideoSync,
     /// The activity's events, `None` before the first detection.
     pub manual_video_sync_detection: Option<std::sync::Arc<crate::features::sync::detection::Detection>>,
     /// The manual sync's candidate results.

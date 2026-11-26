@@ -7,12 +7,12 @@
 //!
 //! This binary is a diagnostic tool — it does no rendering.
 
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::activity::{build_dense_report, parse_activity_json};
+use ovrley_core::config::{parse_config_json, validate_render_config};
 use std::fs;
 use std::path::PathBuf;
 
-use ovrley_core::bin_common::read_arg;
+use ovrley_core::cli::read_arg;
 
 /// Validates that a given activity file and config produce a parse-able
 /// dense activity report, and writes the report to disk.
@@ -34,9 +34,9 @@ fn main() -> Result<(), String> {
         .map_err(|error| format!("Failed to read {}: {error}", config_path.display()))?;
 
     let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
-    let config = parse_and_validate_config(&config_json).map_err(|e| e.to_string())?;
+    let config = parse_config_json(&config_json).and_then(|config| validate_render_config(config, None)).map_err(|e| e.to_string())?;
     let report =
-        build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+        build_dense_report(&activity, &config).map_err(|e| e.to_string())?;
     let output = serde_json::to_string_pretty(&report)
         .map_err(|error| format!("Failed to serialize report: {error}"))?;
 

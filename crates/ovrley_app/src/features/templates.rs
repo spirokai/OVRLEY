@@ -1,5 +1,5 @@
 //! Templates: the listing, loading and importing, saving, the save status, and restoring the
-//! last template at startup. File ingress and egress are `ovrley_core::normalize::template`.
+//! last template at startup. File ingress and egress are `ovrley_core::template`.
 //!
 //! Actions take paths: the UI shows a dialog first, agents pass the path. Work that touches the
 //! disk runs on a worker; its result comes back as an action, and the continuation the caller
@@ -8,8 +8,8 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use ovrley_core::commands::{TemplateDescriptor, TemplateKind};
-use ovrley_core::normalize::template::{create_durable_template_state, load_template_document, template_file_payload, DurableTemplateState};
+use ovrley_core::template::{TemplateDescriptor, TemplateKind};
+use ovrley_core::template::{create_durable_template_state, load_template_document, template_file_payload, DurableTemplateState};
 use ovrley_core::paths::AppPaths;
 use ovrley_services::rasters::RasterResources;
 use ovrley_widgets::model::document::OverlayConfig;
@@ -300,7 +300,7 @@ pub fn fetch_templates(
     store.templates.fetch_waiters = Some(then.into_iter().collect());
     let paths = Arc::clone(&services.paths);
     services.workers.spawn("template-list", move || {
-        let templates = ovrley_core::commands::list_templates(&paths);
+        let templates = ovrley_core::template::list_templates(&paths);
         Box::new(move |store: &mut Store, services: &mut Services| {
             store.template.set_templates(templates);
             let waiters = store
@@ -438,7 +438,7 @@ fn load_listed_template(store: &mut Store, services: &mut Services, id: String, 
         store,
         services,
         move |paths| {
-            ovrley_core::commands::read_template(paths, &read_id).map_err(|error| error.to_string())
+            ovrley_core::template::read_template(paths, &read_id).map_err(|error| error.to_string())
         },
         move |store, services, prepared, on_done| match prepared {
             Ok(prepared) => {
@@ -691,7 +691,7 @@ pub fn save_template(store: &mut Store, services: &mut Services, path: String, t
         let contents =
             serde_json::to_string_pretty(&payload).expect("a template payload serializes");
         let written =
-            ovrley_core::commands::write_template(std::path::Path::new(&write_path), &contents)
+            ovrley_core::template::write_template(std::path::Path::new(&write_path), &contents)
                 .map_err(|error| error.to_string());
         Box::new(move |store: &mut Store, services: &mut Services| {
             let then = store.templates.resume(job);

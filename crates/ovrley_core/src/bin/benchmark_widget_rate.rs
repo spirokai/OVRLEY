@@ -6,19 +6,18 @@
 //!
 //! Outputs aggregated timing and file-size results to
 //! `debug/benchmarks/update_rate.json`.
-//!
-//! Does not own: rendering or encoding — delegates to `ovrley_core`.
 
 use ovrley_core::activity::{parse_activity_json, validate_render_activity};
-use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::config::{parse_config_json, validate_render_config};
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::media::video_probe::probe_video;
-use ovrley_core::normalize::parse_config_value;
-use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
+use ovrley_core::media::probe::probe_video;
+use ovrley_core::config::parse_config_value;
+use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::{plan_single_render, VideoRenderModePlan};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -26,12 +25,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use ovrley_core::benchmark_common::{
+use ovrley_core::cli::{
     average_successful_runs, file_size_mb, is_composite_codec_available, prevent_sleep,
     sleep_between_benchmark_groups, sleep_between_benchmark_runs, summarize_run_outcome,
     CommonRunMetrics,
 };
-use ovrley_core::bin_common::{
+use ovrley_core::cli::{
     format_mmss, read_positional, repo_root, resolve_path, unix_timestamp,
 };
 
@@ -152,7 +151,7 @@ struct BenchmarkOutput {
 
 /// Runs the widget-update-rate composite encoding benchmark.
 ///
-/// # Phases
+/// # Steps
 ///
 /// 1. **Setup** — parse CLI args, prevent system sleep, resolve paths, detect
 ///    available codecs, probe video metadata, compute a 60-second render window.
@@ -167,7 +166,7 @@ struct BenchmarkOutput {
 /// 5. **Output** — aggregate results into `BenchmarkOutput` and write to
 ///    `debug/benchmarks/update_rate.json`.
 fn main() -> Result<(), String> {
-    // -- Phase 1: setup and codec detection --
+    // Setup and codec detection.
     prevent_sleep();
 
     let args: Vec<String> = std::env::args().collect();
@@ -256,13 +255,13 @@ fn main() -> Result<(), String> {
     set_scene_window(&mut base_config_value, activity_start, activity_end)?;
     let base_config_str = serde_json::to_string(&base_config_value)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
-    let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
+    let base_validated = parse_config_json(&base_config_str).and_then(|config| validate_render_config(config, None)).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.presentation.width;
     let res_height = base_validated.scene.presentation.height;
 
     let mut results = BTreeMap::new();
 
-    // -- Phase 2: outer loop — iterate over GPU composite codec profiles --
+    // Outer loop — iterate over GPU composite codec profiles.
     for (codec_index, &(display_name, codec_key)) in CODECS.iter().enumerate() {
         println!("\n=== Codec: {display_name} ===");
 
@@ -281,7 +280,7 @@ fn main() -> Result<(), String> {
 
         let mut update_rate_entries = BTreeMap::new();
 
-        // -- Phase 3: middle loop — iterate over widget update rates (1,2,3,6) --
+        // Middle loop — iterate over widget update rates (1,2,3,6).
         for (ur_index, &update_rate) in UPDATE_RATES.iter().enumerate() {
             let rate_label = format!("ur{}", update_rate);
             println!("    Update rate: {update_rate}");
@@ -295,7 +294,7 @@ fn main() -> Result<(), String> {
             let mut runs = Vec::with_capacity(3);
             let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
-            // -- Phase 4: inner loop — run 3 composite renders for this (codec, rate) --
+            // Inner loop — run 3 composite renders for this (codec, rate).
             for run_num in 1..=3 {
                 print!("      Run {run_num}/3... ");
 
@@ -333,7 +332,7 @@ fn main() -> Result<(), String> {
                 raw.scene.composite_sync_offset = Some(activity_start);
                 raw.scene.composite_video_trim_start = Some(trim_start);
                 raw.scene.composite_render_duration = Some(render_duration);
-                raw.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+                raw.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
                 raw.scene.quality_value = Some(40.0);
                 let plan = plan_single_render(
                     raw,
@@ -357,7 +356,7 @@ fn main() -> Result<(), String> {
                 ));
                 let render_result = RenderOutputTarget::validate(
                     output_path.to_str().unwrap(),
-                    RenderOutputKind::Composite,
+                    ExportMode::Composite,
                     true,
                 )
                 .and_then(|target| execution.render(&paths, plan, &activity, &target));
@@ -461,7 +460,7 @@ fn main() -> Result<(), String> {
         );
     }
 
-    // -- Phase 5: serialize results and write to debug/benchmarks/update_rate.json --
+    // Serialize results and write to debug/benchmarks/update_rate.json.
     let output = BenchmarkOutput {
         generated_at: unix_timestamp(),
         template: template_name,

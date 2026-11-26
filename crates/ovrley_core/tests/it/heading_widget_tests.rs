@@ -15,11 +15,11 @@
 
 use crate::common;
 
-use ovrley_core::normalize::RenderConfig;
-use ovrley_core::normalize::{
+use ovrley_core::config::RenderConfig;
+use ovrley_core::config::{
     validate_render_config, validate_scene_config, ValidatedSceneConfig,
 };
-use ovrley_core::render::surface::{create_surface, native_n32_image_info};
+use ovrley_core::render::{create_surface, native_n32_image_info};
 use ovrley_widgets::render::text::resolve_font;
 use ovrley_widgets::widgets::heading::prepare_heading_cache;
 use ovrley_widgets::widgets::heading::{chevron_vertices, heading_label_baseline, heading_tape_layout, heading_tick_position, visible_labels, visible_ticks, TapeTick};
@@ -66,7 +66,7 @@ fn default_heading() -> ValidatedHeading {
 }
 
 fn default_render_config() -> RenderConfig {
-    let scene: ovrley_core::normalize::SceneConfig =
+    let scene: ovrley_core::config::SceneConfig =
         serde_json::from_value(common::builders::scene_json()).unwrap();
     let config = RenderConfig {
         scene,
@@ -77,7 +77,7 @@ fn default_render_config() -> RenderConfig {
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
     };
-    validate_render_config(config.clone()).unwrap();
+    validate_render_config(config.clone(), None).unwrap();
     config
 }
 

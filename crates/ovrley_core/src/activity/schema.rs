@@ -1,30 +1,8 @@
-//! Activity data contracts used by the renderer.
+//! Activity data shapes: format extraction's [`RawActivity`] and [`ActivityColumns`], the
+//! canonical [`ParsedActivity`], and the trimmed and dense per-frame series rendering reads.
 //!
-//! Owns: `ParsedActivity` (frontend-provided JSON shape), `DenseActivityReport`
-//!       (frame-aligned interpolated telemetry), `TrimmedActivity` (scene-window
-//!       subset), `DebugPayload` (parser debug wrapper), and the type aliases
-//!       `NumericSeries`, `TimeSeries`, `CourseSeries`.
-//! Does not own: parsing (see [`crate::activity::mod::parse_activity_json`]),
-//!       trimming (see [`crate::activity::trim`]), interpolation (see
-//!       [`crate::activity::interpolate`] and [`ovrley_widgets::series`]).
-//!
-//! Allowed dependencies: `chrono-tz`, `serde`, `serde_json`, and activity metric contracts.
-//! Forbidden dependencies: `render`, `encode`, `commands`.
-//!
-//! Related modules: [`crate::activity::interpolate`] (consumes these types for
-//!       densification), [`crate::normalize`] (consumes `RenderDataRequirements` to
-//!       decide which series are needed).
-//!
-//! ## Serde Contract
-//! Format parsers normalize their input into these shapes before finalization.
-//! Optional telemetry values use `Option<T>` so missing sensor
-//! samples remain distinguishable from real zero values during trimming,
-//! interpolation, and widget rendering.
-//!
-//! ## Performance
-//! Not a hot path — these types are constructed once per render during the
-//! parse-and-prepare phase. The `DenseActivityReport` is read heavily during
-//! per-frame rendering (O(1) lookup via `frame_index`).
+//! Optional telemetry values are `Option`, so a missing sensor sample stays distinguishable from
+//! a real zero through trimming, interpolation and rendering.
 
 use chrono_tz::Tz;
 use ovrley_widgets::model::catalog::MetricKind;
@@ -38,12 +16,6 @@ use std::collections::BTreeMap;
 /// apply the metric's interpolation policy and preserve empty vectors for
 /// series that a template did not request.
 pub type NumericSeries = Vec<Option<f64>>;
-
-/// Source lap labels aligned with `sample_elapsed_seconds`.
-///
-/// Present values are normalized at extraction: `-1` is the pre-lap and
-/// valid source labels are preserved as supplied.
-pub type LapNumberSeries = Vec<Option<i64>>;
 
 /// Canonical string gear observations aligned with `sample_elapsed_seconds`.
 pub type GearSeries = Vec<Option<String>>;
@@ -84,14 +56,11 @@ pub type TimeSeries = Vec<Option<String>>;
 /// provide partial or sparse course data.
 pub type CourseSeries = Vec<(Option<f64>, Option<f64>)>;
 
-/// Intermediate activity payload produced by format-specific extraction.
-///
-/// This is the seam between browser/native parsers and shared Rust
-/// finalization: extractors normalize units and field names, then the backend
-/// applies the common post-processing rules exactly once.
+/// Row samples produced by a format parser. Parsers normalize units and field names; the
+/// finalizer applies the shared post-processing exactly once.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct RawActivity {
-    /// Source filename used for diagnostics and frontend display.
+    /// Source filename, for diagnostics and display.
     pub file_name: String,
     /// Parser format label used to preserve source provenance.
     pub file_format: String,
@@ -112,16 +81,14 @@ pub struct RawActivity {
     pub options: RawActivityOptions,
 }
 
-/// Shared post-processing options supplied by extraction.
-///
-/// Options belong to extraction because source quality differs by format; the
-/// finalizer stays a deterministic executor of these explicit requests.
+/// Post-processing options a parser chooses, because source quality differs by format; the
+/// finalizer only executes them.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct RawActivityOptions {
     /// Lets dense subtitle/video-like sources bypass synthetic idle insertion.
     #[serde(default)]
     pub skip_idle_gap_fill: bool,
-    /// Phase 1 smoothing requests keyed by final metric id.
+    /// Smoothing requests keyed by finalized metric id.
     #[serde(default)]
     pub smoothing: BTreeMap<String, SmoothingOption>,
 }
@@ -162,12 +129,8 @@ pub enum TimingMarkerKind {
 
 ovrley_widgets::input_activity_struct!(
     columns,
-    /// Columnar activity input used by the shared finalizer core.
-    ///
-    /// Browser parsers can still send row-oriented [`RawActivity`] JSON; the
-    /// finalizer converts that payload to columns at the boundary. MP4 telemetry
-    /// alignment naturally produces columns and can feed this shape directly
-    /// without constructing large sparse row objects.
+    /// Columnar extraction the finalizer works on. Row parsers' [`RawActivity`] is converted to
+    /// it; columnar sources (CSV, VBO, MP4 telemetry) build it directly without sparse rows.
     #[derive(Clone, Debug, Default)]
     pub struct ActivityColumns {
         pub file_name: String,
@@ -185,10 +148,7 @@ ovrley_widgets::input_activity_struct!(
     }
 );
 
-/// Per-metric smoothing request. Phase 0 only carries this through the schema.
-///
-/// The shape is introduced with RawActivity so frontend parsers can adopt the
-/// contract before the smoothing executor is wired in the next migration phase.
+/// Per-metric smoothing request.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SmoothingOption {
     /// Disabled entries remain serializable so parser defaults can be explicit.
@@ -203,14 +163,14 @@ pub struct SmoothingOption {
 
 ovrley_widgets::input_activity_struct!(
     samples,
-    /// Normalized extraction sample consumed by backend finalization.
+    /// One normalized extraction sample.
     ///
     /// Every field is optional because not all formats expose every sensor. Missing
     /// values remain `None` so derivation can distinguish absent data from real
     /// zeroes.
     #[derive(Clone, Debug, Default, Deserialize, Serialize)]
     pub struct RawSample {
-        /// Marks backend-inserted idle samples for diagnostics.
+        /// Marks idle samples the finalizer inserted into a stationary gap.
         #[serde(default)]
         pub synthetic_idle: bool,
     }
@@ -218,11 +178,10 @@ ovrley_widgets::input_activity_struct!(
 
 ovrley_widgets::numeric_activity_struct!(
     parsed,
-    /// Parsed source activity as passed from the JavaScript parser to Rust.
+    /// The canonical activity: sample-aligned series of the whole source activity.
     ///
-    /// The struct is intentionally forward-compatible: unknown fields are retained
-    /// in [`ParsedActivity::extra`] so newer frontend payloads can travel through
-    /// older Rust builds without being discarded by serde.
+    /// Fields this build does not know are kept in [`ParsedActivity::extra`], which also carries
+    /// the finalizer's units, coverage and attribute lists.
     #[derive(Clone, Debug, Default, Deserialize, Serialize)]
     pub struct ParsedActivity {
         /// Original source filename when known.
@@ -246,15 +205,6 @@ ovrley_widgets::numeric_activity_struct!(
         /// Absolute activity distance progress, normalized to `0.0..=1.0`.
         #[serde(default)]
         pub sample_distance_progress: Vec<f64>,
-        /// Precomputed frame elapsed seconds from older payloads.
-        #[serde(default)]
-        pub frame_elapsed_seconds: Vec<f64>,
-        /// Precomputed frame timestamps from older payloads.
-        #[serde(default)]
-        pub frame_timestamps: Vec<Option<String>>,
-        /// Precomputed frame distance progress from older payloads.
-        #[serde(default)]
-        pub frame_distance_progress: Vec<Option<f64>>,
         /// Default trim start reported by the parser, in seconds.
         #[serde(default)]
         pub trim_start_seconds: f64,
@@ -297,17 +247,13 @@ ovrley_widgets::numeric_activity_struct!(
         /// Prefix-min of `lap_durations_seconds`; `best_so_far[n]` is the fastest lap among laps `0..=n`.
         #[serde(default)]
         pub lap_durations_best_so_far_seconds: Vec<f64>,
-        /// Unrecognized fields preserved for compatibility with frontend payloads.
+        /// Finalizer metadata (`metric_units`, `coverage`, attribute lists) and unknown fields.
         #[serde(flatten)]
         pub extra: BTreeMap<String, Value>,
     }
 );
 
-/// Debug wrapper produced by parser diagnostics.
-///
-/// Some local debug files contain `{ "parsed_activity": ... }` instead of the
-/// activity object directly. Keeping this type small makes that compatibility
-/// explicit in the parser.
+/// The import's debug dump, which wraps the activity under `parsed_activity`.
 #[derive(Clone, Debug, Deserialize)]
 pub struct DebugPayload {
     /// Wrapped parsed activity payload.

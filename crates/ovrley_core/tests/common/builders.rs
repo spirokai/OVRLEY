@@ -30,7 +30,7 @@ pub fn heading_tape_json() -> Value {
 
 /// Materialized shared presentation for video-local planning/pipeline tests.
 pub fn batch_template(
-) -> ovrley_core::normalize::RenderConfig<ovrley_widgets::model::scene::ScenePresentationConfig>
+) -> ovrley_core::config::RenderConfig<ovrley_widgets::model::scene::ScenePresentationConfig>
 {
     let mut scene = super::seam::explicit_scene_json();
     for key in [
@@ -57,13 +57,13 @@ pub fn batch_template(
 /// Captures the plan produced by real submission/preparation, replacing helper-only ingress tests.
 pub fn batch_video_plan(
     paths: &ovrley_core::paths::AppPaths,
-    inspection: &ovrley_core::render_jobs::inspection::VideoInspectionService,
+    inspection: &ovrley_core::jobs::inspection::VideoInspectionService,
     inspection_id: &str,
-    request: ovrley_core::render_jobs::contracts::BatchRenderRequest,
-) -> ovrley_core::error::CoreResult<ovrley_core::render_jobs::planning::PlannedVideoRender> {
+    request: ovrley_core::jobs::contracts::BatchRenderRequest,
+) -> ovrley_core::error::CoreResult<ovrley_core::jobs::planning::PlannedVideoRender> {
     use ovrley_core::activity::schema::ParsedActivity;
     use ovrley_core::error::{CoreError, CoreResult};
-    use ovrley_core::render_jobs::{
+    use ovrley_core::jobs::{
         batch::BatchJobExecutor,
         execution::{RenderExecutionService, RendererReservation},
         planning::PlannedVideoRender,
@@ -73,7 +73,7 @@ pub fn batch_video_plan(
         fn embedded_activity(
             &self,
             _: &ovrley_core::paths::AppPaths,
-            _: &ovrley_core::media::prepared_video::InspectedVideoSource,
+            _: &ovrley_core::media::probe::InspectedVideoSource,
         ) -> CoreResult<Option<ParsedActivity>> {
             unreachable!("external activity")
         }
@@ -124,16 +124,16 @@ pub fn batch_video_plan(
 
 pub fn video_batch_request(
     inspection_id: &str,
-    source: &ovrley_core::media::prepared_video::InspectedVideoSource,
-    encoding: ovrley_core::render_jobs::contracts::BatchEncodingSettings,
-    template: ovrley_core::normalize::RenderConfig<
+    source: &ovrley_core::media::probe::InspectedVideoSource,
+    encoding: ovrley_core::jobs::contracts::BatchEncodingSettings,
+    template: ovrley_core::config::RenderConfig<
         ovrley_widgets::model::scene::ScenePresentationConfig,
     >,
     activity: ovrley_core::activity::schema::ParsedActivity,
     offset: f64,
     skip_overlay: bool,
-) -> ovrley_core::render_jobs::contracts::BatchRenderRequest {
-    use ovrley_core::render_jobs::contracts::*;
+) -> ovrley_core::jobs::contracts::BatchRenderRequest {
+    use ovrley_core::jobs::contracts::*;
     let directory = std::path::Path::new(&source.metadata.path)
         .parent()
         .unwrap();
@@ -159,15 +159,15 @@ pub fn video_batch_request(
 
 /// The piece covering every frame of an inspected source.
 pub fn whole_source_piece(
-    source: &ovrley_core::media::prepared_video::InspectedVideoSource,
+    source: &ovrley_core::media::probe::InspectedVideoSource,
     skip_overlay: bool,
-) -> ovrley_core::render_jobs::contracts::BatchRenderPiece {
-    let fps = ovrley_core::encode::fps::Fps::new(
+) -> ovrley_core::jobs::contracts::BatchRenderPiece {
+    let fps = ovrley_core::encode::timing::Fps::new(
         source.metadata.fps_num.unwrap(),
         source.metadata.fps_den.unwrap(),
     )
     .unwrap();
-    ovrley_core::render_jobs::contracts::BatchRenderPiece {
+    ovrley_core::jobs::contracts::BatchRenderPiece {
         source_id: source.source_id.clone(),
         start_frame: 0,
         end_frame: fps
@@ -345,9 +345,9 @@ pub fn minimal_trimmed_activity(times: Vec<f64>) -> TrimmedActivity {
 }
 
 /// Hard cuts between `pieces` consecutive pieces.
-pub fn hard_cuts(pieces: usize) -> Vec<ovrley_core::render_jobs::contracts::BatchTransition> {
+pub fn hard_cuts(pieces: usize) -> Vec<ovrley_core::jobs::contracts::BatchTransition> {
     (1..pieces)
-        .map(|_| ovrley_core::render_jobs::contracts::BatchTransition {
+        .map(|_| ovrley_core::jobs::contracts::BatchTransition {
             transition_type: "none".into(),
             duration_seconds: 0.0,
         })

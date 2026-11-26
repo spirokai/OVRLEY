@@ -7,17 +7,15 @@
 //! Supports single-second (`--second`) and batch (`--seconds a,b,c`)
 //! previews. Outputs a timing summary JSON to stdout, and optionally a
 //! separate timing file via `--timing-out`.
-//!
-//! Does not own: rendering — delegates to `ovrley_core::render`.
 
-use ovrley_core::activity::{build_dense_activity_report_validated, parse_activity_json};
-use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::activity::{build_dense_report, parse_activity_json};
+use ovrley_core::config::{parse_config_json, validate_render_config};
 use ovrley_core::paths::AppPaths;
 use ovrley_core::render::{render_preview_frames, PreviewFrame};
 use std::fs;
 use std::path::PathBuf;
 
-use ovrley_core::bin_common::{read_arg, read_optional_arg, repo_root};
+use ovrley_core::cli::{read_arg, read_optional_arg, repo_root};
 
 /// Parses `--seconds a,b,c` or `--second N` into a sorted list of activity
 /// seconds to render. Returns an error when no valid seconds are provided.
@@ -61,9 +59,9 @@ fn main() -> Result<(), String> {
     let config_json = fs::read_to_string(&config_path)
         .map_err(|error| format!("Failed to read {}: {error}", config_path.display()))?;
     let activity = parse_activity_json(&payload_json).map_err(|e| e.to_string())?;
-    let config = parse_and_validate_config(&config_json).map_err(|e| e.to_string())?;
+    let config = parse_config_json(&config_json).and_then(|config| validate_render_config(config, None)).map_err(|e| e.to_string())?;
     let dense_activity =
-        build_dense_activity_report_validated(&activity, &config).map_err(|e| e.to_string())?;
+        build_dense_report(&activity, &config).map_err(|e| e.to_string())?;
     let paths = AppPaths::from_repo_root(repo_root()?);
 
     let stem = out_path.file_stem().and_then(|value| value.to_str()).unwrap_or("preview");

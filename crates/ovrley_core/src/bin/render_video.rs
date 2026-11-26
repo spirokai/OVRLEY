@@ -4,25 +4,23 @@
 //! single-pass Skia + ffmpeg render without a window. It is a diagnostic tool:
 //! the app does not run it.
 //!
-//! Responsibilities:
 //! - Deserialize activity data and render config.
 //! - Inject optional ffmpeg overrides (codec, container, pix_fmt) from CLI.
 //! - Run the full render pipeline and print the output filename as JSON.
-//!
-//! Does not own: parsing or encoding — those live in `ovrley_core`.
 
 use ovrley_core::activity::{parse_activity_json, validate_render_activity};
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::normalize::parse_config_value;
-use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
+use ovrley_core::config::parse_config_value;
+use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::{plan_single_render, VideoRenderModePlan};
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::{plan_single_render, VideoRenderModePlan};
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::PathBuf;
 
-use ovrley_core::bin_common::{read_arg, read_optional_arg, repo_root};
+use ovrley_core::cli::{read_arg, read_optional_arg, repo_root};
 
 /// Ensures `config.scene.ffmpeg` is a JSON object, defaulting to an empty
 /// one if it was null. Returns a mutable reference so callers can insert
@@ -107,8 +105,8 @@ fn main() -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
     let output_kind = match plan.mode() {
-        VideoRenderModePlan::Composite { .. } => RenderOutputKind::Composite,
-        VideoRenderModePlan::Transparent(_) => RenderOutputKind::Transparent,
+        VideoRenderModePlan::Composite { .. } => ExportMode::Composite,
+        VideoRenderModePlan::Transparent(_) => ExportMode::Transparent,
     };
     let paths = AppPaths::from_repo_root(repo_root()?);
     paths.ensure_dirs().map_err(|e| e.to_string())?;

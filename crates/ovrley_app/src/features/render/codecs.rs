@@ -7,8 +7,8 @@
 
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, CompositeCodecId};
 use ovrley_core::encode::ffmpeg::detect::AvailableCodecs;
-use ovrley_core::encode::quality::{videotoolbox_display_quality, EncodingQuality};
-use ovrley_core::encode::render_settings::{H264_QUALITY_DEFAULT, HEVC_QUALITY_DEFAULT, QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
+use ovrley_core::encode::settings::{videotoolbox_display_quality, EncodingQuality};
+use ovrley_core::encode::settings::{H264_QUALITY_DEFAULT, HEVC_QUALITY_DEFAULT, QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
 
 /// The platform the accelerations are offered on, read once from the build target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

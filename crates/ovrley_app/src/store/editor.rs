@@ -2,7 +2,7 @@
 //! viewport and mute, the map view mode and the raster images.
 
 use std::rc::Rc;
-use ovrley_core::normalize::template::template_manifest;
+use ovrley_core::template::template_manifest;
 use ovrley_widgets::model::document::{convert_config_units, normalize_selection_ids, primary_selection_id, OverlayConfig, UnitSystem};
 use serde_json::Value;
 use crate::preferences::PreferencesStore;

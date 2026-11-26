@@ -1139,7 +1139,7 @@ mod tests {
                 kind: "backdrop".into(),
                 ..Default::default()
             },
-            &ovrley_core::normalize::template::template_manifest().globals,
+            &ovrley_core::template::template_manifest().globals,
             &Default::default(),
         )
         .unwrap();

@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 use std::sync::LazyLock;
-use ovrley_core::encode::fps::Fps;
+use ovrley_core::encode::timing::Fps;
 use regex::Regex;
 use crate::features::import::{review_commit_shared_offset, set_review_row_offset, set_review_transition_defaults};
 use crate::format::{format_seconds_clock, plain_number, round_decimals};

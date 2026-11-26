@@ -7,8 +7,8 @@
 use std::rc::Rc;
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::transition_defaults;
-use ovrley_core::encode::render_settings::RenderSettings;
-use ovrley_core::media::manual_video_sync::ManualVideoSync;
+use ovrley_core::encode::settings::RenderSettings;
+use ovrley_core::media::sync::ManualVideoSync;
 use ovrley_services::project::{ProjectDocument, ProjectVideo};
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};
@@ -245,7 +245,7 @@ pub fn apply_new_project(store: &mut Store) -> Result<(), String> {
 mod tests {
     use super::*;
     use crate::video::fixtures::{cut, cut_edits, simple};
-    use ovrley_core::media::video_edits::{AnchorSide, PlacementAnchor, SegmentEdits, VideoEdits};
+    use ovrley_core::media::edits::{AnchorSide, PlacementAnchor, SegmentEdits, VideoEdits};
     use ovrley_services::project::PathLocator;
 
     fn project_video(id: &str, edits: VideoEdits) -> ProjectVideo {

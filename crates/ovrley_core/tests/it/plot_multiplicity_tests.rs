@@ -1,4 +1,4 @@
-use ovrley_core::normalize::{RenderConfig, validate_render_config};
+use ovrley_core::config::{RenderConfig, validate_render_config};
 
 #[test]
 fn validation_preserves_multiple_route_and_elevation_plots() {
@@ -45,7 +45,7 @@ fn validation_preserves_multiple_route_and_elevation_plots() {
     }))
     .unwrap();
 
-    let validated = validate_render_config(raw).unwrap();
+    let validated = validate_render_config(raw, None).unwrap();
 
     assert_eq!(validated.course_plots.len(), 2);
     assert_eq!(validated.elevation_plots.len(), 2);

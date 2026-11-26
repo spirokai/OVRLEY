@@ -27,7 +27,7 @@ pub fn hud_template(root: &Path) -> Result<(Map<String, Value>, Map<String, Valu
             .cloned()
             .ok_or_else(|| format!("{}: {pointer} must be an object", path.display()))
     };
-    let mut globals = ovrley_core::normalize::template::template_manifest().globals.clone();
+    let mut globals = ovrley_core::template::template_manifest().globals.clone();
     globals.extend(field("/settings/globalDefaults")?);
     Ok((field("/config/scene")?, globals))
 }

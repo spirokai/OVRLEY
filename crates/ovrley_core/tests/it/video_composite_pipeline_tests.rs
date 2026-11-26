@@ -41,15 +41,15 @@ use std::process::Command;
 
 use ovrley_core::activity::validate_render_activity;
 use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::pipeline::diagnostics::{
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::encode::pipeline::process::{
     format_pipe_write_failure, is_pipe_write_error, verify_successful_output,
 };
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::normalize::validate_render_config;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::derive_composite_render_plan;
-use ovrley_core::render_jobs::planning::plan_single_render;
+use ovrley_core::config::validate_render_config;
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::derive_composite_render_plan;
+use ovrley_core::jobs::planning::plan_single_render;
 
 use common::composite::{
     assert_argument_pair, cancel_after_delay, composite_debug_timing_summary,
@@ -62,13 +62,14 @@ use common::composite::{
 
 #[test]
 fn planned_video_pipelines_encode_padding_and_display_rotation() {
-    use ovrley_core::output::{plan_batch_output_targets, RenderOutputKind};
-    use ovrley_core::render_jobs::contracts::BatchEncodingSettings;
-    use ovrley_core::render_jobs::inspection::VideoInspectionService;
+    use ovrley_core::encode::settings::ExportMode;
+    use ovrley_core::output::plan_batch_output_targets;
+    use ovrley_core::jobs::contracts::BatchEncodingSettings;
+    use ovrley_core::jobs::inspection::VideoInspectionService;
     use serde_json::json;
     let paths = test_paths_named("batch-window-pipelines");
     let ffmpeg =
-        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
+        ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
     let source = paths.temp_dir.join("landscape.mp4");
     let rotated = paths.temp_dir.join("portrait.mp4");
     let generated = Command::new(&ffmpeg)
@@ -156,25 +157,25 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
     template.scene.width = Some(32);
     template.scene.height = Some(64);
     for (mode, offset) in [
-        (ovrley_core::encode::render_settings::ExportMode::Transparent, -5.0),
-        (ovrley_core::encode::render_settings::ExportMode::Transparent, 110.0),
-        (ovrley_core::encode::render_settings::ExportMode::Composite, -5.0),
+        (ovrley_core::encode::settings::ExportMode::Transparent, -5.0),
+        (ovrley_core::encode::settings::ExportMode::Transparent, 110.0),
+        (ovrley_core::encode::settings::ExportMode::Composite, -5.0),
     ] {
         let encoding = BatchEncodingSettings {
             export_mode: mode,
-            export_codec: if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
+            export_codec: if mode == ovrley_core::encode::settings::ExportMode::Composite {
                 "libx264"
             } else {
                 "qtrle"
             }
             .into(),
             fps: 30,
-            update_rate: if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
+            update_rate: if mode == ovrley_core::encode::settings::ExportMode::Composite {
                 1
             } else {
                 2
             },
-            quality_type: ovrley_core::encode::quality::QualityType::Bitrate,
+            quality_type: ovrley_core::encode::settings::QualityType::Bitrate,
             quality_value: 1.0,
             qsv_full_init_args: None,
         };
@@ -189,21 +190,21 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
                 template.clone(),
                 activity.clone(),
                 offset,
-                mode == ovrley_core::encode::render_settings::ExportMode::Composite,
+                mode == ovrley_core::encode::settings::ExportMode::Composite,
             ),
         )
         .unwrap();
-        let kind = if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
-            RenderOutputKind::Composite
+        let kind = if mode == ovrley_core::encode::settings::ExportMode::Composite {
+            ExportMode::Composite
         } else {
-            RenderOutputKind::Transparent
+            ExportMode::Transparent
         };
         let target = plan_batch_output_targets(&paths.downloads_dir, kind, std::slice::from_ref(&rotated))
             .unwrap()
             .remove(0);
         let outcome = execution.render(&paths, plan, &activity, &target);
         outcome.unwrap();
-        let metadata = ovrley_core::media::video_probe::probe_video(
+        let metadata = ovrley_core::media::probe::probe_video(
             &paths.repo_root,
             target.path().to_str().unwrap(),
         )
@@ -218,13 +219,13 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
         assert!((metadata.duration.unwrap() - 20.0).abs() < 0.001);
         assert_eq!(
             metadata.fps,
-            Some(if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
+            Some(if mode == ovrley_core::encode::settings::ExportMode::Composite {
                 30.0
             } else {
                 15.0
             })
         );
-        if mode == ovrley_core::encode::render_settings::ExportMode::Transparent {
+        if mode == ovrley_core::encode::settings::ExportMode::Transparent {
             let (blank_second, covered_second) = if offset < 0.0 {
                 (0.0, 5.0)
             } else {
@@ -266,7 +267,7 @@ fn planned_video_pipelines_encode_padding_and_display_rotation() {
 /// Derives a plan from a 29.97 FPS source with 2x widget update rate and
 /// verifies output_fps matches source, overlay_pipe_fps is halved, and
 /// overlay/output frame counts are correct.
-fn test_4_3_derives_composite_shell_timing_without_rounding() {
+fn derives_composite_shell_timing_without_rounding() {
     let plan = derive_fixture_composite_plan(
         r#""width":3840,"height":2160,"ffmpeg":{"codec":"libx264"}"#,
         30000,
@@ -287,7 +288,7 @@ fn test_4_3_derives_composite_shell_timing_without_rounding() {
 fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.composite_video_path = Some("input.mp4".to_string());
-    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(-5.0);
     config.scene.composite_video_fps_num = Some(30);
@@ -297,7 +298,7 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
 
-    let mut shorter_activity_scene = validate_render_config(config.clone()).unwrap().scene;
+    let mut shorter_activity_scene = validate_render_config(config.clone(), None).unwrap().scene;
     let shorter_activity_plan =
         derive_composite_render_plan(&config.scene, &mut shorter_activity_scene, Some(10.0))
             .unwrap();
@@ -310,7 +311,7 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
     assert_eq!(shorter_activity_plan.overlay_frame_count, 900);
     assert_eq!(shorter_activity_plan.output_frame_count, 900);
 
-    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let mut scene = validate_render_config(config.clone(), None).unwrap().scene;
     let plan = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap();
 
     assert_eq!(scene.start, 0.0);
@@ -326,7 +327,7 @@ fn negative_sync_plan_keeps_full_video_output_and_limits_activity_overlap() {
 fn composite_plan_outside_the_activity_keeps_the_full_video_with_no_covered_frames() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.composite_video_path = Some("input.mp4".to_string());
-    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     config.scene.quality_value = Some(20.0);
     config.scene.composite_video_fps_num = Some(30);
     config.scene.composite_video_fps_den = Some(1);
@@ -338,7 +339,7 @@ fn composite_plan_outside_the_activity_keeps_the_full_video_with_no_covered_fram
     // Ending exactly at the activity start, and starting after its end.
     for offset in [-30.0, 40.0] {
         config.scene.composite_sync_offset = Some(offset);
-        let mut scene = validate_render_config(config.clone()).unwrap().scene;
+        let mut scene = validate_render_config(config.clone(), None).unwrap().scene;
         let plan = derive_composite_render_plan(&config.scene, &mut scene, Some(25.0)).unwrap();
 
         assert_eq!((scene.start, scene.end), (0.0, 25.0), "offset {offset}");
@@ -352,7 +353,7 @@ fn composite_plan_outside_the_activity_keeps_the_full_video_with_no_covered_fram
 #[test]
 /// After deriving a plan, verifies the FFmpeg settings embedded in the plan
 /// have correct FPS args, codec/bitrate args, and filter graph labels.
-fn test_4_4_builds_ffmpeg_settings_inside_composite_shell() {
+fn builds_ffmpeg_settings_inside_composite_shell() {
     let plan = derive_fixture_composite_plan(
         r#""width":3840,"height":2160,"ffmpeg":{"codec":"libx264"}"#,
         30000,
@@ -410,7 +411,7 @@ fn composite_shell_uses_provided_codec_for_mp4_output() {
 /// resolution. Verifies output file exists and is non-empty.
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_5_1_basic_software_h264_composite_creates_mp4() {
+fn basic_software_h264_composite_creates_mp4() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
 
@@ -423,7 +424,7 @@ fn test_5_1_basic_software_h264_composite_creates_mp4() {
 /// or avg_frame_rate.
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_5_2_preserves_29_97_output_fps() {
+fn preserves_29_97_output_fps() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 30000, 1001, 0.2, 1, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
@@ -436,7 +437,7 @@ fn test_5_2_preserves_29_97_output_fps() {
 /// container reports 60000/1001 (not a rounded 60/1).
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_5_3_preserves_59_94_output_fps_when_requested() {
+fn preserves_59_94_output_fps_when_requested() {
     let result = render_fixture_composite(
         "tmp/test-1080p.mp4",
         60000,
@@ -457,7 +458,7 @@ fn test_5_3_preserves_59_94_output_fps_when_requested() {
 /// (6 overlay frames halved in pipe). Verifies progress matches.
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
+fn lower_overlay_update_rate_renders_half_overlay_frames() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.2, 2, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
@@ -471,7 +472,7 @@ fn test_5_4_lower_overlay_update_rate_renders_half_overlay_frames() {
 /// stays at 59.94 FPS. Progress still reports output frame count (12).
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
+fn aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
     let result =
         render_fixture_composite("tmp/test-1080p.mp4", 60000, 1001, 0.2, 6, 600.0, 3840, 2160);
     let fps = ffprobe_video_rates(&result.output_path);
@@ -485,10 +486,10 @@ fn test_5_5_aggressive_overlay_update_rate_renders_one_sixth_overlay_frames() {
 /// an ffmpeg `-ss` seek argument on the video input. Verifies the video
 /// input uses trim-based seeking and the filter graph uses `trim=start=0`.
 #[test]
-fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
+fn sync_offset_is_not_ffmpeg_seek() {
     let mut config = mutable_recent_template_config(3840, 2160);
     config.scene.composite_video_path = Some("tmp/test-1080p.mp4".to_string());
-    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(0.0);
     config.scene.composite_video_fps_num = Some(30000);
@@ -498,12 +499,12 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
     config.scene.composite_video_trim_start = Some(0.0);
     config.scene.composite_widget_update_rate = Some(1);
     let paths = test_paths();
-    let mut scene = validate_render_config(config.clone()).unwrap().scene;
+    let mut scene = validate_render_config(config.clone(), None).unwrap().scene;
     let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
     let output_target = custom_output_target(
         &paths,
         "plan",
-        ovrley_core::output::RenderOutputKind::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
     );
     let size = ovrley_core::render::FrameSize {
         width: scene.presentation.width,
@@ -545,7 +546,7 @@ fn test_5_6_sync_offset_is_not_ffmpeg_seek() {
 /// the last written frame's timestamp is before duration and the first
 /// rejected frame's timestamp is at or after duration.
 #[test]
-fn test_5_7_fractional_duration_uses_overrun_guard() {
+fn fractional_duration_uses_overrun_guard() {
     let plan = derive_fixture_composite_plan(
         r#""width":3840,"height":2160,"ffmpeg":{"codec":"libx264"}"#,
         30000,
@@ -568,7 +569,7 @@ fn test_5_7_fractional_duration_uses_overrun_guard() {
 /// output with AAC audio copy (the probe should report codec_name=aac).
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_5_8_video_with_audio_copies_audio_track() {
+fn video_with_audio_copies_audio_track() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
     let audio = ffprobe_audio_codecs(&result.output_path);
 
@@ -588,7 +589,7 @@ fn test_5_8_video_with_audio_copies_audio_track() {
 /// not containing "cancelled".
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
+fn cancel_mid_render_stops_and_cleans_partial_output() {
     let paths = test_paths_named("phase6_cancel");
     let before = composited_outputs(&paths);
     let controller = RenderController::default();
@@ -618,7 +619,7 @@ fn test_6_1_cancel_mid_render_stops_and_cleans_partial_output() {
 /// After a successful composite render, progress must show `current ==
 /// total == encoded` and the total must match the expected output frame count.
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_6_2_progress_reaches_completion_on_success() {
+fn progress_reaches_completion_on_success() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
     let progress = result.controller.progress();
 
@@ -631,7 +632,7 @@ fn test_6_2_progress_reaches_completion_on_success() {
 /// at 6x update rate, 60 output frames = 10 overlays, and each overlay
 /// tick advances progress by 6.
 #[test]
-fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
+fn progress_uses_output_frames_with_lower_overlay_fps() {
     let plan = derive_fixture_composite_plan(
         r#""width":1920,"height":1080,"ffmpeg":{"codec":"libx264"}"#,
         60000,
@@ -653,7 +654,7 @@ fn test_6_3_progress_uses_output_frames_with_lower_overlay_fps() {
 /// Rejects unknown codecs at config ingress instead of passing malformed
 /// state through to FFmpeg as a custom encoder name.
 #[test]
-fn test_6_4_unknown_codec_fails_at_ingress() {
+fn unknown_codec_fails_at_ingress() {
     let mut config = mutable_recent_template_config(1920, 1080);
     config.scene.ffmpeg = serde_json::json!({"codec": "definitely_not_a_codec"});
 
@@ -676,7 +677,7 @@ fn test_6_4_unknown_codec_fails_at_ingress() {
 ///
 /// Regressions guarded: pipe-write errors producing empty or misleading
 /// messages, missing filter graph in crash diagnostics.
-fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
+fn broken_pipe_error_includes_ffmpeg_exit_context() {
     let status = Command::new(if cfg!(windows) { "cmd" } else { "false" })
         .args(if cfg!(windows) {
             vec!["/C", "exit", "1"]
@@ -717,7 +718,7 @@ fn test_6_5_broken_pipe_error_includes_ffmpeg_exit_context() {
 /// real rendered composite MP4.
 #[test]
 #[ignore = "requires video fixture tests/fixtures/video/test-1080p.mp4"]
-fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
+fn output_file_exists_and_is_nonzero_on_success() {
     let result = render_fixture_composite("tmp/test-1080p.mp4", 30, 1, 0.2, 1, 600.0, 1920, 1080);
 
     assert!(result.output_path.is_file());
@@ -728,7 +729,7 @@ fn test_6_6_output_file_exists_and_is_nonzero_on_success() {
 /// After writing a fixture debug summary, the timing summary JSON file must
 /// exist on disk under the expected path.
 #[test]
-fn test_7_1_timing_summary_exists() {
+fn timing_summary_exists() {
     let paths = write_fixture_composite_debug_summary("composite_debug_summary_exists");
 
     assert!(composite_debug_timing_summary_path(&paths).is_file());
@@ -737,11 +738,11 @@ fn test_7_1_timing_summary_exists() {
 /// The debug timing summary must record `phase: "composite"` and
 /// `mode: "mp4_composite"` so downstream tooling can distinguish render types.
 #[test]
-fn test_7_2_phase_marker_is_correct() {
+fn export_marker_is_correct() {
     let paths = write_fixture_composite_debug_summary("composite_debug_phase_marker");
     let summary = composite_debug_timing_summary(&paths);
 
-    assert_eq!(summary["phase"], "composite");
+    assert_eq!(summary["export"], "composite");
     assert_eq!(summary["mode"], "mp4_composite");
 }
 
@@ -749,7 +750,7 @@ fn test_7_2_phase_marker_is_correct() {
 /// ("60000/1001") not as floats. The decoded `fps` and `layout_fps` must
 /// match the expected NTSC-approximate values.
 #[test]
-fn test_7_3_fps_values_are_recorded_as_rationals() {
+fn fps_values_are_recorded_as_rationals() {
     let paths = write_fixture_composite_debug_summary("composite_debug_rational_fps");
     let summary = composite_debug_timing_summary(&paths);
 
@@ -763,7 +764,7 @@ fn test_7_3_fps_values_are_recorded_as_rationals() {
 /// The debug summary records `rendered_frames`, `layout_total_frames`,
 /// and `total_frames` so tests can verify overlay/output frame ratio.
 #[test]
-fn test_7_4_frame_counts_are_recorded() {
+fn frame_counts_are_recorded() {
     let paths = write_fixture_composite_debug_summary("composite_debug_frame_counts");
     let summary = composite_debug_timing_summary(&paths);
 
@@ -777,7 +778,7 @@ fn test_7_4_frame_counts_are_recorded() {
 /// verifies the `composite.widget_update_rate` timing key is not emitted
 /// (it's a plan-level constant, not a per-frame measurement).
 #[test]
-fn test_7_5_total_wall_time_is_recorded() {
+fn total_wall_time_is_recorded() {
     let paths = write_fixture_composite_debug_summary("composite_debug_total_wall_time");
     let summary = composite_debug_timing_summary(&paths);
 
@@ -817,7 +818,7 @@ fn test_7_5_total_wall_time_is_recorded() {
 /// never seen a composite render — the debug output is only created by
 /// composite rendering, never by transparent renders.
 #[test]
-fn test_7_6_composite_debug_output_is_only_created_by_composite_render() {
+fn composite_debug_output_is_only_created_by_composite_render() {
     let paths = test_paths_named("composite_debug_transparent_unaffected");
 
     assert!(!paths.debug_render_dir.join("composite").exists());
@@ -866,7 +867,7 @@ fn test_frame_workers_render_short_composite_in_order() {
     let output_target = custom_output_target(
         &paths,
         "parallel",
-        ovrley_core::output::RenderOutputKind::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
     );
     let outcome = execution.render(&paths, plan, &activity, &output_target);
     let filename = outcome.unwrap();
@@ -917,7 +918,7 @@ fn test_frame_worker_composite_render() {
     let output_target = custom_output_target(
         &paths,
         "parallel-2",
-        ovrley_core::output::RenderOutputKind::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
     );
     let result = execution.render(&paths, plan, &activity, &output_target);
     assert!(result.is_ok(), "Failed: {:?}", result);
@@ -955,7 +956,7 @@ fn test_frame_worker_composite_render_with_audio() {
     let output_target = custom_output_target(
         &paths,
         "parallel-audio",
-        ovrley_core::output::RenderOutputKind::Composite,
+        ovrley_core::encode::settings::ExportMode::Composite,
     );
     let result = execution.render(&paths, plan, &activity, &output_target);
     assert!(result.is_ok(), "Failed: {:?}", result);

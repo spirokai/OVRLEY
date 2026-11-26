@@ -1,4 +1,4 @@
-//! The native editor preview's streamed map frames (phase 5 D9): the widget never waits for a
+//! The editor preview's streamed map frames: the widget never waits for a
 //! frame, keeps the last one on show until the next arrives, asks for one frame at a time, asks
 //! again once the renderer is rebuilt, and shows its placeholder for a frame that failed.
 use ovrley_core::fonts::NativeFonts;

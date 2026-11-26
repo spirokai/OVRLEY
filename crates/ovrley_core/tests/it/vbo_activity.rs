@@ -1,4 +1,4 @@
-use ovrley_core::activity::vbo::{parse_vbo_activity_path, parse_vbo_activity_reader};
+use ovrley_core::import::vbo::{parse_path, parse_reader};
 use ovrley_core::paths::AppPaths;
 use std::io::Cursor;
 
@@ -11,9 +11,8 @@ time lat long velocity heading height vert-vel\n\
 120000.500 2820.600 -4920.600 72 181 101 2.0\n\
 120001.500 2821.200 -4921.200 90 182 102 2.5\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "session.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "session.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.file_name.as_deref(), Some("session.vbo"));
     assert_eq!(activity.file_format.as_deref(), Some("vbo"));
@@ -40,9 +39,8 @@ velocity kmh\n\
 12 000000.000 2820.1 -4920.1 37\n\
 12 000000.500 2820.2 -4920.2 38\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "rollover.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "rollover.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 0.5, 1.0]);
     assert_eq!(
@@ -69,9 +67,8 @@ time elapsed_time speed_mph\n\
 120000.000 5.00 10\n\
 120001.000 6.25 20\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "dual-time.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "dual-time.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.25]);
     assert_eq!(
@@ -87,16 +84,14 @@ time elapsed_time speed_mph\n\
 #[test]
 fn vbo_reader_accepts_elapsed_or_unix_timestamp_as_the_timeline() {
     let elapsed = "[column names]\nelapsed_time velocity\n[data]\n50 36\n51.5 72\n";
-    let activity = parse_vbo_activity_reader(Cursor::new(elapsed), "elapsed.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(elapsed), "elapsed.vbo", None)
+        .unwrap();
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.5]);
     assert!(activity.time.iter().all(Option::is_none));
 
     let timestamp = "[column names]\ntimestamp velocity\n[data]\n1700000000 36\n1700000001.25 72\n";
-    let activity = parse_vbo_activity_reader(Cursor::new(timestamp), "timestamp.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(timestamp), "timestamp.vbo", None)
+        .unwrap();
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.25]);
     assert_eq!(
         activity.time,
@@ -118,9 +113,8 @@ velocity kmh\n\
 120000 2820 -4920 36\n\
 120001 2821 -4921 72\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "header-only.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "header-only.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0]);
     assert_eq!(activity.course[0], (Some(47.0), Some(82.0)));
@@ -135,9 +129,8 @@ fn vbo_reader_maps_supported_racechrono_custom_channels() {
 120000 2820 -4920 0.3 0.4 0.7 0.1 3 4200 55 20 65 -12.5\n\
 120001 2821 -4921 0.6 0.8 1.1 0.2 4 4300 60 25 70 8.0\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "racechrono.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "racechrono.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.g_force_x, vec![Some(0.3), Some(0.6)]);
     assert_eq!(activity.g_force_y, vec![Some(0.4), Some(0.8)]);
@@ -171,9 +164,8 @@ time rc-latitude-1-gps rc_longitude_1_gps speed-2-canbus bearing-calc altitude-g
 120000 2820 4920 10 180 100 36 500\n\
 120001 2821 4921 20 181 101 72 510\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "aliases.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "aliases.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.course[0], (Some(47.0), Some(-82.0)));
     assert_eq!(activity.speed, vec![Some(4.4704), Some(8.9408)]);
@@ -191,9 +183,8 @@ time velocity speed_1-canbus latacc-calc lateral_acc_1-canbus\n\
 120000 36 72 1 2\n\
 120001 54 90 3 4\n";
 
-    let activity = parse_vbo_activity_reader(Cursor::new(vbo), "priority.vbo", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(Cursor::new(vbo), "priority.vbo", None)
+        .unwrap();
 
     assert_eq!(activity.speed, vec![Some(10.0), Some(15.0)]);
     assert_eq!(activity.g_force_x, vec![Some(2.0), Some(4.0)]);
@@ -202,31 +193,31 @@ time velocity speed_1-canbus latacc-calc lateral_acc_1-canbus\n\
 #[test]
 fn vbo_reader_rejects_malformed_present_data_and_timeline_repairs() {
     let bad_number = "[column names]\ntime velocity\n[data]\n120000 10\n120001 nope\n";
-    let error = parse_vbo_activity_reader(Cursor::new(bad_number), "bad-number.vbo", None)
+    let error = parse_reader(Cursor::new(bad_number), "bad-number.vbo", None)
         .unwrap_err()
         .to_string();
     assert!(error.contains("VBO line 5 contains invalid numeric value 'nope'"));
 
     let bad_width = "[column names]\ntime velocity\n[data]\n120000 10\n120001\n";
-    let error = parse_vbo_activity_reader(Cursor::new(bad_width), "bad-width.vbo", None)
+    let error = parse_reader(Cursor::new(bad_width), "bad-width.vbo", None)
         .unwrap_err()
         .to_string();
     assert!(error.contains("has 1 values but the column layout declares 2"));
 
     let decreasing = "[column names]\ntime velocity\n[data]\n120000 10\n115959 11\n";
-    let error = parse_vbo_activity_reader(Cursor::new(decreasing), "decreasing.vbo", None)
+    let error = parse_reader(Cursor::new(decreasing), "decreasing.vbo", None)
         .unwrap_err()
         .to_string();
     assert!(error.contains("time must be strictly increasing"));
 
     let no_time = "[column names]\nvelocity\n[data]\n10\n11\n";
-    let error = parse_vbo_activity_reader(Cursor::new(no_time), "no-time.vbo", None)
+    let error = parse_reader(Cursor::new(no_time), "no-time.vbo", None)
         .unwrap_err()
         .to_string();
     assert!(error.contains("has no time, timestamp, or elapsed_time column"));
 
     let misaligned_header = "[header]\ntime\nvelocity kmh\n[column names]\ntime velocity heading\n[data]\n120000 10 90\n120001 11 91\n";
-    let error = parse_vbo_activity_reader(
+    let error = parse_reader(
         Cursor::new(misaligned_header),
         "misaligned-header.vbo",
         None,
@@ -237,7 +228,7 @@ fn vbo_reader_rejects_malformed_present_data_and_timeline_repairs() {
 
     let conflicting_names =
         "[header]\ntime\nspeed kmh\n[column names]\ntime rpm\n[data]\n120000 10\n120001 11\n";
-    let error = parse_vbo_activity_reader(
+    let error = parse_reader(
         Cursor::new(conflicting_names),
         "conflicting-names.vbo",
         None,
@@ -247,7 +238,7 @@ fn vbo_reader_rejects_malformed_present_data_and_timeline_repairs() {
     assert!(error.contains("resolves to conflicting metrics speed and rpm"));
 
     let decreasing_distance = "[column names]\ntime distance\n[data]\n120000 100\n120001 99\n";
-    let error = parse_vbo_activity_reader(
+    let error = parse_reader(
         Cursor::new(decreasing_distance),
         "decreasing-distance.vbo",
         None,
@@ -259,7 +250,7 @@ fn vbo_reader_rejects_malformed_present_data_and_timeline_repairs() {
     let invalid_creation_date =
         "File created on nonsense\n[column names]\ntime velocity\n[data]\n120000 10\n120001 11\n";
     let error =
-        parse_vbo_activity_reader(Cursor::new(invalid_creation_date), "bad-created.vbo", None)
+        parse_reader(Cursor::new(invalid_creation_date), "bad-created.vbo", None)
             .unwrap_err()
             .to_string();
     assert!(error.contains("invalid file creation timestamp"));
@@ -268,7 +259,7 @@ fn vbo_reader_rejects_malformed_present_data_and_timeline_repairs() {
         b'[', b'c', b'o', b'l', b'u', b'm', b'n', b' ', b'n', b'a', b'm', b'e', b's', b']', b'\n',
         0xff,
     ];
-    let error = parse_vbo_activity_reader(Cursor::new(invalid_utf8), "bad-encoding.vbo", None)
+    let error = parse_reader(Cursor::new(invalid_utf8), "bad-encoding.vbo", None)
         .unwrap_err()
         .to_string();
     assert!(error.contains("not valid UTF-8"));
@@ -278,9 +269,8 @@ fn vbo_reader_rejects_malformed_present_data_and_timeline_repairs() {
 fn racechrono_vbo_fixture_resolves_standard_and_suffixed_channels() {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity/VBO-test.vbo");
-    let activity = parse_vbo_activity_path(&fixture, None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_path(&fixture, None)
+        .unwrap();
 
     assert_eq!(activity.file_format.as_deref(), Some("vbo"));
     assert_close(activity.course[0].0, 1_141.673_250 / 60.0);
@@ -309,20 +299,20 @@ fn vbo_path_and_command_use_the_native_columnar_pipeline() {
     )
     .unwrap();
 
-    let response = parse_vbo_activity_path(&fixture, None).unwrap();
-    assert_eq!(response.parsed_activity.file_format.as_deref(), Some("vbo"));
-    assert_eq!(response.parsed_activity.sample_elapsed_seconds[0], 0.0);
-    assert_eq!(response.parsed_activity.course[0].0, Some(47.0));
-    assert_eq!(response.parsed_activity.speed[0], Some(10.0));
-    assert_eq!(response.parsed_activity.elevation[0], Some(100.0));
+    let response = parse_path(&fixture, None).unwrap();
+    assert_eq!(response.file_format.as_deref(), Some("vbo"));
+    assert_eq!(response.sample_elapsed_seconds[0], 0.0);
+    assert_eq!(response.course[0].0, Some(47.0));
+    assert_eq!(response.speed[0], Some(10.0));
+    assert_eq!(response.elevation[0], Some(100.0));
 
     let paths = AppPaths::from_repo_root(debug_root.clone());
-    let response = parse_vbo_activity_path(&fixture, Some(&paths.repo_root)).unwrap();
+    let response = parse_path(&fixture, Some(&paths.repo_root)).unwrap();
     assert_eq!(
-        response.parsed_activity.file_name.as_deref(),
+        response.file_name.as_deref(),
         fixture.file_name().unwrap().to_str()
     );
-    assert_eq!(response.parsed_activity.file_format.as_deref(), Some("vbo"));
+    assert_eq!(response.file_format.as_deref(), Some("vbo"));
     assert!(debug_root
         .join("debug/activities/command-test-parse-debug.json")
         .is_file());

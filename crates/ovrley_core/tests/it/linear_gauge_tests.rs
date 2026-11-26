@@ -1,8 +1,8 @@
 use crate::common;
 
 use ovrley_core::activity::schema::DenseActivityReport;
-use ovrley_core::normalize::RenderConfig;
-use ovrley_core::normalize::validate_render_config;
+use ovrley_core::config::RenderConfig;
+use ovrley_core::config::validate_render_config;
 use ovrley_widgets::widgets::gauges::linear::LinearOrientation;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::linear::{bar_fill_rect, bordered_bar_fill_rect};
@@ -73,7 +73,7 @@ fn rejects_starting_altitude_on_non_altitude_linear_gauge() {
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    });
+    }, None);
 
     let error = match result {
         Ok(_) => panic!("starting_altitude must be rejected for speed gauges"),
@@ -142,7 +142,7 @@ fn linear_gauge_samples_fill_across_the_activity_range() {
         values: vec![serde_json::from_value(full_linear_gauge_config(20, 30)).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    })
+    }, None)
     .unwrap();
     let paths = test_paths();
     let dense = dense_speed_activity(vec![Some(10.0), Some(30.0), Some(50.0)]);
@@ -165,7 +165,7 @@ fn bars_style_resolves_configured_linear_geometry_into_the_cache() {
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    })
+    }, None)
     .unwrap();
     let paths = test_paths();
     let dense = dense_speed_activity(vec![Some(0.0), Some(100.0)]);

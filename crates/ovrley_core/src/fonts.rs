@@ -92,7 +92,6 @@ pub struct FontCatalog {
 struct LoadedFace {
     metadata: FontFace,
     typeface: Typeface,
-    data: Option<Vec<u8>>,
 }
 
 struct LoadedFamily {
@@ -264,7 +263,6 @@ fn discover_bundled(font_dirs: &[PathBuf]) -> CoreResult<Vec<LoadedFamily>> {
         loaded.faces.push(LoadedFace {
             metadata: face,
             typeface,
-            data: Some(bytes),
         });
     }
     Ok(families.into_values().collect())
@@ -332,7 +330,6 @@ fn loaded_family(font_dirs: &[PathBuf], id: &str) -> CoreResult<Arc<LoadedFamily
         faces.push(LoadedFace {
             metadata: describe_face(&typeface, None),
             typeface,
-            data: None,
         });
     }
     if faces.is_empty() {
@@ -370,83 +367,8 @@ pub fn font_capabilities(font_dirs: &[PathBuf], id: &str) -> CoreResult<FontFami
     Ok(loaded_family(font_dirs, id)?.capabilities())
 }
 
-/// Returns the bytes Skia loaded for one face. Bundled faces return their
-/// asset bytes; system faces are rebuilt as a standalone sfnt from Skia's
-/// tables, which also extracts a single face from a `.ttc` collection.
-pub fn face_data(font_dirs: &[PathBuf], id: &str, index: usize) -> CoreResult<Vec<u8>> {
-    let loaded = loaded_family(font_dirs, id)?;
-    let face = loaded
-        .faces
-        .get(index)
-        .ok_or_else(|| CoreError::Config(format!("{id} has no face {index}")))?;
-    match &face.data {
-        Some(data) => Ok(data.clone()),
-        None => sfnt_from_tables(&face.typeface)
-            .ok_or_else(|| CoreError::Config(format!("unable to read font tables for {id} face {index}"))),
-    }
-}
-
-fn sfnt_checksum(bytes: &[u8]) -> u32 {
-    bytes.chunks(4).fold(0u32, |sum, chunk| {
-        let mut word = [0u8; 4];
-        word[..chunk.len()].copy_from_slice(chunk);
-        sum.wrapping_add(u32::from_be_bytes(word))
-    })
-}
-
-fn sfnt_from_tables(typeface: &Typeface) -> Option<Vec<u8>> {
-    let mut tags = typeface.read_table_tags()?;
-    tags.sort_unstable();
-    let tables = tags
-        .iter()
-        .map(|tag| Some((*tag, typeface.copy_table_data(*tag)?)))
-        .collect::<Option<Vec<_>>>()?;
-    let count = tables.len();
-    if count == 0 {
-        return None;
-    }
-    let is_cff = tags
-        .iter()
-        .any(|tag| *tag == u32::from_be_bytes(*b"CFF ") || *tag == u32::from_be_bytes(*b"CFF2"));
-    let entry_selector = count.ilog2() as u16;
-    let search_range = (1u16 << entry_selector) * 16;
-    let mut out = Vec::new();
-    out.extend_from_slice(if is_cff { b"OTTO" } else { &[0, 1, 0, 0] });
-    out.extend_from_slice(&(count as u16).to_be_bytes());
-    out.extend_from_slice(&search_range.to_be_bytes());
-    out.extend_from_slice(&entry_selector.to_be_bytes());
-    out.extend_from_slice(&((count as u16) * 16 - search_range).to_be_bytes());
-    let mut offset = 12 + 16 * count;
-    let mut head_offset = None;
-    for (tag, data) in &tables {
-        let mut bytes = data.as_bytes().to_vec();
-        if *tag == u32::from_be_bytes(*b"head") && bytes.len() >= 12 {
-            bytes[8..12].fill(0);
-            head_offset = Some(offset);
-        }
-        out.extend_from_slice(&tag.to_be_bytes());
-        out.extend_from_slice(&sfnt_checksum(&bytes).to_be_bytes());
-        out.extend_from_slice(&(offset as u32).to_be_bytes());
-        out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
-        offset += bytes.len().next_multiple_of(4);
-    }
-    for (tag, data) in &tables {
-        let start = out.len();
-        out.extend_from_slice(data.as_bytes());
-        if *tag == u32::from_be_bytes(*b"head") && data.len() >= 12 {
-            out[start + 8..start + 12].fill(0);
-        }
-        out.resize(out.len().next_multiple_of(4), 0);
-    }
-    if let Some(head) = head_offset {
-        let adjustment = 0xB1B0_AFBAu32.wrapping_sub(sfnt_checksum(&out));
-        out[head + 8..head + 12].copy_from_slice(&adjustment.to_be_bytes());
-    }
-    Some(out)
-}
-
-// CSS Fonts 4 weight matching. Browser and Rust use this policy for static
-// faces and weights outside a variable face's range; no synthetic bolding.
+// CSS Fonts 4 weight matching, for static faces and weights outside a variable face's range;
+// no synthetic bolding.
 fn weight_rank(requested: f32, candidate: f32) -> (u8, f32) {
     if requested < 400.0 {
         if candidate <= requested {
@@ -541,7 +463,7 @@ pub fn weight_control(family: &FontFamily, weight: f32, italic: bool) -> CoreRes
     Ok(WeightControl { axis, weight })
 }
 
-/// `createLabelFontSelection`'s style: the italic a label keeps in this family and the weight it
+/// The style of a label's font selection: the italic a label keeps in this family and the weight it
 /// resolves to.
 pub fn label_font_style(family: &FontFamily, weight: f32, italic: bool) -> CoreResult<(bool, f32)> {
     let italic = italic && family_supports_italic(family)?;

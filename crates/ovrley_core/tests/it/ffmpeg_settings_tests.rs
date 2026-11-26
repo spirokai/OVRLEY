@@ -15,8 +15,8 @@
 //! - Unknown codecs panicking instead of returning errors
 //! - Custom container overrides ignored
 
-use ovrley_core::encode::ffmpeg::settings::{build_ffmpeg_settings, FfmpegSettings};
-use ovrley_core::encode::ffmpeg::transparent_profiles::PRORES_KS_VULKAN_FILTER;
+use ovrley_core::encode::ffmpeg::transparent::{build_ffmpeg_settings, FfmpegSettings};
+use ovrley_core::encode::ffmpeg::profiles::PRORES_KS_VULKAN_FILTER;
 use ovrley_core::error::CoreResult;
 use serde_json::{json, Value};
 

@@ -24,8 +24,8 @@
 
 use super::{
     atlas::{AtlasPlan, SlotPlacement},
-    map_export::{ExportMapJob, ExportMaps},
-    surface::wrap_native_surface,
+    maps::{ExportMapJob, ExportMaps},
+    wrap_native_surface,
     FrameSize,
 };
 use crate::{
@@ -33,10 +33,10 @@ use crate::{
         schema::{DenseActivityReport, ParsedActivity},
         splits::derive_split_table,
     },
-    debug::RenderProfiler,
+    diagnostics::RenderProfiler,
     error::{CoreError, CoreResult},
     fonts::NativeFonts,
-    normalize::{RasterSource, ValidatedRaster, ValidatedRenderConfig},
+    config::{RasterSource, ValidatedRaster, ValidatedRenderConfig},
     raster::load_selected_raster,
 };
 use ovrley_widgets::activity::ActivitySampler;
@@ -111,6 +111,7 @@ impl PreparedAtlas {
 }
 
 impl<'a> ExportWidgets<'a> {
+    #[expect(clippy::too_many_arguments, reason = "each argument is a separate export input")]
     pub fn prepare(
         font_dirs: &'a [PathBuf],
         config: &'a ValidatedRenderConfig,

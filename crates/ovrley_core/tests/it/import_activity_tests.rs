@@ -1,6 +1,6 @@
-//! `import_activity_path`: the one activity import entry (Phase 3, D4).
+//! `load_activity`: the one activity import entry.
 
-use ovrley_core::activity::{import_activity_path, ACTIVITY_EXTENSIONS};
+use ovrley_core::import::{load_activity, ACTIVITY_EXTENSIONS};
 use ovrley_core::paths::AppPaths;
 use std::path::{Path, PathBuf};
 
@@ -57,7 +57,7 @@ fn sample(dir: &Path, extension: &str, upper: bool) -> String {
 }
 
 #[test]
-fn every_extension_imports_in_both_cases_without_a_debug_payload() {
+fn every_extension_imports_in_both_cases() {
     let dir = std::env::temp_dir().join(format!("ovrley-import-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&dir);
     for upper in [false, true] {
@@ -67,11 +67,10 @@ fn every_extension_imports_in_both_cases_without_a_debug_payload() {
                 .join(extension);
             std::fs::create_dir_all(&case_dir).unwrap();
             let path = sample(&case_dir, extension, upper);
-            let response = import_activity_path(&paths(), &path)
+            let activity = load_activity(&paths(), Path::new(&path))
                 .unwrap_or_else(|error| panic!("{path}: {error}"));
-            assert!(response.debug_payload.is_none(), "{path}");
             assert!(
-                !response.parsed_activity.sample_elapsed_seconds.is_empty(),
+                !activity.sample_elapsed_seconds.is_empty(),
                 "{path}"
             );
         }
@@ -81,7 +80,7 @@ fn every_extension_imports_in_both_cases_without_a_debug_payload() {
 
 #[test]
 fn an_unsupported_extension_fails_with_the_file_name() {
-    let error = import_activity_path(&paths(), "/a/notes.txt").unwrap_err();
+    let error = load_activity(&paths(), Path::new("/a/notes.txt")).unwrap_err();
     assert!(
         error
             .to_string()
@@ -92,7 +91,7 @@ fn an_unsupported_extension_fails_with_the_file_name() {
 
 #[test]
 fn a_path_without_a_file_name_fails() {
-    let error = import_activity_path(&paths(), "/a/").unwrap_err();
+    let error = load_activity(&paths(), Path::new("/a/")).unwrap_err();
     assert!(
         error.to_string().contains("Invalid activity path: /a/"),
         "{error}"

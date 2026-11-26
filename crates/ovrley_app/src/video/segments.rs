@@ -1,6 +1,6 @@
 //! The segments of a clip, and where cuts and trims can go.
 
-use ovrley_core::media::video_edits::{FIRST_SEGMENT_KEY, SegmentEdits, VideoEdits};
+use ovrley_core::media::edits::{FIRST_SEGMENT_KEY, SegmentEdits, VideoEdits};
 use crate::video::Clip;
 
 /// One segment of a clip in source order.

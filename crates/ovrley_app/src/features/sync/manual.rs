@@ -6,7 +6,7 @@
 //! edits it moves.
 
 use std::sync::Arc;
-use ovrley_core::media::manual_video_sync::{Landmark, LandmarkKind, MAX_MANUAL_LANDMARKS, MAX_MANUAL_LOCATION_LANDMARKS, MAX_MANUAL_SPEED_THRESHOLD_KMH, MAX_MANUAL_TURN_THRESHOLD_DEGREES, MIN_MANUAL_SPEED_THRESHOLD_KMH, MIN_MANUAL_TURN_THRESHOLD_DEGREES, ManualVideoSync};
+use ovrley_core::media::sync::{Landmark, LandmarkKind, MAX_MANUAL_LANDMARKS, MAX_MANUAL_LOCATION_LANDMARKS, MAX_MANUAL_SPEED_THRESHOLD_KMH, MAX_MANUAL_TURN_THRESHOLD_DEGREES, MIN_MANUAL_SPEED_THRESHOLD_KMH, MIN_MANUAL_TURN_THRESHOLD_DEGREES, ManualVideoSync};
 use crate::features::sync::detection::{Detection, LocationEvent};
 use crate::features::sync::matching::{Candidate, MatchScope};
 use crate::store::Store;

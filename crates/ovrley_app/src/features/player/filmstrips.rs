@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use ovrley_core::encode::ffmpeg::detect::AvailableCodecs;
-use ovrley_core::media::video_edits::VideoResolution;
+use ovrley_core::media::edits::VideoResolution;
 use ovrley_services::video::{base_spacing_seconds, zoom_spacing_seconds, FINEST_SPACING_SECONDS, FRAMES_PER_STRIP, Filmstrip, FilmstripHwaccel, FilmstripRequest, FilmstripWindow};
 use crate::store::Store;
 use crate::store::services::Services;
@@ -553,7 +553,7 @@ mod tests {
     fn long_clip(offset: f64, path: &'static str, missing: bool) -> Clip {
         let mut video = video(TestVideo { id: "long", path, duration_seconds: 7200.0, ..TestVideo::default() });
         video.missing = missing;
-        clip(video, ovrley_core::media::video_edits::VideoEdits { offset_seconds: offset, ..Default::default() })
+        clip(video, ovrley_core::media::edits::VideoEdits { offset_seconds: offset, ..Default::default() })
     }
 
     #[test]

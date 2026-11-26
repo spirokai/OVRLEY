@@ -1,50 +1,60 @@
 //! Shared video preparation and encoding, with one supervised native pipeline.
 
-#[cfg(test)]
-mod atlas_export_tests;
-pub(crate) mod assemble;
-mod buffers;
-#[doc(hidden)]
-pub mod diagnostics;
-mod frames;
-mod process;
-
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use std::time::Instant;
-
-use self::buffers::{
+use self::frames::{
     diagnose_frame_worker_count, merge_timing_maps, FrameBuffer, ParallelFrameChannels,
     ParallelFramePoolPlan,
 };
-use self::diagnostics::{
+use self::process::{
     format_pipe_write_failure, is_pipe_write_error, stderr_tail, EncoderMonitor,
 };
 use self::frames::{render_frames_parallel, ParallelFrameProgress, PipedFrameFormat};
 use self::process::{PipelineKind, PipelineProcesses, PipelineShutdown};
 use crate::activity::schema::{DenseActivityReport, ParsedActivity};
-use crate::debug::TimingBucket;
-use crate::encode::debug::composite::write_composite_timing_summary;
-use crate::encode::debug::video::{
+use crate::diagnostics::TimingBucket;
+use crate::diagnostics::write_composite_timing_summary;
+use crate::diagnostics::{
     create_debug_dir, render_sample_frames_enabled, sample_frame_indices, write_prepare_summary,
     write_sample_frame, write_timing_summary,
 };
-use crate::encode::ffmpeg::binary::resolve_ffmpeg_binary;
+use crate::encode::ffmpeg::resolve_ffmpeg_binary;
 use crate::encode::ffmpeg::composite::CompositeEncoding;
-use crate::encode::ffmpeg::composite_profiles::composite_profile;
-use crate::encode::ffmpeg::transparent_profiles::transparent_profile;
-use crate::encode::overlay_format::OverlayPixelFormat;
-use crate::encode::plan::{CompositeRenderPlan, FrameProductionPlan, TransparentRenderPlan};
+use crate::encode::ffmpeg::profiles::composite_profile;
+use crate::encode::ffmpeg::profiles::transparent_profile;
+use crate::encode::overlay::OverlayPixelFormat;
 use crate::encode::progress::RenderController;
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::ValidatedRenderConfig;
+use crate::config::ValidatedRenderConfig;
 use crate::output::RenderOutputTarget;
 use crate::paths::AppPaths;
-use crate::debug::RenderProfiler;
+use crate::diagnostics::RenderProfiler;
 use crate::render::{ExportMapJob, ExportWidgets, FrameSize, PreparedAtlas, SlotPlacement};
-use crate::render_jobs::inspection::CompositeSourceMetadata;
+use crate::jobs::inspection::CompositeSourceMetadata;
+use std::num::NonZeroU32;
+use std::path::PathBuf;
+use crate::encode::ffmpeg::catalog::CompositeCodecId;
+use crate::encode::ffmpeg::transparent::FfmpegSettings;
+use crate::encode::timing::Fps;
+use crate::encode::timing::ActivityCoverage;
+use std::sync::atomic::AtomicBool;
+use serde::Deserialize;
+use self::process::PartialOutputGuard;
+use crate::encode::ffmpeg::assemble::{
+    concat_manifest, join_args, probe_output_args, remux_part_args, transition_segment_args,
+    AssemblyKind, AssemblySegment, OutputAssembly,
+};
+use crate::encode::ffmpeg::run;
+
+#[cfg(test)]
+mod atlas_export_tests;
+pub mod frames;
+pub mod process;
+
+
 
 /// Encoding inputs fixed by job planning. Source probing and activity timing
 /// belong to jobs; a composite encoding is completed by the export's atlas plan.
@@ -131,6 +141,7 @@ impl VideoEncoding {
     }
 }
 
+#[expect(clippy::too_many_arguments, reason = "each argument is a separate encoding input")]
 pub(crate) fn encode_video(
     paths: &AppPaths,
     config: &ValidatedRenderConfig,
@@ -323,6 +334,7 @@ pub(crate) struct FramePipelineOutcome {
     pub workers: usize,
 }
 
+#[expect(clippy::too_many_arguments, reason = "each argument is a separate pipeline input")]
 pub(crate) fn run_frame_pipeline(
     binary: &Path,
     export: &ExportWidgets<'_>,
@@ -388,7 +400,7 @@ pub(crate) fn run_frame_pipeline(
             plan.frames.count()
         )));
     }
-    diagnostics::verify_successful_output(target.path())?;
+    process::verify_successful_output(target.path())?;
     controller.set_frame_progress(
         plan.output_frame_count,
         plan.output_frame_count,
@@ -406,4 +418,248 @@ pub(crate) fn run_frame_pipeline(
         finalize_ms,
         workers: workers.get(),
     })
+}
+
+/// Supported task count and dense-index stride, checked once during planning.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct FrameProductionPlan {
+    count: u32,
+    stride: NonZeroU32,
+}
+
+impl FrameProductionPlan {
+    pub(crate) fn new(count: u64, stride: NonZeroU32) -> CoreResult<Self> {
+        let count = u32::try_from(count)
+            .ok()
+            .filter(|count| *count > 0)
+            .ok_or_else(|| CoreError::Encode("Frame count must be positive and fit u32".into()))?;
+        let last_index = u64::from(count - 1) * u64::from(stride.get());
+        usize::try_from(last_index.max(u64::from(count)))
+            .map_err(|_| CoreError::Encode("Frame task indices exceed usize".into()))?;
+        Ok(Self { count, stride })
+    }
+
+    pub(crate) fn decimated(layout_count: u64, stride: NonZeroU32) -> CoreResult<Self> {
+        let layout = Self::new(layout_count, NonZeroU32::MIN)?;
+        Ok(Self {
+            count: (layout.count - 1) / stride.get() + 1,
+            stride,
+        })
+    }
+
+    pub(crate) fn count(self) -> u32 {
+        self.count
+    }
+
+    pub(crate) fn stride(self) -> NonZeroU32 {
+        self.stride
+    }
+
+    /// Dense frame index of every produced frame, in output order.
+    pub(crate) fn dense_frame_indices(self) -> Vec<usize> {
+        (0..self.count as usize)
+            .map(|index| index * self.stride.get() as usize)
+            .collect()
+    }
+}
+
+/// Fixed input to the transparent pipeline; timing is supplied by the job owner.
+#[derive(Clone, Debug)]
+pub struct TransparentRenderPlan {
+    pub(crate) frames: FrameProductionPlan,
+    pub(crate) ffmpeg: FfmpegSettings,
+    pub layout_frame_count: u32,
+    pub output_frame_count: u32,
+    pub update_rate: NonZeroU32,
+    pub container_fps: String,
+    pub coverage: ActivityCoverage,
+}
+
+/// Validated inputs and derived timing for one composite render.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompositeRenderPlan {
+    pub(crate) frames: FrameProductionPlan,
+    pub(crate) video_path: PathBuf,
+    pub quality: crate::encode::settings::EncodingQuality,
+    pub(crate) sync_offset: f64,
+    pub(crate) trim_start: f64,
+    pub(crate) render_duration: f64,
+    pub(crate) update_rate: NonZeroU32,
+    pub(crate) source_fps: Fps,
+    pub(crate) overlay_pipe_fps: Fps,
+    pub overlay_frame_count: u64,
+    pub output_frame_count: u32,
+    pub coverage: crate::encode::timing::ActivityCoverage,
+    pub(crate) requested_codec_id: CompositeCodecId,
+    pub(crate) qsv_full_init_args: Vec<String>,
+}
+
+impl CompositeRenderPlan {
+    /// Maps a completed overlay tick onto the validated source frame grid.
+    pub fn output_progress(&self, written_overlay_frames: u64) -> u32 {
+        ((written_overlay_frames - 1) * u64::from(self.update_rate.get())) as u32
+    }
+}
+
+/// Encodes composite transitions, remuxes every composite segment, joins them
+/// into the target and verifies its frame count and audio track.
+pub(crate) fn assemble_output(
+    paths: &AppPaths,
+    assembly: &OutputAssembly,
+    controller: &RenderController,
+) -> CoreResult<()> {
+    let ffmpeg = resolve_ffmpeg_binary(&paths.repo_root)?;
+    let cancel = controller.cancel_flag();
+    if let AssemblyKind::Composite {
+        hevc,
+        transition_encoding,
+        ..
+    } = &assembly.kind
+    {
+        for segment in &assembly.segments {
+            if matches!(segment, AssemblySegment::Transition { .. }) {
+                run_join_step(
+                    &ffmpeg,
+                    &transition_segment_args(transition_encoding, segment),
+                    &cancel,
+                )?;
+            }
+        }
+        for (part, remux) in assembly.remuxes() {
+            run_join_step(&ffmpeg, &remux_part_args(&part, &remux, *hevc), &cancel)?;
+        }
+    }
+    let manifest = assembly.manifest_path();
+    std::fs::write(&manifest, concat_manifest(&assembly.joined_parts())).map_err(|source| {
+        CoreError::Io {
+            path: manifest.clone(),
+            source,
+        }
+    })?;
+    let mut output = PartialOutputGuard::new(&assembly.target);
+    run_join_step(&ffmpeg, &join_args(assembly), &cancel)?;
+    verify_joined_output(&ffmpeg, assembly, &cancel)?;
+    output.preserve();
+    Ok(())
+}
+
+fn run_join_step(ffmpeg: &Path, args: &[String], cancel: &AtomicBool) -> CoreResult<()> {
+    let step = run(ffmpeg, args, false, cancel)?;
+    if !step.status.success() {
+        return Err(CoreError::Encode(format!(
+            "ffmpeg failed while joining output parts ({}). FFmpeg stderr:\n{}",
+            step.status,
+            stderr_tail(&step.stderr)
+        )));
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct ProbedOutput {
+    streams: Vec<ProbedStream>,
+}
+
+#[derive(Deserialize)]
+struct ProbedStream {
+    codec_type: String,
+    nb_read_packets: Option<String>,
+}
+
+/// The joined output must hold exactly the planned video frames, and an audio
+/// track exactly when the assembly encodes one.
+fn verify_joined_output(
+    ffmpeg: &Path,
+    assembly: &OutputAssembly,
+    cancel: &AtomicBool,
+) -> CoreResult<()> {
+    let ffprobe = ffmpeg.with_file_name(if cfg!(windows) {
+        "ffprobe.exe"
+    } else {
+        "ffprobe"
+    });
+    let output = run(&ffprobe, &probe_output_args(&assembly.target), true, cancel)?;
+    if !output.status.success() {
+        return Err(CoreError::Encode(format!(
+            "ffprobe could not read the joined output {}: {}",
+            assembly.target.display(),
+            output.stderr.trim()
+        )));
+    }
+    let probed: ProbedOutput = serde_json::from_slice(&output.stdout).map_err(|error| {
+        CoreError::Encode(format!("ffprobe returned unreadable stream data: {error}"))
+    })?;
+    let video_frames = probed
+        .streams
+        .iter()
+        .filter(|stream| stream.codec_type == "video")
+        .map(|stream| stream.nb_read_packets.as_deref().map(str::parse::<u64>))
+        .collect::<Vec<_>>();
+    let frames = match video_frames.as_slice() {
+        [Some(Ok(frames))] => *frames,
+        _ => {
+            return Err(CoreError::Encode(format!(
+                "Joined output {} must contain one counted video stream",
+                assembly.target.display()
+            )))
+        }
+    };
+    if frames != assembly.frames {
+        return Err(CoreError::Encode(format!(
+            "Joined output {} has {frames} video frames instead of {}",
+            assembly.target.display(),
+            assembly.frames
+        )));
+    }
+    let expects_audio = matches!(
+        assembly.kind,
+        AssemblyKind::Composite { audio: Some(_), .. }
+    );
+    let audio_streams = probed
+        .streams
+        .iter()
+        .filter(|stream| stream.codec_type == "audio")
+        .count();
+    if audio_streams != usize::from(expects_audio) {
+        return Err(CoreError::Encode(format!(
+            "Joined output {} has {audio_streams} audio streams instead of {}",
+            assembly.target.display(),
+            usize::from(expects_audio)
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ffmpeg() -> std::path::PathBuf {
+        resolve_ffmpeg_binary(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")).unwrap()
+    }
+
+    #[test]
+    fn failed_steps_report_ffmpeg_stderr() {
+        let args = ["-nostdin", "-i", "/nonexistent/part.ts", "-f", "null", "-"].map(String::from);
+        let error = run_join_step(&ffmpeg(), &args, &AtomicBool::new(false)).unwrap_err();
+        assert!(
+            error.to_string().contains("/nonexistent/part.ts"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn cancellation_stops_output_verification() {
+        let assembly = OutputAssembly {
+            target: "/nonexistent/joined.mov".into(),
+            parts_directory: "/nonexistent".into(),
+            segments: Vec::new(),
+            frames: 1,
+            kind: AssemblyKind::Transparent,
+        };
+        assert!(matches!(
+            verify_joined_output(&ffmpeg(), &assembly, &AtomicBool::new(true)),
+            Err(CoreError::Cancelled)
+        ));
+    }
 }

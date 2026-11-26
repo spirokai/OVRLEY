@@ -154,13 +154,13 @@ mod testing {
         store
     }
 
-    pub fn video_metadata(path: &str, duration: f64) -> ovrley_core::media::SourceVideoMetadata {
-        ovrley_core::media::SourceVideoMetadata {
+    pub fn video_metadata(path: &str, duration: f64) -> ovrley_core::media::probe::SourceVideoMetadata {
+        ovrley_core::media::probe::SourceVideoMetadata {
             path: path.into(),
             duration: Some(duration),
             fps_num: Some(30),
             fps_den: Some(1),
-            resolution: Some(ovrley_core::media::Resolution {
+            resolution: Some(ovrley_core::media::probe::Resolution {
                 width: 1920,
                 height: 1080,
             }),
@@ -172,7 +172,7 @@ mod testing {
     /// A 600 s activity and clips given as id, offset and duration.
     pub fn with_videos(clips: &[(&str, f64, f64)]) -> Store {
         use ovrley_app::video::create_imported_video;
-        use ovrley_core::media::video_edits::VideoEdits;
+        use ovrley_core::media::edits::VideoEdits;
         use std::rc::Rc;
 
         let mut store = with_activity(600.0);

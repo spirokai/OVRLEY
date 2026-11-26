@@ -10,19 +10,20 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::debug::RenderProgress;
+use ovrley_core::encode::progress::RenderProgress;
 use ovrley_core::encode::ffmpeg::assemble::{AssemblySegment, OutputAssembly};
 use ovrley_core::encode::progress::ProgressSink;
-use ovrley_core::encode::quality::QualityType;
+use ovrley_core::encode::settings::QualityType;
 use ovrley_core::error::{CoreError, CoreResult};
-use ovrley_core::media::SourceVideoMetadata;
+use ovrley_core::media::probe::SourceVideoMetadata;
 use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::batch::{BatchJobExecutor, BatchServiceError};
-use ovrley_core::render_jobs::contracts::*;
-use ovrley_core::render_jobs::execution::{RenderExecutionService, RendererReservation};
-use ovrley_core::render_jobs::inspection::{SourceMetadataProbe, VideoInspectionService};
-use ovrley_core::render_jobs::planning::{
+use ovrley_core::jobs::batch::{BatchJobExecutor, BatchServiceError};
+use ovrley_core::jobs::contracts::*;
+use ovrley_core::media::probe::InspectedVideoSource;
+use ovrley_core::jobs::execution::{RenderExecutionService, RendererReservation};
+use ovrley_core::jobs::inspection::{SourceMetadataProbe, VideoInspectionService};
+use ovrley_core::jobs::planning::{
     plan_batch_configuration, BatchPlanningResponse, PlannedVideoRender, VideoRenderModePlan,
 };
 use serde_json::json;
@@ -86,7 +87,7 @@ impl Fixture {
             })
             .collect::<Vec<_>>();
         let encoding = BatchEncodingSettings {
-            export_mode: ovrley_core::encode::render_settings::ExportMode::Transparent,
+            export_mode: ovrley_core::encode::settings::ExportMode::Transparent,
             export_codec: "qtrle".into(),
             fps: 30,
             update_rate: 2,
@@ -500,11 +501,11 @@ fn sequential_mixed_results_settle_frame_weights_and_preserve_completed_outputs(
     let single_progress = sink.single_progress.lock().unwrap();
     assert_eq!(
         single_progress.first().unwrap().status,
-        ovrley_core::debug::RenderStatus::Preparing
+        ovrley_core::encode::progress::RenderStatus::Preparing
     );
     assert_eq!(
         single_progress.last().unwrap().status,
-        ovrley_core::debug::RenderStatus::Complete
+        ovrley_core::encode::progress::RenderStatus::Complete
     );
 }
 
@@ -703,7 +704,7 @@ fn transparent_batch_follows_scene_size_and_composite_requires_matching_clips() 
         let mut request = fixture.request(&["1-size.mp4"], true);
         request.template.scene.width = Some(width);
         request.template.scene.height = Some(height);
-        if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
+        if mode == ovrley_core::encode::settings::ExportMode::Composite {
             request.encoding.export_mode = mode;
             request.encoding.export_codec = "libx264".into();
         }
@@ -720,15 +721,15 @@ fn transparent_batch_follows_scene_size_and_composite_requires_matching_clips() 
         (scene.width, scene.height)
     };
     // The fixture clip is 64x32; a transparent overlay keeps the scene's size.
-    let transparent = plan(ovrley_core::encode::render_settings::ExportMode::Transparent, 1280, 720).unwrap();
+    let transparent = plan(ovrley_core::encode::settings::ExportMode::Transparent, 1280, 720).unwrap();
     assert_eq!(size(&transparent), (1280, 720));
-    let Err(odd) = plan(ovrley_core::encode::render_settings::ExportMode::Transparent, 1281, 720) else {
+    let Err(odd) = plan(ovrley_core::encode::settings::ExportMode::Transparent, 1281, 720) else {
         panic!("odd transparent scene accepted")
     };
     assert!(odd.to_string().contains("must be even"), "{odd}");
-    let composite = plan(ovrley_core::encode::render_settings::ExportMode::Composite, 64, 32).unwrap();
+    let composite = plan(ovrley_core::encode::settings::ExportMode::Composite, 64, 32).unwrap();
     assert_eq!(size(&composite), (64, 32));
-    let Err(mismatched) = plan(ovrley_core::encode::render_settings::ExportMode::Composite, 1280, 720) else {
+    let Err(mismatched) = plan(ovrley_core::encode::settings::ExportMode::Composite, 1280, 720) else {
         panic!("mismatched composite clip accepted")
     };
     let message = mismatched.to_string();
@@ -737,18 +738,17 @@ fn transparent_batch_follows_scene_size_and_composite_requires_matching_clips() 
 }
 
 #[test]
-fn batch_wire_accepts_frontend_template_and_rejects_redundant_fields() {
+fn batch_request_accepts_a_materialized_template_and_rejects_redundant_fields() {
     let fixture = Fixture::new();
-    let mut frontend_request = fixture.request(&["1-frontend.mp4"], true);
-    // Frontend workflow coverage emits this same materialized wire template.
-    frontend_request.template =
+    let mut request = fixture.request(&["1-template.mp4"], true);
+    request.template =
         serde_json::from_str(include_str!("../fixtures/config/batch-template.json")).unwrap();
-    let inspection_id = frontend_request.inspection_id.clone();
+    let inspection_id = request.inspection_id.clone();
     let plan = common::builders::batch_video_plan(
         &fixture.paths,
         &fixture.inspection,
         &inspection_id,
-        frontend_request,
+        request,
     )
     .unwrap();
     assert_eq!(plan.config().scene.presentation.width, 3840);
@@ -973,7 +973,7 @@ fn outputs_must_fit_their_destination_and_join_compatible_sources() {
         matches!(submit(incompatible), Err(BatchServiceError::InvalidRequest { message }) if message.contains("different display resolution"))
     );
     fs::write(fixture.directory.join("existing.mov"), b"previous output").unwrap();
-    // The frontend asks before replacing an existing combined output.
+    // The app asks before replacing an existing combined output.
     assert!(matches!(
         submit(combined_request(
             &fixture,
@@ -1069,7 +1069,7 @@ fn composite(mut request: BatchRenderRequest) -> BatchRenderRequest {
     // Composite clips must match the scene; the fixture clips are 64x32.
     request.template.scene.width = Some(64);
     request.template.scene.height = Some(32);
-    request.encoding.export_mode = ovrley_core::encode::render_settings::ExportMode::Composite;
+    request.encoding.export_mode = ovrley_core::encode::settings::ExportMode::Composite;
     request.encoding.export_codec = "libx264".into();
     request.encoding.update_rate = 1;
     request

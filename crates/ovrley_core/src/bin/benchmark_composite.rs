@@ -7,19 +7,18 @@
 //!
 //! The binary sleep-cooldowns between codec groups to reduce thermal throttling
 //! bias. On Windows, it also prevents system sleep for the duration of the run.
-//!
-//! Does not own: rendering or encoding — delegates to `ovrley_core`.
 
 use ovrley_core::activity::{parse_activity_json, validate_render_activity};
-use ovrley_core::commands::parse_and_validate_config;
+use ovrley_core::config::{parse_config_json, validate_render_config};
 use ovrley_core::encode::ffmpeg::detect::detect_codecs;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::media::video_probe::probe_video;
-use ovrley_core::normalize::parse_config_value;
-use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
+use ovrley_core::media::probe::probe_video;
+use ovrley_core::config::parse_config_value;
+use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::plan_single_render;
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::plan_single_render;
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -27,12 +26,12 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use ovrley_core::benchmark_common::{
+use ovrley_core::cli::{
     average_successful_runs, file_size_mb, is_composite_codec_available, prevent_sleep,
     sleep_between_benchmark_groups, sleep_between_benchmark_runs, summarize_run_outcome,
     CommonRunMetrics,
 };
-use ovrley_core::bin_common::{
+use ovrley_core::cli::{
     format_mmss, read_positional, repo_root, resolve_path, unix_timestamp,
 };
 
@@ -159,7 +158,7 @@ struct BenchmarkOutput {
 
 /// Runs the composite overlay encoding benchmark across all available codecs.
 ///
-/// # Phases
+/// # Steps
 ///
 /// 1. **Setup** — parse CLI args, prevent system sleep, resolve paths, detect
 ///    available codecs, probe the source video for FPS and duration.
@@ -173,7 +172,7 @@ struct BenchmarkOutput {
 /// 5. **Output** — aggregate results into `BenchmarkOutput` and write to
 ///    `debug/benchmarks/composite.json`.
 fn main() -> Result<(), String> {
-    // -- Phase 1: setup and codec detection --
+    // Setup and codec detection.
     prevent_sleep();
 
     let args: Vec<String> = std::env::args().collect();
@@ -203,7 +202,7 @@ fn main() -> Result<(), String> {
         .map(|r| format!("{}x{}", r.width, r.height))
         .unwrap_or_else(|| "unknown".to_string());
 
-    // -- Phase 2: compute a 60-second render window from video duration --
+    // Compute a 60-second render window from video duration.
     let (activity_start, activity_end, render_duration, trim_start) = if video_duration >= 360.0 {
         (300.0, 360.0, 60.0, 300.0)
     } else if video_duration >= 60.0 {
@@ -256,14 +255,14 @@ fn main() -> Result<(), String> {
     set_scene_window(&mut base_config_value, activity_start, activity_end)?;
     let base_config_str = serde_json::to_string(&base_config_value)
         .map_err(|e| format!("Failed to serialize config: {e}"))?;
-    let base_validated = parse_and_validate_config(&base_config_str).map_err(|e| e.to_string())?;
+    let base_validated = parse_config_json(&base_config_str).and_then(|config| validate_render_config(config, None)).map_err(|e| e.to_string())?;
     let res_width = base_validated.scene.presentation.width;
     let res_height = base_validated.scene.presentation.height;
     let base_update_rate = settings_update_rate.unwrap_or(base_validated.scene.update_rate.get());
 
     let mut results = BTreeMap::new();
 
-    // -- Phase 3: iterate over every composite codec profile --
+    // Iterate over every composite codec profile.
     for (codec_index, &(display_name, codec_key)) in COMPOSITE_CODECS.iter().enumerate() {
         println!("\n=== Codec: {display_name} ===");
 
@@ -288,7 +287,7 @@ fn main() -> Result<(), String> {
         let mut runs = Vec::with_capacity(3);
         let mut successful_run_data: Vec<CommonRunMetrics> = Vec::new();
 
-        // -- Phase 4: run 3 full composite render iterations for this codec --
+        // Run 3 full composite render iterations for this codec.
         for run_num in 1..=3 {
             print!("    Run {run_num}/3... ");
 
@@ -316,7 +315,7 @@ fn main() -> Result<(), String> {
             raw.scene.composite_video_trim_start = Some(trim_start);
             raw.scene.composite_render_duration = Some(render_duration);
             raw.scene.composite_widget_update_rate = Some(base_update_rate);
-            raw.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+            raw.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
             raw.scene.quality_value = Some(40.0);
             let plan = plan_single_render(
                 raw,
@@ -337,7 +336,7 @@ fn main() -> Result<(), String> {
                 .join(format!("benchmark-{display_name}-{run_num}.mp4"));
             let render_result = RenderOutputTarget::validate(
                 output_path.to_str().unwrap(),
-                RenderOutputKind::Composite,
+                ExportMode::Composite,
                 true,
             )
             .and_then(|target| execution.render(&paths, plan, &activity, &target));
@@ -421,7 +420,7 @@ fn main() -> Result<(), String> {
         );
     }
 
-    // -- Phase 5: serialize results and write to debug/benchmarks/composite.json --
+    // Serialize results and write to debug/benchmarks/composite.json.
     let output = BenchmarkOutput {
         generated_at: unix_timestamp(),
         template: template_name,

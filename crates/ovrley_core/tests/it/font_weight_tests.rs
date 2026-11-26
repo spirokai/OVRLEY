@@ -1,14 +1,14 @@
 use crate::common;
 
-use ovrley_core::commands::validate_config_value;
-use ovrley_core::normalize::parse_template_value;
+use crate::common::seam::validate_config_value;
+use ovrley_core::template::parse_template_value;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::render::text::measure_text;
 use ovrley_widgets::widgets::label::validated_label_style;
 use serde_json::json;
 
 #[test]
-fn legacy_templates_upgrade_weight_and_changed_identity_without_rewriting_input() {
+fn older_templates_upgrade_weight_and_changed_identity_without_rewriting_input() {
     for version in [2, 3] {
         let mut config = label_config(537.0);
         config["labels"][0]

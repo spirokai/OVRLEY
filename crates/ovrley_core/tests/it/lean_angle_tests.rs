@@ -1,7 +1,7 @@
 use crate::common;
 
-use ovrley_core::normalize::RenderConfig;
-use ovrley_core::normalize::validate_render_config;
+use ovrley_core::config::RenderConfig;
+use ovrley_core::config::validate_render_config;
 use ovrley_widgets::render::tile::PreviewRasterScale;
 use ovrley_widgets::widgets::lean_angle::prepare_lean_angle_cache;
 use std::collections::BTreeMap;
@@ -16,7 +16,7 @@ fn full_lean_angle_config_validates_and_prepares_one_static_cache() {
         values: vec![serde_json::from_value(full_lean_angle_config()).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    })
+    }, None)
     .unwrap();
 
     let ovrley_widgets::widgets::value::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
@@ -41,7 +41,7 @@ fn lean_angle_rejects_track_thickness_that_consumes_the_inner_radius() {
     let mut value = full_lean_angle_config();
     value["track_thickness"] = serde_json::json!(90);
 
-    let error = match validate_render_config(render_config_with_lean_angle(value)) {
+    let error = match validate_render_config(render_config_with_lean_angle(value), None) {
         Ok(_) => panic!("track thickness consuming the inner radius must fail validation"),
         Err(error) => error,
     };
@@ -56,7 +56,7 @@ fn lean_angle_rejects_border_that_consumes_the_track() {
     let mut value = full_lean_angle_config();
     value["track_border_thickness"] = serde_json::json!(12);
 
-    let error = match validate_render_config(render_config_with_lean_angle(value)) {
+    let error = match validate_render_config(render_config_with_lean_angle(value), None) {
         Ok(_) => panic!("border consuming the track must fail validation"),
         Err(error) => error,
     };
@@ -71,7 +71,7 @@ fn lean_angle_rejects_missing_diameter() {
     let mut value = full_lean_angle_config();
     value.as_object_mut().unwrap().remove("diameter");
 
-    let error = match validate_render_config(render_config_with_lean_angle(value)) {
+    let error = match validate_render_config(render_config_with_lean_angle(value), None) {
         Ok(_) => panic!("missing diameter must fail validation"),
         Err(error) => error,
     };
@@ -84,7 +84,7 @@ fn lean_angle_rejects_rectangular_geometry_fields() {
     let mut value = full_lean_angle_config();
     value["width"] = serde_json::json!(180);
 
-    let error = match validate_render_config(render_config_with_lean_angle(value)) {
+    let error = match validate_render_config(render_config_with_lean_angle(value), None) {
         Ok(_) => panic!("lean-angle width must fail validation"),
         Err(error) => error,
     };
@@ -100,7 +100,7 @@ fn gradient_fill_mirrors_from_upright_to_either_lean_direction() {
         { "offset": 0, "color": "#ff0000" },
         { "offset": 1, "color": "#0000ff" },
     ]);
-    let config = validate_render_config(render_config_with_lean_angle(value)).unwrap();
+    let config = validate_render_config(render_config_with_lean_angle(value), None).unwrap();
     let ovrley_widgets::widgets::value::ValidatedValue::LeanAngle(widget) = &config.values[0] else {
         panic!("lean_angle display type must use the dedicated prepared value");
     };

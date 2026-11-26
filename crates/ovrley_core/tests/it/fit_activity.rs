@@ -1,4 +1,4 @@
-use ovrley_core::activity::parsers::fit::{extract_fit_activity, parse_fit_activity_path};
+use ovrley_core::import::fit::{extract, parse_path};
 use ovrley_core::activity::schema::{LapMarkers, RawActivity};
 use std::path::Path;
 
@@ -6,7 +6,7 @@ fn fixture(name: &str) -> RawActivity {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/activity")
         .join(name);
-    extract_fit_activity(&std::fs::read(path).unwrap(), name).unwrap()
+    extract(&std::fs::read(path).unwrap(), name).unwrap()
 }
 
 #[test]
@@ -47,9 +47,8 @@ fn imports_lap_boundaries_and_decimal_degree_positions() {
 #[test]
 fn syncs_to_the_first_record_time_instead_of_the_file_creation_time() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/activity/test-ride.fit");
-    let activity = parse_fit_activity_path(&path, None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_path(&path, None)
+        .unwrap();
 
     assert_eq!(
         activity.metadata["file_created_at"],
@@ -88,7 +87,7 @@ fn imports_dive_units_gas_switches_and_water_temperature() {
 #[test]
 fn rejects_unreadable_files_and_files_without_records() {
     let error = |bytes: &[u8]| {
-        extract_fit_activity(bytes, "error.fit")
+        extract(bytes, "error.fit")
             .unwrap_err()
             .to_string()
     };

@@ -194,7 +194,7 @@ mod tests {
         assert_eq!((context.origin_second, context.video_id), (0.0, None));
         let mut video = simple("video-1", 60.0, 0);
         video.telemetry = VideoTelemetry::ready(telemetry(120.0));
-        let clip_with = clip(video, ovrley_core::media::video_edits::VideoEdits { offset_seconds: 300.0, ..Default::default() });
+        let clip_with = clip(video, ovrley_core::media::edits::VideoEdits { offset_seconds: 300.0, ..Default::default() });
         let context = resolve_activity_context(None, None, Some(&clip_with)).unwrap();
         assert_eq!((context.origin_second, context.video_id.as_deref()), (300.0, Some("video-1")));
         assert_eq!(context.summary.unwrap().available_metrics.len(), 1);

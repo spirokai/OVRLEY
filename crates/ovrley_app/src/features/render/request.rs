@@ -10,11 +10,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::encode::ffmpeg::detect::AvailableCodecs;
-use ovrley_core::encode::quality::{EncodingQuality, QualityType};
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode, RenderSettings};
-use ovrley_core::normalize::RenderConfig;
-use ovrley_core::normalize::template::template_manifest;
-use ovrley_core::render_jobs::contracts::{BatchActivity, BatchDestination, BatchEncodingSettings, BatchRenderOutput, BatchRenderRequest};
+use ovrley_core::encode::settings::{EncodingQuality, QualityType};
+use ovrley_core::encode::settings::{ExportMode, OutputMode, RenderSettings};
+use ovrley_core::config::RenderConfig;
+use ovrley_core::template::template_manifest;
+use ovrley_core::jobs::contracts::{BatchActivity, BatchDestination, BatchEncodingSettings, BatchRenderOutput, BatchRenderRequest};
 use ovrley_widgets::model::document::OverlayConfig;
 use ovrley_widgets::model::scene::ScenePresentationConfig;
 use serde_json::{json, Map, Value};
@@ -279,7 +279,7 @@ pub fn render_effective_config(
         "values": render_values(&effective.values),
         "plots": effective.plots,
     });
-    ovrley_core::normalize::parse_config_value(&document).map_err(|error| error.to_string())
+    ovrley_core::config::parse_config_value(&document).map_err(|error| error.to_string())
 }
 
 /// The shared presentation of a batch: the effective scene projected
@@ -521,7 +521,7 @@ pub fn preview_render_request(store: &Store) -> Result<PreviewRenderRequest, Str
 
 /// The path with the container extension of the export mode.
 pub fn normalize_render_output_path(output_path: &str, export_mode: ExportMode) -> String {
-    let extension = ovrley_core::output::RenderOutputKind::from(export_mode).extension();
+    let extension = export_mode.extension();
     let split = output_path.rfind(['/', '\\']).map_or(0, |index| index + 1);
     let (directory, filename) = output_path.split_at(split);
     let stem = filename.rfind('.').map_or(filename, |dot| &filename[..dot]);
@@ -859,7 +859,7 @@ pub(crate) mod tests {
     #[test]
     fn core_rejects_a_composite_without_a_video_and_a_mismatched_codec() {
         let store = store();
-        let plan = |config| ovrley_core::render_jobs::planning::plan_single_render(config, 20.0, None, None).map(|_| ());
+        let plan = |config| ovrley_core::jobs::planning::plan_single_render(config, 20.0, None, None).map(|_| ());
         let composite = |settings: &mut RenderSettings| {
             settings.export_mode = ExportMode::Composite;
             settings.codec = "libx264".into();
@@ -992,7 +992,7 @@ pub(crate) mod tests {
             inspection_id: "inspection".into(),
             outputs: vec![BatchRenderOutput {
                 id: "C:/renders/video.mp4".into(),
-                pieces: vec![ovrley_core::render_jobs::contracts::BatchRenderPiece {
+                pieces: vec![ovrley_core::jobs::contracts::BatchRenderPiece {
                     source_id: "source".into(),
                     start_frame: 0,
                     end_frame: 900,

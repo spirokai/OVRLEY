@@ -1,8 +1,9 @@
 //! Shearwater extraction and the shared preview/export scuba metric contract.
 use crate::common;
 
+use ovrley_core::import::csv::parse_reader;
 use ovrley_core::activity::{
-    csv::parse_csv_activity_reader, interpolate::densify_activity, schema::ParsedActivity,
+    interpolate::densify_activity, schema::ParsedActivity,
     trim::trim_activity,
 };
 use ovrley_widgets::activity::ActivitySampler;
@@ -22,9 +23,8 @@ const TYPES: [&str; 7] = [
 const HEADER: &str = "Time (sec),Depth,First Stop Depth,Time To Surface (min),Average PPO2,Fraction O2,Fraction He,First Stop Time,Water Temp\n";
 
 fn parse(csv: &str) -> ParsedActivity {
-    parse_csv_activity_reader(csv.as_bytes(), "Shearwater.csv")
+    parse_reader(csv.as_bytes(), "Shearwater.csv")
         .unwrap()
-        .parsed_activity
 }
 
 fn widget(kind: &str) -> Value {
@@ -291,7 +291,7 @@ fn dive_times_allow_decimals_but_show_whole_minutes_by_default() {
 #[test]
 fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixels() {
     use ovrley_core::{
-        debug::RenderProfiler,
+        diagnostics::RenderProfiler,
         fonts::preview_font_resource,
         paths::AppPaths,
         render::render_full_frames,

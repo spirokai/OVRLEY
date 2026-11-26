@@ -10,7 +10,7 @@ use super::schema::{
     CourseSeries, DenseActivityReport, DenseSeriesReport, NumericSeries, TimeSeries,
     TrimmedActivity,
 };
-use crate::normalize::RenderDataRequirements;
+use crate::config::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ovrley_widgets::model::telemetry::{ActivitySeries, InterpolationKind, NumericActivity};
 
@@ -286,7 +286,7 @@ fn interpolate_time_series(
 /// Only the series requested through [`RenderDataRequirements`] are produced;
 /// all other vectors are left empty to reduce allocation and per-frame work.
 ///
-/// Phases:
+/// Steps:
 /// 1. Build the canonical frame timeline from scene duration and FPS.
 /// 2. Interpolate distance progress, course, and timestamps onto the frame
 ///    timeline (only if the active template requested each one).
@@ -296,10 +296,10 @@ pub fn densify_activity(
     frame_elapsed_seconds: Vec<f64>,
     requirements: &RenderDataRequirements,
 ) -> DenseActivityReport {
-    // ── Phase 1: build the canonical frame timeline ──────────────────────
+    // Build the canonical frame timeline.
     // Every enabled series uses this same target vector so all rendered
     // values and widgets stay frame-aligned.
-    // ── Phase 2: interpolate distance progress, course, timestamps ───────
+    // Interpolate distance progress, course, timestamps.
     // Distance progress is absolute (not trim-relative) so route/elevation
     // widgets can use it without additional normalization.
     let frame_distance_progress =
@@ -371,7 +371,7 @@ pub fn densify_activity(
         Vec::new()
     };
 
-    // ── Phase 3: densify each requested numeric series ───────────────────
+    // Densify each requested numeric series.
     // Empty vectors signal to render code that the series is not needed,
     // avoiding wasted per-frame lookups and allocations.
     let numeric = NumericDensification {

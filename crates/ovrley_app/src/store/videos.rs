@@ -7,7 +7,7 @@
 
 use std::rc::Rc;
 use ovrley_core::encode::ffmpeg::transitions::{transition_defaults, TransitionDefaults};
-use ovrley_core::media::video_edits::{FIRST_SEGMENT_KEY, TimezoneMode, Transition};
+use ovrley_core::media::edits::{FIRST_SEGMENT_KEY, TimezoneMode, Transition};
 use crate::features::player::playback::{timeline_minimum, total_playback_duration};
 use crate::features::sync::manual::{clear_video_sync_for_activity, select_video_sync_video};
 use crate::store::Store;
@@ -450,7 +450,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::features::history::undo;
     use crate::video::fixtures::*;
-    use ovrley_core::media::video_edits::TransitionKind;
+    use ovrley_core::media::edits::TransitionKind;
     use crate::store::services::fakes::fake_services;
     use crate::store::Dispatcher;
     use serde_json::json;
@@ -468,7 +468,7 @@ pub(crate) mod tests {
         Dispatcher::new(store_with(vec![simple("ride", 10.0, 0)], &[]), parts)
     }
 
-    fn edits(dispatcher: &Dispatcher) -> ovrley_core::media::video_edits::VideoEdits {
+    fn edits(dispatcher: &Dispatcher) -> ovrley_core::media::edits::VideoEdits {
         dispatcher.with_store(|store| store.video_import.video_edits["ride"].clone())
     }
 
@@ -681,7 +681,7 @@ pub(crate) mod tests {
 
     #[test]
     fn relinking_fits_the_cuts_drops_landmarks_past_the_end_and_a_lost_selected_segment() {
-        use ovrley_core::media::manual_video_sync::Landmark;
+        use ovrley_core::media::sync::Landmark;
         let mut gone = simple("ride", 10.0, 0);
         gone.missing = true;
         let mut store = store_with(vec![gone], &[]);

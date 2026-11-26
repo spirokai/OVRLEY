@@ -16,7 +16,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 use std::sync::Arc;
 use ovrley_core::activity::trim::ActivityTrim;
-use ovrley_core::normalize::template::normalize_global_defaults;
+use ovrley_core::template::normalize_global_defaults;
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::model::document::{merge_widget_data, number, resolve_active_widget_data, OverlayConfig};
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
@@ -996,7 +996,7 @@ mod tests {
         let (dispatcher, fakes) = dispatcher();
         let mut backdrop = ovrley_widgets::model::document::create_widget_defaults(
             &ovrley_widgets::model::document::WidgetSelection { kind: "backdrop".into(), ..Default::default() },
-            &ovrley_core::normalize::template::template_manifest().globals,
+            &ovrley_core::template::template_manifest().globals,
             &Default::default(),
         )
         .unwrap();

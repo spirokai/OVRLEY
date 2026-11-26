@@ -12,7 +12,7 @@ use super::interpolate::{
 };
 use super::schema::{ParsedActivity, TrimmedActivity};
 use crate::error::{CoreError, CoreResult};
-use crate::normalize::RenderDataRequirements;
+use crate::config::RenderDataRequirements;
 use chrono::{DateTime, SecondsFormat, Utc};
 use ovrley_widgets::series::{collect_valid_numeric_points, interpolate_heading_points, interpolate_numeric_series_value, MissingSamplePolicy};
 use ovrley_widgets::model::telemetry::{ActivitySeries, NumericActivity};
@@ -21,8 +21,7 @@ use ovrley_widgets::widgets::value::format::resolve_metric_display_value;
 use serde::{Deserialize, Serialize};
 
 /// The part of the external activity the user kept, in activity seconds (which are timeline
-/// seconds): what an overlay renders when no video decides it. The editor's store holds it and
-/// projects save it.
+/// seconds): what an overlay renders when no video decides it. Projects save it.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ActivityTrim {
@@ -32,21 +31,22 @@ pub struct ActivityTrim {
 
 impl ActivityTrim {
     /// Finite bounds with `0 <= start < end`.
-    pub fn validate(&self) -> Result<(), String> {
+    pub fn validate(&self) -> CoreResult<()> {
         if !self.start_second.is_finite() || !self.end_second.is_finite() {
-            return Err("activityTrim bounds must be finite".into());
+            return Err(CoreError::Config("activityTrim bounds must be finite".into()));
         }
         if self.start_second < 0.0 || self.start_second >= self.end_second {
-            return Err("activityTrim requires 0 <= startSecond < endSecond".into());
+            return Err(CoreError::Config(
+                "activityTrim requires 0 <= startSecond < endSecond".into(),
+            ));
         }
         Ok(())
     }
 }
 
-// Validates that the requested scene window fits inside activity duration.
+/// Checks that the scene window fits inside the activity.
 fn validate_trim_window(duration: f64, start: f64, end: f64) -> CoreResult<()> {
-    // Keep validation messages frontend-friendly because they are surfaced
-    // directly when a user configures an invalid export window.
+    // These messages reach the user directly when an export window is invalid.
     if start < 0.0 {
         return Err(CoreError::Activity(
             "The video starts before the activity. The activity has no data for the start of the video.".into(),
@@ -198,7 +198,7 @@ fn last_finite(series: &[Option<f64>]) -> Option<f64> {
 /// Optional telemetry series are only copied when requested by
 /// [`RenderDataRequirements`].
 ///
-/// Phases:
+/// Steps:
 /// 1. Validate that the activity has enough samples and the trim window fits
 ///    within the activity duration.
 /// 2. Find the source-sample indices that lie strictly inside the trim
@@ -216,23 +216,11 @@ pub fn trim_activity(
     end: f64,
     requirements: &RenderDataRequirements,
 ) -> CoreResult<TrimmedActivity> {
-    // ── Phase 1: validate inputs ─────────────────────────────────────────
-    if activity.sample_elapsed_seconds.len() < 2 {
-        return Err(CoreError::Activity(
-            "parsedActivity must contain at least two sample_elapsed_seconds values".into(),
-        ));
-    }
-
-    let duration = activity.trim_end_seconds.max(
-        activity
-            .sample_elapsed_seconds
-            .last()
-            .copied()
-            .unwrap_or_default(),
-    );
+    // Validate inputs.
+    let duration = super::validate_render_activity(activity)?;
     validate_trim_window(duration, start, end)?;
 
-    // ── Phase 2: find interior source-sample indices ─────────────────────
+    // Find interior source-sample indices.
     let elapsed = &activity.sample_elapsed_seconds;
     let (start_inner_index, end_inner_index) = split_trim_indices(elapsed, start, end);
     let lap_metadata_required = requirements.lap_number
@@ -247,7 +235,7 @@ pub fn trim_activity(
         (Vec::new(), Vec::new())
     };
 
-    // ── Phase 3: build trim-relative elapsed timeline ────────────────────
+    // Build trim-relative elapsed timeline.
     // The first entry is always 0.0, the last is end - start. Interior
     // samples are offset so the timeline is contiguous from zero.
     let mut trimmed_elapsed =
@@ -296,7 +284,7 @@ pub fn trim_activity(
         Vec::new()
     };
 
-    // ── Phase 4: trim distance progress, course, and start timestamp ─────
+    // Trim distance progress, course, and start timestamp.
     // Absolute distance progress is not re-normalized to the trim — route
     // and elevation widgets decide whether they need absolute or
     // trim-relative progress at render time.
@@ -357,7 +345,7 @@ pub fn trim_activity(
         })
         .map(|value| value.to_rfc3339_opts(SecondsFormat::Millis, true));
 
-    // ── Phase 5: trim each requested numeric series ──────────────────────
+    // Trim each requested numeric series.
     // Each series gets interpolated boundary values at the exact start/end
     // positions so downstream interpolation has precise endpoints even when
     // the trim window cuts through a source sampling interval.
@@ -433,10 +421,10 @@ pub fn trim_activity(
 }
 
 #[cfg(test)]
-mod lap_tests {
+mod tests {
     use super::trim_activity;
     use crate::activity::schema::ParsedActivity;
-    use crate::normalize::RenderDataRequirements;
+    use crate::config::RenderDataRequirements;
 
     #[test]
     fn preserves_original_lap_time_and_best_history_when_scene_starts_mid_lap() {

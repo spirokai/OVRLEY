@@ -1,7 +1,7 @@
 //! Elevation geometry from a validated config and an activity, through core's ingress.
 
 use ovrley_core::activity::parse_activity_json;
-use ovrley_core::normalize::{parse_config_json, validate_elevation_plots, validate_scene_config};
+use ovrley_core::config::{parse_config_json, validate_elevation_plots, validate_scene_config};
 use ovrley_widgets::widgets::elevation::geometry::ElevationGeometry;
 
 /// The builder returns valid geometry for a minimal activity with elevation data.

@@ -26,11 +26,11 @@ use ovrley_core::encode::ffmpeg::catalog::CompositeCodecId;
 use ovrley_core::encode::ffmpeg::composite::{
     build_composite_ffmpeg_settings, CompositeFfmpegSettings,
 };
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::encode::plan::CompositeRenderPlan;
-use ovrley_core::normalize::{validate_scene_config, SceneConfig};
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::encode::pipeline::CompositeRenderPlan;
+use ovrley_core::config::{validate_scene_config, SceneConfig};
 use ovrley_core::render::{AtlasPlan, FrameSize};
-use ovrley_core::render_jobs::planning::derive_composite_render_plan;
+use ovrley_core::jobs::planning::derive_composite_render_plan;
 use serde_json::json;
 
 /// Builds composite FFmpeg settings with default libx264 codec for quick tests
@@ -114,7 +114,7 @@ fn render_plan(
         serde_json::from_value(common::seam::explicit_scene_json()).unwrap();
     scene.ffmpeg = json!({"codec": codec});
     scene.composite_video_path = Some("test.mp4".to_string());
-    scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     scene.quality_value = Some(bitrate.strip_suffix('M').unwrap().parse().unwrap());
     scene.composite_sync_offset = Some(0.0);
     let (fps_num, fps_den) = source_fps.components();
@@ -142,7 +142,7 @@ fn render_plan(
 }
 
 #[test]
-fn test_2_1_builds_command_for_29_97_fps_source_without_rounding() {
+fn builds_command_for_29_97_fps_source_without_rounding() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -158,7 +158,7 @@ fn test_2_1_builds_command_for_29_97_fps_source_without_rounding() {
 }
 
 #[test]
-fn test_2_2_preserves_source_fps_with_lower_overlay_update_rate() {
+fn preserves_source_fps_with_lower_overlay_update_rate() {
     let built = settings(
         Fps::new(60000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -170,7 +170,7 @@ fn test_2_2_preserves_source_fps_with_lower_overlay_update_rate() {
 }
 
 #[test]
-fn test_2_3_sync_offset_is_not_used_as_seek_argument() {
+fn sync_offset_is_not_used_as_seek_argument() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -181,7 +181,7 @@ fn test_2_3_sync_offset_is_not_used_as_seek_argument() {
 }
 
 #[test]
-fn test_2_4_video_trim_uses_coarse_seek_and_filter_side_cut_for_video_and_audio() {
+fn video_trim_uses_coarse_seek_and_filter_side_cut_for_video_and_audio() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -202,7 +202,7 @@ fn test_2_4_video_trim_uses_coarse_seek_and_filter_side_cut_for_video_and_audio(
 }
 
 #[test]
-fn test_2_4a_short_trim_keeps_zero_input_seek_and_exact_filter_offset() {
+fn short_trim_keeps_zero_input_seek_and_exact_filter_offset() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -220,7 +220,7 @@ fn test_2_4a_short_trim_keeps_zero_input_seek_and_exact_filter_offset() {
 }
 
 #[test]
-fn test_2_5_rawvideo_pipe_input_has_expected_shape() {
+fn rawvideo_pipe_input_has_expected_shape() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -245,7 +245,7 @@ fn test_2_5_rawvideo_pipe_input_has_expected_shape() {
 }
 
 #[test]
-fn test_2_6_filter_graph_labels_and_maps_output() {
+fn filter_graph_labels_and_maps_output() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -257,7 +257,7 @@ fn test_2_6_filter_graph_labels_and_maps_output() {
 }
 
 #[test]
-fn test_2_7_filtered_audio_map_and_encoding_are_present() {
+fn filtered_audio_map_and_encoding_are_present() {
     let fps = Fps::new(30000, 1001).unwrap();
     let render = render_plan("libx264", "60M", fps, fps, 12.0);
     for (audio_bit_rate, expected) in [(Some(128_000), "128000"), (None, "192000")] {
@@ -291,7 +291,7 @@ fn test_2_7_filtered_audio_map_and_encoding_are_present() {
 }
 
 #[test]
-fn test_2_7b_source_without_audio_omits_audio_input_and_filter_graph() {
+fn source_without_audio_omits_audio_input_and_filter_graph() {
     let render = render_plan(
         "libx264",
         "60M",
@@ -326,7 +326,7 @@ fn test_2_7b_source_without_audio_omits_audio_input_and_filter_graph() {
 }
 
 #[test]
-fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
+fn video_trim_is_filter_side_even_without_input_seek() {
     let built = settings(
         Fps::new(30000, 1001).unwrap(),
         Fps::new(30000, 1001).unwrap(),
@@ -341,7 +341,7 @@ fn test_2_7a_video_trim_is_filter_side_even_without_input_seek() {
 }
 
 #[test]
-fn test_2_8_float_fps_metadata_can_feed_rational_builder_args() {
+fn float_fps_metadata_can_feed_rational_builder_args() {
     let fps = Fps::from_f64_metadata(29.97).unwrap();
     let built = settings(fps, fps, 0.0);
 
@@ -354,7 +354,7 @@ fn rejects_zero_fps_at_construction() {
 }
 
 #[test]
-fn test_8_1_software_h264_profile_uses_cpu_overlay_and_libx264() {
+fn software_h264_profile_uses_cpu_overlay_and_libx264() {
     let built = settings_for_codec(
         "libx264",
         "20M",
@@ -370,7 +370,7 @@ fn test_8_1_software_h264_profile_uses_cpu_overlay_and_libx264() {
 }
 
 #[test]
-fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
+fn software_h265_profile_uses_cpu_overlay_and_libx265() {
     let built = settings_for_codec(
         "libx265",
         "60M",
@@ -387,7 +387,7 @@ fn test_8_2_software_h265_profile_uses_cpu_overlay_and_libx265() {
 }
 
 #[test]
-fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
+fn nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
     let built = settings_for_codec(
         "h264_nvenc",
         "60M",
@@ -405,7 +405,7 @@ fn test_8_3_nvenc_h264_simple_path_uses_cpu_overlay_when_available() {
 }
 
 #[test]
-fn test_8_5_videotoolbox_simple_path_hands_encoder_nv12() {
+fn videotoolbox_simple_path_hands_encoder_nv12() {
     for codec in ["h264_videotoolbox", "hevc_videotoolbox"] {
         let built = settings_for_codec(
             codec,
@@ -422,7 +422,7 @@ fn test_8_5_videotoolbox_simple_path_hands_encoder_nv12() {
 }
 
 #[test]
-fn test_8_7_qsv_h264_simple_path_when_available() {
+fn qsv_h264_simple_path_when_available() {
     let built = settings_for_codec(
         "h264_qsv",
         "60M",
@@ -438,7 +438,7 @@ fn test_8_7_qsv_h264_simple_path_when_available() {
 }
 
 #[test]
-fn test_8_7b_amf_h264_simple_path_when_available() {
+fn amf_h264_simple_path_when_available() {
     let built = settings_for_codec(
         "h264_amf",
         "60M",
@@ -457,7 +457,7 @@ fn test_8_7b_amf_h264_simple_path_when_available() {
 }
 
 #[test]
-fn test_8_9_bitrate_override_is_respected_for_every_profile() {
+fn bitrate_override_is_respected_for_every_profile() {
     for codec in [
         "libx264",
         "libx265",
@@ -504,7 +504,7 @@ fn test_8_9_bitrate_override_is_respected_for_every_profile() {
 /// Verifies the full-CUDA path (nnvgpu_h264) produces a complete filter stack:
 /// scale_cuda → overlay_cuda with hwupload on the overlay input. Also checks
 /// the fallback profile is recorded as `nvgpu_h264`.
-fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
+fn cuda_h264_full_profile_uses_overlay_cuda_when_available() {
     let built = settings_for_codec(
         "nnvgpu_h264",
         "60M",
@@ -533,7 +533,7 @@ fn test_9_2_cuda_h264_full_profile_uses_overlay_cuda_when_available() {
 /// Verifies the full-CUDA HEVC path (nnvgpu_hevc) produces the CUDA filter
 /// stack with hevc_nvenc as the output codec. Fallback profile must be
 /// recorded as `nvgpu_hevc`.
-fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
+fn cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
     let built = settings_for_codec(
         "nnvgpu_hevc",
         "60M",
@@ -557,7 +557,7 @@ fn test_9_3_cuda_hevc_full_profile_uses_overlay_cuda_when_available() {
 #[test]
 /// `repeatlast=0` keeps `overlay_cuda` from sending 32-aligned padded copies of
 /// the main frame to NVENC, so the output needs no crop metadata at any size.
-fn test_9_3_1_cuda_profiles_encode_exact_frames_without_crop_metadata() {
+fn cuda_profiles_encode_exact_frames_without_crop_metadata() {
     for codec in ["nnvgpu_h264", "nnvgpu_hevc"] {
         for (width, height) in [(1920, 1080), (1080, 1920), (2704, 1520), (1920, 1920)] {
             let built = cuda_settings_for_dimensions(codec, width, height);
@@ -574,7 +574,7 @@ fn test_9_3_1_cuda_profiles_encode_exact_frames_without_crop_metadata() {
 /// complete QSV filter stack: scale_qsv for scaling → hwupload for overlay
 /// input → overlay_qsv for composite. Verifies no hwdownload (stays on GPU)
 /// and that detected init args are used verbatim.
-fn test_9_6_qsv_full_profile_uses_overlay_qsv_when_available() {
+fn qsv_full_profile_uses_overlay_qsv_when_available() {
     let detected_args = vec![
         "-init_hw_device".to_string(),
         "qsv=qs".to_string(),
@@ -696,7 +696,7 @@ fn qsv_full_rotated_sources_rotate_only_the_rgba_overlay() {
 }
 
 #[test]
-fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
+fn safe_codec_names_do_not_select_experimental_profiles() {
     let nvenc = settings_for_codec(
         "h264_nvenc",
         "60M",
@@ -720,7 +720,7 @@ fn test_9_7_safe_codec_names_do_not_select_experimental_profiles() {
 
 #[test]
 fn quality_mode_selects_encoder_specific_args() {
-    use ovrley_core::encode::quality::EncodingQuality;
+    use ovrley_core::encode::settings::EncodingQuality;
     for (codec, flag, value) in [
         ("libx264", "-crf", "18"),
         ("libx265", "-crf", "18"),

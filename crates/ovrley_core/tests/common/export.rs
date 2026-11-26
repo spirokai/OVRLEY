@@ -3,7 +3,7 @@
 
 use super::{builders::minimal_dense_activity, test_config::repo_git_root};
 use ovrley_core::{
-    activity::schema::ParsedActivity, debug::RenderProfiler, normalize::ValidatedRenderConfig,
+    activity::schema::ParsedActivity, diagnostics::RenderProfiler, config::ValidatedRenderConfig,
     render::render_full_frames,
 };
 

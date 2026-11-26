@@ -1,5 +1,4 @@
-use ovrley_core::media::dji_ac004::{extract_from_video, parse_raw_metadata};
-use ovrley_core::media::mp4_telemetry;
+use ovrley_core::media::telemetry::dji::{extract_from_video, parse_raw_metadata};
 use std::path::Path;
 
 #[test]
@@ -28,7 +27,7 @@ fn extract_from_video_reads_dji_fixture() {
 fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
     let (repo_root, fixture) = dji_fixture();
 
-    let metadata = mp4_telemetry::probe_video_metadata(repo_root, fixture.to_str().unwrap())
+    let metadata = ovrley_core::media::telemetry::probe_video_metadata(repo_root, fixture.to_str().unwrap())
         .expect("expected video metadata probe to succeed");
     assert_eq!(
         metadata.sync_time.as_deref(),
@@ -39,10 +38,10 @@ fn mp4_telemetry_uses_ac004_fallback_for_dji_fixture() {
         Some("2026-03-15T15:58:14+00:00")
     );
     assert_eq!(metadata.time_source.as_deref(), Some("gps"));
-    let response = mp4_telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
+    let response = ovrley_core::media::telemetry::extract_activity(repo_root, fixture.to_str().unwrap())
         .expect("expected extraction to succeed")
         .expect("expected MP4 telemetry activity");
-    let activity = &response.parsed_activity;
+    let activity = &response;
 
     assert_eq!(activity.file_format.as_deref(), Some("mp4_telemetry"));
     assert_eq!(
@@ -178,6 +177,7 @@ fn parse_raw_metadata_rejects_samples_without_gps_fix() {
     assert!(parse_raw_metadata(&raw).is_none());
 }
 
+#[expect(clippy::too_many_arguments, reason = "test fixture parameters")]
 fn sample_payload(
     device_name: &str,
     sample_rate_hz: f32,

@@ -1,14 +1,8 @@
-//! Canonical codec and profile catalog for encoder-facing FFmpeg choices.
+//! The codec catalog: typed encoder, transparent codec and composite profile identifiers, their
+//! external names, filter-stack classification and availability rules.
 //!
-//! Owns: typed codec/profile identifiers, external names, overlay/filter-stack
-//!       classification, and availability-rule metadata shared by detection and
-//!       FFmpeg-setting builders.
-//! Does not own: subprocess probing, frontend wire serialization, or final
-//!       FFmpeg argument assembly.
-//!
-//! The catalog is intentionally data-shaped. Each entry describes one canonical
-//! transparent codec or composite profile used throughout normalization,
-//! capability detection, and FFmpeg command construction.
+//! The catalog is data. Each entry describes one transparent codec or composite profile that
+//! config validation, encoder detection and FFmpeg command construction share.
 
 use crate::render::SlotPlacement;
 

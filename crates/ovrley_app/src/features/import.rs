@@ -9,8 +9,8 @@
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::sync::{Arc, Condvar, Mutex};
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::media::video_edits::{AnchorSide, OffsetSource, TimezoneMode, VideoResolution};
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::media::edits::{AnchorSide, OffsetSource, TimezoneMode, VideoResolution};
 use crate::dialogs::{filename_from_selected_path, open_multiple_paths, DialogOptions};
 use crate::features::history::{change_video_collection, HistoryMode};
 use crate::features::shell::EditorBackgroundMode;
@@ -1185,11 +1185,11 @@ fn commit_reviewed_import(
 
 /// The fps rounded, the update rate normalized for it. The
 /// scene takes the videos' size.
-fn adopted_render_settings(store: &Store, fps: Fps) -> Result<ovrley_core::encode::render_settings::RenderSettings, String> {
+fn adopted_render_settings(store: &Store, fps: Fps) -> Result<ovrley_core::encode::settings::RenderSettings, String> {
     let rate = fps.as_f64().round();
     let update_rate = normalize_update_rate_for_fps(rate, f64::from(store.render_settings.widget_update_rate));
     let mut settings = store.render_settings.clone();
-    settings.set_fps_and_update_rate(rate, update_rate)?;
+    settings.set_fps_and_update_rate(rate, update_rate).map_err(|error| error.to_string())?;
     Ok(settings)
 }
 
@@ -1700,7 +1700,7 @@ fn pump_telemetry(store: &mut Store, services: &mut Services) {
         services.workers.spawn("video-telemetry", move || {
             let telemetry = match tools
                 .extract_telemetry(&path)
-                .and_then(|response| response.map(ImportedActivity::from_response).transpose())
+                .and_then(|response| response.map(ImportedActivity::from_activity).transpose())
             {
                 Ok(Some(activity)) => VideoTelemetry::ready(activity),
                 Ok(None) => {

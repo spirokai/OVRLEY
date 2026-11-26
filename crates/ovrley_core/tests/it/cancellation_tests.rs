@@ -2,11 +2,11 @@
 //!
 //! Exercises the native service boundary with controlled preparation and cleanup.
 
-use ovrley_core::debug::RenderProgress;
+use ovrley_core::encode::progress::RenderProgress;
 use ovrley_core::encode::progress::ProgressSink;
 use ovrley_core::encode::progress::RenderController;
 use ovrley_core::error::CoreError;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::execution::RenderExecutionService;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
@@ -24,7 +24,7 @@ fn double_cancel_is_idempotent() {
     let progress = controller.progress();
     assert_eq!(
         progress.status,
-        ovrley_core::debug::RenderStatus::Cancelling
+        ovrley_core::encode::progress::RenderStatus::Cancelling
     );
     assert!(progress.busy);
     assert!(matches!(
@@ -33,7 +33,7 @@ fn double_cancel_is_idempotent() {
     ));
     assert_eq!(
         controller.progress().status,
-        ovrley_core::debug::RenderStatus::Cancelled
+        ovrley_core::encode::progress::RenderStatus::Cancelled
     );
 }
 
@@ -60,14 +60,14 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
 
     for cancel in [true, false] {
         let pending = if cancel {
-            ovrley_core::debug::RenderStatus::Cancelling
+            ovrley_core::encode::progress::RenderStatus::Cancelling
         } else {
-            ovrley_core::debug::RenderStatus::Preparing
+            ovrley_core::encode::progress::RenderStatus::Preparing
         };
         let terminal = if cancel {
-            ovrley_core::debug::RenderStatus::Cancelled
+            ovrley_core::encode::progress::RenderStatus::Cancelled
         } else {
-            ovrley_core::debug::RenderStatus::Error
+            ovrley_core::encode::progress::RenderStatus::Error
         };
         let sink = Arc::new(RecordingSink::default());
         let controller = RenderController::with_sink(sink.clone());
@@ -104,7 +104,7 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
         prepared_rx.recv_timeout(Duration::from_secs(5)).unwrap();
         assert_eq!(
             service.progress().status,
-            ovrley_core::debug::RenderStatus::Preparing
+            ovrley_core::encode::progress::RenderStatus::Preparing
         );
         assert!(service.reserve().is_err());
         if cancel {
@@ -144,7 +144,7 @@ fn cancellation_or_panic_during_preparation_retains_ownership_until_cleanup() {
         next.complete(Ok("next.mov".to_owned())).unwrap();
         assert_eq!(
             service.progress().status,
-            ovrley_core::debug::RenderStatus::Complete
+            ovrley_core::encode::progress::RenderStatus::Complete
         );
     }
 }

@@ -115,18 +115,18 @@ impl Editor {
     fn open(root: &Path, output: &Path, count: usize, mixed: bool) -> Result<Self, String> {
         let (scene, globals) = editor::hud_template(root)?;
         let (parts, fakes) = fake_services(json!({}));
-        let path = root.join(RIDE).display().to_string();
+        let path = root.join(RIDE);
         // The import's debug dump (debug builds) lands beside the results.
         let directory = output.parent().ok_or("the output has no folder")?.to_path_buf();
         let paths = ovrley_core::paths::AppPaths::from_runtime_roots(directory.clone(), directory.clone(), directory.join("runtime"));
-        let response = ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string())?;
-        let imported = ImportedActivity::from_response(response)?;
+        let activity = ovrley_core::import::load_activity(&paths, &path).map_err(|error| error.to_string())?;
+        let imported = ImportedActivity::from_activity(activity)?;
         let config = fixture(scene, &globals, count, mixed, &imported)?;
         let dispatcher = Dispatcher::new(Store { theme: Some(editor::theme()), ..Store::default() }, parts);
         dispatcher.dispatch(move |store, _| {
             store.history.set_mode(HistoryMode::Reset);
             store.template.global_defaults = Rc::new(globals);
-            ovrley_app::features::shell::activate_parsed_activity(store, ActivitySource::File { path }, imported);
+            ovrley_app::features::shell::activate_parsed_activity(store, ActivitySource::File { path: path.display().to_string() }, imported);
             store.editor.set_config(config);
             store.editor.set_selected_second(PLAYHEAD_SECOND);
             // A 1600 × 1000 editor at density 1.

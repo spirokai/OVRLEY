@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::media::manual_video_sync::{Landmark, LandmarkKind, ManualVideoSync};
+use ovrley_core::media::sync::{Landmark, LandmarkKind, ManualVideoSync};
 use crate::features::player::viewport::TimelineMetrics;
 use crate::features::sync::detection::LocationEvent;
 use crate::features::sync::manual::{self, CandidateStatus};

@@ -14,7 +14,7 @@
 //! - Overlay FPS division producing unrepresentable rationals
 //! - Float fallback missing a common NTSC rate
 
-use ovrley_core::encode::fps::Fps;
+use ovrley_core::encode::timing::Fps;
 
 #[test]
 // Verifies common NTSC-rate rational pairs preserve precision.
@@ -160,7 +160,7 @@ fn seconds_and_frames_convert_on_the_exact_grid() {
     assert!((ntsc.frames_to_seconds(30) - 1.001).abs() < 1e-12);
     let thirty = Fps::new(30, 1).unwrap();
     assert_eq!(thirty.seconds_to_frames(0.5 / 30.0), 1, "halves round up");
-    assert_eq!(thirty.seconds_to_frames(-0.5 / 30.0), 0, "as JavaScript's Math.round");
+    assert_eq!(thirty.seconds_to_frames(-0.5 / 30.0), 0, "halves round up");
     assert_eq!(thirty.seconds_to_frames(-2.0), -60);
 }
 

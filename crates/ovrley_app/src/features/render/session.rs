@@ -8,9 +8,9 @@
 //! batch at a newer revision, and a tick only on its snapshot's revision.
 
 use std::sync::{Arc, Mutex};
-use ovrley_core::debug::{RenderProgress, RenderStatus};
+use ovrley_core::encode::progress::{RenderProgress, RenderStatus};
 use ovrley_core::encode::progress::ProgressSink;
-use ovrley_core::render_jobs::contracts::{BatchProgressUpdate, BatchRenderEvent, BatchSnapshot};
+use ovrley_core::jobs::contracts::{BatchProgressUpdate, BatchRenderEvent, BatchSnapshot};
 use crate::store::Store;
 use crate::store::services::{Services, UiPost};
 
@@ -253,7 +253,7 @@ pub(crate) mod tests {
     use super::*;
     use crate::store::services::fakes::{fake_services, FakeRenderCall};
     use crate::store::Dispatcher;
-    use ovrley_core::render_jobs::contracts::{BatchPhase, BatchResultCounts};
+    use ovrley_core::jobs::contracts::{BatchPhase, BatchResultCounts};
     use serde_json::json;
 
     fn dispatcher() -> (Dispatcher, crate::store::services::fakes::Fakes) {

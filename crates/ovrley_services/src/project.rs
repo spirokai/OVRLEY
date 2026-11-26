@@ -12,17 +12,17 @@ use chrono::DateTime;
 use ovrley_core::encode::ffmpeg::catalog::{CodecSelection, EncoderId};
 use ovrley_core::activity::trim::ActivityTrim;
 use ovrley_core::encode::ffmpeg::transitions::{transition_defaults, TransitionDefaults};
-use ovrley_core::encode::quality::{validate_quality, EncodingQuality, QualityType};
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode, RenderSettings};
-use ovrley_core::media::manual_video_sync::{
+use ovrley_core::encode::settings::{EncodingQuality, QualityType};
+use ovrley_core::encode::settings::{ExportMode, OutputMode, RenderSettings};
+use ovrley_core::media::sync::{
     Landmark, ManualVideoSync, DEFAULT_MANUAL_SPEED_THRESHOLD_KMH,
     DEFAULT_MANUAL_TURN_THRESHOLD_DEGREES,
 };
-use ovrley_core::media::video_edits::{
+use ovrley_core::media::edits::{
     Cut, OffsetSource, PlacementAnchor, SegmentEdits, TimezoneMode, VideoEdits,
     VideoMetadataSnapshot,
 };
-use ovrley_core::normalize::validate_template_rasters;
+use ovrley_core::config::validate_template_rasters;
 use ovrley_widgets::widgets::raster::RasterConfig;
 use ovrley_core::raster::{
     is_canonical_extension, load_embedded_raster, SelectedRaster, MAX_ENCODED_BYTES,
@@ -198,7 +198,7 @@ struct ProjectDocumentV1 {
     timeline: ProjectTimeline,
 }
 
-/// The editor's durable state. The template ingress (`ovrley_core::normalize::template`)
+/// The editor's durable state. The template ingress (`ovrley_core::template`)
 /// normalizes it when the project is applied.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -442,7 +442,7 @@ impl Serialize for ProjectRender {
 impl<'de> Deserialize<'de> for ProjectRender {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let fields = ProjectRenderFields::deserialize(deserializer)?;
-        let quality = validate_quality(fields.quality.quality_type, fields.quality.quality_value)
+        let quality = EncodingQuality::try_new(fields.quality.quality_type, fields.quality.quality_value)
             .map_err(|error| serde::de::Error::custom(format!("render.{error}")))?;
         Ok(Self {
             settings: RenderSettings {
@@ -648,7 +648,7 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         validate_folder(folder)?;
     }
     let render = &project.render.settings;
-    render.validate()?;
+    render.validate().map_err(|error| error.to_string())?;
     for (label, value) in [
         ("timeline.playheadSecond", project.timeline.playhead_second),
         ("timeline.viewStart", project.timeline.view_start),
@@ -665,7 +665,7 @@ fn validate_project(project: &ProjectDocument) -> Result<HashSet<String>, String
         return Err("Composite export mode requires a video source".into());
     }
     if let Some(trim) = &project.activity_trim {
-        trim.validate()?;
+        trim.validate().map_err(|error| error.to_string())?;
         if project.sources.activity.is_none() {
             return Err("activityTrim requires an activity source".into());
         }
@@ -777,7 +777,7 @@ fn validate_project_rasters(
 }
 
 fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
-    ovrley_core::normalize::validate_saved_label_typography(&editor.config)
+    ovrley_core::template::validate_saved_label_typography(&editor.config)
         .map_err(|error| error.to_string())?;
     let globals: GlobalDefaults =
         serde_json::from_value(Value::Object(editor.global_defaults.clone()))
@@ -830,7 +830,7 @@ fn validate_editor(editor: &ProjectEditor) -> Result<(), String> {
 }
 
 fn migrate_project(version: u32, mut value: Value) -> Result<MigratedProject, String> {
-    ovrley_core::normalize::migrate_saved_font_input(&mut value);
+    ovrley_core::template::migrate_saved_font_input(&mut value);
     if matches!(
         version,
         PROJECT_VERSION_V1 | PROJECT_VERSION_V2 | PROJECT_VERSION_V3
@@ -977,7 +977,7 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
         turn_threshold_degrees: manual.turn_threshold_degrees,
     };
     manual.validate()?;
-    let quality = validate_quality(render.quality_type, render.quality_value)
+    let quality = EncodingQuality::try_new(render.quality_type, render.quality_value)
         .map_err(|error| format!("render.{error}"))?;
     let document = ProjectDocument {
         format: project.format,
@@ -1593,7 +1593,7 @@ pub fn write_project<S: std::hash::BuildHasher>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ovrley_core::media::video_edits::FIRST_SEGMENT_KEY;
+    use ovrley_core::media::edits::FIRST_SEGMENT_KEY;
 
     use crate::rasters::TEST_BMP;
     use ovrley_core::raster::RasterResourceResolver;
@@ -2037,7 +2037,7 @@ mod tests {
             assert_eq!(loaded.project.version, PROJECT_VERSION);
             assert_eq!(
                 loaded.project.render.settings.quality,
-                validate_quality(quality_type, quality_value).unwrap()
+                EncodingQuality::try_new(quality_type, quality_value).unwrap()
             );
             assert_eq!(
                 loaded.project.editor.config["rasters"],

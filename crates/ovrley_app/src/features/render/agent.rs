@@ -3,9 +3,9 @@
 //! hands its tool calls to these.
 
 use std::num::NonZeroU32;
-use ovrley_core::encode::quality::validate_quality;
-use ovrley_core::encode::render_settings::{QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
-use ovrley_core::render_jobs::contracts::{BatchItemOutcome, BatchPhase};
+
+use ovrley_core::encode::settings::{QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
+use ovrley_core::jobs::contracts::{BatchItemOutcome, BatchPhase};
 use serde_json::{json, Value};
 use crate::features::render::{close_render_dialog, format_render_path_error, imported_video_fps, locked_video_fps, open_render_dialog, ready_batch, reconcile_draft, render_disabled_reason, resolution_mismatch, select_acceleration, select_format, set_batch_output_folder, set_custom_fps, set_export_mode, set_output_mode, set_output_path, set_quality_type, set_render_full_activity, set_update_rate, start_blocked, start_render, text, update_rate_fps, view, DialogPhase, EncodingQuality, ExportMode, OutputMode, QualityType};
 use crate::features::render::codecs::{codec_selection, default_quality, is_format_available, visible_accelerations, Acceleration, FormatGroup, OutputFormat, PlatformOs};
@@ -238,7 +238,7 @@ fn apply_options(store: &mut Store, options: &AgentRenderOptions) -> Result<(), 
             EncodingQuality::Bitrate(_) => QualityType::Bitrate,
         };
         draft.settings.quality =
-            validate_quality(quality_type, value).map_err(|error| error.to_string())?;
+            EncodingQuality::try_new(quality_type, value).map_err(|error| error.to_string())?;
     }
     if let Some(enabled) = options.render_full_activity {
         if enabled
@@ -477,7 +477,7 @@ pub fn describe_progress(store: &Store) -> Value {
         "secondsRemaining": progress.estimated_seconds_remaining,
         "outputPath": store.media.active_render_output_path,
         "filename": progress.filename,
-        "error": (progress.status == ovrley_core::debug::RenderStatus::Error).then(|| progress.message.clone()),
+        "error": (progress.status == ovrley_core::encode::progress::RenderStatus::Error).then(|| progress.message.clone()),
     })
 }
 

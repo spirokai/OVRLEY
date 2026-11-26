@@ -1,4 +1,4 @@
-use ovrley_core::activity::parsers::tcx::parse_tcx_activity_reader;
+use ovrley_core::import::tcx::parse_reader;
 
 #[test]
 fn tcx_trackpoints_finalize_into_existing_activity_fields() {
@@ -23,9 +23,8 @@ fn tcx_trackpoints_finalize_into_existing_activity_fields() {
         <Creator><Name>Sample Device</Name></Creator>
       </Activity></Activities>
     </TrainingCenterDatabase>"#;
-    let activity = parse_tcx_activity_reader(tcx.as_bytes(), "ride.tcx", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(tcx.as_bytes(), "ride.tcx", None)
+        .unwrap();
 
     assert_eq!(activity.file_format.as_deref(), Some("tcx"));
     assert_eq!(activity.sample_elapsed_seconds, vec![0.0, 1.0, 2.0]);
@@ -51,7 +50,7 @@ fn tcx_rejects_multiple_activities() {
     let tcx = r#"<TrainingCenterDatabase><Activities>
       <Activity Sport="Biking"/><Activity Sport="Running"/>
     </Activities></TrainingCenterDatabase>"#;
-    let error = parse_tcx_activity_reader(tcx.as_bytes(), "multiple.tcx", None).unwrap_err();
+    let error = parse_reader(tcx.as_bytes(), "multiple.tcx", None).unwrap_err();
 
     assert!(error.to_string().contains("multiple.tcx"));
     assert!(error.to_string().contains("multiple activities"));
@@ -69,9 +68,8 @@ fn tcx_preserves_lap_start_times_through_idle_gap_filling() {
         <Trackpoint><Time>2026-06-07T11:00:07Z</Time><DistanceMeters>10</DistanceMeters></Trackpoint>
       </Track></Lap>
     </Activity></Activities></TrainingCenterDatabase>"#;
-    let activity = parse_tcx_activity_reader(tcx.as_bytes(), "laps.tcx", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(tcx.as_bytes(), "laps.tcx", None)
+        .unwrap();
 
     assert_eq!(
         activity.sync_time.as_deref(),
@@ -123,9 +121,8 @@ fn tcx_imports_running_cadence_without_replacing_missing_readings() {
         <Trackpoint><Time>2026-06-07T11:00:02Z</Time></Trackpoint>
       </Track></Lap></Activity></Activities>
     </TrainingCenterDatabase>"#;
-    let activity = parse_tcx_activity_reader(tcx.as_bytes(), "run.tcx", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(tcx.as_bytes(), "run.tcx", None)
+        .unwrap();
 
     assert_eq!(activity.cadence, vec![Some(86.0), Some(0.0), None]);
 }
@@ -138,9 +135,8 @@ fn tcx_uses_activity_id_without_lap_timestamps() {
         <Trackpoint><Time>2026-06-07T11:01:51Z</Time></Trackpoint>
       </Track></Lap>
     </Activity></Activities></TrainingCenterDatabase>"#;
-    let activity = parse_tcx_activity_reader(tcx.as_bytes(), "no-lap-times.tcx", None)
-        .unwrap()
-        .parsed_activity;
+    let activity = parse_reader(tcx.as_bytes(), "no-lap-times.tcx", None)
+        .unwrap();
 
     assert_eq!(
         activity.sync_time.as_deref(),

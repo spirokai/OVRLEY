@@ -2,9 +2,9 @@
 //!
 //! The encoder receives already-densified activity data and rendered Skia
 //! frames, streams raw overlay pixels to ffmpeg (RGBA, or `yuva420p` for
-//! composite graphs that blend in YUV; see [`overlay_format`]), and records
+//! composite graphs that blend in YUV; see [`overlay`]), and records
 //! timing/debug output.
-//! Callers submit work through [`crate::render_jobs::execution::RenderExecutionService`].
+//! Callers submit work through [`crate::jobs::execution::RenderExecutionService`].
 //! Job planning fixes timing and settings; [`pipeline`] prepares assets and
 //! feeds ordered frames into one supervised FFmpeg process.
 //!
@@ -17,23 +17,9 @@
 //! | Monitor | Process owner | ffmpeg stderr, bounded diagnostic history | ffmpeg exits → stderr EOF | Process owner |
 //! | Operation | Render execution service | Reservation and accepted inputs | Completion / cancel / error | Execution service |
 
-/// Encoding diagnostics and timing summaries.
-pub mod debug;
-/// FFmpeg discovery, capability detection, profiles, and argument builders.
 pub mod ffmpeg;
-/// Rational frame-rate helpers shared by composite encoding modules.
-pub mod fps;
-/// Pixel format and conversion of the raw overlay frames piped to FFmpeg.
-pub mod overlay_format;
-/// Encoding runtime pipelines and their shared frame/process infrastructure.
+pub mod overlay;
 pub mod pipeline;
-/// Canonical composite-render data contract.
-pub mod plan;
-/// Live render progress estimation helpers.
 pub mod progress;
-/// Composite quality/bitrate validation and FFmpeg arguments.
-pub mod quality;
-/// The editor's render settings, which projects save.
-pub mod render_settings;
-/// Video-local activity coverage shared by both export modes.
-pub mod video_timing;
+pub mod settings;
+pub mod timing;

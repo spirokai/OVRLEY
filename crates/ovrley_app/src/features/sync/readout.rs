@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
-use ovrley_core::normalize::template::normalize_global_defaults;
+use ovrley_core::template::normalize_global_defaults;
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
 use ovrley_widgets::render::tile::WidgetGeometry;

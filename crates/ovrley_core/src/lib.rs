@@ -1,45 +1,20 @@
-//! Core rendering and encoding library for OVRLEY.
-//!
-//! The app calls it with typed values. It owns the
-//! production data path from the render config through activity trimming,
-//! per-frame interpolation, Skia overlay rendering, ffmpeg encoding, progress
-//! tracking, and debug artifact generation.
-//!
-//! Public modules are intentionally grouped by responsibility so the app's
-//! services stay thin while the testable business logic remains here.
+//! OVRLEY's core without a UI: activity import and preparation, render config validation,
+//! Skia overlay rendering, FFmpeg encoding, render jobs and their diagnostics.
 #![recursion_limit = "256"]
 
-pub use ovrley_map::gpu::{MapDataSource, MapSource};
-
-/// Activity JSON contracts plus trim and interpolation utilities.
 pub mod activity;
-/// Shared benchmark infrastructure for diagnostic benchmark binaries.
-pub mod benchmark_common;
-/// Shared CLI argument helpers for diagnostic binaries.
-pub mod bin_common;
-/// Template, preview-frame and file helpers the app calls.
-pub mod commands;
-/// Progress and timing diagnostics shared by render and encode code.
-pub mod debug;
-/// Video encoding and ffmpeg integration.
+#[doc(hidden)]
+pub mod cli;
+pub mod config;
+pub mod diagnostics;
 pub mod encode;
-/// Structured error types and result alias used by all core modules.
 pub mod error;
-/// Font identities, face capabilities, and session resolution.
 pub mod fonts;
-/// Source media probing and embedded telemetry extraction.
+pub mod import;
+pub mod jobs;
 pub mod media;
-/// Render config validation seam — zero backend-owned defaults.
-pub mod normalize;
-/// Render output naming, validation, and request-owned targets.
 pub mod output;
-/// Application path configuration and resolution.
 pub mod paths;
-/// Validation and oriented preview decoding for user-selected bitmap resources.
 pub mod raster;
-/// Skia-based overlay rendering.
 pub mod render;
-/// Batch render submission and lifecycle vocabulary.
-pub mod render_jobs;
-
-pub use error::{CoreError, CoreResult};
+pub mod template;

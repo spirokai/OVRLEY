@@ -1,8 +1,8 @@
 use crate::common;
 
 use ovrley_core::activity::schema::DenseActivityReport;
-use ovrley_core::normalize::RenderConfig;
-use ovrley_core::normalize::validate_render_config;
+use ovrley_core::config::RenderConfig;
+use ovrley_core::config::validate_render_config;
 use ovrley_widgets::widgets::gauges::arc::CornerOrientation;
 use ovrley_core::paths::AppPaths;
 use ovrley_widgets::widgets::gauges::arc::{
@@ -143,7 +143,7 @@ fn corner_bars_keep_the_configured_segment_count() {
 
 fn validate_single_corner(
     value: serde_json::Value,
-) -> Result<ovrley_core::normalize::ValidatedRenderConfig, ovrley_core::CoreError> {
+) -> Result<ovrley_core::config::ValidatedRenderConfig, ovrley_core::error::CoreError> {
     validate_render_config(RenderConfig {
         scene: serde_json::from_value(common::builders::scene_json()).unwrap(),
         backdrops: vec![],
@@ -152,7 +152,7 @@ fn validate_single_corner(
         values: vec![serde_json::from_value(value).unwrap()],
         plots: serde_json::Value::Object(serde_json::Map::new()),
         extra: BTreeMap::new(),
-    })
+    }, None)
 }
 
 fn full_corner_gauge_config(corner_orientation: &str) -> serde_json::Value {

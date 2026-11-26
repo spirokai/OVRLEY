@@ -1,7 +1,7 @@
 //! MetricKind serde compatibility tests.
 //!
-//! Verifies each `MetricKind` variant serializes to the exact legacy
-//! JSON string expected by the frontend (e.g., `"speed"`, `"heartrate"`),
+//! Verifies each `MetricKind` variant serializes to its exact saved JSON string (e.g.,
+//! `"speed"`, `"heartrate"`),
 //! and that deserialization of old string values works correctly.
 //! Confirms unknown metric names produce deserialization errors.
 //!
@@ -11,7 +11,7 @@
 //! ## Regressions guarded
 //! - `#[serde(rename)]` changes breaking old templates/configs
 //! - Unknown metric strings silently mapping to a default variant
-//! - Variant name refactors breaking frontend communication
+//! - Variant renames changing the saved names
 
 use ovrley_widgets::model::catalog::MetricKind;
 

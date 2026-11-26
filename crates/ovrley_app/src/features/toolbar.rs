@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-use ovrley_core::media::video_edits::TimezoneMode;
+use ovrley_core::media::edits::TimezoneMode;
 use ovrley_widgets::model::document::round_half_up;
 use ovrley_widgets::widgets::lap_timer::format_lap_duration;
 use serde::{Deserialize, Serialize};

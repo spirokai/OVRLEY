@@ -3,7 +3,7 @@
 //! external activity import, agent sessions, the settings sections, and the app update.
 
 use std::sync::{Arc, Mutex};
-use ovrley_core::activity::ACTIVITY_EXTENSIONS;
+use ovrley_core::import::ACTIVITY_EXTENSIONS;
 use ovrley_services::runtime::Distribution;
 use ovrley_services::updater::DownloadProgress;
 use ovrley_widgets::model::document::{course_widget_dimensions, number};
@@ -395,7 +395,7 @@ pub fn import_activity(store: &mut Store, services: &mut Services, path: String,
     store.media.set_processing(true);
     let paths = std::sync::Arc::clone(&services.paths);
     services.workers.spawn("activity-import", move || {
-        let result = ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string()).and_then(ImportedActivity::from_response);
+        let result = ovrley_core::import::load_activity(&paths, std::path::Path::new(&path)).map_err(|error| error.to_string()).and_then(ImportedActivity::from_activity);
         Box::new(move |store: &mut Store, _: &mut Services| finish_activity_import(store, path, result, reply))
     });
 }
@@ -1151,7 +1151,7 @@ mod tests {
     #[test]
     fn template_save_runs_only_while_the_status_shows() {
         let mut store = Store::default();
-        store.template.last_saved_template_state = Some(ovrley_core::normalize::template::create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults)).unwrap());
+        store.template.last_saved_template_state = Some(ovrley_core::template::create_durable_template_state(&store.editor.config, Some(&store.template.global_defaults)).unwrap());
         crate::features::templates::reconcile_durable_state(&mut store);
         let (answers, _, fakes) = press(store, vec![modified("p", true, true)]);
         assert_eq!(answers, [false], "a saved template has nothing to save");

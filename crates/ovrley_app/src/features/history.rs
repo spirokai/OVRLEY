@@ -5,7 +5,7 @@
 
 use std::rc::Rc;
 use ovrley_core::activity::trim::ActivityTrim;
-use ovrley_core::encode::render_settings::RenderSettings;
+use ovrley_core::encode::settings::RenderSettings;
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::{Map, Value};
 use crate::store::Store;

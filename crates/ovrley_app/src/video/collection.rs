@@ -3,8 +3,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use ovrley_core::encode::ffmpeg::transitions::TransitionDefaults;
-use ovrley_core::encode::fps::Fps;
-use ovrley_core::media::video_edits::VideoResolution;
+use ovrley_core::encode::timing::Fps;
+use ovrley_core::media::edits::VideoResolution;
 use crate::dialogs::filename_from_selected_path;
 use crate::i18n::{catalog, interpolate, Locale};
 use crate::video::{Clip, ImportedVideo, SecondsRange, VideoEditsMap};

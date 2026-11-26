@@ -1,11 +1,11 @@
 //! Exercises real FFmpeg teardown and compares single/batch work and progress.
 use crate::common;
 
-use ovrley_core::debug::RenderProgress;
+use ovrley_core::encode::progress::RenderProgress;
 use ovrley_core::encode::progress::ProgressSink;
-use ovrley_core::render_jobs::contracts::*;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::inspection::VideoInspectionService;
+use ovrley_core::jobs::contracts::*;
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::inspection::VideoInspectionService;
 use serde_json::json;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
@@ -28,8 +28,9 @@ impl ProgressSink for Observations {
 #[test]
 fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse() {
     use ovrley_core::encode::progress::RenderController;
-    use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
-    use ovrley_core::render_jobs::planning::plan_single_render;
+    use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
+    use ovrley_core::jobs::planning::plan_single_render;
     use std::sync::atomic::{AtomicBool, Ordering};
 
     struct Interrupt {
@@ -39,7 +40,7 @@ fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse(
     }
     impl ProgressSink for Interrupt {
         fn emit_progress(&self, progress: &RenderProgress) {
-            if progress.status == ovrley_core::debug::RenderStatus::Rendering
+            if progress.status == ovrley_core::encode::progress::RenderStatus::Rendering
                 && progress.current > 0
                 && progress.current < progress.total
                 && !self.fired.swap(true, Ordering::Relaxed)
@@ -87,7 +88,7 @@ fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse(
         let output = paths.downloads_dir.join(format!("interrupted-{panic}.mov"));
         let target = RenderOutputTarget::validate(
             output.to_str().unwrap(),
-            RenderOutputKind::Transparent,
+            ExportMode::Transparent,
             true,
         )
         .unwrap();
@@ -119,7 +120,7 @@ fn native_cancellation_and_coordinator_panic_clean_output_before_renderer_reuse(
         assert!(output.metadata().unwrap().len() > 0);
         assert_eq!(
             service.progress().status,
-            ovrley_core::debug::RenderStatus::Complete
+            ovrley_core::encode::progress::RenderStatus::Complete
         );
     }
 }
@@ -130,7 +131,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
     // `submit_single_config` and must plan the same work as the JSON entry's batch.
     let paths = common::composite::test_paths_named("execution-parity");
     let binary =
-        ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
+        ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&paths.repo_root).unwrap();
     let source = paths.temp_dir.join("source.mp4");
     let generated = std::process::Command::new(binary)
         .args([
@@ -167,10 +168,10 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
     )
     .unwrap();
 
-    for mode in [ovrley_core::encode::render_settings::ExportMode::Transparent, ovrley_core::encode::render_settings::ExportMode::Composite] {
+    for mode in [ovrley_core::encode::settings::ExportMode::Transparent, ovrley_core::encode::settings::ExportMode::Composite] {
         let (codec, extension) = match mode {
-            ovrley_core::encode::render_settings::ExportMode::Transparent => ("qtrle", "mov"),
-            ovrley_core::encode::render_settings::ExportMode::Composite => ("libx264", "mp4"),
+            ovrley_core::encode::settings::ExportMode::Transparent => ("qtrle", "mov"),
+            ovrley_core::encode::settings::ExportMode::Composite => ("libx264", "mp4"),
         };
         let mut template = common::builders::batch_template();
         template.scene.width = Some(1280);
@@ -184,7 +185,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
             }))
             .unwrap(),
         );
-        if mode == ovrley_core::encode::render_settings::ExportMode::Composite {
+        if mode == ovrley_core::encode::settings::ExportMode::Composite {
             scene.extend(
                 serde_json::from_value::<serde_json::Map<String, serde_json::Value>>(json!({
                     "composite_video_path": source.metadata.path,
@@ -203,7 +204,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
         let output = output.to_str().unwrap();
         // The JSON entry for one mode, the typed entry for the other: both match the batch.
         match mode {
-            ovrley_core::encode::render_settings::ExportMode::Transparent => service.submit_single(
+            ovrley_core::encode::settings::ExportMode::Transparent => service.submit_single(
                 &paths,
                 &single.to_string(),
                 &serde_json::to_string(&activity).unwrap(),
@@ -212,9 +213,9 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
                 None,
                 None,
             ),
-            ovrley_core::encode::render_settings::ExportMode::Composite => service.submit_single_config(
+            ovrley_core::encode::settings::ExportMode::Composite => service.submit_single_config(
                 &paths,
-                ovrley_core::normalize::parse_config_value(&single).unwrap(),
+                ovrley_core::config::parse_config_value(&single).unwrap(),
                 Arc::new(activity.clone()),
                 output,
                 true,
@@ -229,7 +230,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
         let terminal = single.last().unwrap();
         assert_eq!(
             terminal.status,
-            ovrley_core::debug::RenderStatus::Complete,
+            ovrley_core::encode::progress::RenderStatus::Complete,
             "{}",
             terminal.message
         );
@@ -248,7 +249,7 @@ fn single_and_batch_use_the_same_frame_work_and_native_fps() {
                 export_codec: codec.into(),
                 fps: 30,
                 update_rate: 2,
-                quality_type: ovrley_core::encode::quality::QualityType::Bitrate,
+                quality_type: ovrley_core::encode::settings::QualityType::Bitrate,
                 quality_value: 10.0,
                 qsv_full_init_args: None,
             },

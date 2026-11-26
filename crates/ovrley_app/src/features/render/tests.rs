@@ -1,11 +1,11 @@
 //! The render dialog with the fake render service and dialogs.
 
 use std::time::{Duration, Instant};
-use ovrley_core::debug::{RenderProgress, RenderStatus};
+use ovrley_core::encode::progress::{RenderProgress, RenderStatus};
 use ovrley_core::encode::ffmpeg::detect::AvailableCodecs;
 use ovrley_core::encode::progress::ProgressSink;
-use ovrley_core::render_jobs::batch::BatchServiceError;
-use ovrley_core::render_jobs::contracts::{BatchAcceptance, BatchActivity, BatchDestination};
+use ovrley_core::jobs::batch::BatchServiceError;
+use ovrley_core::jobs::contracts::{BatchAcceptance, BatchActivity, BatchDestination};
 use ovrley_widgets::model::document::OverlayConfig;
 use serde_json::json;
 use crate::features::render::*;
@@ -799,14 +799,14 @@ fn stale_sources_mark_their_rows_and_block_start_until_inspected_again() {
     fakes.render.batch_results.lock().unwrap().push_back(Err(
         BatchServiceError::ReinspectionRequired {
             message: "stale".into(),
-            rejection: ovrley_core::render_jobs::inspection::InspectionRejection {
+            rejection: ovrley_core::jobs::inspection::InspectionRejection {
                 inspection_id: "inspection-1".into(),
                 issues: vec![
-                    ovrley_core::render_jobs::inspection::SourceInspectionIssue {
+                    ovrley_core::jobs::inspection::SourceInspectionIssue {
                         source_id: "source-a".into(),
                         path: Some("/videos/a.mp4".into()),
                         reason:
-                            ovrley_core::render_jobs::inspection::ReinspectionReason::SourceChanged,
+                            ovrley_core::jobs::inspection::ReinspectionReason::SourceChanged,
                     },
                 ],
             },

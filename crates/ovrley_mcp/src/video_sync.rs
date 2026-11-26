@@ -9,7 +9,7 @@ use ovrley_app::store::agent::AgentReply;
 use ovrley_app::store::services::Services;
 use ovrley_app::features::sync::manual as manual;
 use ovrley_app::store::Store;
-use ovrley_core::media::manual_video_sync::LandmarkKind;
+use ovrley_core::media::sync::LandmarkKind;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -299,7 +299,7 @@ mod tests {
             let clip = create_imported_video(&metadata, "clip".into(), 0).unwrap();
             let edits = VideoEditsMap::from([(
                 "clip".to_string(),
-                ovrley_core::media::video_edits::VideoEdits::default(),
+                ovrley_core::media::edits::VideoEdits::default(),
             )]);
             let collection = vec![clip];
             commit_video_collection(store, collection, edits);

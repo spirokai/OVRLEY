@@ -107,13 +107,13 @@ fn tour() -> Vec<Step> {
         ("render-progress", |store, _| {
             store.render_dialog.phase = ovrley_app::features::render::DialogPhase::Progress;
             store.media.start_render_session(999, "/tmp/overlay.mov".into(), "Starting render...".into());
-            store.media.render_progress = ovrley_core::debug::RenderProgress {
+            store.media.render_progress = ovrley_core::encode::progress::RenderProgress {
                 render_id: 999,
                 busy: true,
                 current: 1234,
                 total: 3000,
                 rendered: 1234,
-                status: ovrley_core::debug::RenderStatus::Rendering,
+                status: ovrley_core::encode::progress::RenderStatus::Rendering,
                 rendering_fps: Some(47.3),
                 estimated_seconds_remaining: Some(125),
                 ..Default::default()
@@ -146,7 +146,7 @@ fn tour() -> Vec<Step> {
         ("sync-manual", |store, services| {
             use ovrley_app::features::sync::{calculate, matching::MatchScope};
             use ovrley_app::features::sync::manual as manual;
-            use ovrley_core::media::manual_video_sync::LandmarkKind;
+            use ovrley_core::media::sync::LandmarkKind;
             store.layout.open_manual_video_sync();
             for (kind, second) in [(LandmarkKind::Stop, 5.0), (LandmarkKind::LeftTurn, 12.0), (LandmarkKind::Location, 20.0)] {
                 manual::add_landmark(store, kind, second).expect("a landmark inside the clip");
@@ -242,16 +242,16 @@ impl ovrley_app::store::services::AppUpdate for SnapshotUpdate {
 /// Videos of the given display size and offset, on the timeline without files: the render dialog
 /// shows them; their inspection fails, as for a moved file.
 fn snapshot_videos(store: &mut Store, videos: &[(u32, u32, f64)]) {
-    use ovrley_core::media::video_edits::VideoEdits;
+    use ovrley_core::media::edits::VideoEdits;
     let mut imported = Vec::new();
     let mut edits = std::collections::BTreeMap::new();
     for (index, (width, height, offset)) in videos.iter().enumerate() {
-        let metadata = ovrley_core::media::SourceVideoMetadata {
+        let metadata = ovrley_core::media::probe::SourceVideoMetadata {
             path: format!("/snapshot/clip-{index}.mp4"),
             duration: Some(60.0),
             fps_num: Some(30),
             fps_den: Some(1),
-            resolution: Some(ovrley_core::media::Resolution { width: (*width).into(), height: (*height).into() }),
+            resolution: Some(ovrley_core::media::probe::Resolution { width: (*width).into(), height: (*height).into() }),
             ..Default::default()
         };
         let video = ovrley_app::video::create_imported_video(&metadata, format!("clip-{index}"), index as u32).expect("snapshot videos are valid");

@@ -2,10 +2,10 @@
 //! rows. Strings a view builds are translated here; `ovrley_ui` copies the view into the Slint
 //! global.
 
-use ovrley_core::debug::RenderStatus;
-use ovrley_core::encode::quality::EncodingQuality;
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode, QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
-use ovrley_core::render_jobs::contracts::{BatchItemOutcome, BatchItemPhase, BatchPhase, BatchSnapshot};
+use ovrley_core::encode::progress::RenderStatus;
+use ovrley_core::encode::settings::EncodingQuality;
+use ovrley_core::encode::settings::{ExportMode, OutputMode, QUALITY_SLIDER_MAX, QUALITY_SLIDER_MIN};
+use ovrley_core::jobs::contracts::{BatchItemOutcome, BatchItemPhase, BatchPhase, BatchSnapshot};
 use crate::activity::ActivityWindow;
 use crate::controls::choice::ChoiceKind;
 use crate::features::render::{format_render_path_error, imported_video_fps, locked_video_fps, ready_batch, render_transport, resolution_mismatch, start_blocked, update_rate_fps, video_format, DialogPhase};

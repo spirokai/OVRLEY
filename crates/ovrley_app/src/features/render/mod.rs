@@ -16,10 +16,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 use codecs::{codec_selection, default_bitrate, default_quality, first_available_acceleration, first_available_mp4_codec, is_mp4_codec, visible_accelerations, Acceleration, OutputFormat, PlatformOs};
 use ovrley_core::encode::ffmpeg::catalog::CompositeCodecId;
-use ovrley_core::encode::quality::{EncodingQuality, QualityType};
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
+use ovrley_core::encode::settings::{EncodingQuality, QualityType};
+use ovrley_core::encode::settings::{ExportMode, OutputMode};
 use ovrley_core::error::{CoreError, RenderPathError};
-use ovrley_core::render_jobs::batch::BatchServiceError;
+use ovrley_core::jobs::batch::BatchServiceError;
 use request::{detected_codecs, export_destination, normalize_render_output_path, render_request, render_settings_draft, render_transport, RenderRequest, RenderSettingsDraft, RenderTransport, ReviewedBatch};
 use review::{mark_stale_rows, review_export, ExportReview, ReviewInputs, SourceInspection};
 use session::{is_renderer_busy, RenderTarget};
@@ -143,7 +143,7 @@ pub fn sorted_clips(store: &Store) -> Vec<Clip> {
 }
 
 /// The videos' shared resolution and rate: the largest compatible group's.
-pub fn video_format(store: &Store) -> Option<(ovrley_core::media::video_edits::VideoResolution, ovrley_core::encode::fps::Fps)> {
+pub fn video_format(store: &Store) -> Option<(ovrley_core::media::edits::VideoResolution, ovrley_core::encode::timing::Fps)> {
     let clips = &store.player.timeline.timeline().committed.clips;
     derive_compatibility(&clips.iter().collect::<Vec<_>>()).reference
 }
@@ -282,7 +282,7 @@ pub fn open_render_dialog(store: &mut Store, services: &mut Services) {
     }
     let draft = render_settings_draft(store, String::new());
     let suggested = load_remembered_render_directory(services)
-        .and_then(|directory| services.render.suggest_output_path(draft.settings.export_mode.into(), directory.as_deref()));
+        .and_then(|directory| services.render.suggest_output_path(draft.settings.export_mode, directory.as_deref()));
     match suggested {
         Ok(output_path) => {
             let dialog = &mut store.render_dialog;
@@ -379,7 +379,7 @@ pub fn set_output_path(store: &mut Store, path: String) {
 /// The save dialog at the current path.
 pub fn browse_output_path(store: &mut Store, services: &mut Services) {
     let Some(draft) = store.render_dialog.draft.as_ref().filter(|draft| !draft.output_path.is_empty()) else { return };
-    let kind: ovrley_core::output::RenderOutputKind = draft.settings.export_mode.into();
+    let kind = draft.settings.export_mode;
     let shown = save_single_path(
         services,
         &draft.output_path,
@@ -513,8 +513,8 @@ pub fn set_render_full_activity(store: &mut Store, enabled: bool) {
 
 /// What a submission returned, typed for the dialog.
 enum SubmitOutcome {
-    Single(ovrley_core::render_jobs::execution::RenderAccepted),
-    Batch(Box<ovrley_core::render_jobs::contracts::BatchAcceptance>),
+    Single(ovrley_core::jobs::execution::RenderAccepted),
+    Batch(Box<ovrley_core::jobs::contracts::BatchAcceptance>),
     /// An existing output, not cleared for overwriting.
     Exists,
     PathError(RenderPathError),
@@ -523,7 +523,7 @@ enum SubmitOutcome {
     Failed(String),
 }
 
-fn single_outcome(result: Result<ovrley_core::render_jobs::execution::RenderAccepted, CoreError>) -> SubmitOutcome {
+fn single_outcome(result: Result<ovrley_core::jobs::execution::RenderAccepted, CoreError>) -> SubmitOutcome {
     match result {
         Ok(accepted) => SubmitOutcome::Single(accepted),
         Err(CoreError::OutputExists(_)) => SubmitOutcome::Exists,
@@ -533,7 +533,7 @@ fn single_outcome(result: Result<ovrley_core::render_jobs::execution::RenderAcce
     }
 }
 
-fn batch_outcome(result: Result<ovrley_core::render_jobs::contracts::BatchAcceptance, BatchServiceError>) -> SubmitOutcome {
+fn batch_outcome(result: Result<ovrley_core::jobs::contracts::BatchAcceptance, BatchServiceError>) -> SubmitOutcome {
     match result {
         Ok(acceptance) => SubmitOutcome::Batch(Box::new(acceptance)),
         Err(BatchServiceError::AlreadyExists { .. }) => SubmitOutcome::Exists,
@@ -594,7 +594,7 @@ pub fn start_render(store: &mut Store, services: &mut Services, overwrite: bool,
     });
 }
 
-fn finish_submission(store: &mut Store, services: &mut Services, outcome: SubmitOutcome, accepted: ovrley_core::encode::render_settings::RenderSettings, output_path: String, writes_file: bool) {
+fn finish_submission(store: &mut Store, services: &mut Services, outcome: SubmitOutcome, accepted: ovrley_core::encode::settings::RenderSettings, output_path: String, writes_file: bool) {
     let single = store.media.render_submission_target == Some(RenderTarget::Single);
     store.media.render_submission_target = None;
     let commit = |store: &mut Store| {

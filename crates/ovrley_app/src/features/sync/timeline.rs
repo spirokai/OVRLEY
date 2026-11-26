@@ -1,7 +1,7 @@
 //! The timeline in Sync Doctor: the telemetry graph and its event bands, and the landmark handles
 //! with their drag.
 
-use ovrley_core::media::manual_video_sync::LandmarkKind;
+use ovrley_core::media::sync::LandmarkKind;
 use crate::features::player::lanes::seconds_to_view_px;
 use crate::features::sync::detection::{DETECTED_LOCATION_ID, Detection, GraphPoint, GraphSeries, TurnDirection};
 use crate::features::sync::manual::{self, find_video_sync_target};

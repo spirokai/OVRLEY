@@ -9,7 +9,7 @@ use crate::common;
 use serde_json::json;
 
 use ovrley_core::activity::schema::ParsedActivity;
-use ovrley_core::normalize::RenderDataRequirements;
+use ovrley_core::config::RenderDataRequirements;
 
 #[test]
 fn parsed_activity_accepts_heading_from_json() {

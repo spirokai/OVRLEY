@@ -484,7 +484,7 @@ mod tests {
     use crate::features::widgets::{edit_field, update_widget_data};
     use crate::store::services::fakes::Fakes;
     use crate::store::Dispatcher;
-    use ovrley_core::normalize::template::template_manifest;
+    use ovrley_core::template::template_manifest;
     use ovrley_widgets::model::catalog::catalog;
     use ovrley_widgets::model::document::{create_widget_defaults, WidgetCreationOptions, WidgetSelection};
 

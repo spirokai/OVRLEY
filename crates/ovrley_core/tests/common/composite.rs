@@ -18,18 +18,20 @@ use std::thread;
 
 use ovrley_core::activity::schema::ParsedActivity;
 use ovrley_core::activity::{parse_activity_json, validate_render_activity};
-use ovrley_core::debug::RenderProfiler;
-use ovrley_core::encode::debug::composite::write_composite_timing_summary;
+use ovrley_core::diagnostics::RenderProfiler;
+use ovrley_core::diagnostics::write_composite_timing_summary;
 use ovrley_core::encode::ffmpeg::composite::CompositeEncoding;
-use ovrley_core::encode::fps::Fps;
+use ovrley_core::encode::timing::Fps;
 use ovrley_core::encode::progress::RenderController;
-use ovrley_core::normalize::{parse_config_json, RenderConfig};
-use ovrley_core::normalize::{parse_template_value, validate_render_config, ValidatedRenderConfig};
-use ovrley_core::output::{RenderOutputKind, RenderOutputTarget};
+use ovrley_core::config::{parse_config_json, RenderConfig};
+use ovrley_core::config::{validate_render_config, ValidatedRenderConfig};
+use ovrley_core::template::parse_template_value;
+use ovrley_core::encode::settings::ExportMode;
+use ovrley_core::output::RenderOutputTarget;
 use ovrley_core::paths::AppPaths;
-use ovrley_core::render_jobs::execution::RenderExecutionService;
-use ovrley_core::render_jobs::planning::derive_composite_render_plan;
-use ovrley_core::render_jobs::planning::plan_single_render;
+use ovrley_core::jobs::execution::RenderExecutionService;
+use ovrley_core::jobs::planning::derive_composite_render_plan;
+use ovrley_core::jobs::planning::plan_single_render;
 use serde_json::Value;
 
 /// Bundles the key artifacts produced by a fixture composite render.
@@ -92,7 +94,7 @@ pub fn derive_fixture_composite_plan(
     let paths = test_paths_named("composite_plan_tests");
 
     config.scene.composite_video_path = Some("input.mp4".to_string());
-    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     config.scene.quality_value = Some(60.0);
     config.scene.composite_video_fps_num = Some(fps_num);
     config.scene.composite_video_fps_den = Some(fps_den);
@@ -100,9 +102,9 @@ pub fn derive_fixture_composite_plan(
     config.scene.composite_render_duration = Some(render_duration);
     config.scene.composite_video_trim_start = Some(trim_start);
     config.scene.composite_widget_update_rate = Some(update_rate);
-    let mut scene = ovrley_core::normalize::validate_scene_config(config.scene.clone()).unwrap();
+    let mut scene = ovrley_core::config::validate_scene_config(config.scene.clone()).unwrap();
     let render = derive_composite_render_plan(&config.scene, &mut scene, None).unwrap();
-    let target = custom_output_target(&paths, "plan", RenderOutputKind::Composite);
+    let target = custom_output_target(&paths, "plan", ExportMode::Composite);
     let size = ovrley_core::render::FrameSize {
         width: scene.presentation.width,
         height: scene.presentation.height,
@@ -123,7 +125,7 @@ pub fn derive_fixture_composite_plan(
 pub fn custom_output_target(
     paths: &AppPaths,
     label: &str,
-    kind: RenderOutputKind,
+    kind: ExportMode,
 ) -> RenderOutputTarget {
     let extension = kind.extension();
     let directory = if paths.downloads_dir.is_absolute() && paths.downloads_dir.is_dir() {
@@ -145,6 +147,7 @@ pub fn custom_output_target(
 /// Renders the shared composite fixture and returns the output details.
 ///
 /// This is the primary black-box render helper for success-path tests.
+#[expect(clippy::too_many_arguments, reason = "test fixture parameters")]
 pub fn render_fixture_composite(
     video_path: &str,
     fps_num: u32,
@@ -176,6 +179,7 @@ pub fn render_fixture_composite(
 ///
 /// Cancellation tests use this to flip the controller flag while rendering is
 /// in progress and then inspect the resulting success or error value.
+#[expect(clippy::too_many_arguments, reason = "test fixture parameters")]
 pub fn spawn_fixture_composite_render(
     paths: AppPaths,
     controller: RenderController,
@@ -220,6 +224,7 @@ pub fn spawn_fixture_composite_render(
 ///
 /// This keeps path construction reusable for tests that need stable output
 /// directories, such as cancellation cleanup or debug-summary assertions.
+#[expect(clippy::too_many_arguments, reason = "test fixture parameters")]
 pub fn render_fixture_composite_with_paths(
     paths: AppPaths,
     controller: RenderController,
@@ -234,7 +239,7 @@ pub fn render_fixture_composite_with_paths(
     codec: &str,
 ) -> Result<RenderFixtureResult, String> {
     let execution = RenderExecutionService::with_controller(controller.clone());
-    // ── Phase 1: resolve fixture video path ────────────────────────
+    // Resolve fixture video path.
     let absolute_video_path = crate::common::test_config::fixtures()
         .join("video")
         .join(video_path.trim_start_matches("tmp/"));
@@ -242,18 +247,18 @@ pub fn render_fixture_composite_with_paths(
     let mut config = mutable_recent_template_config(width, height);
     config.scene.ffmpeg = serde_json::json!({"codec": codec});
 
-    // ── Phase 2: compute FPS hierarchy from source → overlay pipe ──
+    // Compute FPS hierarchy from source → overlay pipe.
     let source_fps = Fps::new(fps_num, fps_den).unwrap();
     let overlay_fps = source_fps
         .divided_by(std::num::NonZeroU32::new(update_rate).unwrap())
         .unwrap();
 
-    // ── Phase 3: apply composite scene timing and metadata ───────────
+    // Apply composite scene timing and metadata.
     config.scene.start = sync_offset;
     config.scene.end = sync_offset + render_duration;
     config.scene.fps = overlay_fps.as_f64();
     config.scene.composite_video_path = Some(absolute_video_path.clone());
-    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     config.scene.quality_value = Some(20.0);
     config.scene.composite_sync_offset = Some(sync_offset);
     config.scene.composite_video_fps_num = Some(fps_num);
@@ -267,12 +272,12 @@ pub fn render_fixture_composite_with_paths(
     let plan =
         plan_single_render(config, validate_render_activity(&activity).unwrap(), None, None).unwrap();
 
-    // ── Phase 4: execute canonical frame-worker composite render ────
-    let output_target = custom_output_target(&paths, "render", RenderOutputKind::Composite);
+    // Execute canonical frame-worker composite render.
+    let output_target = custom_output_target(&paths, "render", ExportMode::Composite);
     let outcome = execution.render(&paths, plan, &activity, &output_target);
     let filename = outcome.map_err(|error| error.to_string())?;
 
-    // ── Phase 5: validate output and collect metadata ─────────────────
+    // Validate output and collect metadata.
     let output_path = paths.downloads_dir.join(filename);
     let output_size = fs::metadata(&output_path)
         .map_err(|error| format!("Failed to read output metadata: {error}"))?
@@ -365,7 +370,7 @@ pub fn write_fixture_composite_debug_summary(path_name: &str) -> AppPaths {
 /// Loads the shipped recent-template fixture and overrides the output size.
 pub fn recent_template_config(width: u32, height: u32) -> ValidatedRenderConfig {
     let config = mutable_recent_template_config(width, height);
-    validate_render_config(config).unwrap()
+    validate_render_config(config, None).unwrap()
 }
 
 /// Loads the shipped recent-template fixture as a mutable raw config.
@@ -388,7 +393,7 @@ pub fn composite_test_config(
 ) -> RenderConfig {
     let mut config = mutable_composite_test_config(render_duration);
     config.scene.composite_video_path = Some(video_path.to_string());
-    config.scene.quality_type = Some(ovrley_core::encode::quality::QualityType::Bitrate);
+    config.scene.quality_type = Some(ovrley_core::encode::settings::QualityType::Bitrate);
     config.scene.quality_value = Some(10.0);
     config.scene.composite_video_fps_num = Some(30000);
     config.scene.composite_video_fps_den = Some(1001);

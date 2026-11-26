@@ -117,7 +117,7 @@ fn text_display_type_passes_standard_metric_validation() {
 
 #[test]
 fn incomplete_linear_display_type_requires_gauge_fields() {
-    let error = ovrley_core::commands::validate_config_value(&json!({
+    let error = crate::common::seam::validate_config_value(&json!({
         "scene": common::seam::explicit_scene_json(),
         "labels": [],
         "values": [{

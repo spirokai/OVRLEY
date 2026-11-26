@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::Arc;
 use apply::{apply_new_project, apply_project, create_project_manual_video_sync, create_project_video_edits, resolve_disabled_laps, PreparedProject};
-use ovrley_core::normalize::template::create_durable_template_state;
+use ovrley_core::template::create_durable_template_state;
 use ovrley_services::project::{default_project_directory, list_project_files, read_project, write_project, OpenedProject, ProjectEditor, ProjectError, ProjectFileSummary};
 use ovrley_widgets::model::document::{canonical_numbers, OverlayConfig};
 use ovrley_widgets::widgets::raster::RasterError;
@@ -143,8 +143,8 @@ struct StatusValues {
     activity_trim: Option<ovrley_core::activity::trim::ActivityTrim>,
     disabled_laps: Vec<usize>,
     transition_defaults: ovrley_core::encode::ffmpeg::transitions::TransitionDefaults,
-    render_settings: ovrley_core::encode::render_settings::RenderSettings,
-    manual_video_sync: ovrley_core::media::manual_video_sync::ManualVideoSync,
+    render_settings: ovrley_core::encode::settings::RenderSettings,
+    manual_video_sync: ovrley_core::media::sync::ManualVideoSync,
     batch_output_folder: Option<String>,
     loaded_project_path: Option<String>,
     baseline_serial: u64,
@@ -573,7 +573,7 @@ fn write_session(store: &mut Store, services: &mut Services, path: String, then:
         }
     };
     store.projects.running = true;
-    let ffmpeg = ovrley_core::encode::ffmpeg::binary::resolve_ffmpeg_binary(&services.paths.repo_root).ok();
+    let ffmpeg = ovrley_core::encode::ffmpeg::resolve_ffmpeg_binary(&services.paths.repo_root).ok();
     let job = store.projects.park(then);
     services.workers.spawn("project-save", move || {
         let written = write_project(std::path::Path::new(&path), document.clone(), ffmpeg.as_deref(), images)
@@ -869,7 +869,7 @@ fn prepare_project(store: &mut Store, services: &mut Services, pending: PendingL
             let legacy_batch_video_folder = read.legacy_batch_video_folder;
             let saved_paths: Vec<String> = read.resolved_sources.video_paths.iter().map(|path| path.to_string_lossy().into_owned()).collect();
             let activity = match activity_path {
-                Some(path) => Some((path.clone(), ovrley_core::activity::import_activity_path(&paths, &path).map_err(|error| error.to_string()).and_then(ImportedActivity::from_response)?)),
+                Some(path) => Some((path.clone(), ovrley_core::import::load_activity(&paths, std::path::Path::new(&path)).map_err(|error| error.to_string()).and_then(ImportedActivity::from_activity)?)),
                 None => None,
             };
             let found: Vec<(String, String, u32)> = document

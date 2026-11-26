@@ -1029,7 +1029,7 @@ mod tests {
     use crate::store::template::ThemeColors;
     use crate::features::widgets::build_config_widgets;
     use crate::store::Store;
-    use ovrley_core::normalize::template::template_manifest;
+    use ovrley_core::template::template_manifest;
     use ovrley_widgets::model::document::{create_widget_defaults, OverlayConfig, WidgetCreationOptions, WidgetSelection};
     use serde_json::json;
 

@@ -1,9 +1,10 @@
-//! Request-owned production render output contracts.
+//! Render outputs: validated destinations, batch output names, the parts folder of a joined
+//! output, suggested output paths, and opening outputs in the system.
 
+use crate::encode::settings::ExportMode;
 use crate::error::{CoreError, CoreResult, RenderPathError};
 use crate::paths::AppPaths;
 use chrono::{DateTime, Datelike, Local, Timelike, Utc};
-use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -12,25 +13,8 @@ use std::sync::atomic::{AtomicI64, Ordering};
 static LAST_SUGGESTED_SECONDS: AtomicI64 = AtomicI64::new(0);
 static NEXT_BATCH_PROBE: AtomicI64 = AtomicI64::new(0);
 
-/// The two production output containers supported by OVRLEY.
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum RenderOutputKind {
-    Transparent,
-    Composite,
-}
-
-impl From<crate::encode::render_settings::ExportMode> for RenderOutputKind {
-    /// The container an export mode writes.
-    fn from(mode: crate::encode::render_settings::ExportMode) -> Self {
-        match mode {
-            crate::encode::render_settings::ExportMode::Transparent => Self::Transparent,
-            crate::encode::render_settings::ExportMode::Composite => Self::Composite,
-        }
-    }
-}
-
-impl RenderOutputKind {
+impl ExportMode {
+    /// The container extension an export writes.
     pub fn extension(self) -> &'static str {
         match self {
             Self::Transparent => "mov",
@@ -38,6 +22,7 @@ impl RenderOutputKind {
         }
     }
 
+    /// The prefix of suggested and batch output names.
     pub fn filename_prefix(self) -> &'static str {
         match self {
             Self::Transparent => "overlay",
@@ -54,7 +39,7 @@ pub struct RenderOutputTarget {
 
 impl RenderOutputTarget {
     /// Validates and probes one exact output path.
-    pub fn validate(raw_path: &str, kind: RenderOutputKind, overwrite: bool) -> CoreResult<Self> {
+    pub fn validate(raw_path: &str, kind: ExportMode, overwrite: bool) -> CoreResult<Self> {
         if raw_path.trim().is_empty() {
             return Err(CoreError::OutputInvalid(
                 RenderPathError::OutputFileRequired,
@@ -153,7 +138,7 @@ impl RenderOutputTarget {
 /// destinations. Existing outputs may be overwritten; input aliases may not.
 pub fn plan_batch_output_targets(
     directory: &Path,
-    kind: RenderOutputKind,
+    kind: ExportMode,
     sources: &[PathBuf],
 ) -> CoreResult<Vec<RenderOutputTarget>> {
     if !directory.is_absolute() || !directory.is_dir() {
@@ -255,7 +240,7 @@ fn without_verbatim_prefix(path: PathBuf) -> PathBuf {
 /// Validates one exact combined-output path that must not replace any input.
 pub fn plan_file_output_target(
     raw_path: &str,
-    kind: RenderOutputKind,
+    kind: ExportMode,
     overwrite: bool,
     sources: &[PathBuf],
 ) -> CoreResult<RenderOutputTarget> {
@@ -351,7 +336,7 @@ impl Drop for ProbeCleanup {
 /// Returns a fresh suggested absolute production output path.
 pub fn suggest_output_path(
     paths: &AppPaths,
-    kind: RenderOutputKind,
+    kind: ExportMode,
     remembered_directory: Option<&Path>,
 ) -> CoreResult<PathBuf> {
     let directory = remembered_directory.unwrap_or(&paths.downloads_dir);
@@ -401,6 +386,52 @@ fn suggested_timestamp() -> CoreResult<String> {
     ))
 }
 
+/// Opens the render output folder in the system file browser: `directory` (absolute, existing),
+/// else Downloads.
+pub fn open_output_directory(paths: &AppPaths, directory: Option<&str>) -> CoreResult<()> {
+    let target = match directory {
+        None => paths.downloads_dir.clone(),
+        Some(directory) => {
+            let path = Path::new(directory);
+            if !path.is_absolute() {
+                return Err(CoreError::Config(format!(
+                    "Render output directory must be absolute: {directory}"
+                )));
+            }
+            if !path.is_dir() {
+                return Err(CoreError::Config(format!(
+                    "Render output directory is not available: {directory}"
+                )));
+            }
+            path.to_path_buf()
+        }
+    };
+    open_path_in_system(&target)
+}
+
+/// Opens a rendered file (a video, or the debug PNG frame) in the system player.
+pub fn open_rendered_video(output_path: &str) -> CoreResult<()> {
+    let target = Path::new(output_path);
+    if !target.is_absolute() || !target.is_file() {
+        return Err(CoreError::Config(format!(
+            "Video file not found: {output_path}"
+        )));
+    }
+
+    open_path_in_system(target)
+}
+
+// Opens a path with the operating system's default handler.
+//
+// Uses the `open` crate which delegates to ShellExecuteW on Windows,
+// NSWorkspace on macOS, and xdg-open/gnome-open/etc on Linux — all
+// without blocking the caller.
+fn open_path_in_system(path: &Path) -> CoreResult<()> {
+    open::that(path)
+        .map_err(|error| CoreError::Encode(format!("Failed to open {}: {error}", path.display())))
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -424,7 +455,7 @@ mod tests {
 
         let target = RenderOutputTarget::validate(
             path.to_str().unwrap(),
-            RenderOutputKind::Transparent,
+            ExportMode::Transparent,
             false,
         )
         .unwrap();
@@ -435,7 +466,7 @@ mod tests {
         assert!(matches!(
             RenderOutputTarget::validate(
                 missing_parent.to_str().unwrap(),
-                RenderOutputKind::Transparent,
+                ExportMode::Transparent,
                 false
             ),
             Err(CoreError::OutputIo { .. })
@@ -445,14 +476,14 @@ mod tests {
         assert!(matches!(
             RenderOutputTarget::validate(
                 path.to_str().unwrap(),
-                RenderOutputKind::Transparent,
+                ExportMode::Transparent,
                 false
             ),
             Err(CoreError::OutputExists(_))
         ));
         let target = RenderOutputTarget::validate(
             path.to_str().unwrap(),
-            RenderOutputKind::Transparent,
+            ExportMode::Transparent,
             true,
         )
         .unwrap();
@@ -471,7 +502,7 @@ mod tests {
         fs::write(&target, b"other video").unwrap();
         let error = plan_batch_output_targets(
             &directory,
-            RenderOutputKind::Composite,
+            ExportMode::Composite,
             &[source.clone(), target.clone()],
         )
         .unwrap_err();
@@ -481,13 +512,13 @@ mod tests {
         fs::hard_link(&source, &target).unwrap();
         assert!(plan_batch_output_targets(
             &directory,
-            RenderOutputKind::Composite,
+            ExportMode::Composite,
             std::slice::from_ref(&source),
         )
         .is_err());
         assert_eq!(fs::read(&source).unwrap(), b"source video");
         fs::remove_file(&target).unwrap();
-        plan_batch_output_targets(&directory, RenderOutputKind::Composite, &[source]).unwrap();
+        plan_batch_output_targets(&directory, ExportMode::Composite, &[source]).unwrap();
         fs::remove_dir_all(directory).unwrap();
     }
 

@@ -12,7 +12,7 @@
 //! - Marker_y not tracking elevation changes at same GPS position
 
 use ovrley_core::activity::schema::{DenseActivityReport, DenseSeriesReport, ParsedActivity};
-use ovrley_core::normalize::ValidatedSceneConfig;
+use ovrley_core::config::ValidatedSceneConfig;
 use ovrley_widgets::widgets::elevation::geometry::{build_elevation_completed_points, ElevationGeometry};
 use ovrley_widgets::widgets::elevation::ValidatedElevationPlot;
 use std::collections::BTreeMap;
@@ -55,9 +55,6 @@ fn minimal_activity() -> ParsedActivity {
         sync_time: None,
         sample_elapsed_seconds: vec![0.0, 1.0, 2.0, 3.0],
         sample_distance_progress: vec![0.0, 0.25, 0.5, 1.0],
-        frame_elapsed_seconds: Vec::new(),
-        frame_timestamps: Vec::new(),
-        frame_distance_progress: Vec::new(),
         trim_start_seconds: 0.0,
         trim_end_seconds: 3.0,
         sample_course_points: Vec::new(),

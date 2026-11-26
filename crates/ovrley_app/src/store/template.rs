@@ -2,8 +2,8 @@
 //! editor-effective document: global defaults resolved into widget data for rendering and editing.
 
 use std::rc::Rc;
-use ovrley_core::commands::TemplateDescriptor;
-use ovrley_core::normalize::template::{normalize_global_defaults, template_manifest, DurableTemplateState};
+use ovrley_core::template::TemplateDescriptor;
+use ovrley_core::template::{normalize_global_defaults, template_manifest, DurableTemplateState};
 use ovrley_widgets::model::catalog::catalog;
 use ovrley_widgets::model::document::{font_family_name, font_selection, is_color_field_key, normalize_color_fields, pick_defined, resolve_active_widget_data, Collection, LabelStyle, OverlayConfig, WidgetData};
 use serde_json::{Map, Value};

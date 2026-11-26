@@ -9,7 +9,7 @@ use ovrley_app::controls::seconds::{self, SecondsField};
 use ovrley_app::features::import::{self, ReviewPhase};
 use ovrley_app::features::sync::VideoSyncControls;
 use ovrley_app::store::{DispatchHandle, Dispatcher, Store};
-use ovrley_core::media::video_edits::TimezoneMode;
+use ovrley_core::media::edits::TimezoneMode;
 use slint::{ComponentHandle, SharedString};
 
 convert_enum!(ImportPhase <=> ReviewPhase { Probing, Reviewing, Confirming, Importing });

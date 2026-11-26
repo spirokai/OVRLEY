@@ -1,4 +1,4 @@
-use ovrley_core::activity::parsers::igc::extract_igc_activity;
+use ovrley_core::import::igc::extract;
 use std::path::Path;
 
 const HEADER: &str = "AXCSABC\nHFDTE020720\nHFPLTPILOT:Foo_Bar\n";
@@ -7,7 +7,7 @@ const HEADER: &str = "AXCSABC\nHFDTE020720\nHFPLTPILOT:Foo_Bar\n";
 fn normalizes_logger_extensions_into_canonical_units() {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/activity/1G_77fv6m71.igc");
-    let activity = extract_igc_activity(&std::fs::read(path).unwrap(), "flight.igc").unwrap();
+    let activity = extract(&std::fs::read(path).unwrap(), "flight.igc").unwrap();
 
     assert_eq!(activity.file_format, "igc");
     assert_eq!(activity.metadata["logger_manufacturer"], "LXNAV");
@@ -32,7 +32,7 @@ fn keeps_void_fixes_on_a_timeline_that_crosses_midnight() {
     let igc = format!(
         "{HEADER}B2359595206343N00006198WA0058700558\nB0000015206343S00006198EV0058700558\n"
     );
-    let activity = extract_igc_activity(igc.as_bytes(), "midnight.igc").unwrap();
+    let activity = extract(igc.as_bytes(), "midnight.igc").unwrap();
     let (first, second) = (&activity.raw_samples[0], &activity.raw_samples[1]);
 
     assert_eq!(first.elapsed_seconds, Some(0.0));
@@ -50,7 +50,7 @@ fn keeps_void_fixes_on_a_timeline_that_crosses_midnight() {
 #[test]
 fn malformed_lines_are_reported_without_failing_the_import() {
     let igc = format!("{HEADER}Bbad\nH-GTY:x\nB1101355206343N00006198WA0058700558\n");
-    let activity = extract_igc_activity(igc.as_bytes(), "lenient.igc").unwrap();
+    let activity = extract(igc.as_bytes(), "lenient.igc").unwrap();
 
     assert_eq!(activity.raw_samples.len(), 1);
     assert_eq!(
@@ -65,7 +65,7 @@ fn malformed_lines_are_reported_without_failing_the_import() {
 #[test]
 fn rejects_logs_missing_required_records() {
     let error = |igc: &str| {
-        extract_igc_activity(igc.as_bytes(), "error.igc")
+        extract(igc.as_bytes(), "error.igc")
             .unwrap_err()
             .to_string()
     };

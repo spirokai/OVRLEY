@@ -1,7 +1,7 @@
 //! Gauge layouts and per-frame states built straight from the shared widget crate.
 #![allow(dead_code)]
 
-use ovrley_core::{activity::schema::DenseActivityReport, normalize::ValidatedRenderConfig};
+use ovrley_core::{activity::schema::DenseActivityReport, config::ValidatedRenderConfig};
 use ovrley_widgets::render::tile::PreviewRasterScale;
 use ovrley_widgets::render::text::FontResolver;
 use ovrley_widgets::widgets::gauges::GaugeLayout;

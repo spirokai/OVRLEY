@@ -9,8 +9,8 @@ use ovrley_app::features::render::view::{
 };
 use ovrley_app::features::render::{self as render, DialogPhase};
 use ovrley_app::store::{Dispatcher, Store};
-use ovrley_core::encode::quality::QualityType;
-use ovrley_core::encode::render_settings::{ExportMode, OutputMode};
+use ovrley_core::encode::settings::QualityType;
+use ovrley_core::encode::settings::{ExportMode, OutputMode};
 use slint::{ComponentHandle, SharedString};
 
 fn choice(entry: &SelectEntry) -> Choice {

@@ -94,8 +94,8 @@ pub fn format_zoned_date_time(timestamp: &str, timezone: &str, language: Locale)
 /// GPS times, and camera or filename clocks read as UTC, in the
 /// recording timezone; other clocks as they read. `Unknown` without a time. A time that cannot be
 /// read shows as it is (external data).
-pub fn format_video_creation_time(timestamp: Option<&str>, source: Option<&str>, timezone: Option<&str>, timezone_mode: Option<ovrley_core::media::video_edits::TimezoneMode>, language: Locale) -> String {
-    use ovrley_core::media::video_edits::TimezoneMode;
+pub fn format_video_creation_time(timestamp: Option<&str>, source: Option<&str>, timezone: Option<&str>, timezone_mode: Option<ovrley_core::media::edits::TimezoneMode>, language: Locale) -> String {
+    use ovrley_core::media::edits::TimezoneMode;
     let Some(timestamp) = timestamp.filter(|timestamp| !timestamp.is_empty()) else {
         return "Unknown".into();
     };
@@ -110,7 +110,7 @@ pub fn format_video_creation_time(timestamp: Option<&str>, source: Option<&str>,
 }
 
 /// `{width}×{height} · {fps} fps · {duration}`, the rate to two decimals.
-pub fn format_video_details(resolution: ovrley_core::media::video_edits::VideoResolution, fps: ovrley_core::encode::fps::Fps, duration_seconds: f64, language: Locale) -> String {
+pub fn format_video_details(resolution: ovrley_core::media::edits::VideoResolution, fps: ovrley_core::encode::timing::Fps, duration_seconds: f64, language: Locale) -> String {
     let template = crate::i18n::catalog().t_or(language, "video-preview.videoDetails", "{{width}}×{{height}} · {{fps}} fps · {{duration}}");
     let rate = plain_number((fps.as_f64() * 100.0).round() / 100.0);
     crate::i18n::interpolate(
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn video_creation_times_follow_their_source() {
-        use ovrley_core::media::video_edits::TimezoneMode;
+        use ovrley_core::media::edits::TimezoneMode;
         let en = Locale::En;
         assert_eq!(format_video_creation_time(None, None, None, None, en), "Unknown");
         // A camera clock shows as it reads, whatever its zone suffix.
@@ -261,8 +261,8 @@ mod tests {
 
     #[test]
     fn video_details_round_the_rate() {
-        let fps = ovrley_core::encode::fps::Fps::new(30000, 1001).unwrap();
-        let resolution = ovrley_core::media::video_edits::VideoResolution { width: 1920, height: 1080 };
+        let fps = ovrley_core::encode::timing::Fps::new(30000, 1001).unwrap();
+        let resolution = ovrley_core::media::edits::VideoResolution { width: 1920, height: 1080 };
         assert_eq!(format_video_details(resolution, fps, 330.5, Locale::En), "1920×1080 · 29.97 fps · 05:30.5");
     }
 

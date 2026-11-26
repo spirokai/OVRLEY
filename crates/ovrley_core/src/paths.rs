@@ -1,30 +1,12 @@
-//! Application path configuration and resolution.
-//!
-//! Owns: AppPaths struct, path construction, template path resolution,
-//!        directory ensuring.
-//! Does not own: runtime configuration (that's `config`), render parameters.
-//!
-//! Allowed dependencies: std, crate::error.
-//! Forbidden dependencies: config, activity, render, encode, commands.
-//!
-//! This module lives in a neutral location because both `commands` and
-//! `encode` need `AppPaths`. Placing it here breaks the circular-ish
-//! dependency where `encode` had to import from `commands`.
+//! Application paths: fonts, templates, runtime debug and temp folders, and the render output
+//! folder, computed once at startup.
 
 use crate::error::{CoreError, CoreResult};
 use std::fs;
 use std::path::PathBuf;
 
-/// Central path configuration for the application runtime.
-///
-/// Resolves font directories, template directories, debug/render output paths,
-/// temporary storage, and the public render-output directory. Paths are
-/// computed once at startup from the repository root, the active resource
-/// root, and a single OVRLEY user-data root, then cloned into every request
-/// that needs filesystem access.
-///
-/// This type lives in a neutral module so both `commands` and `encode` can
-/// depend on it without creating a circular dependency.
+/// The application's folders, computed once at startup from the repository root, the active
+/// resource root and the OVRLEY user-data root.
 #[derive(Clone, Debug)]
 pub struct AppPaths {
     pub repo_root: PathBuf,
@@ -39,10 +21,6 @@ pub struct AppPaths {
 impl AppPaths {
     pub fn from_repo_root(repo_root: PathBuf) -> Self {
         Self::from_runtime_roots(repo_root.clone(), repo_root, documents_ovrley_dir())
-    }
-
-    pub fn from_resource_root(repo_root: PathBuf, resource_root: PathBuf) -> Self {
-        Self::from_runtime_roots(repo_root, resource_root, documents_ovrley_dir())
     }
 
     pub fn from_runtime_roots(
@@ -104,11 +82,8 @@ impl AppPaths {
     }
 }
 
-// Resolves the platform-specific OVRLEY documents directory.
-//
-// On Windows this is `%USERPROFILE%\Documents\OVRLEY`; on other platforms it
-// is `$HOME/Documents/OVRLEY`. Falls back to `.` if the home directory cannot
-// be determined.
+/// The OVRLEY documents folder: `%USERPROFILE%\Documents\OVRLEY` on Windows and
+/// `$HOME/Documents/OVRLEY` elsewhere, under `.` when the home folder is unknown.
 fn documents_ovrley_dir() -> PathBuf {
     let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .map(PathBuf::from)

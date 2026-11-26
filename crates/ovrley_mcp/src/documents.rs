@@ -7,7 +7,7 @@ use ovrley_app::features::templates;
 use ovrley_app::store::agent::{describe_activity, describe_template, AbsolutePath, AgentReply};
 use ovrley_app::store::services::Services;
 use ovrley_app::store::Store;
-use ovrley_core::commands::TemplateKind;
+use ovrley_core::template::TemplateKind;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::{json, Value};
