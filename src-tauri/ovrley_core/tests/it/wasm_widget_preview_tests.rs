@@ -5,7 +5,7 @@ use ovrley_core::fonts::{preview_font_resource, NativeFonts};
 use ovrley_widgets::{
     model::scene::validate_scene_presentation,
     preview::PreviewSession,
-    render::{pixels::read_surface_rgba, text::validated_value_style},
+    render::{pixels::read_surface_rgba, preview::PreviewRasterScale, text::validated_value_style},
     widgets::value::preview::WidgetRequest,
     widgets::value::{
         format::{format_metric_parts, MetricSample},
@@ -222,6 +222,26 @@ fn every_preview_family_reuses_drag_pixels_and_restores_fractional_commit() {
 }
 
 #[test]
+fn every_preview_family_rerasterizes_at_a_new_session_scale_like_a_fresh_widget() {
+    for (mut preview, request) in every_family_preview() {
+        let kind = request["type"].as_str().unwrap().to_owned();
+        let id = preview.create_widget(serde_json::from_value(request.clone()).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        preview.set_raster_scale(PreviewRasterScale::new(0.5).unwrap()).unwrap();
+        let fresh = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
+        preview.render(1.5).unwrap();
+        let rescaled: Value = serde_json::from_slice(preview.widgets[&id].geometry()).unwrap();
+        let fresh_geometry: Value = serde_json::from_slice(preview.widgets[&fresh].geometry()).unwrap();
+        assert_eq!(rescaled["preview_raster_scale"], json!(0.5), "{kind} must rasterize at the session scale");
+        let bounds = preview.widgets[&id].bounds().unwrap();
+        let size = (rescaled["width"].as_u64().unwrap() as u32, rescaled["height"].as_u64().unwrap() as u32);
+        assert_eq!(size, ((bounds.width * 0.5).ceil() as u32, (bounds.height * 0.5).ceil() as u32), "{kind} must allocate pixels at the session scale");
+        assert_eq!(rescaled, fresh_geometry, "{kind} rescaled geometry must match a fresh render");
+        assert_eq!(preview.widgets[&id].pixels(), preview.widgets[&fresh].pixels(), "{kind} rescaled pixels must match a fresh render");
+    }
+}
+
+#[test]
 fn every_preview_family_derives_serialized_geometry_from_typed_tile_bounds() {
     for (mut preview, mut request) in every_family_preview() {
         let kind = request["type"].as_str().unwrap().to_owned();
@@ -336,7 +356,7 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
         for (variant, request) in bounds_variants(&base) {
             let kind = format!("{} ({variant})", request["type"].as_str().unwrap());
             let raster = request["type"] == "raster";
-            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &preview.fonts, &preview.images, preview.map_styles.as_ref())
+            let mut widget = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &preview.fonts, &preview.images, preview.map_styles.as_ref())
                 .unwrap_or_else(|error| panic!("{kind}: {error}"));
             let allocated = allocated_surfaces();
             let bounds: Vec<TileBounds> = seconds
@@ -744,7 +764,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
     let request_scene = raster["scene"].clone();
     for (mut preview, request) in [(raster_preview, raster), label_preview()] {
         let kind = request["type"].as_str().unwrap().to_owned();
-        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), &fonts, resources, None).unwrap();
+        let native = PreviewWidget::new(serde_json::from_value(request.clone()).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, None).unwrap();
         let id = preview.create_widget(serde_json::from_value(request).unwrap()).unwrap();
         let session = &preview.widgets[&id];
         assert_eq!(native.pixels(), session.pixels(), "{kind} pixels must not depend on the host");
@@ -752,7 +772,7 @@ fn widgets_accept_the_native_font_and_raster_resolvers_used_by_export() {
         assert_eq!(native.bounds(), session.bounds(), "{kind} bounds must not depend on the host");
     }
     let missing = json!({ "type":"raster", "widget": { "id":"raster", "x":0, "y":0, "width":1, "height":1, "rotation":0, "opacity":1, "path":"/image.png", "resourceId":"missing" }, "scene": request_scene });
-    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), &fonts, resources, None).is_err(), "unresolved native rasters must fail loudly");
+    assert!(PreviewWidget::new(serde_json::from_value(missing).unwrap(), PreviewRasterScale::NATIVE, &fonts, resources, None).is_err(), "unresolved native rasters must fail loudly");
 }
 
 #[test]
@@ -3666,6 +3686,7 @@ fn rolling_chart_matches_export_pixels_slides_with_the_playhead_and_validates_at
         ("series", json!([{"metric": "speed", "label": "A", "color": "#ffffff"}, {"metric": "speed", "label": "B", "color": "#000000"}])),
         ("series", json!([{"metric": "bogus", "label": "A", "color": "#ffffff"}])),
         ("series", json!([{"metric": "speed", "label": " ", "color": "#ffffff"}])),
+        ("series", json!([{"metric": "speed", "color": "#ffffff"}])), // A shown legend needs its label.
         ("series", json!([{"metric": "speed", "label": "A", "color": "white"}])),
         ("window_seconds", json!(4)),
         ("window_seconds", json!(301)),

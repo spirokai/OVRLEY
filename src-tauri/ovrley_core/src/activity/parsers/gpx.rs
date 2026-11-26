@@ -104,6 +104,18 @@ fn extract_track_point(point: Node<'_, '_>) -> CoreResult<RawSample> {
         )?,
         calories: read_strict_metric(&values, &["calories", "kcal", "energy"])?,
         cadence: metric(&["cad", "cadence"]),
+        // Vehicle OBD tags win; Garmin's generic water temperature is the fallback.
+        coolant_temperature: metric(&[
+            "coolant_temp_c",
+            "coolant_temperature",
+            "coolant_temp",
+            "engine_coolant_temperature",
+            "wtemp",
+        ]),
+        // Kilopascals, gauge or absolute as recorded; finalization converts to gauge.
+        boost_pressure: metric(&["boost", "boost_pressure"]),
+        // GPX has no standard engine speed tag; `cad` stays pedalling cadence.
+        rpm: metric(&["engine_rpm", "rpm"]),
         core_temperature: metric(&["core_temperature", "coretemp", "core_temp"]),
         distance: metric(&[
             "distance",

@@ -1,27 +1,25 @@
 //! Preview pixel density is independent of scene geometry and native export.
 use crate::{
-    error::WidgetResult,
-    model::{scene::ScenePresentationConfig, validation::require_positive_f32},
-    render::pixels::read_surface_rgba,
+    error::WidgetResult, model::validation::require_positive_f32, render::pixels::read_surface_rgba,
 };
 use skia_safe::{Canvas, Color, ColorType, FilterMode, Image, Paint, Point, Rect, Surface};
 
+/// The editor's display density, set on the preview session; it is not widget or scene configuration.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PreviewRasterScale(f32);
+
+/// Hosts without a viewport density retain native raster resolution.
+impl Default for PreviewRasterScale {
+    fn default() -> Self {
+        Self::NATIVE
+    }
+}
 
 impl PreviewRasterScale {
     pub const NATIVE: Self = Self(1.0);
 
-    /// Hosts without a viewport density retain native raster resolution.
-    pub(crate) fn from_scene(scene: &ScenePresentationConfig) -> WidgetResult<Self> {
-        match scene.extra.get("preview_raster_scale") {
-            None => Ok(Self::NATIVE),
-            Some(value) => require_positive_f32(
-                value.as_f64().map(|value| value as f32),
-                "scene.preview_raster_scale",
-            )
-            .map(Self),
-        }
+    pub fn new(scale: f32) -> WidgetResult<Self> {
+        require_positive_f32(Some(scale), "preview raster scale").map(Self)
     }
 
     pub(crate) fn dimensions(self, bounds: Rect) -> (u32, u32) {

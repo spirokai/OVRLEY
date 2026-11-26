@@ -158,10 +158,12 @@ pub fn finalize_activity_columns(
 /// recomputing the activity or threading debug state through render-facing
 /// schemas.
 fn finalize_raw_activity_with_debug(raw_activity: &RawActivity) -> CoreResult<FinalizedActivity> {
+    // Gap filling compares neighbouring samples, so it must see each instant once.
+    let merged_raw_samples = merge_equal_time_samples(&raw_activity.raw_samples);
     let (normalized_raw_samples, gap_debug) = if raw_activity.options.skip_idle_gap_fill {
-        (raw_activity.raw_samples.clone(), skipped_gap_debug())
+        (merged_raw_samples, skipped_gap_debug())
     } else {
-        insert_idle_gap_samples(&raw_activity.raw_samples)
+        insert_idle_gap_samples(&merged_raw_samples)
     };
     let columns = activity_columns_from_samples(
         raw_activity,
@@ -375,6 +377,30 @@ macro_rules! activity_input_operations {
                 $(columns.$absent.push(None);)*
             }
             columns
+        }
+
+        /// Merges each run of samples sharing one instant, so the timeline strictly increases.
+        /// Formats such as FIT may split one instant across records (GPS in one, heart rate in
+        /// the next); a later sample fills in the fields it carries, as CSV rows at one time do.
+        /// A sample with neither an elapsed time nor a timestamp has no instant to share.
+        fn merge_equal_time_samples(raw_samples: &[RawSample]) -> Vec<RawSample> {
+            let mut merged: Vec<RawSample> = Vec::with_capacity(raw_samples.len());
+            for sample in raw_samples {
+                let has_time = sample.elapsed_seconds.is_some() || sample.timestamp.is_some();
+                match merged.last_mut() {
+                    Some(last)
+                        if has_time
+                            && last.elapsed_seconds == sample.elapsed_seconds
+                            && last.timestamp == sample.timestamp =>
+                    {
+                        $(if sample.$sample.is_some() { last.$sample = sample.$sample; })*
+                        $(if sample.$sample_text.is_some() { last.$sample_text = sample.$sample_text.clone(); })*
+                        $(if sample.$sample_integer.is_some() { last.$sample_integer = sample.$sample_integer; })*
+                    }
+                    _ => merged.push(sample.clone()),
+                }
+            }
+            merged
         }
 
         fn validate_column_lengths(columns: &ActivityColumns) -> CoreResult<()> {

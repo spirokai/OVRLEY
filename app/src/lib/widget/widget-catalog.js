@@ -45,6 +45,12 @@ export const WIDGET_CATEGORY_NAME_KEYS = widgetsManifest.categories
 export const ALTITUDE_UNIT_SCALES = widgetsManifest.altitudeUnitScales
 /** Defaults, geometry, modes, and optional fields for each display. */
 export const DISPLAY_TYPE_DEFINITIONS = compileDisplayDefinitions()
+/** [metric, imperial] unit pairs; the first pair whose target a field accepts converts it. */
+export const UNIT_CONVERSIONS = metricsManifest.unitConversions
+/** Widget and display fields that hold a unit. */
+export const UNIT_FIELDS = metricsManifest.unitFields
+/** [metric, imperial] label toggles; one enabled toggle follows the unit system, both enabled stay. */
+export const UNIT_TOGGLES = metricsManifest.unitToggles
 
 function compileWidgetDefinitions() {
   const definitions = {}

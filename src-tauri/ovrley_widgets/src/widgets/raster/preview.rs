@@ -3,6 +3,7 @@ use super::{
     frame::RasterFrame,
     validation::{validate_raster_geometry, RasterGeometry},
 };
+use crate::render::preview::PreviewRasterScale;
 use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
@@ -57,29 +58,32 @@ impl PreviewRaster {
     pub fn new(
         widget: RasterConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         images: &(impl ImageSource + ?Sized),
     ) -> WidgetResult<Self> {
-        Self::prepare(widget, scene, images, None)
+        Self::prepare(widget, scene, raster_scale, images, None)
     }
 
     pub fn update(
         &mut self,
         widget: RasterConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         images: &(impl ImageSource + ?Sized),
     ) -> WidgetResult<()> {
-        *self = Self::prepare(widget, scene, images, Some(self))?;
+        *self = Self::prepare(widget, scene, raster_scale, images, Some(self))?;
         Ok(())
     }
 
     fn prepare(
         widget: RasterConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         images: &(impl ImageSource + ?Sized),
         previous: Option<&mut Self>,
     ) -> WidgetResult<Self> {
         let config = validate_raster_geometry(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         let scene = validate_scene_presentation(scene)?;
         if widget.resource_id.is_some() && widget.resource_error_code.is_some() {
             return Err(WidgetError::Config(

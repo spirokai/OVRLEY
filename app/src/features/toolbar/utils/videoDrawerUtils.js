@@ -6,6 +6,7 @@ const TIME_SOURCE_KEYS = {
   ffprobe: 'toolbar.timeSourceMetadata',
   file_mtime: 'toolbar.timeSourceFileModified',
   filename: 'toolbar.timeSourceFilename',
+  timecode: 'toolbar.timeSourceTimecode',
 }
 
 /**

@@ -3,13 +3,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { deepEqual } from '@/store/store-utils'
 import useStore from '@/store/useStore'
 import { filenameFromSelectedPath } from '@/lib/file-dialog'
-import { createProjectContentSnapshot, createProjectDirtyState } from '../utils/projectSnapshot'
+import { createProjectContentSnapshot, createProjectDirtyState, createProjectSnapshot } from '../utils/projectSnapshot'
 import { isRendererBusy } from '@/features/render-video/utils/renderRequest'
-
-function getCurrentProjectContent(state, projectPath) {
-  if (!projectPath) return null
-  return createProjectContentSnapshot(state, projectPath)
-}
 
 /**
  * Owns loaded-project identity, its saved baseline, and derived save status.
@@ -55,25 +50,27 @@ export default function useProjectDocumentState() {
   const conflictingOperation = projectOwnedState.isProcessing || projectOwnedState.importingVideo || projectOwnedState.rendererBusy
   const status = useMemo(() => {
     if (!lastSavedProjectState) return 'Unsaved'
-    const current = getCurrentProjectContent(projectOwnedState, loadedProjectPath)
-    if (!current) return 'Modified'
-
-    const contentIsModified = !deepEqual(current, lastSavedProjectState.content)
-    return !contentIsModified && !timelineIsModified ? 'Saved' : 'Modified'
+    const current = createProjectContentSnapshot(projectOwnedState, loadedProjectPath)
+    const unchanged = deepEqual(current, lastSavedProjectState.content) && !timelineIsModified
+    if (!loadedProjectPath) return unchanged ? 'New' : 'Unsaved'
+    return unchanged ? 'Saved' : 'Modified'
   }, [lastSavedProjectState, loadedProjectPath, projectOwnedState, timelineIsModified])
+  const hasUnsavedChanges = status === 'Unsaved' || status === 'Modified'
 
   const markSaved = useCallback((path, project) => {
     setLoadedProjectPath(path)
     setLastSavedProjectState(createProjectDirtyState(project))
   }, [])
 
+  // Baselines the current session as a pristine, never-saved project.
   const markNew = useCallback(() => {
     setLoadedProjectPath(null)
-    setLastSavedProjectState(null)
+    setLastSavedProjectState(createProjectDirtyState(createProjectSnapshot(useStore.getState(), null)))
   }, [])
 
   return {
     conflictingOperation,
+    hasUnsavedChanges,
     loadedProjectPath,
     markNew,
     markSaved,

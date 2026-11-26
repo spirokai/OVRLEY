@@ -35,6 +35,8 @@ describe('RenderVideoDialog', () => {
         ...DEFAULT_CONFIG,
         scene: {
           ...DEFAULT_CONFIG.scene,
+          width: 1920,
+          height: 1080,
         },
       },
       platformOs: 'windows',
@@ -180,22 +182,19 @@ describe('RenderVideoDialog', () => {
     expect(screen.getByText("Locked to each video's FPS")).toBeInTheDocument()
   })
 
-  test('does not block batch mode on the current video resolution mismatch', async () => {
+  test('blocks batch mode on the current video resolution mismatch without offering a target switch', () => {
     useStore.setState({
       importedVideoPath: 'C:\\video.mp4',
       importedVideoFps: 30,
       importedVideoDuration: 12,
       importedVideoResolution: { width: 640, height: 360 },
     })
-    const user = userEvent.setup()
 
-    render(<RenderVideoDialogHarness initialSettings={transparentSettings()} />)
+    render(<RenderVideoDialogHarness initialSettings={{ ...transparentSettings(), renderTarget: 'batch' }} />)
 
     expect(screen.getByText(/must match imported video/i)).toBeInTheDocument()
-    await user.click(screen.getByRole('tab', { name: 'Batch' }))
-
-    expect(screen.queryByText(/must match imported video/i)).not.toBeInTheDocument()
-    expect(screen.getByText('Video folder')).toBeInTheDocument()
+    expect(screen.queryByRole('tab', { name: 'Batch' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Video folder')).not.toBeInTheDocument()
   })
 
   test('keeps batch start disabled until queued sources have fresh native inspection', () => {

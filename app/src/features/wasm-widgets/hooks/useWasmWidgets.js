@@ -6,11 +6,11 @@ import { createPreviewSession, loadWidgetModule } from '../utils/previewSession'
 /**
  * One preview session per editor document: widget ids are only unique within a document, so a replaced document
  * starts a fresh session instead of updating the previous document's handles.
- * @param {object} props Effective scene/widgets. The canonical playhead is read from the store outside React so playback
- * frames reach the session without re-rendering the editor.
+ * @param {object} props Effective scene/widgets and the raster density for the screen size they are shown at. The canonical
+ * playhead is read from the store outside React so playback frames reach the session without re-rendering the editor.
  * @returns {object} Canvas binding, the document revision that canvases are keyed by, and visible resource/render error.
  */
-export function useWasmWidgets({ widgets, scene, activity, disabledLaps, defaultFont }) {
+export function useWasmWidgets({ widgets, scene, rasterScale, activity, disabledLaps, defaultFont }) {
   const documentRevision = useStore((state) => state.editorDocumentRevision)
   const session = useRef(null)
   const canvases = useRef(new Map())
@@ -21,13 +21,14 @@ export function useWasmWidgets({ widgets, scene, activity, disabledLaps, default
     latest.current = {
       widgets,
       scene,
+      rasterScale,
       activityId: activity === null ? null : activity.preview_activity_id,
       disabledLaps,
       second: useStore.getState().selectedSecond,
       defaultFont,
     }
     session.current?.setSnapshot(latest.current)
-  }, [activity, disabledLaps, widgets, scene, defaultFont])
+  }, [activity, disabledLaps, widgets, scene, rasterScale, defaultFont])
   useEffect(
     () =>
       useStore.subscribe((state, previous) => {

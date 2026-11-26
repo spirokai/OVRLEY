@@ -110,6 +110,8 @@ export function createPreviewSession(module, onError) {
   // Split lengths requested for the current activity; Rust core derives each table once.
   const splitTables = new Set()
   let snapshot
+  // The density the Rust session last applied.
+  let rasterScale = null
   let activityId
   let activityReady = true
   let disposed = false
@@ -258,6 +260,11 @@ export function createPreviewSession(module, onError) {
           widgets.delete(id)
         }
       }
+      // A zoom burst lands here once per frame, so every widget re-rasterizes once at the latest density.
+      if (snapshot.rasterScale !== rasterScale) {
+        check(module._ovrley_preview_raster_scale(handle, snapshot.rasterScale))
+        rasterScale = snapshot.rasterScale
+      }
       for (const widget of interaction.resolve(snapshot)) {
         let instance = widgets.get(widget.id)
         const transient =
@@ -376,13 +383,20 @@ export function createPreviewSession(module, onError) {
         previous &&
         previous.widgets === next.widgets &&
         previous.scene === next.scene &&
+        previous.rasterScale === next.rasterScale &&
         previous.activityId === next.activityId &&
         previous.disabledLaps === next.disabledLaps &&
         previous.defaultFont === next.defaultFont &&
         !next.widgets.some(isTimeDependentWidget)
       )
         return
-      if (previous?.widgets !== next.widgets || previous?.scene !== next.scene || previous?.activityId !== next.activityId) mapDownload.update(next)
+      if (
+        previous?.widgets !== next.widgets ||
+        previous?.scene !== next.scene ||
+        previous?.rasterScale !== next.rasterScale ||
+        previous?.activityId !== next.activityId
+      )
+        mapDownload.update(next)
       if (previous?.defaultFont !== next.defaultFont) loadFont({ font: next.defaultFont })
       if (previous?.widgets !== next.widgets) {
         for (const widget of next.widgets) {

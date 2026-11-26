@@ -39,7 +39,7 @@
   "devDependencies": {
     "@playwright/test": "^1.52.0",
     "@semantic-release/commit-analyzer": "^13.0.1",
-    "@tauri-apps/cli": "^2.9.6",
+    "@tauri-apps/cli": "^2.12.4",
     "eslint-plugin-react": "^7.37.5",
     "semantic-release": "^25.0.3",
     "vite-plus": "catalog:"

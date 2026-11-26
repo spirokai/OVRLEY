@@ -9,6 +9,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
   const {
     widgets,
     scene,
+    rasterScale,
     activity,
     disabledLaps,
     globalDefaults,
@@ -25,6 +26,7 @@ export default function OverlayCanvas({ state, backgroundMode, displayScale, gri
   const { attach, attachMapLayer, documentRevision, error } = useWasmWidgets({
     widgets,
     scene,
+    rasterScale,
     activity,
     disabledLaps,
     defaultFont: globalDefaults.font_values,

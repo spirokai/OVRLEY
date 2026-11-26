@@ -26,8 +26,8 @@ import {
   AppHeader,
   ControlPanel,
   ErrorAlert,
-  KeyboardShortcutsDialog,
   LoadingOverlay,
+  SettingsDialog,
   UnsavedChangesDialog,
   useAppShellComposition,
 } from '@/features/app-shell'
@@ -35,9 +35,10 @@ import * as backend from './api/backend'
 import { useTranslation } from 'react-i18next'
 import { changeLanguagePreference } from '@/i18n/language-preference'
 
+/** Right-click opens DevTools in development builds only. */
 function useRightClickDevtools() {
   useEffect(() => {
-    if (!backend.hasTauriRuntime()) {
+    if (!import.meta.env.DEV || !backend.hasTauriRuntime()) {
       return undefined
     }
 
@@ -168,11 +169,13 @@ function App() {
         <UnsavedChangesDialog {...templateManagement.newTemplateConfirmDialog} />
         <UnsavedChangesDialog {...projectLifecycle.unsavedProjectDialog} />
         <MissingSourceDialog {...projectLifecycle.missingSourceDialog} />
-        <KeyboardShortcutsDialog
-          open={editorShell.keyboardShortcutsOpen}
+        <SettingsDialog
+          open={editorShell.settingsOpen}
+          section={editorShell.settingsSection}
+          onSectionChange={editorShell.setSettingsSection}
           locale={i18n.resolvedLanguage}
           onLocaleChange={changeLanguagePreference}
-          onClose={editorShell.closeKeyboardShortcuts}
+          onClose={editorShell.closeSettings}
         />
         <AppHeader
           activityImport={activityImport}
@@ -189,6 +192,7 @@ function App() {
         <ToolbarDrawerLayout
           {...toolbarDrawer}
           drawerContent={drawerContent}
+          onOpenSettings={editorShell.openSettings}
           workspace={
             <>
               <LoadingOverlay
@@ -219,7 +223,7 @@ function App() {
                   importedVideoFilename={videoControls.importedVideoFilename}
                   editorShell={editorShell}
                   undoRedoControls={undoRedoControls}
-                  showProjectStatus={projectLifecycle.status !== 'Saved'}
+                  showProjectStatus={projectLifecycle.hasUnsavedChanges}
                   projectStatus={projectLifecycle.status}
                   videoSyncMode={videoSyncWorkspace.videoSyncMode}
                   videoSyncMarkControls={videoSyncWorkspace.markControls}

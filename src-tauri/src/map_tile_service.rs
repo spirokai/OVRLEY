@@ -20,7 +20,34 @@ use uuid::Uuid;
 pub(crate) const OPENFREEMAP_TILE_URL: &str =
     "https://tiles.openfreemap.org/planet/latest/{z}/{x}/{y}.pbf";
 pub(crate) const OPENFREEMAP_CACHE_NAMESPACE: &str = "openfreemap-planet";
-const TILE_CACHE_LIMIT: u64 = 500 * 1024 * 1024;
+const MIB: u64 = 1024 * 1024;
+const TILE_CACHE_LIMIT_STEP: u64 = 128 * MIB;
+pub(crate) const DEFAULT_TILE_CACHE_LIMIT: u64 = 4 * TILE_CACHE_LIMIT_STEP;
+const MIN_TILE_CACHE_LIMIT: u64 = TILE_CACHE_LIMIT_STEP;
+const MAX_TILE_CACHE_LIMIT: u64 = 40 * TILE_CACHE_LIMIT_STEP;
+
+/// The cache's current size and its configurable limit bounds and step, in bytes.
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TileCacheUsage {
+    used_bytes: u64,
+    limit_bytes: u64,
+    min_limit_bytes: u64,
+    max_limit_bytes: u64,
+    limit_step_bytes: u64,
+}
+
+/// Accepts a user-configured cache limit only on a step inside the supported bounds.
+pub(crate) fn validate_tile_cache_limit(limit: u64) -> Result<u64, String> {
+    if !(MIN_TILE_CACHE_LIMIT..=MAX_TILE_CACHE_LIMIT).contains(&limit)
+        || limit % TILE_CACHE_LIMIT_STEP != 0
+    {
+        return Err(format!(
+            "Map tile cache limit {limit} must be a multiple of {TILE_CACHE_LIMIT_STEP} between {MIN_TILE_CACHE_LIMIT} and {MAX_TILE_CACHE_LIMIT} bytes"
+        ));
+    }
+    Ok(limit)
+}
 
 #[derive(Clone)]
 pub(crate) struct MapTileService {
@@ -112,6 +139,7 @@ struct PersistentEntry {
 }
 
 impl MapTileService {
+    #[cfg(test)]
     pub(crate) fn new(
         cache_root: PathBuf,
         source_url: String,
@@ -123,7 +151,7 @@ impl MapTileService {
             cache_namespace,
             Duration::from_secs(5),
             Duration::from_secs(15),
-            TILE_CACHE_LIMIT,
+            DEFAULT_TILE_CACHE_LIMIT,
         )
     }
 
@@ -141,7 +169,7 @@ impl MapTileService {
             cache_namespace,
             connect_timeout,
             request_timeout,
-            TILE_CACHE_LIMIT,
+            DEFAULT_TILE_CACHE_LIMIT,
         )
     }
 
@@ -217,12 +245,45 @@ impl MapTileService {
         Ok(service)
     }
 
-    pub(crate) fn for_application_cache(application_cache: PathBuf) -> Result<Self, String> {
-        Self::new(
+    pub(crate) fn for_application_cache(
+        application_cache: PathBuf,
+        cache_limit: u64,
+    ) -> Result<Self, String> {
+        Self::with_timeouts(
             application_cache.join("tiles"),
             OPENFREEMAP_TILE_URL.to_string(),
             OPENFREEMAP_CACHE_NAMESPACE.to_string(),
+            Duration::from_secs(5),
+            Duration::from_secs(15),
+            validate_tile_cache_limit(cache_limit)?,
         )
+    }
+
+    pub(crate) fn usage(&self) -> Result<TileCacheUsage, String> {
+        let accounting = self
+            .maintenance
+            .accounting
+            .lock()
+            .map_err(|error| error.to_string())?;
+        Ok(TileCacheUsage {
+            used_bytes: accounting.total_size,
+            limit_bytes: accounting.limit,
+            min_limit_bytes: MIN_TILE_CACHE_LIMIT,
+            max_limit_bytes: MAX_TILE_CACHE_LIMIT,
+            limit_step_bytes: TILE_CACHE_LIMIT_STEP,
+        })
+    }
+
+    /// Applies a new limit and evicts least recently used tiles down to it.
+    pub(crate) fn set_limit(&self, cache_limit: u64) -> Result<TileCacheUsage, String> {
+        let cache_limit = validate_tile_cache_limit(cache_limit)?;
+        self.maintenance
+            .accounting
+            .lock()
+            .map_err(|error| error.to_string())?
+            .limit = cache_limit;
+        self.reconcile_and_evict()?;
+        self.usage()
     }
 
     pub(crate) fn resolve(&self, coordinates: TileCoordinates) -> Result<TilePayload, String> {
@@ -634,7 +695,6 @@ impl MapTileService {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub(crate) fn clear(&self) -> Result<(), String> {
         let _maintenance = self
             .maintenance

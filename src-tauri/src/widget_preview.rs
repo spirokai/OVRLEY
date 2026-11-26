@@ -5,6 +5,7 @@ use ovrley_widgets::{
     activity::ActivitySampler,
     host::WidgetHost,
     model::scene::{validate_scene_presentation, ScenePresentationConfig},
+    render::preview::PreviewRasterScale,
     widgets::map::{config::MapConfig, validation::validate_map_widget},
 };
 use serde::Serialize;
@@ -84,6 +85,7 @@ pub(crate) async fn backend_map_prepare(
     activity_id: String,
     widgets: Vec<MapConfig>,
     scene: ScenePresentationConfig,
+    raster_scale: f32,
 ) -> Result<(), String> {
     let cancelled = Arc::new(AtomicBool::new(false));
     if let Some(previous) = download
@@ -108,7 +110,10 @@ pub(crate) async fn backend_map_prepare(
     let events = app.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         let activity = ActivitySampler::from_json(&activity).map_err(CoreError::from)?;
-        let host = WidgetHost::from_scene(&scene).map_err(CoreError::from)?;
+        // The preview's density sets the map's pixel ratio and so the tile zoom it needs.
+        let host = PreviewRasterScale::new(raster_scale)
+            .and_then(|raster_scale| WidgetHost::from_scene(&scene, raster_scale))
+            .map_err(CoreError::from)?;
         let scene = validate_scene_presentation(scene).map_err(CoreError::from)?;
         let widgets = widgets
             .iter()

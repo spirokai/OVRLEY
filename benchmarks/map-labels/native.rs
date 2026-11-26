@@ -372,8 +372,10 @@ fn camera(values: &[f64]) -> Result<MapCamera, String> {
 
 fn label_draw(values: &[f64]) -> Result<MapLabelDraw, String> {
     let cameras: Vec<MapCamera> = values[..values.len() - 1]
-        .chunks_exact(6)
-        .map(camera)
+        .as_chunks::<6>()
+        .0
+        .iter()
+        .map(|values| camera(values))
         .collect::<Result<_, _>>()?;
     MapLabelDraw::new(
         cameras

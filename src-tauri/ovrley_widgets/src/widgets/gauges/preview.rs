@@ -37,9 +37,13 @@ pub struct PreviewGauge {
 }
 
 impl PreviewGauge {
-    pub fn new(widget: ValueConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn new(
+        widget: ValueConfig,
+        scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
         let widget = ValidatedGauge::new(widget)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Ok(Self::from_validated(
             widget,
             validate_scene_presentation(scene)?,

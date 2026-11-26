@@ -3,6 +3,7 @@ use super::{
     frame::prepare_backdrop_frame,
     validation::{validate_backdrop, ValidatedBackdrop},
 };
+use crate::render::preview::PreviewRasterScale;
 use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
@@ -26,9 +27,13 @@ pub struct PreviewBackdrop {
 }
 
 impl PreviewBackdrop {
-    pub fn new(widget: BackdropConfig, scene: ScenePresentationConfig) -> WidgetResult<Self> {
+    pub fn new(
+        widget: BackdropConfig,
+        scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
+    ) -> WidgetResult<Self> {
         let backdrop = validate_backdrop(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Self::from_validated(backdrop, &validate_scene_presentation(scene)?, &host)
     }
 

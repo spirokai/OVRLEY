@@ -47,8 +47,8 @@ pub struct DjiAc004Sample {
     pub frame_index: usize,
     /// Video-relative time derived from sample index and device sample rate.
     pub timestamp_ms: f64,
-    /// Camera-local timestamp promoted to UTC-formatted text for compatibility
-    /// with the existing importer contract.
+    /// GPS clock time converted to UTC RFC 3339 text per the camera model's
+    /// clock rule (see [`crate::media::time::DjiGpsClock`]).
     pub timestamp: String,
     /// Latitude in decimal degrees.
     pub latitude: f64,

@@ -22,7 +22,7 @@ const defaultProps = {
   activityImport: { activityFilename: 'Test Activity', handleActivityFileOpen: vi.fn() },
   appShell: { config: {} },
   backendState: { backendStatus: 'connected' },
-  editorShell: { debugModeEnabled: false, openKeyboardShortcuts: vi.fn() },
+  editorShell: { debugModeEnabled: false },
   onOpenDownloads: vi.fn(),
   projectLifecycle: {
     status: 'Unsaved',
@@ -101,6 +101,5 @@ describe('AppHeader grouped-props contract', () => {
     expect(props).toContain('renderDisabled')
     expect(props).toContain('renderingVideo')
     expect(props).toContain('backendStatus')
-    expect(props).toContain('onOpenKeyboardShortcuts')
   })
 })

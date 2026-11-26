@@ -4,7 +4,7 @@ use crate::{
     error::{WidgetError, WidgetResult},
     preview_instance::PreviewInstance,
     preview_widget::{PreviewWidget, ResizeRequest, ResizeUpdate, WidgetRequest},
-    render::text::FontResolver,
+    render::{preview::PreviewRasterScale, text::FontResolver},
 };
 use ovrley_map::MapStyleCatalog;
 use skia_safe::{FontMgr, Typeface};
@@ -77,6 +77,8 @@ pub struct PreviewSession {
     disabled_laps: Vec<usize>,
     pub widgets: BTreeMap<u32, PreviewInstance>,
     next_id: u32,
+    /// The editor's display density; every widget rasterizes at it.
+    raster_scale: PreviewRasterScale,
 }
 
 impl PreviewSession {
@@ -434,6 +436,7 @@ impl PreviewSession {
                         point: request.point,
                         second: request.second,
                     },
+                    self.raster_scale,
                     self.activity.as_ref(),
                     &self.fonts,
                 )?,
@@ -518,8 +521,13 @@ impl PreviewSession {
         Ok(())
     }
     pub fn create_widget(&mut self, request: WidgetRequest) -> WidgetResult<u32> {
-        let widget =
-            PreviewInstance::new(request, &self.fonts, &self.images, self.map_styles.as_ref())?;
+        let widget = PreviewInstance::new(
+            request,
+            self.raster_scale,
+            &self.fonts,
+            &self.images,
+            self.map_styles.as_ref(),
+        )?;
         self.next_id = self
             .next_id
             .checked_add(1)
@@ -531,7 +539,34 @@ impl PreviewSession {
         self.widgets
             .get_mut(&id)
             .ok_or_else(|| WidgetError::Render("unknown widget handle".into()))?
-            .update(request, &self.fonts, &self.images, self.map_styles.as_ref())
+            .update(
+                request,
+                self.raster_scale,
+                &self.fonts,
+                &self.images,
+                self.map_styles.as_ref(),
+            )
+    }
+    /// Zoom changes only the density, so widgets re-rasterize from their applied requests.
+    pub fn set_raster_scale(&mut self, raster_scale: PreviewRasterScale) -> WidgetResult<()> {
+        if raster_scale == self.raster_scale {
+            return Ok(());
+        }
+        self.raster_scale = raster_scale;
+        // One failing widget must not leave the rest at the previous density.
+        let mut result = Ok(());
+        for widget in self.widgets.values_mut() {
+            let rebuilt = widget.set_raster_scale(
+                raster_scale,
+                &self.fonts,
+                &self.images,
+                self.map_styles.as_ref(),
+            );
+            if result.is_ok() {
+                result = rebuilt;
+            }
+        }
+        result
     }
     pub fn render(&mut self, second: f64) -> WidgetResult<()> {
         if !second.is_finite() {

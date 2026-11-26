@@ -109,9 +109,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin
+        run: rustup toolchain install && rustup target add aarch64-apple-darwin
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2

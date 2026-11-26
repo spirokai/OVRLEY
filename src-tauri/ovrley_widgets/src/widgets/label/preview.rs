@@ -3,6 +3,7 @@ use super::{
     frame::{prepare_label_frame, LabelFrame},
     validation::{validate_label, ValidatedLabel},
 };
+use crate::render::preview::PreviewRasterScale;
 use crate::{
     error::{WidgetError, WidgetResult},
     host::WidgetHost,
@@ -28,10 +29,11 @@ impl PreviewLabel {
     pub fn new(
         widget: LabelConfig,
         scene: ScenePresentationConfig,
+        raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
     ) -> WidgetResult<Self> {
         let label = validate_label(&widget, 0)?;
-        let host = WidgetHost::from_scene(&scene)?;
+        let host = WidgetHost::from_scene(&scene, raster_scale)?;
         Self::from_validated(&label, &validate_scene_presentation(scene)?, &host, fonts)
     }
 

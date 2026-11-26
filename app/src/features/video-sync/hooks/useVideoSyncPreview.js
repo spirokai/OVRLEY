@@ -62,6 +62,8 @@ export default function useVideoSyncPreview({
   const { attach, error: speedError } = useWasmWidgets({
     widgets: hasSpeed ? VIDEO_SYNC_SPEED_WIDGETS : VIDEO_SYNC_EMPTY_WIDGETS,
     scene: speedScene,
+    // The scene scale already lays the speed readout out at its screen size.
+    rasterScale: 1,
     activity,
     disabledLaps: VIDEO_SYNC_DISABLED_LAPS,
     second: previewSecond,

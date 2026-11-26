@@ -562,6 +562,31 @@ fn durable_template_without_scene_timing_still_validates_for_save() {
 }
 
 #[test]
+fn template_save_accepts_charts_without_legend_labels() {
+    let manifest: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../assets/standard-widgets.json")).unwrap();
+    let chart = manifest["definitions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|widget| widget["type"] == "rolling_chart")
+        .unwrap()["defaults"]
+        .clone();
+    let template = json!({
+        "format": "ovrley-template",
+        "version": TEMPLATE_FILE_VERSION,
+        "config": {
+            "scene": common::seam::explicit_scene_json(),
+            "rasters": [],
+            "labels": [],
+            "values": [],
+            "plots": [chart]
+        }
+    });
+    validate_template_contents(&template.to_string()).unwrap();
+}
+
+#[test]
 fn template_save_accepts_editable_raster_placeholder() {
     let template = json!({
         "format": "ovrley-template",

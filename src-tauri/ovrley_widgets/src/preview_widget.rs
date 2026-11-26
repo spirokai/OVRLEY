@@ -26,6 +26,7 @@ use crate::{
     },
     render::{
         image::{ImageSource, RasterImage},
+        preview::PreviewRasterScale,
         text::FontResolver,
     },
     widgets::{
@@ -314,76 +315,99 @@ pub enum PreviewWidget {
 impl PreviewWidget {
     pub fn new(
         request: WidgetRequest,
+        raster_scale: PreviewRasterScale,
         fonts: &dyn FontResolver,
         images: &(impl ImageSource + ?Sized),
         map_styles: Option<&MapStyleCatalog>,
     ) -> WidgetResult<Self> {
         match request {
             WidgetRequest::DivingProfile { widget, scene, .. } => Ok(Self::DivingProfile(
-                PreviewDivingProfile::new(widget, scene)?,
+                PreviewDivingProfile::new(widget, scene, raster_scale)?,
             )),
             WidgetRequest::RollingChart { widget, scene, .. } => Ok(Self::RollingChart(
-                PreviewRollingChart::new(widget, scene, fonts)?,
+                PreviewRollingChart::new(widget, scene, raster_scale, fonts)?,
             )),
-            WidgetRequest::Elevation { widget, scene, .. } => {
-                Ok(Self::Elevation(PreviewElevation::new(widget, scene)?))
-            }
+            WidgetRequest::Elevation { widget, scene, .. } => Ok(Self::Elevation(
+                PreviewElevation::new(widget, scene, raster_scale)?,
+            )),
             WidgetRequest::Route { widget, scene, .. } => {
-                Ok(Self::Route(PreviewRoute::new(widget, scene)?))
+                Ok(Self::Route(PreviewRoute::new(widget, scene, raster_scale)?))
             }
             WidgetRequest::Map { widget, scene, .. } => Ok(Self::Map(PreviewMap::new(
-                widget, scene, map_styles, fonts,
+                widget,
+                scene,
+                raster_scale,
+                map_styles,
+                fonts,
             )?)),
-            WidgetRequest::Raster { widget, scene, .. } => {
-                Ok(Self::Raster(PreviewRaster::new(widget, scene, images)?))
-            }
-            WidgetRequest::Backdrop { widget, scene, .. } => {
-                Ok(Self::Backdrop(PreviewBackdrop::new(widget, scene)?))
-            }
-            WidgetRequest::Label { widget, scene, .. } => {
-                Ok(Self::Label(PreviewLabel::new(widget, scene, fonts)?))
-            }
+            WidgetRequest::Raster { widget, scene, .. } => Ok(Self::Raster(PreviewRaster::new(
+                widget,
+                scene,
+                raster_scale,
+                images,
+            )?)),
+            WidgetRequest::Backdrop { widget, scene, .. } => Ok(Self::Backdrop(
+                PreviewBackdrop::new(widget, scene, raster_scale)?,
+            )),
+            WidgetRequest::Label { widget, scene, .. } => Ok(Self::Label(PreviewLabel::new(
+                widget,
+                scene,
+                raster_scale,
+                fonts,
+            )?)),
             WidgetRequest::Gradient(request) => Ok(Self::Gradient(PreviewGradient::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::LeanAngle(request) => Ok(Self::LeanAngle(PreviewLeanAngle::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::GForce(request) => Ok(Self::GForce(PreviewGForce::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::LapTimer(request) => Ok(Self::LapTimer(PreviewLapTimer::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::SplitsRun(request) => Ok(Self::SplitsRun(PreviewSplitsRun::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
             WidgetRequest::HeadingTape(request) => Ok(Self::HeadingTape(PreviewHeading::new(
                 request.widget,
                 request.scene,
+                raster_scale,
                 fonts,
             )?)),
             WidgetRequest::HeadingCompass(request) => Ok(Self::HeadingCompass(
-                PreviewHeadingCompass::new(request.widget, request.scene, fonts)?,
+                PreviewHeadingCompass::new(request.widget, request.scene, raster_scale, fonts)?,
             )),
             WidgetRequest::HeartZones(request) => Ok(Self::HeartZones(PreviewHeartZones::new(
                 request.widget,
                 request.scene,
+                raster_scale,
                 fonts,
             )?)),
             WidgetRequest::AltitudeTape(request) => Ok(Self::AltitudeTape(
-                PreviewAltitudeTape::new(request.widget, request.scene, fonts)?,
+                PreviewAltitudeTape::new(request.widget, request.scene, raster_scale, fonts)?,
             )),
             WidgetRequest::Gauge(request) => Ok(Self::Gauge(PreviewGauge::new(
                 request.widget,
                 request.scene,
+                raster_scale,
             )?)),
-            WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(request, fonts)?)),
+            WidgetRequest::Value(request) => Ok(Self::Value(ValuePreview::new(
+                request,
+                raster_scale,
+                fonts,
+            )?)),
         }
     }
     /// Builds a validated widget for a host other than the editor preview.

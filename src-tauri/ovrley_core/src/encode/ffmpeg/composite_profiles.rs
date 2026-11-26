@@ -14,7 +14,8 @@ pub struct CompositeProfile {
     pub input_args: &'static [&'static str],
     pub filter_complex: Option<&'static str>,
     pub output_args: &'static [&'static str],
-    /// Uses `{quality}` or `{videotoolbox_quality}` value placeholders.
+    /// Uses `{quality}`, `{videotoolbox_h264_quality}` or
+    /// `{videotoolbox_hevc_quality}` value placeholders.
     pub quality_args: &'static [&'static str],
     /// Uses `{bitrate}`, `{maxrate}`, and `{bufsize}` values in Mbps.
     pub bitrate_args: &'static [&'static str],
@@ -30,6 +31,14 @@ const SOFTWARE_H264_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 const SOFTWARE_HEVC_FILTER: &str = "[0:v]{base_video_filters}null[base];\
 [1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
 {atlas_slot_overlays}[out]";
+
+// VideoToolbox graphs overlay on the CPU like the software graphs and hand the
+// encoder NV12, its native layout. Left unpinned, FFmpeg negotiates packed
+// 4:4:4 `ayuv` for HEVC, converting every frame on the CPU only for
+// VideoToolbox to subsample it again (and failing outright for full range).
+const VIDEOTOOLBOX_FILTER: &str = "[0:v]{base_video_filters}null[base];\
+[1:v]setpts=PTS-STARTPTS,{atlas_slot_crops};\
+{atlas_slot_overlays},format=nv12[out]";
 
 // Hardware overlay graphs crop every atlas slot on the CPU, upload each crop
 // and chain one hardware overlay per slot onto `[base]` the same way. QSV full
@@ -317,9 +326,9 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         codec_id: CompositeCodecId::MacH264,
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
-        filter_complex: Some(SOFTWARE_H264_FILTER),
+        filter_complex: Some(VIDEOTOOLBOX_FILTER),
         output_args: &["-prio_speed", "1"],
-        quality_args: &["-global_quality", "{videotoolbox_quality}"],
+        quality_args: &["-global_quality", "{videotoolbox_h264_quality}"],
         bitrate_args: &[
             "-b:v",
             "{bitrate}",
@@ -333,10 +342,10 @@ const BUILTIN_PROFILES: &[CompositeProfile] = &[
         codec_id: CompositeCodecId::MacHevc,
         cpu_cores_per_frame_worker: 0,
         input_args: &["-hwaccel", "videotoolbox"],
-        filter_complex: Some(SOFTWARE_HEVC_FILTER),
+        filter_complex: Some(VIDEOTOOLBOX_FILTER),
         // Speed priority roughly doubles 4K media-engine HEVC throughput.
         output_args: &["-tag:v", "hvc1", "-prio_speed", "1"],
-        quality_args: &["-global_quality", "{videotoolbox_quality}"],
+        quality_args: &["-global_quality", "{videotoolbox_hevc_quality}"],
         bitrate_args: &[
             "-b:v",
             "{bitrate}",

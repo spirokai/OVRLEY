@@ -134,7 +134,7 @@ jobs:
             zip
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: rustup toolchain install
 
       - name: Cache Cargo dependencies
         uses: Swatinem/rust-cache@v2
@@ -196,14 +196,14 @@ jobs:
           install -m 0644 src-tauri/target/packaging/THIRD_PARTY_NOTICES.txt "$payload_dir/THIRD_PARTY_NOTICES.txt"
           install -m 0644 packaging/install/INSTALL-linux.txt "$payload_dir/INSTALL.txt"
           install -m 0755 packaging/appimage/AppRun "$app_dir/AppRun"
-          install -m 0644 packaging/appimage/com.ovrley.desktop "$app_dir/usr/share/applications/com.ovrley.desktop"
+          install -m 0644 packaging/appimage/com.ovrley.desktop.desktop "$app_dir/usr/share/applications/com.ovrley.desktop.desktop"
           ln -s ../lib/ovrley/OVRLEY "$app_dir/usr/bin/OVRLEY"
 
           for size in 32x32 64x64 128x128; do
             install -Dm0644 "src-tauri/icons/$size.png" "$app_dir/usr/share/icons/hicolor/$size/apps/ovrley.png"
           done
           install -Dm0644 src-tauri/icons/128x128@2x.png "$app_dir/usr/share/icons/hicolor/256x256/apps/ovrley.png"
-          ln -s usr/share/applications/com.ovrley.desktop "$app_dir/com.ovrley.desktop"
+          ln -s usr/share/applications/com.ovrley.desktop.desktop "$app_dir/com.ovrley.desktop.desktop"
           ln -s usr/share/icons/hicolor/128x128/apps/ovrley.png "$app_dir/ovrley.png"
           ln -s ovrley.png "$app_dir/.DirIcon"
 
@@ -248,8 +248,9 @@ jobs:
           find "$appimage_root" -type f -name 'THIRD_PARTY_NOTICES.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing third-party notices.' >&2; exit 1; }
           find "$appimage_root" -type f -name 'INSTALL.txt' -print -quit | grep -q . || { echo 'Extracted AppImage is missing Linux installation documentation.' >&2; exit 1; }
           [[ -e "$appimage_root/.DirIcon" ]] || { echo 'Extracted AppImage is missing its root icon.' >&2; exit 1; }
-          desktop_file="$(find "$appimage_root/usr/share/applications" -maxdepth 1 -type f -name '*.desktop' -print -quit)"
-          [[ -n "$desktop_file" ]] || { echo 'Extracted AppImage is missing its desktop entry.' >&2; exit 1; }
+          # The app copies this entry into the user's menu by this name, which Wayland matches to the window's app id.
+          desktop_file="$appimage_root/usr/share/applications/com.ovrley.desktop.desktop"
+          [[ -f "$desktop_file" ]] || { echo 'Extracted AppImage is missing its desktop entry.' >&2; exit 1; }
           grep -Fxq 'Name=OVRLEY' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong application name.' >&2; exit 1; }
           grep -Fxq 'StartupWMClass=com.ovrley.desktop' "$desktop_file" || { echo 'Extracted AppImage desktop entry has the wrong GTK application ID.' >&2; exit 1; }
           find "$appimage_root/usr/share/icons/hicolor" -type f -name '*.png' -print -quit | grep -q . || { echo 'Extracted AppImage is missing its application icon assets.' >&2; exit 1; }
