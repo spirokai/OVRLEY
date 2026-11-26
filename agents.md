@@ -50,7 +50,6 @@ app/                the former React app: a frozen reading reference. Nothing re
 | `cargo test --workspace --features ovrley_ui/dev-windows` | The whole suite                                                       |
 | `pnpm test:native-ui`                                     | `ovrley_app`, `ovrley_ui`, `ovrley_services` and `ovrley_mcp` tests   |
 | `pnpm build`                                              | Release build and packages for this OS (`scripts/package.mjs`)        |
-| `pnpm install:packager`                                   | cargo-packager at the pinned revision                                 |
 | `pnpm prepare:packaging`                                  | The notices and the player's libraries, in `target/packaging/`        |
 | `pnpm release`                                            | semantic-release; CI runs it                                          |
 
@@ -90,7 +89,7 @@ ABSOLUTELY NEVER run build without the user's permission!
 
 ## Build & release
 
-- `scripts/package.mjs` builds and packages; cargo-packager's config is `[package.metadata.packager]` in `crates/ovrley_ui/Cargo.toml`.
+- `scripts/package.mjs` builds and packages, and first installs cargo-packager at the pinned revision when cargo does not list it; cargo-packager's config is `[package.metadata.packager]` in `crates/ovrley_ui/Cargo.toml`.
 - The workspace's version is the app's. `scripts/release/set-version.mjs` stamps it; the committed one is a placeholder.
 - Workflows in `.github/workflows/`: `workflow_release.yml` runs the Windows, macOS and AppImage ones and drafts the release; `release-linux.yml` (deb), `release-flatpak.yml` and `release-ms-store.yml` are separate. Never trigger them.
 - semantic-release tags pushes to `main`, `rust-rewrite` and `rust-wasm` (`.releaserc.json`).

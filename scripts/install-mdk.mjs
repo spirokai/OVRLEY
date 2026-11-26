@@ -74,16 +74,22 @@ async function isSdk(dir, sdk) {
 
 async function extract(archivePath, destination) {
   if (process.platform !== 'win32') return run('tar', ['-xf', archivePath, '-C', destination])
-  // Windows' own tar is libarchive, which reads 7z where it was built with LZMA. Git's tar does not.
+  // Windows' own tar is libarchive, which reads 7z where it was built with LZMA; Windows 10's was
+  // not. Git's tar does not. 7-Zip's installer does not put it on PATH.
   try {
     await run(join(process.env.SystemRoot, 'System32', 'tar.exe'), ['-xf', archivePath, '-C', destination])
-  } catch {
+    return
+  } catch {}
+  const errors = []
+  for (const sevenZip of ['7z', join(process.env.ProgramFiles, '7-Zip', '7z.exe')]) {
     try {
-      await run('7z', ['x', '-y', `-o${destination}`, archivePath])
+      await run(sevenZip, ['x', '-y', `-o${destination}`, archivePath])
+      return
     } catch (error) {
-      throw new Error(
-        `Could not extract the .7z with Windows' tar or with 7z (${error.message}). Install 7-Zip and put it on PATH, or extract it to ${installDir}.`,
-      )
+      errors.push(error.message)
     }
   }
+  throw new Error(
+    `Could not extract the .7z with Windows' tar or with 7-Zip (${errors.join('; ')}). Install 7-Zip, or extract it to ${installDir}.`,
+  )
 }

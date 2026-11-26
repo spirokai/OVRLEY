@@ -10,7 +10,7 @@ vendor/ffmpeg/bin/ffmpeg[.exe]
 
 Packages also carry the MDK player's libraries, which the executable links. `pnpm install` fetches its SDK into `vendor/mdk-sdk/`, and `pnpm prepare:packaging` copies the libraries a package needs to `target/packaging/player/`.
 
-`pnpm build` runs `scripts/package.mjs`: the release build, the packaging resources, cargo-packager (configured in `crates/ovrley_ui/Cargo.toml`) and, on Windows and macOS, the portable ZIP of `packaging/portable.mjs`. The DMG, the AppImage, the Flatpak and the Store's MSIX are built by their workflows. `pnpm install:packager` installs cargo-packager at the pinned revision, as the workflows do.
+`pnpm build` runs `scripts/package.mjs`: the release build, the packaging resources, cargo-packager (configured in `crates/ovrley_ui/Cargo.toml`; by default the `.app` on macOS and the `.deb` on Linux, and on Windows only with `--bundles nsis`, as the workflow passes) and, on Windows and macOS, the portable ZIP of `packaging/portable.mjs`. The DMG, the AppImage, the Flatpak and the Store's MSIX are built by their workflows. It first installs cargo-packager at the pinned revision (in `scripts/package.mjs`) when `cargo install --list` does not show it.
 
 The updater (`ovrley_services::updater`) reads the release's `latest.json`, which `scripts/release/create-latest-json.mjs` writes. The artifacts it installs must be signed by cargo-packager (`CARGO_PACKAGER_SIGN_PRIVATE_KEY` and its `_PASSWORD`), which signs the version too; the AppImage is signed with `cargo packager signer sign --app-version <version>`.
 

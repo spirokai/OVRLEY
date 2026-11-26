@@ -139,9 +139,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install cargo-packager
-        run: pnpm install:packager
-
       - name: Build Linux application binary
         run: pnpm build --no-bundle
 

@@ -150,10 +150,9 @@ pnpm test:native-ui                                       # The app, services, M
 
 ## Building & Compatibility
 
-Packaging needs cargo-packager at the pinned revision:
+`pnpm build` installs cargo-packager at the pinned revision the first time it runs:
 
 ```bash
-pnpm install:packager
 pnpm build
 ```
 

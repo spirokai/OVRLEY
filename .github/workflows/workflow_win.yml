@@ -107,9 +107,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install cargo-packager
-        run: pnpm install:packager
-
       - name: Build signed NSIS installer
         run: pnpm build --bundles nsis
         env:

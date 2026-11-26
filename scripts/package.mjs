@@ -1,8 +1,10 @@
 // `pnpm build`: builds the app and packages it for this OS.
+//   0. cargo-packager at the pinned revision, installed when cargo does not list it;
 //   1. the release build of ovrley_ui;
 //   2. the packaging resources (notices, the player's libraries);
 //   3. the staging folder, target/packaging, with the binary under its packaged names;
-//   4. cargo-packager, configured in crates/ovrley_ui/Cargo.toml;
+//   4. cargo-packager, configured in crates/ovrley_ui/Cargo.toml: the .app on macOS, the .deb on
+//      Linux, nothing on Windows unless --bundles names a format (the workflow asks for nsis);
 //   5. the portable ZIP (Windows and macOS).
 // --bundles <formats> picks the packager's formats and --no-bundle packages none; both leave out
 // step 5. --debug packages a debug build. With CARGO_PACKAGER_SIGN_PRIVATE_KEY (and its _PASSWORD)
@@ -20,7 +22,9 @@ const isWindows = process.platform === 'win32'
 // and updates, shortcuts and pins find the app by that name.
 const packagedName = 'OVRLEY'
 const installedName = isWindows ? 'app' : packagedName
-const defaultFormats = { win32: ['nsis'], darwin: ['app'], linux: ['deb'] }
+const defaultFormats = { win32: [], darwin: ['app'], linux: ['deb'] }
+const packagerRepository = 'https://github.com/crabnebula-dev/cargo-packager'
+const packagerRev = 'd27f3df01749d64d258e0d356cb6e1bb8223c652'
 
 main().catch((error) => {
   console.error(`[package] ${error.message}`)
@@ -31,6 +35,9 @@ async function main() {
   const options = readOptions(process.argv.slice(2))
   const profile = options.debug ? 'debug' : 'release'
 
+  // Before the app's build, so that a failed install does not wait for it; also with --no-bundle,
+  // after which the AppImage workflow signs with `cargo packager signer`.
+  await installPackager()
   await run('cargo', ['build', '--locked', '-p', 'ovrley_ui', '--bin', 'ovrley', ...(options.debug ? [] : ['--release'])], {
     env: { ...process.env, OVRLEY_PACKAGING: '1' },
   })
@@ -72,6 +79,18 @@ function readOptions(args) {
     }
   }
   return options
+}
+
+// `cargo install --list` names a git install's source as `<repository>?rev=<rev>#<short>`.
+async function installPackager() {
+  const result = spawnSync('cargo', ['install', '--list'], { encoding: 'utf8' })
+  if (result.status !== 0) {
+    throw new Error(`cargo install --list failed: ${result.stderr?.trim() || result.error?.message}`)
+  }
+  const installed = result.stdout.split('\n').some((line) => line.startsWith('cargo-packager ') && line.includes(`rev=${packagerRev}`))
+  if (installed) return
+  console.log(`[package] Installing cargo-packager ${packagerRev}`)
+  await run('cargo', ['install', 'cargo-packager', '--git', packagerRepository, '--rev', packagerRev, '--locked'])
 }
 
 async function stageBinary(profile) {

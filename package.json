@@ -6,7 +6,6 @@
   "scripts": {
     "preinstall": "node scripts/require-pnpm.mjs",
     "postinstall": "node scripts/install-ffmpeg.mjs && node scripts/install-mdk.mjs",
-    "install:packager": "cargo install cargo-packager --git https://github.com/crabnebula-dev/cargo-packager --rev d27f3df01749d64d258e0d356cb6e1bb8223c652 --locked",
     "build": "node scripts/package.mjs",
     "prepare:packaging": "node packaging/resources.mjs",
     "release": "semantic-release",
