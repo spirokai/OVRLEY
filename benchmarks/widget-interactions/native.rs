@@ -253,7 +253,7 @@ impl Editor {
             for (id, widget) in &next {
                 if shown.get(id).is_some_and(|old| old.pixels_revision != widget.pixels_revision) {
                     measured.redraws += 1;
-                    measured.redrawn_bytes += u64::from(widget.geometry.widget.width) * u64::from(widget.geometry.widget.height) * 4;
+                    measured.redrawn_bytes += u64::from(widget.geometry.width) * u64::from(widget.geometry.height) * 4;
                 }
             }
             shown = next;

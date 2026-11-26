@@ -11,7 +11,8 @@ use ovrley_core::{
     paths::AppPaths,
     render::{ExportWidgets, FrameSize},
 };
-use ovrley_widgets::{preview::FontRequest, widgets::value::validation::ValidatedValue};
+use ovrley_widgets::preview::FontRequest;
+use ovrley_widgets::widgets::value::ValidatedValue;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::PathBuf, time::Instant};

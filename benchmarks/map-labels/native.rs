@@ -28,7 +28,7 @@ const FOLLOW_PITCH: f64 = 50.0;
 const FOLLOW_TOP_PADDING: f64 = 0.45;
 const LINE_WIDTH: f32 = 6.0;
 /// The top-down camera fits the route's longer side into 500 units, with the 8% margin of
-/// `ovrley_widgets::widgets::map::content`'s fit.
+/// `ovrley_widgets::widgets::map`'s fit.
 const FIXED_ROUTE_SPAN: f64 = 500.0 * (1.0 - 0.08 * 2.0);
 const LABEL_STEP_SECONDS: f64 = 0.3;
 /// Chase speed along the route.

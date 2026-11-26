@@ -1,7 +1,7 @@
 //! Runs the editor's preview session, including sampling and RGBA readback.
 use super::Plan;
 use ovrley_services::maps::{MapStyleDirs, MapStyleRegistry};
-use ovrley_widgets::error::WidgetResult;
+use ovrley_widgets::WidgetResult;
 use ovrley_widgets::preview::{FontRequest, PreviewSession};
 use ovrley_widgets::widgets::map::preview::{
     MapFrameFactory, MapFramePixels, MapFrameProvider, MapFrameReply, MapFrameRequest,
@@ -89,7 +89,10 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
         if let Some(filename) = &case.split_table {
             session
                 .replace_split_table(
-                    &fs::read(directory.join(filename)).map_err(|error| error.to_string())?,
+                    serde_json::from_slice(
+                        &fs::read(directory.join(filename)).map_err(|error| error.to_string())?,
+                    )
+                    .map_err(|error| error.to_string())?,
                 )
                 .map_err(|error| error.to_string())?;
         }
@@ -150,9 +153,10 @@ pub(super) fn run(plan: &Plan, directory: &Path) -> Result<(), String> {
         }
         let raster = handle
             .map(|id| {
-                let geometry: Value = serde_json::from_slice(session.widgets[&id].geometry())
-                    .map_err(|error| error.to_string())?;
-                Ok::<_, String>(json!([geometry["width"], geometry["height"]]))
+                let geometry = session.widgets[&id]
+                    .geometry()
+                    .ok_or("the widget presents nothing")?;
+                Ok::<_, String>(json!([geometry.width, geometry.height]))
             })
             .transpose()?;
         let total_ms = if case.dynamic {

@@ -287,11 +287,9 @@ function escapeRegExp(value) {
 
 function extractArchive(archivePath, destination) {
   if (process.platform === 'win32') {
-    return run('powershell', [
-      '-NoProfile',
-      '-Command',
-      `Expand-Archive -LiteralPath '${archivePath.replaceAll("'", "''")}' -DestinationPath '${destination.replaceAll("'", "''")}' -Force`,
-    ])
+    // Windows' bundled bsdtar reads zip. Not Expand-Archive: Windows PowerShell spawned from
+    // a pwsh step inherits pwsh's PSModulePath, loads the PS7 Archive module, fails, and exits 0.
+    return run(join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe'), ['-xf', archivePath, '-C', destination])
   }
   if (archivePath.endsWith('.tar.xz')) {
     return run('tar', ['-xf', archivePath, '-C', destination])
