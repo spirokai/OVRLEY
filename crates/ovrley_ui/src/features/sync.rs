@@ -319,6 +319,7 @@ fn project_drawer(global: &VideoSync<'_>, store: &Store) {
     set_if_changed(global.get_can_calculate_location(), view.eligibility.can_calculate_location, |value| global.set_can_calculate_location(value));
     set_if_changed(global.get_calculating(), view.calculating, |value| global.set_calculating(value));
     set_if_changed(global.get_all_explanation(), SharedString::from(view.eligibility.all_explanation.unwrap_or_default()), |value| global.set_all_explanation(value));
+    set_if_changed(global.get_held_by_other_video(), SharedString::from(view.held_by_other_video.unwrap_or_default()), |value| global.set_held_by_other_video(value));
     let next = candidate_list(&view.location);
     if !same_list(&global.get_location_result(), &next) {
         global.set_location_result(next);
@@ -346,6 +347,8 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     global.on_open_manual_sync(move || d.dispatch(|store, _| store.layout.open_manual_video_sync()));
     let d = dispatcher.handle();
     global.on_clear_landmarks(move || d.dispatch(|store, _| manual::clear_landmarks(store)));
+    let d = dispatcher.handle();
+    global.on_show_sync_video(move || dispatch_logged(&d, CONTEXT, |store, _| sync::show_sync_video(store)));
     let d = dispatcher.handle();
     global.on_set_landmark_kind(move |id, kind| dispatch_logged(&d, CONTEXT, move |store, _| manual::set_landmark_kind(store, &id, kind.into())));
     let d = dispatcher.handle();

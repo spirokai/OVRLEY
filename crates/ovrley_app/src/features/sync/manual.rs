@@ -4,6 +4,10 @@
 //! The durable state is core's `ManualVideoSync` (`Store::manual_video_sync`), which projects save.
 //! It is outside the editor history: only `apply_candidate` makes an undo step, through the video
 //! edits it moves.
+//!
+//! The video the landmarks were marked in holds the sync: its first landmark claims it, only it
+//! takes more, and it lets go with its last one. Candidates place that video, and every other
+//! video follows it.
 
 use std::sync::Arc;
 use ovrley_core::media::sync::{Landmark, LandmarkKind, MAX_MANUAL_LANDMARKS, MAX_MANUAL_LOCATION_LANDMARKS, MAX_MANUAL_SPEED_THRESHOLD_KMH, MAX_MANUAL_TURN_THRESHOLD_DEGREES, MIN_MANUAL_SPEED_THRESHOLD_KMH, MIN_MANUAL_TURN_THRESHOLD_DEGREES, ManualVideoSync};
@@ -106,7 +110,7 @@ pub const TURN_THRESHOLD_RANGE: (f64, f64) = (
     MAX_MANUAL_TURN_THRESHOLD_DEGREES,
 );
 
-/// The clip whose landmarks the workspace matches.
+/// The clip that holds the sync, the one its landmarks were marked in; `None` without landmarks.
 pub fn find_video_sync_target(store: &Store) -> Option<Clip> {
     let video_id = store.manual_video_sync.video_id.as_deref()?;
     let video = store
@@ -121,8 +125,7 @@ pub fn find_video_sync_target(store: &Store) -> Option<Clip> {
 }
 
 fn require_target(store: &Store) -> Result<Clip, String> {
-    find_video_sync_target(store)
-        .ok_or_else(|| "A video must be loaded before adding a manual video sync landmark".into())
+    find_video_sync_target(store).ok_or_else(|| "Manual video sync has no landmarks".into())
 }
 
 /// A video second inside the target video.
@@ -190,16 +193,38 @@ fn reset_derived_state(store: &mut Store) {
     store.manual_video_sync_results = store.manual_video_sync_results.renewed();
 }
 
-/// Inside the target video, at most five, at most one location. Returns
-/// the new landmark's id.
+/// Landmarks hold the sync to their video; without any, no video holds it and their candidates
+/// go too.
+fn release_empty_target(store: &mut Store) {
+    if !store.manual_video_sync.landmarks.is_empty() {
+        return;
+    }
+    store.manual_video_sync.video_id = None;
+    store.manual_video_sync_results = store.manual_video_sync_results.renewed();
+}
+
+/// A landmark in video `video_id`, inside it, at most five, at most one location. The first
+/// landmark makes that video hold the sync, and only it takes more. Returns the new landmark's id.
 pub fn add_landmark(
     store: &mut Store,
+    video_id: &str,
     kind: LandmarkKind,
     video_second: f64,
 ) -> Result<String, String> {
-    let video = require_target(store)?;
+    if let Some(target) = store
+        .manual_video_sync
+        .video_id
+        .as_deref()
+        .filter(|target| *target != video_id)
+    {
+        return Err(format!(
+            "Manual video sync landmarks belong to video {target}, not {video_id}"
+        ));
+    }
+    let video = find_video(&store.video_import.imported_videos, video_id)
+        .map_err(|_| format!("Unknown manual video sync video: {video_id}"))?;
     let id = crate::video::new_id();
-    validate_video_second(video_second, video.duration_seconds())?;
+    validate_video_second(video_second, video.duration_seconds)?;
     let landmarks = &store.manual_video_sync.landmarks;
     if landmarks.len() >= MAX_MANUAL_LANDMARKS {
         return Err(format!(
@@ -213,6 +238,7 @@ pub fn add_landmark(
     {
         return Err(location_limit_error());
     }
+    store.manual_video_sync.video_id = Some(video_id.to_string());
     store
         .manual_video_sync
         .landmarks
@@ -276,15 +302,30 @@ pub fn remove_landmark(store: &mut Store, id: &str) -> Result<(), String> {
         .landmarks
         .retain(|landmark| landmark.id() != id);
     invalidate_for(store, kind == LandmarkKind::Location);
+    release_empty_target(store);
     Ok(())
 }
 
+/// Removes every landmark with its candidates, so no video holds the sync any more.
 pub fn clear_landmarks(store: &mut Store) {
     if store.manual_video_sync.landmarks.is_empty() {
         return;
     }
     store.manual_video_sync.landmarks.clear();
-    invalidate_for(store, true);
+    release_empty_target(store);
+}
+
+/// Drops the landmarks past the end of video `video_id`'s relinked file, `duration_seconds` long,
+/// when that video holds the sync; with none left, it lets go.
+pub fn fit_landmarks_to_relinked_video(store: &mut Store, video_id: &str, duration_seconds: f64) {
+    if store.manual_video_sync.video_id.as_deref() != Some(video_id) {
+        return;
+    }
+    store
+        .manual_video_sync
+        .landmarks
+        .retain(|landmark| landmark.video_second() <= duration_seconds);
+    release_empty_target(store);
 }
 
 /// "Set location" on the map.
@@ -387,7 +428,7 @@ pub fn set_thresholds(store: &mut Store, kmh: Option<f64>, degrees: Option<f64>)
 const SAME_OFFSET_SECONDS: f64 = 1e-6;
 
 /// Only from a fresh result holding that offset. Candidates place the
-/// target clip; every clip moves by the same amount, and the playhead with them.
+/// clip that holds the sync; every clip moves by the same amount, and the playhead with them.
 pub fn apply_candidate(store: &mut Store, scope: MatchScope, offset: f64) -> Result<(), String> {
     let result = store.manual_video_sync_results.get(scope);
     if result.status != CandidateStatus::Fresh {
@@ -469,22 +510,6 @@ pub fn complete_detection(store: &mut Store, detection: Detection) {
     ));
 }
 
-/// The video whose landmarks the manual sync matches; landmarks belong to
-/// one video and are cleared on a change.
-pub fn select_video_sync_video(store: &mut Store, video_id: Option<String>) -> Result<(), String> {
-    if store.manual_video_sync.video_id == video_id {
-        return Ok(());
-    }
-    if let Some(video_id) = &video_id {
-        find_video(&store.video_import.imported_videos, video_id)
-            .map_err(|_| format!("Unknown manual video sync video: {video_id}"))?;
-    }
-    store.manual_video_sync.video_id = video_id;
-    store.manual_video_sync.landmarks.clear();
-    store.manual_video_sync_results = store.manual_video_sync_results.renewed();
-    Ok(())
-}
-
 /// The detected location belongs to the replaced activity.
 pub fn clear_video_sync_for_activity(store: &mut Store) {
     store.manual_video_sync.detected_location_second = None;
@@ -509,11 +534,9 @@ mod tests {
     use crate::video::fixtures::simple;
     use crate::store::videos::tests::store_with;
 
-    /// A store with one 60 s video at offset 0, selected for the manual sync.
+    /// A store with one 60 s video at offset 0.
     fn store() -> Store {
-        let mut store = store_with(vec![simple("ride", 60.0, 0)], &[]);
-        select_video_sync_video(&mut store, Some("ride".into())).unwrap();
-        store
+        store_with(vec![simple("ride", 60.0, 0)], &[])
     }
 
     fn candidate(offset: f64) -> Candidate {
@@ -543,7 +566,7 @@ mod tests {
     #[test]
     fn adds_typed_landmarks_inside_the_target_video_with_the_limits() {
         let mut store = store();
-        let id = add_landmark(&mut store, LandmarkKind::Location, 4.0).unwrap();
+        let id = add_landmark(&mut store, "ride", LandmarkKind::Location, 4.0).unwrap();
         assert_eq!(
             store.manual_video_sync.landmarks,
             vec![Landmark::Location {
@@ -552,35 +575,91 @@ mod tests {
                 activity_second: None
             }]
         );
-        assert!(add_landmark(&mut store, LandmarkKind::Location, 5.0)
+        assert!(add_landmark(&mut store, "ride", LandmarkKind::Location, 5.0)
             .unwrap_err()
             .contains("at most 1 location"));
-        assert!(add_landmark(&mut store, LandmarkKind::Stop, -1.0)
+        assert!(add_landmark(&mut store, "ride", LandmarkKind::Stop, -1.0)
             .unwrap_err()
             .contains("must not be negative"));
-        assert!(add_landmark(&mut store, LandmarkKind::Stop, 61.0)
+        assert!(add_landmark(&mut store, "ride", LandmarkKind::Stop, 61.0)
             .unwrap_err()
             .contains("within the imported video duration"));
         for second in [1.0, 2.0, 3.0, 4.0] {
-            add_landmark(&mut store, LandmarkKind::Stop, second).unwrap();
+            add_landmark(&mut store, "ride", LandmarkKind::Stop, second).unwrap();
         }
-        assert!(add_landmark(&mut store, LandmarkKind::Stop, 5.0)
+        assert!(add_landmark(&mut store, "ride", LandmarkKind::Stop, 5.0)
             .unwrap_err()
             .contains("at most 5 landmarks"));
     }
 
     #[test]
-    fn a_landmark_needs_a_target_video() {
+    fn a_landmark_needs_a_known_video() {
         let mut store = Store::default();
-        assert!(add_landmark(&mut store, LandmarkKind::Stop, 1.0)
+        assert!(add_landmark(&mut store, "ride", LandmarkKind::Stop, 1.0)
             .unwrap_err()
-            .contains("A video must be loaded"));
+            .contains("Unknown manual video sync video: ride"));
+    }
+
+    #[test]
+    fn the_first_landmark_claims_its_video_and_the_last_one_lets_it_go() {
+        let mut store = store_with(
+            vec![simple("ride", 60.0, 0), simple("second", 30.0, 1)],
+            &[],
+        );
+        assert_eq!(
+            find_video_sync_target(&store),
+            None,
+            "no landmark, no video holds the sync"
+        );
+        let first = add_landmark(&mut store, "second", LandmarkKind::Stop, 1.0).unwrap();
+        assert_eq!(store.manual_video_sync.video_id.as_deref(), Some("second"));
+        assert_eq!(
+            find_video_sync_target(&store)
+                .map(|clip| clip.id().to_string())
+                .as_deref(),
+            Some("second")
+        );
+        assert!(add_landmark(&mut store, "ride", LandmarkKind::Stop, 2.0)
+            .unwrap_err()
+            .contains("belong to video second, not ride"));
+        assert!(
+            add_landmark(&mut store, "second", LandmarkKind::Stop, 31.0).is_err(),
+            "inside the video that holds the sync"
+        );
+        let second = add_landmark(&mut store, "second", LandmarkKind::LeftTurn, 2.0).unwrap();
+        searched(&mut store, MatchScope::All, vec![candidate(1.0)]);
+        remove_landmark(&mut store, &first).unwrap();
+        assert_eq!(
+            store.manual_video_sync.video_id.as_deref(),
+            Some("second"),
+            "a landmark is left"
+        );
+        assert_eq!(
+            store.manual_video_sync_results.all.status,
+            CandidateStatus::Stale
+        );
+        remove_landmark(&mut store, &second).unwrap();
+        assert_eq!(store.manual_video_sync.video_id, None);
+        assert_eq!(
+            store.manual_video_sync_results.all,
+            CandidateResult {
+                revision: store.manual_video_sync_results.all.revision,
+                ..CandidateResult::default()
+            },
+            "the candidates go with the last landmark"
+        );
+        add_landmark(&mut store, "ride", LandmarkKind::Stop, 2.0).unwrap();
+        clear_landmarks(&mut store);
+        assert_eq!(
+            store.manual_video_sync.video_id, None,
+            "clearing lets go too"
+        );
     }
 
     #[test]
     fn moves_retypes_and_removes_landmarks() {
         let mut store = store();
-        let id = add_landmark(&mut store, LandmarkKind::Stop, 1.0).unwrap();
+        let id = add_landmark(&mut store, "ride", LandmarkKind::Stop, 1.0).unwrap();
         move_landmark(&mut store, &id, 7.5).unwrap();
         assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 7.5);
         assert!(move_landmark(&mut store, &id, 70.0).is_err());
@@ -592,7 +671,7 @@ mod tests {
             store.manual_video_sync.landmarks[0].kind(),
             LandmarkKind::Location
         );
-        let other = add_landmark(&mut store, LandmarkKind::LeftTurn, 2.0).unwrap();
+        let other = add_landmark(&mut store, "ride", LandmarkKind::LeftTurn, 2.0).unwrap();
         assert!(
             set_landmark_kind(&mut store, &other, LandmarkKind::Location)
                 .unwrap_err()
@@ -617,7 +696,7 @@ mod tests {
         let mut store = store();
         searched(&mut store, MatchScope::All, vec![candidate(1.0)]);
         searched(&mut store, MatchScope::Location, vec![candidate(2.0)]);
-        let stop = add_landmark(&mut store, LandmarkKind::Stop, 1.0).unwrap();
+        let stop = add_landmark(&mut store, "ride", LandmarkKind::Stop, 1.0).unwrap();
         assert_eq!(
             (
                 store.manual_video_sync_results.all.status,
@@ -626,7 +705,7 @@ mod tests {
             (CandidateStatus::Stale, CandidateStatus::Fresh)
         );
         searched(&mut store, MatchScope::All, vec![]);
-        add_landmark(&mut store, LandmarkKind::Location, 2.0).unwrap();
+        add_landmark(&mut store, "ride", LandmarkKind::Location, 2.0).unwrap();
         assert_eq!(
             (
                 store.manual_video_sync_results.all.status,
@@ -635,7 +714,7 @@ mod tests {
             (CandidateStatus::Stale, CandidateStatus::Stale)
         );
         let mut fresh = self::store();
-        add_landmark(&mut fresh, LandmarkKind::Stop, 1.0).unwrap();
+        add_landmark(&mut fresh, "ride", LandmarkKind::Stop, 1.0).unwrap();
         assert_eq!(
             fresh.manual_video_sync_results.all.status,
             CandidateStatus::Idle,
@@ -682,7 +761,7 @@ mod tests {
             None,
             "one search at a time"
         );
-        add_landmark(&mut store, LandmarkKind::Stop, 1.0).unwrap();
+        add_landmark(&mut store, "ride", LandmarkKind::Stop, 1.0).unwrap();
         assert!(
             !complete_calculation(
                 &mut store,
@@ -724,7 +803,7 @@ mod tests {
             vec![simple("ride", 60.0, 0), simple("second", 30.0, 1)],
             &[],
         );
-        select_video_sync_video(&mut store, Some("ride".into())).unwrap();
+        add_landmark(&mut store, "ride", LandmarkKind::Stop, 1.0).unwrap();
         let before: Vec<f64> = ["ride", "second"]
             .iter()
             .map(|id| store.video_import.video_edits[*id].offset_seconds)
@@ -754,11 +833,8 @@ mod tests {
     }
 
     #[test]
-    fn the_manual_sync_selects_known_videos_and_keeps_landmarks_across_activities() {
+    fn the_manual_sync_keeps_its_landmarks_across_activities() {
         let mut store = store_with(vec![simple("ride", 10.0, 0)], &[]);
-        assert!(select_video_sync_video(&mut store, Some("gone".into()))
-            .unwrap_err()
-            .contains("Unknown manual video sync video"));
         hydrate_video_sync_state(
             &mut store,
             ManualVideoSync {
@@ -785,14 +861,6 @@ mod tests {
             (None, 1)
         );
         assert_eq!(store.manual_video_sync_detection, None);
-        select_video_sync_video(&mut store, Some("ride".into())).unwrap();
-        assert_eq!(
-            store.manual_video_sync.landmarks.len(),
-            1,
-            "selecting the same video keeps its landmarks"
-        );
-        select_video_sync_video(&mut store, None).unwrap();
-        assert!(store.manual_video_sync.landmarks.is_empty());
         reset_video_sync_state(&mut store);
         assert_eq!(store.manual_video_sync, ManualVideoSync::default());
     }

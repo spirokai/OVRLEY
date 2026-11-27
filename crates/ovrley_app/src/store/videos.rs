@@ -9,10 +9,10 @@ use std::rc::Rc;
 use ovrley_core::encode::ffmpeg::transitions::{transition_defaults, TransitionDefaults};
 use ovrley_core::media::edits::{FIRST_SEGMENT_KEY, TimezoneMode, Transition};
 use crate::features::player::playback::{timeline_minimum, total_playback_duration};
-use crate::features::sync::manual::{clear_video_sync_for_activity, select_video_sync_video};
+use crate::features::sync::manual::{clear_landmarks, clear_video_sync_for_activity, fit_landmarks_to_relinked_video};
 use crate::store::Store;
 use crate::video::{Clip, ImportedVideo, TelemetryStatus, VideoEditsMap, VideoTelemetry};
-use crate::video::collection::{join_video_edits, sort_clips_by_timeline, timeline_bounds, VideoDragPreview};
+use crate::video::collection::{join_video_edits, timeline_bounds, VideoDragPreview};
 use crate::video::edits::{find_video, segment_before_cut, CollectionDraft, CreationTimeSource};
 use crate::video::segments::{fit_cuts_to_frame_count, TrimSide};
 use crate::video::sync::SyncActivity;
@@ -153,9 +153,22 @@ pub fn select_clip(store: &mut Store, selection: Option<SelectedClip>) -> Result
     Ok(())
 }
 
+/// Selects a whole video clip and, with the playhead outside it, pauses the playhead at the clip's
+/// start, so the preview shows the video that was picked.
+pub fn select_clip_revealing_playhead(store: &mut Store, video_id: &str) -> Result<(), String> {
+    select_clip(store, Some(SelectedClip { lane: ClipLane::Video(video_id.to_string()), segment_key: None }))?;
+    let offset = store.video_import.video_edits[video_id].offset_seconds;
+    let duration = find_video(&store.video_import.imported_videos, video_id)?.duration_seconds;
+    let second = store.editor.selected_second;
+    if second < offset || second >= offset + duration {
+        store.editor.commit_preview_scrub(offset);
+    }
+    Ok(())
+}
+
 /// Removes a video, without the history rebase (`change_video_collection` wraps it).
-/// The playhead stays on the timeline; the clip's selection and cut question go with it, and the
-/// manual sync moves to the first clip when it was this video's.
+/// The playhead stays on the timeline; the clip's selection and cut question go with it, and so do
+/// the manual sync's landmarks when they were marked in it.
 pub fn remove_imported_video(store: &mut Store, video_id: &str) -> Result<(), String> {
     edit_collection(store, |draft| draft.remove_video(video_id))?;
     store.video_import.video_drag_preview = None;
@@ -167,22 +180,15 @@ pub fn remove_imported_video(store: &mut Store, video_id: &str) -> Result<(), St
     }
     clamp_playhead_to_videos(store, 0.0);
     if store.manual_video_sync.video_id.as_deref() == Some(video_id) {
-        select_first_clip_for_video_sync(store);
+        clear_landmarks(store);
     }
     Ok(())
 }
 
-/// The manual sync moves to the first clip on the timeline, or to none.
-fn select_first_clip_for_video_sync(store: &mut Store) {
-    let clips = store.video_import.clips();
-    let first = sort_clips_by_timeline(&clips).first().map(|clip| clip.id().to_string());
-    select_video_sync_video(store, first).expect("the first clip is imported");
-}
-
 /// Replaces the collection, without the history rebase (`change_video_collection` wraps it): the
 /// collection replaces the current one. The background image, the drag preview, the cut question
-/// and a selection of a video that left go; the playhead stays on the timeline; the manual sync
-/// moves to the first clip when its video left.
+/// and a selection of a video that left go; the playhead stays on the timeline; the manual sync's
+/// landmarks go when their video left.
 pub fn commit_video_collection(store: &mut Store, videos: Vec<ImportedVideo>, edits: VideoEditsMap) {
     let slice = &mut store.video_import;
     slice.imported_videos = Rc::new(videos);
@@ -196,22 +202,21 @@ pub fn commit_video_collection(store: &mut Store, videos: Vec<ImportedVideo>, ed
         }
     }
     clamp_playhead_to_videos(store, 0.0);
-    let kept = store.manual_video_sync.video_id.as_deref().is_some_and(|video_id| find_video(&store.video_import.imported_videos, video_id).is_ok());
-    if !kept {
-        select_first_clip_for_video_sync(store);
+    let left = store.manual_video_sync.video_id.as_deref().is_some_and(|video_id| find_video(&store.video_import.imported_videos, video_id).is_err());
+    if left {
+        clear_landmarks(store);
     }
 }
 
 /// Relinks a missing video, without the history rebase: a found file replaces it. Its cuts are
-/// fitted to the file's frames; manual-sync landmarks past a shorter file's end and a selected
-/// segment that no longer exists go; the playhead stays on the timeline.
+/// fitted to the file's frames; manual-sync landmarks past a shorter file's end (all of them gone
+/// clears the manual sync) and a selected segment that no longer exists go; the playhead stays on
+/// the timeline.
 pub fn relink_video(store: &mut Store, video: ImportedVideo) -> Result<(), String> {
     let slice = &mut store.video_import;
     let index = slice.imported_videos.iter().position(|candidate| candidate.id == video.id).filter(|index| slice.imported_videos[*index].missing).ok_or_else(|| format!("Video is not missing: {}", video.id))?;
     let fitted = fit_cuts_to_frame_count(&slice.video_edits[&video.id], video.frame_count);
-    if store.manual_video_sync.video_id.as_deref() == Some(video.id.as_str()) {
-        store.manual_video_sync.landmarks.retain(|landmark| landmark.video_second() <= video.duration_seconds);
-    }
+    fit_landmarks_to_relinked_video(store, &video.id, video.duration_seconds);
     let slice = &mut store.video_import;
     if let Some(selection) = slice.selected_clip.as_mut().filter(|selection| selection.lane.video_id() == Some(video.id.as_str())) {
         if selection.segment_key.as_ref().is_some_and(|key| !fitted.segments.contains_key(key)) {
@@ -233,7 +238,7 @@ fn clear_collection(store: &mut Store, background_image: Option<String>) {
     slice.video_drag_preview = None;
     slice.cut_removal_request = None;
     slice.selected_clip = None;
-    select_video_sync_video(store, None).expect("no video is always selectable");
+    clear_landmarks(store);
 }
 
 /// Clears the videos, without the history rebase.
@@ -615,18 +620,32 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn removing_a_clip_moves_the_manual_sync_to_the_first_remaining_clip() {
+    fn removing_the_clip_that_holds_the_manual_sync_clears_its_landmarks() {
+        use ovrley_core::media::sync::LandmarkKind;
         let mut store = Store::default();
         import_videos(&mut store, vec![timed("early", "/videos/early.mp4", "2026-07-18T08:00:00Z", 0)]);
         import_videos(&mut store, vec![timed("late", "/videos/late.mp4", "2026-07-18T08:10:00Z", 1)]);
         store.editor.selected_second = 615.0;
-        select_video_sync_video(&mut store, Some("late".into())).unwrap();
-        remove_imported_video(&mut store, "late").unwrap();
-        assert_eq!(store.manual_video_sync.video_id.as_deref(), Some("early"));
-        assert_eq!(store.editor.selected_second, 20.0);
+        crate::features::sync::manual::add_landmark(&mut store, "late", LandmarkKind::Stop, 2.0).unwrap();
         remove_imported_video(&mut store, "early").unwrap();
-        assert_eq!(store.manual_video_sync.video_id, None);
+        assert_eq!(store.manual_video_sync.video_id.as_deref(), Some("late"), "another clip leaves the sync alone");
+        remove_imported_video(&mut store, "late").unwrap();
+        assert_eq!((store.manual_video_sync.video_id.clone(), store.manual_video_sync.landmarks.len()), (None, 0));
         assert!(store.video_import.imported_videos.is_empty());
+    }
+
+    #[test]
+    fn selecting_a_clip_with_reveal_pauses_the_playhead_at_its_start_only_from_outside() {
+        let mut store = store_with(vec![simple("a", 10.0, 0), simple("b", 10.0, 1)], &[]);
+        set_video_offset(&mut store, "b", 20.0, false).unwrap();
+        store.editor.selected_second = 5.0;
+        select_clip_revealing_playhead(&mut store, "b").unwrap();
+        assert_eq!(store.editor.selected_second, 20.0);
+        assert_eq!(store.video_import.selected_clip, Some(SelectedClip { lane: ClipLane::Video("b".into()), segment_key: None }));
+        store.editor.selected_second = 25.0;
+        select_clip_revealing_playhead(&mut store, "b").unwrap();
+        assert_eq!(store.editor.selected_second, 25.0, "a playhead inside stays");
+        assert!(select_clip_revealing_playhead(&mut store, "gone").is_err());
     }
 
     #[test]
@@ -673,10 +692,11 @@ pub(crate) mod tests {
         assert_eq!(store.video_import.imported_background_image_path.as_deref(), Some("/bg.png"));
         import_videos(&mut store, vec![simple("a", 10.0, 0)]);
         assert_eq!(store.video_import.imported_background_image_path, None);
-        assert_eq!(store.manual_video_sync.video_id.as_deref(), Some("a"), "the manual sync takes the first clip");
+        crate::features::sync::manual::add_landmark(&mut store, "a", ovrley_core::media::sync::LandmarkKind::Stop, 1.0).unwrap();
         select_clip(&mut store, Some(SelectedClip { lane: ClipLane::Video("a".into()), segment_key: None })).unwrap();
         commit_video_collection(&mut store, Vec::new(), VideoEditsMap::new());
         assert_eq!((store.video_import.selected_clip.clone(), store.manual_video_sync.video_id.clone()), (None, None));
+        assert!(store.manual_video_sync.landmarks.is_empty(), "the landmarks left with their video");
     }
 
     #[test]
@@ -687,7 +707,7 @@ pub(crate) mod tests {
         let mut store = store_with(vec![gone], &[]);
         let cut_id = cut_video(&mut store, "ride", 250).unwrap();
         select_clip(&mut store, Some(SelectedClip { lane: ClipLane::Video("ride".into()), segment_key: Some(cut_id.clone()) })).unwrap();
-        select_video_sync_video(&mut store, Some("ride".into())).unwrap();
+        store.manual_video_sync.video_id = Some("ride".into());
         store.manual_video_sync.landmarks = vec![Landmark::Stop { id: "in".into(), video_second: 4.0 }, Landmark::Stop { id: "out".into(), video_second: 7.0 }];
         assert!(relink_video(&mut store, simple("other", 5.0, 0)).unwrap_err().contains("not missing"));
         relink_video(&mut store, simple("ride", 5.0, 0)).unwrap();
@@ -697,6 +717,18 @@ pub(crate) mod tests {
         assert_eq!(store.video_import.selected_clip.as_ref().unwrap().segment_key, None);
         assert!(!store.video_import.imported_videos[0].missing);
         assert!(relink_video(&mut store, simple("ride", 5.0, 0)).is_err(), "only a missing video relinks");
+    }
+
+    #[test]
+    fn relinking_a_file_shorter_than_every_landmark_clears_the_manual_sync() {
+        use ovrley_core::media::sync::Landmark;
+        let mut gone = simple("ride", 10.0, 0);
+        gone.missing = true;
+        let mut store = store_with(vec![gone], &[]);
+        store.manual_video_sync.video_id = Some("ride".into());
+        store.manual_video_sync.landmarks = vec![Landmark::Stop { id: "out".into(), video_second: 7.0 }];
+        relink_video(&mut store, simple("ride", 5.0, 0)).unwrap();
+        assert_eq!((store.manual_video_sync.video_id.clone(), store.manual_video_sync.landmarks.len()), (None, 0));
     }
 
     #[test]

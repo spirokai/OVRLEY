@@ -15,9 +15,11 @@ use crate::format::{compare_text, format_clock_duration, format_locale_number, f
 use crate::i18n::{catalog, interpolate, Locale};
 use crate::preferences::PreferencesStore;
 use crate::shortcuts::{match_keyboard_shortcut, KeyInput, Scope};
+use crate::features::player::video_sync_mode;
 use crate::store::Store;
 use crate::store::media::{ActivitySource, ActivitySummary, MetricSource};
 use crate::store::services::{DialogFilter, Services};
+use crate::store::videos::{select_clip, select_clip_revealing_playhead, ClipLane, SelectedClip};
 use crate::video::{Clip, TelemetryStatus};
 use crate::video::collection::{format_video_warning, sort_clips_by_timeline};
 use crate::video::edits::CreationTimeSource;
@@ -498,12 +500,15 @@ pub struct VideoCard {
     pub thumbnail: Option<Arc<[u8]>>,
     pub missing: bool,
     pub selected: bool,
+    /// In Sync Doctor, the video whose landmarks hold the sync.
+    pub holds_sync: bool,
 }
 
 /// The clips in timeline order.
 pub fn video_cards(store: &Store) -> Vec<VideoCard> {
     let clips = &store.player.timeline.timeline().committed.clips;
     let selected = selected_video_id(store);
+    let sync_target = store.manual_video_sync.video_id.as_deref().filter(|_| video_sync_mode(store));
     sort_clips_by_timeline(clips)
         .into_iter()
         .map(|clip| VideoCard {
@@ -515,8 +520,18 @@ pub fn video_cards(store: &Store) -> Vec<VideoCard> {
             thumbnail: clip.video.thumbnail.clone(),
             missing: clip.video.missing,
             selected: selected == Some(clip.id()),
+            holds_sync: sync_target == Some(clip.id()),
         })
         .collect()
+}
+
+/// A card selects its whole clip. In Sync Doctor, which acts on the selected video, it also brings
+/// the playhead into the clip.
+pub fn select_card(store: &mut Store, video_id: &str) -> Result<(), String> {
+    if video_sync_mode(store) {
+        return select_clip_revealing_playhead(store, video_id);
+    }
+    select_clip(store, Some(SelectedClip { lane: ClipLane::Video(video_id.to_string()), segment_key: None }))
 }
 
 /// The file dialog, then the relink of the chosen file.
@@ -603,9 +618,10 @@ pub fn locate_missing_video(
     });
 }
 
-/// `VideoPanel` takes the control panel's place while the video drawer is open.
+/// `VideoPanel` takes the control panel's place while the video drawer is open, and in Sync Doctor.
 pub fn video_panel_shown(store: &Store) -> bool {
-    store.layout.left_drawer_visible && store.layout.active_left_drawer_tool == crate::features::toolbar::LeftDrawerTool::Video
+    video_sync_mode(store)
+        || (store.layout.left_drawer_visible && store.layout.active_left_drawer_tool == crate::features::toolbar::LeftDrawerTool::Video)
 }
 
 /// A part's range pressed: the playhead pauses at its start.
@@ -950,6 +966,26 @@ mod tests {
                 .collect::<Vec<_>>(),
             [("early", false), ("late", true)]
         );
+    }
+
+    #[test]
+    fn in_sync_doctor_the_panel_marks_the_card_that_holds_the_sync_and_a_card_brings_the_playhead_in() {
+        let mut store = store_with(
+            vec![simple("late", 10.0, 0), simple("early", 10.0, 1)],
+            &[("late", 30.0)],
+        );
+        crate::features::sync::manual::add_landmark(&mut store, "late", ovrley_core::media::sync::LandmarkKind::Stop, 1.0).unwrap();
+        reconcile_player(&mut store);
+        let holds = |store: &Store| video_cards(store).into_iter().map(|card| (card.id, card.holds_sync)).collect::<Vec<_>>();
+        assert_eq!(holds(&store), [("early".to_string(), false), ("late".to_string(), false)], "only in Sync Doctor");
+        assert!(!video_panel_shown(&store));
+        select_card(&mut store, "late").unwrap();
+        assert_eq!(store.editor.selected_second, 0.0, "outside Sync Doctor the playhead stays");
+        store.layout.select_left_drawer_tool(LeftDrawerTool::VideoSync);
+        assert!(video_panel_shown(&store));
+        assert_eq!(holds(&store), [("early".to_string(), false), ("late".to_string(), true)]);
+        select_card(&mut store, "late").unwrap();
+        assert_eq!(store.editor.selected_second, 30.0);
     }
 
     fn initialized(pinned: bool) -> LayoutState {

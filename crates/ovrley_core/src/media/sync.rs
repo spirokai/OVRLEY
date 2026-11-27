@@ -122,6 +122,9 @@ impl Landmark {
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ManualVideoSync {
+    /// The video the landmarks were marked in, which holds the sync: candidates place it and every
+    /// other video follows. Required with landmarks; earlier version 6 files also name it without
+    /// landmarks, which loads as no video holding the sync.
     pub video_id: Option<String>,
     pub landmarks: Vec<Landmark>,
     pub detected_location_second: Option<f64>,

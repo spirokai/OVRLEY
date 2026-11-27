@@ -112,6 +112,32 @@ component VideoCard inherits Rectangle {
                 source: root.card.thumbnail;
                 image-fit: contain;
             }
+            if root.card.holds-sync: Rectangle {
+                x: 0.25rem;
+                y: 0.25rem;
+                width: badge.preferred-width + 0.5rem;
+                height: badge.preferred-height;
+                border-radius: Theme.radius-xs * 1rem;
+                background: Theme.primary;
+                badge := HorizontalLayout {
+                    spacing: 0.25rem;
+                    alignment: center;
+                    VerticalLayout {
+                        alignment: center;
+                        Icon {
+                            glyph: Icons.link-2;
+                            size: 0.75rem;
+                            color: Theme.primary-foreground;
+                        }
+                    }
+                    AppText {
+                        content: @tr("toolbar.holdsSync" => "Sync");
+                        font-size: 0.65rem;
+                        font-weight: Theme.font-weight-bold;
+                        color: Theme.primary-foreground;
+                    }
+                }
+            }
             Rectangle {
                 x: parent.width - self.width - 0.25rem;
                 y: parent.height - self.height - 0.25rem;
@@ -171,7 +197,8 @@ component VideoCard inherits Rectangle {
     }
 }
 
-// `VideoPanel`: in the control panel's place while the video drawer is open.
+// `VideoPanel`: in the control panel's place while the video drawer is open, and in Sync Doctor,
+// where it shows only the cards and marks the one whose landmarks hold the sync.
 export component VideoPanel inherits Rectangle {
     background: Theme.card;
     Rectangle {
@@ -196,8 +223,8 @@ export component VideoPanel inherits Rectangle {
             padding-top: 1rem;
             padding-bottom: 1rem;
             spacing: 2rem;
-            // Sync all videos.
-            VerticalLayout {
+            // Sync all videos; not in Sync Doctor, which has its own.
+            if !Toolbar.video-panel-in-sync: VerticalLayout {
                 spacing: 0.75rem;
                 SectionHeading {
                     icon: Icons.clock-3;
@@ -274,7 +301,7 @@ export component VideoPanel inherits Rectangle {
                 }
             }
             // Default transitions.
-            VerticalLayout {
+            if !Toolbar.video-panel-in-sync: VerticalLayout {
                 spacing: 0.75rem;
                 SectionHeading {
                     icon: Icons.blend;

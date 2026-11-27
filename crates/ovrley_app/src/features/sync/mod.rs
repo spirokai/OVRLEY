@@ -20,7 +20,7 @@ use crate::i18n::catalog;
 use crate::store::Store;
 use crate::store::agent::AgentReply;
 use crate::store::services::Services;
-use crate::video::{ImportedVideo, VideoEditsMap};
+use crate::video::{Clip, ImportedVideo, VideoEditsMap};
 use crate::video::collection::{join_video_edits, sort_clips_by_timeline};
 use crate::video::sync::{parse_video_filename_creation_time, SyncWarning};
 
@@ -131,6 +131,31 @@ fn follow_committed_thresholds(store: &mut Store) {
     }
 }
 
+/// The clip the workspace acts on: the selected one, even with the playhead outside it, else the
+/// one the clip commands at the playhead act on. Marking needs the playhead inside it.
+pub fn work_clip(store: &Store) -> Option<&Clip> {
+    match crate::features::toolbar::selected_video_id(store) {
+        Some(id) => store.player.timeline.timeline().committed.clips.iter().find(|clip| clip.id() == id),
+        None => crate::features::player::edits::resolve_edit_target(store).map(|(clip, _)| clip),
+    }
+}
+
+/// The file name of the video that holds the sync while the workspace acts on another one: marking
+/// is disabled, and the drawer offers to clear the landmarks or to go to that video.
+pub fn held_by_other_video(store: &Store) -> Option<String> {
+    let target = manual::find_video_sync_target(store)?;
+    if work_clip(store).is_some_and(|clip| clip.id() == target.id()) {
+        return None;
+    }
+    Some(crate::dialogs::filename_from_selected_path(&target.video.path).unwrap_or_default().to_string())
+}
+
+/// "Go to that video": selects the video that holds the sync and brings the playhead into it.
+pub fn show_sync_video(store: &mut Store) -> Result<(), String> {
+    let target = manual::find_video_sync_target(store).ok_or("Manual video sync has no landmarks")?;
+    crate::store::videos::select_clip_revealing_playhead(store, target.id())
+}
+
 /// The four mark buttons' state at the playhead.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MarkControls {
@@ -144,16 +169,19 @@ pub struct MarkControls {
 pub fn mark_controls(store: &Store) -> MarkControls {
     let language = store.i18n.language;
     let t = |key: &str| catalog().t(language, key).to_string();
-    let target = manual::find_video_sync_target(store);
+    let work = work_clip(store);
+    let held_by = held_by_other_video(store);
     let landmarks = &store.manual_video_sync.landmarks;
     let has_location = landmarks.iter().any(|landmark| landmark.kind() == LandmarkKind::Location);
     let has_capacity = landmarks.len() < MAX_MANUAL_LANDMARKS;
-    let inside = target.as_ref().is_some_and(|clip| {
+    let inside = work.is_some_and(|clip| {
         let second = store.editor.selected_second - clip.offset_seconds();
         second >= 0.0 && second < clip.duration_seconds()
     });
-    let mark_disabled_reason = if target.is_none() {
+    let mark_disabled_reason = if !store.video_import.has_videos() {
         Some(t("videoSync.videoRequired"))
+    } else if let Some(name) = &held_by {
+        Some(catalog().t_with(language, "videoSync.landmarksInOtherVideo", &[("name", name)]))
     } else if !inside {
         Some(t("videoSync.playheadInsideVideo"))
     } else if !has_capacity {
@@ -161,24 +189,24 @@ pub fn mark_controls(store: &Store) -> MarkControls {
     } else {
         None
     };
-    let can_mark = inside && has_capacity;
+    let can_mark = inside && held_by.is_none() && has_capacity;
     MarkControls {
         can_mark,
         can_mark_location: can_mark && !has_location,
-        location_disabled_reason: if has_location { Some(t("videoSync.locationLimit")) } else { mark_disabled_reason.clone() },
+        location_disabled_reason: if has_location && mark_disabled_reason.is_none() { Some(t("videoSync.locationLimit")) } else { mark_disabled_reason.clone() },
         mark_disabled_reason,
     }
 }
 
-/// A mark button: a landmark at the playhead's video second.
+/// A mark button: a landmark in the work video at the playhead's video second.
 pub fn add_landmark_at_playhead(store: &mut Store, kind: LandmarkKind) -> Result<String, String> {
     let marks = mark_controls(store);
     let disabled = if kind == LandmarkKind::Location { marks.location_disabled_reason } else { marks.mark_disabled_reason };
     if let Some(reason) = disabled {
         return Err(reason);
     }
-    let offset = manual::find_video_sync_target(store).map(|clip| clip.offset_seconds()).ok_or("A video must be loaded before adding a manual video sync landmark")?;
-    manual::add_landmark(store, kind, store.editor.selected_second - offset)
+    let (video_id, offset) = work_clip(store).map(|clip| (clip.id().to_string(), clip.offset_seconds())).expect("marking is enabled only on a video");
+    manual::add_landmark(store, &video_id, kind, store.editor.selected_second - offset)
 }
 
 /// A landmark type's label key (`VIDEO_SYNC_LANDMARK_PRESENTATION`).
@@ -249,6 +277,9 @@ pub struct DrawerView {
     pub calculating: bool,
     pub location: CandidateListView,
     pub all: CandidateListView,
+    /// `held_by_other_video`: the searches and candidates give way to clearing the landmarks or
+    /// going to that video.
+    pub held_by_other_video: Option<String>,
 }
 
 fn candidate_list(store: &Store, scope: MatchScope, applied_offset: f64) -> CandidateListView {
@@ -313,6 +344,7 @@ pub fn drawer_view(store: &Store) -> DrawerView {
         calculating: store.manual_video_sync_results.is_calculating(),
         location: candidate_list(store, MatchScope::Location, applied),
         all: candidate_list(store, MatchScope::All, applied),
+        held_by_other_video: held_by_other_video(store),
     }
 }
 
@@ -353,7 +385,7 @@ pub struct CalculationEligibility {
 
 /// The searches' eligibility.
 pub fn calculation_eligibility(store: &Store) -> CalculationEligibility {
-    let has_video = store.manual_video_sync.video_id.is_some();
+    let has_video = store.video_import.has_videos();
     let domain = matching::eligibility(&store.manual_video_sync.landmarks, store.manual_video_sync_detection.as_deref());
     let language = store.i18n.language;
     let all_explanation = if !has_video {
@@ -437,6 +469,7 @@ pub fn describe_video_sync(store: &Store) -> serde_json::Value {
     let (speed, turn) = (manual::SPEED_THRESHOLD_RANGE, manual::TURN_THRESHOLD_RANGE);
     json!({
         "targetVideo": target.as_ref().map(|clip| json!({ "id": clip.id(), "offsetSeconds": clip.offset_seconds(), "durationSeconds": clip.duration_seconds() })),
+        "markVideoId": work_clip(store).map(Clip::id),
         "landmarks": landmarks,
         "detectedLocationSecond": store.manual_video_sync.detected_location_second,
         "sensitivity": {

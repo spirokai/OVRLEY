@@ -22,8 +22,11 @@ const NOT_UNDOABLE: &str = "Not undoable: the manual sync is outside the editor 
 struct AddArguments {
     #[serde(rename = "type")]
     kind: LandmarkKind,
-    /// The second in the target video; without it, the playhead's, as the mark buttons place it.
+    /// The second in `videoId`; without both, the playhead's in the video the mark buttons act on
+    /// (`markVideoId`), as they place it.
     video_second: Option<f64>,
+    /// The video the landmark is in, given with `videoSecond`.
+    video_id: Option<String>,
 }
 
 /// A landmark's new second.
@@ -32,7 +35,7 @@ struct AddArguments {
 struct MoveArguments {
     /// A landmark id from `video_sync_get`.
     id: String,
-    /// The second in the target video, inside it.
+    /// The second in the video that holds the sync, inside it.
     video_second: f64,
 }
 
@@ -92,17 +95,21 @@ pub(crate) fn tools() -> Vec<Tool> {
         Tool::read(
             "video_sync_get",
             "Read the manual sync",
-            "Sync Doctor's manual sync: the target video (the first clip), the landmarks with \
-             their video and timeline seconds, the course location, the sensitivity and its \
-             ranges, the detected events, and both searches with their eligibility and results.",
+            "Sync Doctor's manual sync: the target video (the one the landmarks were marked in, \
+             which holds the sync: candidates place it and every other video follows), the video \
+             the mark buttons act on (the selected one, else the one at the playhead), the \
+             landmarks with their video and timeline seconds, the course location, the \
+             sensitivity and its ranges, the detected events, and both searches with their \
+             eligibility and results.",
             get,
         ),
         Tool::edit(
             "video_sync_landmark_add",
             "Mark a landmark",
-            "Adds a stop, leftTurn, rightTurn or location landmark in the target video, at \
-             videoSecond or at the playhead as the mark buttons do. At most five, at most one \
-             location. Replies with its id. Not undoable.",
+            "Adds a stop, leftTurn, rightTurn or location landmark, at videoSecond of videoId or, \
+             without both, at the playhead as the mark buttons do. The first landmark makes its video the \
+             target, and only the target takes more; deleting every landmark frees it. At most \
+             five, at most one location. Replies with its id. Not undoable.",
             add_landmark,
         ),
         Tool::edit(
@@ -120,14 +127,14 @@ pub(crate) fn tools() -> Vec<Tool> {
         Tool::edit(
             "video_sync_landmark_remove",
             "Delete a landmark",
-            "Deletes one landmark. Not undoable.",
+            "Deletes one landmark; the last one frees the target video. Not undoable.",
             remove_landmark,
         )
         .destructive(),
         Tool::edit(
             "video_sync_landmarks_clear",
             "Clear the landmarks",
-            "Deletes every landmark. Not undoable.",
+            "Deletes every landmark, which frees the target video. Not undoable.",
             clear_landmarks,
         )
         .destructive(),
@@ -199,9 +206,10 @@ fn get(_: NoArguments, store: &Store, _: &Services) -> ToolResult {
 }
 
 fn add_landmark(args: AddArguments, store: &mut Store, _: &mut Services) -> ToolResult {
-    let id = match args.video_second {
-        Some(second) => manual::add_landmark(store, args.kind, second)?,
-        None => sync::add_landmark_at_playhead(store, args.kind)?,
+    let id = match (args.video_second, args.video_id) {
+        (Some(second), Some(video_id)) => manual::add_landmark(store, &video_id, args.kind, second)?,
+        (None, None) => sync::add_landmark_at_playhead(store, args.kind)?,
+        _ => return Err(ToolError::InvalidParams("videoSecond and videoId go together; without both the landmark goes at the playhead.".into())),
     };
     let mut state = answer_edit(store);
     state["id"] = json!(id);
@@ -310,7 +318,7 @@ mod tests {
     fn add_location(editor: &Editor, activity_second: f64) -> Value {
         let added = editor.ok(
             "video_sync_landmark_add",
-            json!({"type": "location", "videoSecond": 4}),
+            json!({"type": "location", "videoSecond": 4, "videoId": "clip"}),
         );
         editor.ok("video_sync_location_set", json!({"activitySecond": activity_second}));
         added["id"].clone()
@@ -326,10 +334,14 @@ mod tests {
             !editor.dispatcher.with_store(|store| store.layout.left_drawer_visible),
             "a refused call opens nothing"
         );
-        let added = editor.ok("video_sync_landmark_add", json!({"type": "stop", "videoSecond": 4}));
+        let added = editor.ok("video_sync_landmark_add", json!({"type": "stop", "videoSecond": 4, "videoId": "clip"}));
         let id = &added["id"];
         assert_eq!(added["landmarks"][0]["videoSecond"], json!(4.0));
         assert_eq!(added["undo"], json!(NOT_UNDOABLE));
+        assert_eq!(added["targetVideo"]["id"], json!("clip"), "the first landmark makes its video the target");
+        assert!(editor.failed("video_sync_landmark_add", json!({"type": "stop", "videoSecond": 1, "videoId": "other"})).contains("belong to video clip"));
+        editor.invalid("video_sync_landmark_add", json!({"type": "stop", "videoId": "clip"}));
+        editor.invalid("video_sync_landmark_add", json!({"type": "stop", "videoSecond": 1}));
         editor.dispatcher.with_store(|store| {
             assert!(store.layout.left_drawer_visible);
             assert_eq!(store.layout.video_sync_drawer_tab, VideoSyncDrawerTab::Manual);
@@ -339,10 +351,11 @@ mod tests {
         let retype = json!({"id": id, "type": "location"});
         let retyped = editor.ok("video_sync_landmark_set_type", retype);
         assert_eq!(retyped["landmarks"][0]["type"], json!("location"));
-        editor.failed("video_sync_landmark_add", json!({"type": "location", "videoSecond": 1}));
+        editor.failed("video_sync_landmark_add", json!({"type": "location", "videoSecond": 1, "videoId": "clip"}));
         editor.ok("video_sync_landmark_remove", json!({"id": id}));
         editor.ok("video_sync_landmark_add", json!({"type": "leftTurn"}));
-        assert_eq!(editor.ok("video_sync_landmarks_clear", json!({}))["landmarks"], json!([]));
+        let cleared = editor.ok("video_sync_landmarks_clear", json!({}));
+        assert_eq!((&cleared["landmarks"], &cleared["targetVideo"]), (&json!([]), &Value::Null), "clearing frees the target");
         editor.dispatcher.dispatch(|store, _| store.editor.selected_second = 50.0);
         assert_eq!(
             editor.failed("video_sync_landmark_add", json!({"type": "stop"})),
@@ -412,12 +425,12 @@ mod tests {
     fn the_summary_and_get_describe_the_manual_sync() {
         let editor = editor();
         let state = editor.ok("video_sync_get", json!({}));
-        assert_eq!(state["targetVideo"]["id"], json!("clip"));
+        assert_eq!((&state["targetVideo"], &state["markVideoId"]), (&Value::Null, &json!("clip")), "no landmark, no target");
         assert_eq!(state["sensitivity"]["turnRange"], json!([70.0, 180.0]));
         assert_eq!(
             editor.dispatcher.with_store(summary),
             json!({
-                "targetVideoId": "clip",
+                "targetVideoId": null,
                 "landmarkCount": 0,
                 "locationSet": false,
                 "searches": {"all": "idle", "location": "idle"},

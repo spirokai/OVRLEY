@@ -358,6 +358,63 @@ component CandidateList inherits VerticalLayout {
     }
 }
 
+// In place of the searches while the workspace acts on a video other than the one whose landmarks
+// hold the sync: clear those landmarks, or go to that video.
+component HeldByOtherVideo inherits Rectangle {
+    border-radius: Theme.radius-sm * 1rem;
+    border-width: 1px;
+    border-color: Theme.border.transparentize(0.4);
+    background: Theme.surface-darken;
+    accessible-role: text;
+    accessible-label: message.content;
+    VerticalLayout {
+        padding: 0.75rem;
+        spacing: 0.75rem;
+        HorizontalLayout {
+            spacing: 0.5rem;
+            alignment: start;
+            VerticalLayout {
+                alignment: start;
+                padding-top: 0.125rem;
+                Icon {
+                    glyph: Icons.link-2;
+                    size: 0.875rem;
+                    color: Theme.muted-foreground;
+                }
+            }
+            message := AppText {
+                horizontal-stretch: 1;
+                content: @tr("videoSync.syncHeldByOtherVideo" => "{0} holds the landmarks that sync every video. Its offset places this video too.", VideoSync.held-by-other-video);
+                font-size: Theme.text-xs * 1rem;
+                color: Theme.muted-foreground;
+                wrap: word-wrap;
+            }
+        }
+        HorizontalLayout {
+            spacing: 0.5rem;
+            Button {
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                variant: ButtonVariant.outline;
+                font-size: Theme.text-xs * 1rem;
+                text: @tr("videoSync.clearSyncLandmarks" => "Clear landmarks");
+                clicked => {
+                    VideoSync.clear-landmarks();
+                }
+            }
+            Button {
+                horizontal-stretch: 1;
+                preferred-width: 0px;
+                font-size: Theme.text-xs * 1rem;
+                text: @tr("videoSync.showSyncVideo" => "Go to that video");
+                clicked => {
+                    VideoSync.show-sync-video();
+                }
+            }
+        }
+    }
+}
+
 // The Manual Sync tab: the landmarks, then the sensitivity, the counts, both searches and their
 // candidates.
 component ManualSyncTab inherits VerticalLayout {
@@ -451,42 +508,46 @@ component ManualSyncTab inherits VerticalLayout {
                 background: Theme.border.transparentize(0.5);
             }
         }
-        VerticalLayout {
-            spacing: 0.5rem;
-            Button {
-                text: @tr("videoSync.syncLandmarks" => "Sync All Landmarks");
-                disabled: !VideoSync.can-calculate-all || VideoSync.calculating;
-                clicked => {
-                    VideoSync.calculate(MatchScope.all);
+        if VideoSync.held-by-other-video != "": HeldByOtherVideo { }
+        if VideoSync.held-by-other-video == "": VerticalLayout {
+            spacing: 1rem;
+            VerticalLayout {
+                spacing: 0.5rem;
+                Button {
+                    text: @tr("videoSync.syncLandmarks" => "Sync All Landmarks");
+                    disabled: !VideoSync.can-calculate-all || VideoSync.calculating;
+                    clicked => {
+                        VideoSync.calculate(MatchScope.all);
+                    }
+                }
+                Button {
+                    text: @tr("videoSync.syncLocation" => "Match Location Only");
+                    disabled: !VideoSync.can-calculate-location || VideoSync.calculating;
+                    clicked => {
+                        VideoSync.calculate(MatchScope.location);
+                    }
                 }
             }
-            Button {
-                text: @tr("videoSync.syncLocation" => "Match Location Only");
-                disabled: !VideoSync.can-calculate-location || VideoSync.calculating;
-                clicked => {
-                    VideoSync.calculate(MatchScope.location);
+            if !VideoSync.can-calculate-all && VideoSync.all-explanation != "": VerticalLayout {
+                padding-top: 0.5rem;
+                padding-bottom: 0.5rem;
+                AppText {
+                    content: VideoSync.all-explanation;
+                    font-size: 0.741rem;
+                    color: Theme.muted-foreground;
+                    wrap: word-wrap;
                 }
             }
-        }
-        if !VideoSync.can-calculate-all && VideoSync.all-explanation != "": VerticalLayout {
-            padding-top: 0.5rem;
-            padding-bottom: 0.5rem;
-            AppText {
-                content: VideoSync.all-explanation;
-                font-size: 0.741rem;
-                color: Theme.muted-foreground;
-                wrap: word-wrap;
+            if VideoSync.location-result.shown: CandidateList {
+                scope: MatchScope.location;
+                title: @tr("videoSync.locationSyncCandidates" => "Location Sync");
+                result: VideoSync.location-result;
             }
-        }
-        if VideoSync.location-result.shown: CandidateList {
-            scope: MatchScope.location;
-            title: @tr("videoSync.locationSyncCandidates" => "Location Sync");
-            result: VideoSync.location-result;
-        }
-        if VideoSync.all-result.shown: CandidateList {
-            scope: MatchScope.all;
-            title: @tr("videoSync.syncCandidates" => "Sync Candidates");
-            result: VideoSync.all-result;
+            if VideoSync.all-result.shown: CandidateList {
+                scope: MatchScope.all;
+                title: @tr("videoSync.syncCandidates" => "Sync Candidates");
+                result: VideoSync.all-result;
+            }
         }
     }
 }

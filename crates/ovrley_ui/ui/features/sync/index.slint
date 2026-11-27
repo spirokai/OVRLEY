@@ -98,6 +98,9 @@ export global VideoSync {
     in property <string> all-explanation;
     in property <CandidateListView> location-result;
     in property <CandidateListView> all-result;
+    // The file name of the video that holds the sync while the workspace acts on another one, or
+    // empty: the searches give way to clearing the landmarks or going to that video.
+    in property <string> held-by-other-video;
 
     // The mark controls at the playhead.
     in property <bool> can-mark;
@@ -181,6 +184,7 @@ export global VideoSync {
     callback set-utc(utc: bool);
     callback open-manual-sync();
     callback clear-landmarks();
+    callback show-sync-video();
     callback set-landmark-kind(id: string, kind: LandmarkKind);
     callback remove-landmark(id: string);
     callback speed-changed(value: float);

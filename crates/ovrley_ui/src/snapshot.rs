@@ -138,9 +138,7 @@ fn tour() -> Vec<Step> {
         // Sync Doctor: the Autodetect tab over the pair, then the Manual Sync tab with
         // landmarks, a course location and a search.
         ("sync-autodetect", |store, _| {
-            use ovrley_app::features::sync::manual as manual;
             snapshot_videos(store, &[(1920, 1080, 30.0)]);
-            manual::select_video_sync_video(store, Some("clip-0".into())).expect("a snapshot clip");
             store.layout.select_left_drawer_tool(LeftDrawerTool::VideoSync);
         }),
         ("sync-manual", |store, services| {
@@ -149,7 +147,7 @@ fn tour() -> Vec<Step> {
             use ovrley_core::media::sync::LandmarkKind;
             store.layout.open_manual_video_sync();
             for (kind, second) in [(LandmarkKind::Stop, 5.0), (LandmarkKind::LeftTurn, 12.0), (LandmarkKind::Location, 20.0)] {
-                manual::add_landmark(store, kind, second).expect("a landmark inside the clip");
+                manual::add_landmark(store, "clip-0", kind, second).expect("a landmark inside the clip");
             }
             manual::set_detected_location(store, 100.0).expect("a course location");
             store.editor.set_selected_second(40.0);

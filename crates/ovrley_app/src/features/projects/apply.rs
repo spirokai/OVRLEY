@@ -59,19 +59,21 @@ pub fn create_project_video_edits(
         .collect()
 }
 
-/// When its video was left out at load, its landmarks go and the
-/// first loaded video is selected; a found file shorter than the saved video keeps the landmarks
-/// inside it.
+/// The manual sync and the video that holds it. When that video was left out at load, its
+/// landmarks go with it; a found file shorter than the saved video keeps the landmarks inside it.
+/// With none left, no video holds the sync: earlier version 6 files also name a video without
+/// landmarks, which loads the same way.
 pub fn create_project_manual_video_sync(
     videos: &[ImportedVideo],
     manual: &ManualVideoSync,
 ) -> ManualVideoSync {
     let mut manual = manual.clone();
-    if let Some(video) = videos.iter().find(|video| Some(&video.id) == manual.video_id.as_ref()) {
-        manual.landmarks.retain(|landmark| landmark.video_second() <= video.duration_seconds);
-    } else {
-        manual.video_id = videos.first().map(|video| video.id.clone());
-        manual.landmarks.clear();
+    match videos.iter().find(|video| Some(&video.id) == manual.video_id.as_ref()) {
+        Some(video) => manual.landmarks.retain(|landmark| landmark.video_second() <= video.duration_seconds),
+        None => manual.landmarks.clear(),
+    }
+    if manual.landmarks.is_empty() {
+        manual.video_id = None;
     }
     manual
 }
@@ -303,17 +305,22 @@ mod tests {
     }
 
     #[test]
-    fn the_manual_sync_moves_to_the_first_video_when_its_video_was_left_out() {
+    fn a_loaded_manual_sync_is_held_only_by_a_loaded_video_with_landmarks_inside_it() {
+        use ovrley_core::media::sync::Landmark;
+        let stop = |id: &str, video_second: f64| Landmark::Stop { id: id.into(), video_second };
         let manual = ManualVideoSync {
-            video_id: Some("gone".into()),
+            video_id: Some("a".into()),
+            landmarks: vec![stop("in", 4.0), stop("out", 30.0)],
             ..ManualVideoSync::default()
         };
         let resolved = create_project_manual_video_sync(&[simple("a", 20.0, 0)], &manual);
-        assert_eq!(resolved.video_id.as_deref(), Some("a"));
-        assert_eq!(
-            create_project_manual_video_sync(&[], &manual).video_id,
-            None
-        );
+        assert_eq!((resolved.video_id.as_deref(), resolved.landmarks), (Some("a"), vec![stop("in", 4.0)]));
+        let left_out = create_project_manual_video_sync(&[simple("b", 20.0, 0)], &manual);
+        assert_eq!((left_out.video_id, left_out.landmarks.len()), (None, 0), "the landmarks leave with their video");
+        let shorter = create_project_manual_video_sync(&[simple("a", 2.0, 0)], &manual);
+        assert_eq!((shorter.video_id, shorter.landmarks.len()), (None, 0), "no landmark fits the shorter file");
+        let without_landmarks = ManualVideoSync { video_id: Some("a".into()), ..ManualVideoSync::default() };
+        assert_eq!(create_project_manual_video_sync(&[simple("a", 20.0, 0)], &without_landmarks).video_id, None, "an earlier file's video without landmarks holds nothing");
     }
 
     #[test]

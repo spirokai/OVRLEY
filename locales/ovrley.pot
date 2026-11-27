@@ -1574,6 +1574,10 @@ msgctxt "toolbar.hideOverlay"
 msgid "Hide overlay"
 msgstr ""
 
+msgctxt "toolbar.holdsSync"
+msgid "Sync"
+msgstr ""
+
 msgctxt "toolbar.importedVideos"
 msgid "Imported videos"
 msgstr ""
@@ -2070,6 +2074,10 @@ msgctxt "videoSync.clearLandmarks"
 msgid "Clear"
 msgstr ""
 
+msgctxt "videoSync.clearSyncLandmarks"
+msgid "Clear landmarks"
+msgstr ""
+
 msgctxt "videoSync.deleteLandmark"
 msgid "Delete {0} landmark"
 msgstr ""
@@ -2100,6 +2108,10 @@ msgstr ""
 
 msgctxt "videoSync.landmarkLimit"
 msgid "The maximum of five landmarks has been reached"
+msgstr ""
+
+msgctxt "videoSync.landmarksInOtherVideo"
+msgid "Landmarks are marked in {{name}}"
 msgstr ""
 
 msgctxt "videoSync.landmarksMatched"
@@ -2198,6 +2210,10 @@ msgctxt "videoSync.setLocationInMap"
 msgid "Set location"
 msgstr ""
 
+msgctxt "videoSync.showSyncVideo"
+msgid "Go to that video"
+msgstr ""
+
 msgctxt "videoSync.speed"
 msgid "Speed"
 msgstr ""
@@ -2220,6 +2236,10 @@ msgstr ""
 
 msgctxt "videoSync.syncCandidates"
 msgid "Sync Candidates"
+msgstr ""
+
+msgctxt "videoSync.syncHeldByOtherVideo"
+msgid "{0} holds the landmarks that sync every video. Its offset places this video too."
 msgstr ""
 
 msgctxt "videoSync.syncLandmarks"

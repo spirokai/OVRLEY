@@ -160,7 +160,7 @@ Start with `ovrley_summary`. Each tool's full description and input schema come 
 ### Sync Doctor
 
 - `video_sync_get`: landmarks, location, events and search results
-- `video_sync_landmark_add`: adds a landmark
+- `video_sync_landmark_add`: adds a landmark; the first one picks the video that holds the sync
 - `video_sync_landmark_move`: moves a landmark
 - `video_sync_landmark_set_type`: changes a landmark's type
 - `video_sync_landmark_remove`: deletes a landmark

@@ -79,6 +79,8 @@ export struct VideoCardView {
     has-thumbnail: bool,
     missing: bool,
     selected: bool,
+    // In Sync Doctor, the video whose landmarks hold the sync.
+    holds-sync: bool,
     remove-label: string,
 }
 
@@ -102,6 +104,8 @@ export global Toolbar {
     in property <bool> has-selected-video;
     in property <SelectedVideoView> selected-video;
     in property <bool> video-panel-shown;
+    // Sync Doctor's panel: only the cards, the one whose landmarks hold the sync marked.
+    in property <bool> video-panel-in-sync;
     in property <[VideoCardView]> video-cards;
     in property <VideoSyncView> panel-sync;
     in property <string> panel-transition-label;

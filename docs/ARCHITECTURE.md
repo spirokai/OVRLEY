@@ -67,7 +67,7 @@ One wgpu device is shared by the window and the video players: Metal on macOS, D
 - Videos: MP4, MOV and MKV. Camera telemetry is read from the file (`ovrley_core/src/media/`).
 - Clips sit on one timeline by recording time. Cuts, exclusions and per-join transitions form the output program (`ovrley_app/src/lib/video_program/`).
 - Playback uses two MDK players that take turns at cuts. A transition plays as a short FFmpeg-rendered proxy. The zero-copy targets are Metal on macOS, D3D11 on Windows, and OpenGL into Vulkan memory on Linux.
-- Sync Doctor matches landmarks in the first clip to stops, turns and places in the activity (`features/video_sync/`).
+- Sync Doctor matches landmarks to stops, turns and places in the activity. The clip the landmarks were marked in holds the sync: a candidate places it and every other clip follows (`ovrley_app/src/features/sync/`).
 
 ## Export
 

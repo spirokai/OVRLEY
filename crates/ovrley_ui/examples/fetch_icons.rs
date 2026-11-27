@@ -68,6 +68,7 @@ const ICONS: &[(&str, &str)] = &[
     ("italic", iconify::svg!("lucide:italic")),
     ("keyboard", iconify::svg!("lucide:keyboard")),
     ("layout-grid", iconify::svg!("lucide:layout-grid")),
+    ("link-2", iconify::svg!("lucide:link-2")),
     ("loader-circle", iconify::svg!("lucide:loader-circle")),
     ("magnet", iconify::svg!("lucide:magnet")),
     ("map-pin", iconify::svg!("lucide:map-pin")),

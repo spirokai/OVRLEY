@@ -213,9 +213,9 @@ fn stores_and_applies_a_location_only_result() {
 }
 
 #[test]
-fn reports_no_video_until_a_target_clip_is_selected() {
+fn reports_no_video_until_videos_are_imported() {
     let (dispatcher, _) = dispatcher(moving(), one_video(), &[]);
-    dispatcher.dispatch(|store, _| store.manual_video_sync.video_id = None);
+    dispatcher.dispatch(|store, _| crate::store::videos::clear_imported_videos(store));
     let eligibility = dispatcher.with_store(super::calculation_eligibility);
     assert_eq!(
         (
@@ -228,6 +228,124 @@ fn reports_no_video_until_a_target_clip_is_selected() {
         eligibility.all_explanation.as_deref(),
         Some("A video is required for Landmark Sync")
     );
+}
+
+// --- The video that holds the sync -------------------------------------------------------------
+
+/// Two 30 s videos, `video-1` at 0 holding two landmarks and `video-2` at 40.
+fn two_videos() -> Dispatcher {
+    use crate::video::fixtures::{video, TestVideo};
+    let videos = vec![
+        video(TestVideo {
+            id: "video-1",
+            path: "/videos/first.mp4",
+            duration_seconds: 30.0,
+            import_order: 0,
+            ..TestVideo::default()
+        }),
+        video(TestVideo {
+            id: "video-2",
+            path: "/videos/second.mp4",
+            duration_seconds: 30.0,
+            import_order: 1,
+            ..TestVideo::default()
+        }),
+    ];
+    dispatcher(moving(), videos, &[("video-1", 0.0), ("video-2", 40.0)]).0
+}
+
+#[test]
+fn marking_acts_on_the_selected_video_else_the_one_at_the_playhead() {
+    use crate::store::videos::{select_clip, ClipLane, SelectedClip};
+    let dispatcher = two_videos();
+    dispatcher.dispatch(|store, _| manual::clear_landmarks(store));
+    dispatcher.dispatch(|store, _| store.editor.selected_second = 45.0);
+    assert_eq!(
+        dispatcher
+            .with_store(|store| super::work_clip(store).map(|clip| clip.id().to_string()))
+            .as_deref(),
+        Some("video-2")
+    );
+    dispatcher.dispatch(|store, _| {
+        select_clip(
+            store,
+            Some(SelectedClip {
+                lane: ClipLane::Video("video-1".into()),
+                segment_key: None,
+            }),
+        )
+        .unwrap()
+    });
+    let marks = dispatcher.with_store(super::mark_controls);
+    assert_eq!(
+        (marks.can_mark, marks.mark_disabled_reason.as_deref()),
+        (
+            false,
+            Some("Move the playhead inside the video to mark a landmark")
+        ),
+        "the selected video, even with the playhead elsewhere"
+    );
+    dispatcher.dispatch(|store, _| select_clip(store, None).unwrap());
+    dispatcher.dispatch(|store, _| {
+        super::add_landmark_at_playhead(store, LandmarkKind::Stop).unwrap();
+    });
+    dispatcher.with_store(|store| {
+        assert_eq!(
+            store.manual_video_sync.video_id.as_deref(),
+            Some("video-2"),
+            "the first landmark claims the video at the playhead"
+        );
+        assert_eq!(store.manual_video_sync.landmarks[0].video_second(), 5.0);
+    });
+}
+
+#[test]
+fn another_video_offers_to_clear_the_landmarks_or_go_to_the_video_that_holds_them() {
+    let dispatcher = two_videos();
+    dispatcher.dispatch(|store, _| store.editor.selected_second = 45.0);
+    dispatcher.with_store(|store| {
+        assert_eq!(
+            super::held_by_other_video(store).as_deref(),
+            Some("first.mp4")
+        );
+        assert_eq!(
+            super::drawer_view(store).held_by_other_video.as_deref(),
+            Some("first.mp4")
+        );
+        let marks = super::mark_controls(store);
+        assert_eq!((marks.can_mark, marks.can_mark_location), (false, false));
+        assert_eq!(
+            marks.mark_disabled_reason.as_deref(),
+            Some("Landmarks are marked in first.mp4")
+        );
+        assert_eq!(marks.location_disabled_reason, marks.mark_disabled_reason);
+    });
+    dispatcher.dispatch(|store, _| {
+        assert_eq!(
+            super::add_landmark_at_playhead(store, LandmarkKind::Stop).unwrap_err(),
+            "Landmarks are marked in first.mp4"
+        )
+    });
+    dispatcher.dispatch(|store, _| super::show_sync_video(store).unwrap());
+    dispatcher.with_store(|store| {
+        assert_eq!(
+            store.editor.selected_second, 0.0,
+            "the playhead goes to the start of the video that holds the sync"
+        );
+        assert_eq!(super::held_by_other_video(store), None);
+        assert!(super::mark_controls(store).can_mark);
+    });
+    dispatcher.dispatch(|store, _| store.editor.selected_second = 45.0);
+    dispatcher.dispatch(|store, _| crate::store::videos::select_clip(store, None).unwrap());
+    dispatcher.dispatch(|store, _| manual::clear_landmarks(store));
+    dispatcher.with_store(|store| {
+        assert_eq!(
+            super::held_by_other_video(store),
+            None,
+            "cleared, no video holds the sync"
+        );
+        assert!(super::mark_controls(store).can_mark);
+    });
 }
 
 // --- The timeline -----------------------------------------------------------------------------

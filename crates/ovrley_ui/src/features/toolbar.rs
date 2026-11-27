@@ -45,6 +45,8 @@ impl Projection {
     fn project_video_panel(&self, toolbar: &Toolbar<'_>, store: &Store) {
         let shown = toolbar::video_panel_shown(store);
         set_if_changed(toolbar.get_video_panel_shown(), shown, |value| toolbar.set_video_panel_shown(value));
+        let in_sync = ovrley_app::features::player::video_sync_mode(store);
+        set_if_changed(toolbar.get_video_panel_in_sync(), in_sync, |value| toolbar.set_video_panel_in_sync(value));
         let locale = store.i18n.language;
         let cards = toolbar::video_cards(store)
             .into_iter()
@@ -59,6 +61,7 @@ impl Projection {
                     thumbnail: image.unwrap_or_default(),
                     missing: card.missing,
                     selected: card.selected,
+                    holds_sync: card.holds_sync,
                 }
             })
             .collect();
@@ -250,8 +253,6 @@ fn bind_videos(toolbar: &Toolbar<'_>, dispatcher: &Dispatcher) {
     toolbar.on_remove_all_videos(move || d.dispatch(|store, _| import::clear_videos(store)));
     let d = dispatcher.handle();
     toolbar.on_select_card(move |id| {
-        dispatch_logged(&d, CONTEXT, move |store, _| {
-            videos::select_clip(store, Some(videos::SelectedClip { lane: videos::ClipLane::Video(id.to_string()), segment_key: None }))
-        });
+        dispatch_logged(&d, CONTEXT, move |store, _| toolbar::select_card(store, &id));
     });
 }

@@ -16,7 +16,6 @@ import { VideoImport } from "features/video/index.slint";
 import { Toolbar } from "features/toolbar/index.slint";
 import { ToolbarDrawerLayout } from "features/toolbar/layout.slint";
 import { VideoPanel } from "features/toolbar/panel.slint";
-import { VideoSync } from "features/sync/index.slint";
 import { RenderVideo } from "features/render/index.slint";
 import { RenderVideoDialog, RenderOverwriteDialog, RenderMissingVideosNotice } from "features/render/dialog.slint";
 
@@ -111,8 +110,7 @@ export component AppWindow inherits FluidWindow {
             active-tool: Toolbar.active-tool;
             drawer-visible: Toolbar.visible;
             pinned: Toolbar.pinned;
-            // Sync Doctor hides the control panel.
-            trailing-width: VideoSync.mode ? 0px : root.control-panel-width;
+            trailing-width: root.control-panel-width;
             trailing-above-backdrop: Toolbar.video-panel-shown;
             select-tool(tool) => {
                 Toolbar.select-tool(tool);
@@ -153,7 +151,7 @@ export component AppWindow inherits FluidWindow {
                     label: Projects.loading ? @tr("app.loadingProject" => "Loading project...") : AppShell.importing-video ? @tr("app.importingYourVideo" => "Importing your video...") : @tr("app.processingYourActivity" => "Processing your activity...");
                 }
             }
-            if !VideoSync.mode: Rectangle {
+            Rectangle {
                 width: root.control-panel-width;
                 // A still region: drawn from a cached layer (see `AppHeader`).
                 cache-rendering-hint: true;
