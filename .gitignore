@@ -20,6 +20,8 @@ lerna-debug.log*
 tauri_build.log
 
 # Common build artifacts
+result
+result-*
 node_modules/
 .pnpm-store/
 dist/
