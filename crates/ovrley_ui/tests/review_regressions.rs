@@ -17,10 +17,6 @@ fn harness() -> ovrley_ui::RegressionHarness {
     window
 }
 
-fn wait(ms: u64) {
-    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(ms));
-}
-
 fn tooltip_shown(window: &ovrley_ui::RegressionHarness) -> bool {
     window.global::<TooltipLayer>().get_shown()
 }

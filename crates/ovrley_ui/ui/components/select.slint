@@ -3,7 +3,7 @@ import { AppText, Label } from "text.slint";
 import { Icon, Icons } from "icons.slint";
 import { FocusRing } from "focus.slint";
 import { Shadow, ShadowSize, GroupPosition, GroupSurface, OverlayMotion } from "surface.slint";
-import { HelpTooltip } from "tooltip.slint";
+import { HelpTooltip, PopupTooltipLayer, TooltipLayer, TooltipLayerView } from "tooltip.slint";
 import { Choice, ChoiceKind, ChoiceListLogic, ChoiceListMetrics, ItemAlignedPlacement, Placement, PlacementAlign, PlacementLogic, PlacementSide } from "logic.slint";
 
 export enum SelectSize { default, sm }
@@ -190,6 +190,16 @@ export component Select {
         radius: root.radius;
         group-position: root.group-position;
         ring-color: root.invalid ? Theme.ring-invalid-color : Theme.ring-color;
+    }
+
+    // The popup's tooltip layer, opened by the layer itself (the popup's position is not readable
+    // from here) and closed with the popup.
+    property <PopupTooltipLayer> tooltip-layer;
+    property <bool> tooltip-popup-open: popup.is-open;
+    changed tooltip-popup-open => {
+        if !root.tooltip-popup-open {
+            TooltipLayer.close-popup(root.tooltip-layer);
+        }
     }
 
     popup := PopupWindow {
@@ -443,6 +453,12 @@ export component Select {
                         }
                     }
                 }
+            }
+        }
+        TooltipLayerView {
+            popup: root.tooltip-layer;
+            init => {
+                root.tooltip-layer = TooltipLayer.open-popup(root.absolute-position.x + popup.x, root.absolute-position.y + popup.y);
             }
         }
     }

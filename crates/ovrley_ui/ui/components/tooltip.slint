@@ -5,10 +5,23 @@ import { Placement, PlacementAlign, PlacementLogic, PlacementRect, PlacementSide
 import { Icon, Icons } from "icons.slint";
 import { FocusRing } from "focus.slint";
 
-// The window's tooltip. Tooltips are drawn instead in this layer, the last child of `FluidWindow`:
-// above the content, never clipped by scroll areas, and taking no input. `SimpleTooltip` writes the
-// global; `serial` lets a tooltip that is leaving hide only itself. A tooltip cannot appear above
-// an open popup.
+// An open popup's tooltip layer: its nesting depth and window position, and those of the popup it
+// opened from, which `close-popup` restores.
+export struct PopupTooltipLayer {
+    depth: int,
+    x: length,
+    y: length,
+    outer-x: length,
+    outer-y: length,
+}
+
+// The window's tooltip. Tooltips are drawn instead in a layer: the last child of `FluidWindow`, and
+// one in each popup (dialogs, selects, popovers), as an open popup covers the window's layer. They
+// sit above the content, are never clipped by scroll areas, and take no input. `SimpleTooltip`
+// writes the global; `serial` lets a tooltip that is leaving hide only itself. Slint's
+// `absolute-position` is relative to the popup an element lies in, so a tooltip shows in the layer
+// of the innermost open popup, the only one that takes the pointer, and that layer adds the popup's
+// window position back.
 export global TooltipLayer {
     in-out property <bool> shown;
     in-out property <int> serial;
@@ -22,22 +35,52 @@ export global TooltipLayer {
     in-out property <bool> wrap-text;
     // Space between the trigger and the bubble; each SimpleTooltip sets it when it shows.
     in-out property <length> gap;
+    // The depth of the layer that draws the shown tooltip; 0 is the window's.
+    in-out property <int> layer;
+    // The innermost open popup: its depth (0 when none is open) and window position.
+    in-out property <int> popup-depth;
+    in-out property <length> popup-x;
+    in-out property <length> popup-y;
+
+    // A popup's layer calls it when the popup opens, with the popup's position inside the popup it
+    // opened from (the host's `absolute-position` plus the popup's x and y); the host keeps the
+    // result for the layer and for `close-popup` when the popup closes.
+    public function open-popup(x: length, y: length) -> PopupTooltipLayer {
+        let layer = { depth: self.popup-depth + 1, x: self.popup-x + x, y: self.popup-y + y, outer-x: self.popup-x, outer-y: self.popup-y };
+        self.shown = false;
+        self.popup-depth = layer.depth;
+        self.popup-x = layer.x;
+        self.popup-y = layer.y;
+        layer
+    }
+    // A tooltip inside a closing popup goes with it and never sees the pointer leave.
+    public function close-popup(layer: PopupTooltipLayer) {
+        self.shown = false;
+        self.popup-depth = layer.depth - 1;
+        self.popup-x = layer.outer-x;
+        self.popup-y = layer.outer-y;
+    }
 }
 
 // The arrow keeps pointing at the trigger after a shift, at least 0.5rem from a bubble corner. It
 // fades in over 100 ms with ease-out and hides at once; resizing the window hides it, as a placed
-// bubble would drift from its trigger.
+// bubble would drift from its trigger. In a popup, `popup` is the host's `PopupTooltipLayer`; the
+// layer covers the window whatever its parent's position.
 export component TooltipLayerView {
+    in property <PopupTooltipLayer> popup;
+    property <PlacementRect> anchor: { x: TooltipLayer.anchor.x + root.popup.x, y: TooltipLayer.anchor.y + root.popup.y, width: TooltipLayer.anchor.width, height: TooltipLayer.anchor.height };
     property <length> pad-x: 0.625rem;
     property <length> pad-y: 0.375rem;
     property <length> arrow: 4px;
     property <length> bubble-width: measure.width + 2 * root.pad-x + 2px;
     property <length> bubble-height: measure.preferred-height + 2 * root.pad-y + 2px;
-    property <Placement> placed: PlacementLogic.place(TooltipLayer.anchor, root.bubble-width, root.bubble-height, WindowMetrics.width, WindowMetrics.height, TooltipLayer.side, TooltipLayer.align, TooltipLayer.gap);
+    property <Placement> placed: PlacementLogic.place(root.anchor, root.bubble-width, root.bubble-height, WindowMetrics.width, WindowMetrics.height, TooltipLayer.side, TooltipLayer.align, TooltipLayer.gap);
     property <bool> vertical-side: root.placed.side == PlacementSide.top || root.placed.side == PlacementSide.bottom;
 
-    width: 100%;
-    height: 100%;
+    x: -root.popup.x;
+    y: -root.popup.y;
+    width: WindowMetrics.width;
+    height: WindowMetrics.height;
 
     changed width => {
         TooltipLayer.shown = false;
@@ -65,9 +108,10 @@ export component TooltipLayerView {
         y: root.placed.y;
         width: root.bubble-width;
         height: root.bubble-height;
-        visible: TooltipLayer.shown;
-        opacity: TooltipLayer.shown ? 1 : 0;
-        animate opacity { duration: TooltipLayer.shown ? Theme.duration-100 : 0ms; easing: ease-out; }
+        property <bool> shown: TooltipLayer.shown && TooltipLayer.layer == root.popup.depth;
+        visible: self.shown;
+        opacity: self.shown ? 1 : 0;
+        animate opacity { duration: self.shown ? Theme.duration-100 : 0ms; easing: ease-out; }
 
         Shadow {
             size: ShadowSize.xxl;
@@ -94,8 +138,8 @@ export component TooltipLayerView {
         // from the corners.
         Path {
             property <length> edge: root.vertical-side ? root.bubble-width : root.bubble-height;
-            property <length> anchor-start: root.vertical-side ? TooltipLayer.anchor.x : TooltipLayer.anchor.y;
-            property <length> anchor-size: root.vertical-side ? TooltipLayer.anchor.width : TooltipLayer.anchor.height;
+            property <length> anchor-start: root.vertical-side ? root.anchor.x : root.anchor.y;
+            property <length> anchor-size: root.vertical-side ? root.anchor.width : root.anchor.height;
             property <length> target: self.anchor-start + (TooltipLayer.align == PlacementAlign.start ? 0.5rem
                 : TooltipLayer.align == PlacementAlign.end ? self.anchor-size - 0.5rem : self.anchor-size / 2);
             property <length> along: max(0.5rem, min(self.target - (root.vertical-side ? root.placed.x : root.placed.y), self.edge - 0.5rem));
@@ -142,6 +186,7 @@ export component SimpleTooltip inherits TouchArea {
         TooltipLayer.content-width = root.content-width;
         TooltipLayer.wrap-text = root.wrap-text;
         TooltipLayer.gap = root.gap;
+        TooltipLayer.layer = TooltipLayer.popup-depth;
         TooltipLayer.shown = true;
     }
     public function hide() {

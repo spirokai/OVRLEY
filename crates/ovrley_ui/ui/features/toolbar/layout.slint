@@ -8,7 +8,6 @@ import { DrawerTool, Toolbar } from "index.slint";
 import { ActivityDrawer } from "activity.slint";
 import { VideoDrawer } from "videos.slint";
 import { ProjectsDrawer } from "projects.slint";
-import { AppShell } from "../shell/index.slint";
 import { VideoSyncDrawer } from "../sync/drawer.slint";
 import { WidgetButtonGrid } from "../widgets/drawer.slint";
 
@@ -161,19 +160,6 @@ export component ToolbarDrawerLayout {
         animate x { duration: Theme.duration-300; easing: ease-in-out; }
         // A still region: drawn from a cached layer, which also slides without being redrawn.
         cache-rendering-hint: true;
-        // The drawer's rectangle, for the kept areas of the clip selection.
-        function report-area() {
-            AppShell.video-drawer-area = { x: self.absolute-position.x, y: self.absolute-position.y, width: self.width, height: self.height };
-        }
-        init => {
-            self.report-area();
-        }
-        changed x => {
-            self.report-area();
-        }
-        changed height => {
-            self.report-area();
-        }
 
         Shadow {
             size: ShadowSize.md;

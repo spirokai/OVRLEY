@@ -1,8 +1,10 @@
-//! Dialog keyboard behaviour: Escape closes it, and Tab stays inside it while it is open.
+//! Dialog behaviour: Escape closes it, Tab stays inside it while it is open, and its tooltips show
+//! above it.
 
 mod common;
 
 use common::*;
+use ovrley_ui::TooltipLayer;
 use slint::platform::Key;
 use slint::ComponentHandle;
 
@@ -41,10 +43,26 @@ fn escape_closes_the_dialog() {
     assert!(!window.get_open());
 }
 
+/// A tooltip inside the dialog shows in the dialog's own layer, above the scrim, and hides when the
+/// dialog closes under it.
+fn tooltips_show_above_the_dialog() {
+    let window = harness();
+    move_to(&window, element_center(&element(&window, "First")));
+    wait(450);
+    let layer = window.global::<TooltipLayer>();
+    assert!(layer.get_shown(), "the tooltip did not show");
+    assert_eq!((layer.get_layer(), layer.get_popup_depth()), (1, 1), "the tooltip is not in the dialog's layer");
+    window.set_open(false);
+    settle();
+    assert!(!layer.get_shown(), "the tooltip outlived its dialog");
+    assert_eq!(layer.get_popup_depth(), 0);
+}
+
 #[test]
 fn cases() {
     run_cases(&[
         ("tab_stays_inside_the_dialog", tab_stays_inside_the_dialog),
         ("escape_closes_the_dialog", escape_closes_the_dialog),
+        ("tooltips_show_above_the_dialog", tooltips_show_above_the_dialog),
     ]);
 }

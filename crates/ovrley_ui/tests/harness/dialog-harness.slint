@@ -1,8 +1,10 @@
 import { FluidWindow } from "../../ui/window.slint";
 import { Button } from "../../ui/components/button.slint";
 import { Dialog } from "../../ui/components/popup.slint";
+import { SimpleTooltip } from "../../ui/components/tooltip.slint";
 
-// The Dialog test harness: a button behind the dialog and two buttons inside it.
+// The Dialog test harness: a button behind the dialog and two buttons inside it, the first with a
+// tooltip.
 export component DialogHarness inherits FluidWindow {
     width: 1100px;
     height: 720px;
@@ -23,7 +25,10 @@ export component DialogHarness inherits FluidWindow {
         open-changed(o) => { root.open = o; }
         HorizontalLayout {
             spacing: 8px;
-            Button { text: "First"; clicked => { root.last-clicked = "first"; } }
+            SimpleTooltip {
+                content: "First tip";
+                Button { text: "First"; clicked => { root.last-clicked = "first"; } }
+            }
             Button { text: "Second"; clicked => { root.last-clicked = "second"; } }
         }
     }

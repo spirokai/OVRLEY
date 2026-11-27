@@ -95,3 +95,8 @@ pub fn click(window: &impl ComponentHandle, position: LogicalPosition) {
 pub fn settle() {
     i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(50));
 }
+
+/// Advances the mocked clock by `ms`.
+pub fn wait(ms: u64) {
+    i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(ms));
+}

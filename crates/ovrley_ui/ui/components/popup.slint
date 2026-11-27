@@ -3,6 +3,7 @@ import { AppText } from "text.slint";
 import { Shadow, ShadowSize, OverlayMotion } from "surface.slint";
 import { Placement, PlacementAlign, PlacementLogic, PlacementSide } from "logic.slint";
 import { AlertLayerView } from "alert.slint";
+import { PopupTooltipLayer, TooltipLayer, TooltipLayerView } from "tooltip.slint";
 
 // Slint has one slot per component, so `Popover` is placed beside the trigger, inside the trigger's
 // parent, which it fills and anchors to; its slot is the content. Escape and an outside click close
@@ -39,6 +40,16 @@ export component Popover {
     width: 100%;
     height: 100%;
 
+    // The popup's tooltip layer, opened by the layer itself (the popup's position is not readable
+    // from here) and closed with the popup.
+    property <PopupTooltipLayer> tooltip-layer;
+    property <bool> tooltip-popup-open: popup.is-open;
+    changed tooltip-popup-open => {
+        if !root.tooltip-popup-open {
+            TooltipLayer.close-popup(root.tooltip-layer);
+        }
+    }
+
     popup := PopupWindow {
         property <Placement> placed: PlacementLogic.place(
             { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
@@ -73,6 +84,12 @@ export component Popover {
                         @children
                     }
                 }
+            }
+        }
+        TooltipLayerView {
+            popup: root.tooltip-layer;
+            init => {
+                root.tooltip-layer = TooltipLayer.open-popup(root.absolute-position.x + popup.x, root.absolute-position.y + popup.y);
             }
         }
     }
@@ -123,6 +140,16 @@ export component Dialog {
     width: 0px;
     height: 0px;
 
+    // The popup's tooltip layer, opened by the layer itself (the popup's position is not readable
+    // from here) and closed with the popup.
+    property <PopupTooltipLayer> tooltip-layer;
+    property <bool> tooltip-popup-open: popup.is-open;
+    changed tooltip-popup-open => {
+        if !root.tooltip-popup-open {
+            TooltipLayer.close-popup(root.tooltip-layer);
+        }
+    }
+
     popup := PopupWindow {
         close-policy: PopupClosePolicy.no-auto-close;
         x: -root.absolute-position.x;
@@ -170,6 +197,12 @@ export component Dialog {
                         }
                     }
                 }
+            }
+        }
+        TooltipLayerView {
+            popup: root.tooltip-layer;
+            init => {
+                root.tooltip-layer = TooltipLayer.open-popup(root.absolute-position.x + popup.x, root.absolute-position.y + popup.y);
             }
         }
         // The error alert stays visible and clickable above an open dialog.

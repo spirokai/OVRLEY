@@ -6,6 +6,7 @@ import { Slider } from "slider.slint";
 import { Input } from "input.slint";
 import { Select } from "select.slint";
 import { Choice, ColorFormat, ColorPickerLogic, Hsv, Rgba, Placement, PlacementAlign, PlacementLogic, PlacementSide } from "logic.slint";
+import { PopupTooltipLayer, TooltipLayer, TooltipLayerView } from "tooltip.slint";
 
 // Slint has no context, so the parts take the picker's state (`color`, `hsv`, `format`) from their
 // caller, which owns it, and report changes through callbacks.
@@ -551,6 +552,16 @@ export component HexColorPicker {
       }
     }
 
+    // The popup's tooltip layer, opened by the layer itself (the popup's position is not readable
+    // from here) and closed with the popup.
+    property <PopupTooltipLayer> tooltip-layer;
+    property <bool> tooltip-popup-open: popup.is-open;
+    changed tooltip-popup-open => {
+        if !root.tooltip-popup-open {
+            TooltipLayer.close-popup(root.tooltip-layer);
+        }
+    }
+
     popup := PopupWindow {
         property <Placement> placed: PlacementLogic.place(
             { x: root.absolute-position.x, y: root.absolute-position.y, width: root.width, height: root.height },
@@ -679,6 +690,12 @@ export component HexColorPicker {
                     }
                 }
                 @children
+            }
+        }
+        TooltipLayerView {
+            popup: root.tooltip-layer;
+            init => {
+                root.tooltip-layer = TooltipLayer.open-popup(root.absolute-position.x + popup.x, root.absolute-position.y + popup.y);
             }
         }
     }

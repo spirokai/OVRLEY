@@ -120,7 +120,7 @@ impl Player {
 
                 p->player->setRenderCallback([rust](void*) { ovrley_playback_on_render(rust); });
                 const auto guard = p->guard;
-                p->player->onEvent([p, guard](const mdk::MediaEvent& event) -> bool {
+                p->player->onEvent([guard](const mdk::MediaEvent& event) -> bool {
                     const std::lock_guard<std::recursive_mutex> lock(guard->mutex);
                     if (!guard->alive) return false;
                     ovrley_playback_on_event(event.error, event.category.c_str(), event.detail.c_str());

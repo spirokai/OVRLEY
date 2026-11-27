@@ -14,7 +14,7 @@
 //!   editor or the control panel `editor`, before the press reaches any element.
 
 use super::{dispatch_ui, APP_WINDOW, UI_DISPATCH};
-use crate::{AppShell, DrawerTool, FocusedField, Player, Toolbar, TransitionSelect};
+use crate::{AppShell, FocusedField, Player};
 use ovrley_app::features::shell::{self, DroppedPath};
 use slint::winit_030::{winit, CustomApplicationHandler, EventResult};
 use slint::ComponentHandle;
@@ -114,33 +114,15 @@ fn area(rect: crate::PlacementRect) -> shell::Area {
     shell::Area { x: rect.x.into(), y: rect.y.into(), width: rect.width.into(), height: rect.height.into() }
 }
 
-/// What a press at `point` changes outside Slint's routing: a press outside the player and the
-/// areas that keep the clip selection clears it, and the press selects its keyboard workspace.
+/// The keyboard workspace of a press at `point`, selected before Slint routes the press.
 fn select_workspace(scale_factor: f32, cursor: winit::dpi::PhysicalPosition<f64>) {
     let point = (cursor.x / f64::from(scale_factor), cursor.y / f64::from(scale_factor));
-    let pressed = APP_WINDOW.with(|slot| {
+    let workspace = APP_WINDOW.with(|slot| {
         let window = slot.borrow().as_ref().and_then(slint::Weak::upgrade)?;
         let shell = window.global::<AppShell>();
-        let player = window.global::<Player>();
-        let toolbar = window.global::<Toolbar>();
-        let player_area = player.get_visible().then(|| area(shell.get_player_area()));
-        let in_player = player_area.is_some_and(|player| player.contains(point));
-        // The player's popovers and dialogs, the video drawer, the video panel and an open
-        // transition select keep the clip selection.
-        let in_drawer = toolbar.get_visible() && toolbar.get_active_tool() == DrawerTool::Video && area(shell.get_video_drawer_area()).contains(point);
-        let in_panel = toolbar.get_video_panel_shown() && area(shell.get_control_panel_area()).contains(point);
-        let keeps = in_player || player.get_keeps_clip_selection() || in_drawer || in_panel || !window.global::<TransitionSelect>().get_open_target().is_empty();
-        let workspace = shell::workspace_at(point, area(shell.get_editor_area()), area(shell.get_control_panel_area()), player_area);
-        Some((keeps, workspace))
+        let player_area = window.global::<Player>().get_visible().then(|| area(shell.get_player_area()));
+        shell::workspace_at(point, area(shell.get_editor_area()), area(shell.get_control_panel_area()), player_area)
     });
-    let Some((keeps, workspace)) = pressed else { return };
-    if !keeps {
-        dispatch_ui(|store, _| {
-            if store.video_import.selected_clip.is_some() {
-                store.video_import.selected_clip = None;
-            }
-        });
-    }
     if let Some(workspace) = workspace {
         dispatch_ui(move |store, _| {
             if store.editor_shell.active_keyboard_workspace != workspace {

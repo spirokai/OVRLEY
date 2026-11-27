@@ -421,10 +421,7 @@ fn project_edits(player: &Player<'_>, store: &Store) {
     let (lane, cut) = store.player.cut_popover.as_ref().map_or((String::new(), String::new()), |(video_id, cut_id)| (ClipLane::Video(video_id.clone()).id(), cut_id.clone()));
     set_if_changed(player.get_cut_popover_lane(), SharedString::from(lane), |value| player.set_cut_popover_lane(value));
     set_if_changed(player.get_cut_popover_cut(), SharedString::from(cut), |value| player.set_cut_popover_cut(value));
-    let asking = store.video_import.cut_removal_request.is_some();
-    set_if_changed(player.get_cut_removal_open(), asking, |value| player.set_cut_removal_open(value));
-    let popover = store.player.cut_popover.is_some() || store.player.join_panel.is_some();
-    set_if_changed(player.get_keeps_clip_selection(), asking || popover, |value| player.set_keeps_clip_selection(value));
+    set_if_changed(player.get_cut_removal_open(), store.video_import.cut_removal_request.is_some(), |value| player.set_cut_removal_open(value));
 }
 
 fn surface_gesture(kind: TimelineSurfaceKind) -> SurfaceGesture {
