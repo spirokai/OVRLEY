@@ -490,3 +490,48 @@ fn off_view_landmarks_clamp_to_an_inert_edge_marker() {
         (true, false, 400.0)
     );
 }
+
+// --- Auto-sync and Sync all videos ------------------------------------------------------------
+
+#[test]
+fn auto_sync_replaces_the_selected_clip_and_sync_all_every_clip_even_ones_placed_by_hand() {
+    use crate::store::videos::{select_clip, set_video_offset, sync_all_videos, ClipLane, SelectedClip};
+    use crate::video::fixtures::{video, TestVideo};
+    use ovrley_core::media::edits::OffsetSource;
+    let timed = |id: &'static str, creation_time: &str| {
+        let mut clip = video(TestVideo { id, duration_seconds: 60.0, ..TestVideo::default() });
+        clip.creation_time = Some(creation_time.into());
+        clip.time_source = Some("ffprobe".into());
+        clip
+    };
+    let videos = vec![timed("video-1", "2026-07-18T08:00:00Z"), timed("video-2", "2026-07-18T08:10:00Z")];
+    let (dispatcher, _) = dispatcher(moving(), videos, &[]);
+    dispatcher.dispatch(|store, _| {
+        let summary = store.media.activity_summary.as_mut().unwrap();
+        summary.sync_time = Some("2026-07-18T08:00:00Z".into());
+        summary.end_time = Some("2026-07-18T09:00:00Z".into());
+        summary.timezone = Some("Europe/Prague".into());
+        set_video_offset(store, "video-1", 500.0, false).unwrap();
+        set_video_offset(store, "video-2", 900.0, false).unwrap();
+    });
+    let placement = |dispatcher: &Dispatcher, id: &'static str| {
+        dispatcher.with_store(move |store| {
+            let edits = &store.video_import.video_edits[id];
+            (edits.offset_seconds, edits.offset_source)
+        })
+    };
+    dispatcher.dispatch(|store, _| {
+        select_clip(store, Some(SelectedClip { lane: ClipLane::Video("video-2".into()), segment_key: None })).unwrap()
+    });
+    dispatcher.dispatch(|store, _| super::auto_sync(store).unwrap());
+    assert_eq!(placement(&dispatcher, "video-2"), (600.0, OffsetSource::Auto), "the selected clip goes to its recording time");
+    assert_eq!(placement(&dispatcher, "video-1"), (500.0, OffsetSource::Manual), "the other clip stays");
+    dispatcher.dispatch(|store, _| sync_all_videos(store).unwrap());
+    assert_eq!(placement(&dispatcher, "video-1"), (0.0, OffsetSource::Auto));
+    dispatcher.dispatch(|store, _| {
+        select_clip(store, None).unwrap();
+        store.editor.selected_second = 200.0;
+    });
+    assert!(dispatcher.with_store(|store| super::work_clip(store).is_none()));
+    dispatcher.dispatch(|store, _| assert!(super::auto_sync(store).is_err(), "nothing to sync without a clip"));
+}

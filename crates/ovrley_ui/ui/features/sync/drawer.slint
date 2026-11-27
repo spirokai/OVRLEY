@@ -577,8 +577,13 @@ export component VideoSyncDrawer inherits VerticalLayout {
             if VideoSync.has-videos: VideoSyncControls {
                 sync: VideoSync.sync;
                 can-open-manual-sync: true;
+                can-compute: VideoSync.can-auto-sync;
+                can-sync-all: true;
                 compute => {
                     VideoSync.compute();
+                }
+                sync-all => {
+                    VideoSync.sync-all();
                 }
                 reset-creation-times => {
                     VideoSync.reset-creation-times();

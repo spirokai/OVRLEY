@@ -78,6 +78,8 @@ export global VideoSync {
     in property <VideoSyncTab> tab: VideoSyncTab.autodetect;
     in property <bool> has-videos;
     in property <VideoSyncView> sync;
+    // Auto-sync acts on the selected clip, else the one at the playhead.
+    in property <bool> can-auto-sync;
     in property <[LandmarkRowView]> landmarks;
     in property <bool> has-location-landmark;
     in property <float> speed-draft;
@@ -179,6 +181,7 @@ export global VideoSync {
     // A landmark handle's pointer; `x` is the timeline x of a move.
     callback landmark-pointer(id: string, phase: PointerPhase, x: length);
     callback compute();
+    callback sync-all();
     callback reset-creation-times();
     callback filename-creation-times();
     callback set-utc(utc: bool);

@@ -292,6 +292,7 @@ fn project_drawer(global: &VideoSync<'_>, store: &Store) {
     if tab == VideoSyncDrawerTab::Autodetect {
         let controls = sync::store_video_sync_controls(store);
         set_if_changed(global.get_sync(), sync_view(store, &controls, &SecondsField::SyncSharedOffset), |value| global.set_sync(value));
+        set_if_changed(global.get_can_auto_sync(), sync::work_clip(store).is_some(), |value| global.set_can_auto_sync(value));
         return;
     }
     let view = sync::drawer_view(store);
@@ -336,7 +337,9 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     let d = dispatcher.handle();
     global.on_set_tab(move |tab| d.dispatch(move |store, _| store.layout.set_video_sync_drawer_tab(tab.into())));
     let d = dispatcher.handle();
-    global.on_compute(move || dispatch_logged(&d, CONTEXT, |store, _| videos::compute_video_sync(store)));
+    global.on_compute(move || dispatch_logged(&d, CONTEXT, |store, _| sync::auto_sync(store)));
+    let d = dispatcher.handle();
+    global.on_sync_all(move || dispatch_logged(&d, CONTEXT, |store, _| videos::sync_all_videos(store)));
     let d = dispatcher.handle();
     global.on_reset_creation_times(move || dispatch_logged(&d, CONTEXT, |store, _| videos::reset_video_creation_times(store)));
     let d = dispatcher.handle();

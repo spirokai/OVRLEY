@@ -159,10 +159,10 @@ pub fn handle_app_key(store: &mut Store, services: &mut Services, input: &KeyInp
             true
         }
         "sync.auto" => {
-            if !store.video_import.has_videos() || store.media.activity_summary.is_none() {
+            if store.media.activity_summary.is_none() || crate::features::sync::work_clip(store).is_none() {
                 return false;
             }
-            if let Err(error) = crate::store::videos::compute_video_sync(store) {
+            if let Err(error) = crate::features::sync::auto_sync(store) {
                 log::error!("video sync: {error}");
             }
             true
@@ -1128,9 +1128,9 @@ mod tests {
     }
 
     #[test]
-    fn sync_auto_needs_videos_and_an_activity() {
+    fn sync_auto_needs_a_clip_and_an_activity() {
         let (answers, _, _) = press(Store::default(), vec![modified("a", true, true)]);
-        assert_eq!(answers, [false], "without videos the key is not consumed");
+        assert_eq!(answers, [false], "without a clip the key is not consumed");
     }
 
     #[test]

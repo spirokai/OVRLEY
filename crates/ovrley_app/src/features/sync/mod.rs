@@ -150,6 +150,13 @@ pub fn held_by_other_video(store: &Store) -> Option<String> {
     Some(crate::dialogs::filename_from_selected_path(&target.video.path).unwrap_or_default().to_string())
 }
 
+/// Auto-sync: the clip the workspace acts on goes back to its detected recording time, also after
+/// it was placed by hand. "Sync all videos" (`videos::sync_all_videos`) does it for every clip.
+pub fn auto_sync(store: &mut Store) -> Result<(), String> {
+    let video_id = work_clip(store).map(|clip| clip.id().to_string()).ok_or("No video is selected or at the playhead")?;
+    crate::store::videos::reset_video_offset(store, &video_id)
+}
+
 /// "Go to that video": selects the video that holds the sync and brings the playhead into it.
 pub fn show_sync_video(store: &mut Store) -> Result<(), String> {
     let target = manual::find_video_sync_target(store).ok_or("Manual video sync has no landmarks")?;

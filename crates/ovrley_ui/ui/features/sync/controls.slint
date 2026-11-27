@@ -13,6 +13,11 @@ export component VideoSyncControls inherits VerticalLayout {
     in property <string> title: @tr("toolbar.videoSync" => "Sync Doctor");
     in property <VideoSyncView> sync;
     callback compute();
+    // Auto-sync's state; Sync Doctor's acts on the selected clip, else the one at the playhead.
+    in property <bool> can-compute: true;
+    // "Sync all videos" below the offset, where it is offered (Sync Doctor).
+    in property <bool> can-sync-all;
+    callback sync-all();
     callback reset-creation-times();
     callback filename-creation-times();
     callback set-utc(utc: bool);
@@ -67,9 +72,20 @@ export component VideoSyncControls inherits VerticalLayout {
                 height: 2.25rem;
                 font-size: Theme.text-xs * 1rem;
                 text: @tr("toolbar.autosync" => "Auto-sync");
+                disabled: !root.can-compute;
                 clicked => {
                     root.compute();
                 }
+            }
+        }
+        if root.can-sync-all: Button {
+            variant: ButtonVariant.secondary;
+            height: 2.25rem;
+            icon: Icons.refresh-cw;
+            font-size: Theme.text-xs * 1rem;
+            text: @tr("toolbar.syncAllVideos" => "Sync all videos");
+            clicked => {
+                root.sync-all();
             }
         }
         VerticalLayout {
