@@ -28,7 +28,7 @@ export component Select {
     in property <length> font-size: Theme.text-sm * 1rem;
     in property <bool> mono;
     in property <bool> uppercase;
-    in property <color> background: transparent;
+    in property <color> background: Theme.surface;
     in property <length> border-width: 0px;
     in property <color> border-color: Theme.border;
     in property <ShadowSize> shadow: ShadowSize.xs;
@@ -483,7 +483,6 @@ export component FontSelectField inherits VerticalLayout {
     in property <[Choice]> system-options;
     in property <length> label-font-size: 0.741rem;
     in property <SelectSize> size: SelectSize.sm;
-    in property <color> background: transparent;
     callback value-changed(value: string);
 
     spacing: 0.25rem;
@@ -497,7 +496,6 @@ export component FontSelectField inherits VerticalLayout {
     }
     Select {
         size: root.size;
-        background: root.background;
         font-size: Theme.text-xs * 1rem;
         disabled: root.disabled;
         value: root.value;

@@ -247,7 +247,6 @@ component GeneralSettingsPanel {
                     items: root.languages;
                     value: root.language;
                     align: PlacementAlign.end;
-                    background: Theme.surface;
                     font-size: Theme.text-xs * 1rem;
                     accessible-label: @tr("app-shell.language" => "Language");
                     value-changed(value) => {
@@ -266,7 +265,6 @@ component GeneralSettingsPanel {
                     ];
                     value: root.unit-system;
                     align: PlacementAlign.end;
-                    background: Theme.surface;
                     font-size: Theme.text-xs * 1rem;
                     accessible-label: @tr("app-shell.unitSystem" => "Units");
                     value-changed(value) => {

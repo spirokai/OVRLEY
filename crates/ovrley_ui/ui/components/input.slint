@@ -24,7 +24,7 @@ export component Input {
     in property <length> font-size: root.inline ? 0.741rem : Theme.text-sm * 1rem;
     in property <bool> mono: root.inline;
     in property <TextHorizontalAlignment> horizontal-alignment: root.inline ? TextHorizontalAlignment.right : TextHorizontalAlignment.left;
-    in property <color> background: root.inline && field.has-focus ? Theme.surface : transparent;
+    in property <color> background: !root.inline || field.has-focus ? Theme.surface : transparent;
     in property <color> text-color: root.inline && !field.has-focus ? Theme.muted-foreground : Theme.foreground;
     in property <length> border-width: 0px;
     in property <color> border-color: Theme.border;
@@ -289,7 +289,7 @@ export component BlurInput {
     in property <length> font-size: Theme.text-sm * 1rem;
     in property <bool> mono;
     // The clean field's fill; a dirty draft shows its own.
-    in property <color> background: transparent;
+    in property <color> background: Theme.surface;
     in property <length> inset-right: root.number ? 2.75rem : 0.75rem;
     // `aria-label`: the field's accessible name.
     in property <string> label;
@@ -465,8 +465,6 @@ export component SecondsInput inherits VerticalLayout {
             label: root.label;
             invalid: root.error != "";
             font-size: root.font-size;
-            border-width: 1px;
-            border-color: Theme.border.transparentize(0.3);
             disabled: root.disabled;
             inset-right: root.show-unit && !root.step-buttons && root.slot == SecondsSlot.none ? 2.25rem
                 : root.step-buttons && root.slot != SecondsSlot.none ? 3.25rem

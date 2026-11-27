@@ -133,7 +133,6 @@ export component ChartSeriesRow inherits HorizontalLayout {
         items: root.options;
         value: root.metric;
         font-size: Theme.text-xs * 1rem;
-        background: Theme.surface;
         border-color: Theme.border.transparentize(0.3);
         accessible-label: root.metric-label;
         value-changed(value) => {
@@ -261,7 +260,6 @@ export component WindowSecondsField inherits FieldBlock {
         invalid: root.invalid;
         label: root.label;
         font-size: Theme.text-xs * 1rem;
-        background: Theme.surface;
         accepted => {
             root.committed(root.draft);
         }

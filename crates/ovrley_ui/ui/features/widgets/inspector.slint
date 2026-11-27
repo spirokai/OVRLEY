@@ -211,7 +211,6 @@ component CellView inherits CellEvents {
             value: root.cell.text;
             placeholder: root.cell.text2;
             font-size: Theme.text-xs * 1rem;
-            background: Theme.surface;
             label: root.cell.label;
             changed(value) => {
                 root.set-text(root.cell.id, value);
@@ -240,7 +239,6 @@ component CellView inherits CellEvents {
         system-options: root.system-fonts;
         label-font-size: root.cell.small-label ? 9px : 0.667rem;
         size: SelectSize.default;
-        background: Theme.surface;
         value-changed(id) => {
             root.set-text(root.cell.id, id);
         }

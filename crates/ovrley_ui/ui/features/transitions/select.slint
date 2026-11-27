@@ -2,6 +2,7 @@ import { Theme } from "../../theme.slint";
 import { AppText } from "../../components/text.slint";
 import { Icon, Icons } from "../../components/icons.slint";
 import { Popover } from "../../components/popup.slint";
+import { Shadow, ShadowSize, GroupSurface } from "../../components/surface.slint";
 import { PlacementAlign } from "../../components/logic.slint";
 import { TransitionPicker } from "picker.slint";
 import { TransitionPreview } from "preview.slint";
@@ -25,9 +26,14 @@ export component TransitionSelectTrigger {
         clicked => {
             TransitionSelect.open(root.target);
         }
-        Rectangle {
-            border-radius: Theme.radius-sm * 1rem;
-            background: touch.has-hover ? Theme.surface-highlight-soft : Theme.field-lift;
+        Shadow {
+            size: ShadowSize.xs;
+            radius: Theme.radius-sm * 1rem;
+        }
+        GroupSurface {
+            radius: Theme.radius-sm * 1rem;
+            background: touch.has-hover ? Theme.surface-highlight-soft : Theme.surface;
+            field-lift: true;
             HorizontalLayout {
                 padding-left: root.preview-index >= 0 ? 0.25rem : 0.75rem;
                 padding-right: 0.75rem;

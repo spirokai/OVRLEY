@@ -145,7 +145,6 @@ export component ColorPickerFormatSelect inherits Select {
     value: root.format == ColorFormat.rgb ? "rgb" : root.format == ColorFormat.hsl ? "hsl" : root.format == ColorFormat.hsb ? "hsb" : "hex";
     width: 4.5rem;
     horizontal-stretch: 0;
-    background: Theme.surface;
     border-color: Theme.border.transparentize(0.3);
     font-size: Theme.text-xs * 1rem;
     mono: true;
@@ -178,8 +177,6 @@ component ChannelInput {
         placeholder: "0";
         group-position: root.group-position;
         disabled: root.disabled;
-        background: Theme.surface;
-        border-color: Theme.border.transparentize(0.3);
         font-size: Theme.text-xs * 1rem;
         mono: true;
         horizontal-alignment: center;
@@ -228,8 +225,6 @@ export component ColorPickerInput {
         label: @tr("components.hexColorValue" => "Hex color value");
         placeholder: "#000000";
         disabled: root.disabled;
-        background: Theme.surface;
-        border-color: Theme.border.transparentize(0.3);
         font-size: Theme.text-xs * 1rem;
         mono: true;
         horizontal-alignment: center;
@@ -353,8 +348,6 @@ export component HexColorPicker {
     in property <bool> show-value: true;
     in property <bool> custom-trigger;
     in property <[string]> preset-colors: ["#ffffff", "#afeeee", "#40e0d0", "#005b5b", "#c65102", "#000000"];
-    // The hex field's fill, the call site's override: the widget editor's fields sit on `surface`.
-    in property <color> field-background: transparent;
     // The hex field's type, the call site's override: the widget editor matches its fields.
     in property <length> field-font-size: 0.815rem;
     in property <bool> field-mono: true;
@@ -479,7 +472,6 @@ export component HexColorPicker {
             disabled: root.disabled;
             mono: root.field-mono;
             font-size: root.field-font-size;
-            background: root.field-background;
             show-focus-ring: false;
             focus-changed(focused) => {
                 root.hex-field-focused = focused;

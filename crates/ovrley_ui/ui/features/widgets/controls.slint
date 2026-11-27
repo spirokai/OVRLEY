@@ -70,7 +70,6 @@ export component SelectField inherits FieldBlock {
         value: root.value;
         disabled: root.disabled;
         font-size: Theme.text-xs * 1rem;
-        background: Theme.surface;
         border-color: Theme.border.transparentize(0.3);
         accessible-label: root.label;
         value-changed(value) => {
@@ -97,7 +96,6 @@ export component NumberField inherits FieldBlock {
             placeholder: root.placeholder;
             disabled: root.disabled;
             font-size: Theme.text-xs * 1rem;
-            background: Theme.surface;
             inset-right: root.suffix != "" ? 4rem : 2.75rem;
             label: root.label;
             changed(raw) => {
@@ -131,7 +129,6 @@ export component ColorField inherits VerticalLayout {
     HexColorPicker {
         value: root.value;
         disabled: root.disabled;
-        field-background: Theme.surface;
         field-font-size: Theme.text-xs * 1rem;
         field-mono: false;
         changed(hex) => {
