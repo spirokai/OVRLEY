@@ -39,7 +39,7 @@ describe('useVideoSyncWorkspace', () => {
       ...videoStoreState([createTestVideo({ path: 'C:\\video.mp4', durationSeconds: 20 })], { 'video-1': 2 }),
       selectedSecond: 8,
       manualVideoSync: {
-        videoId: 'video-1',
+        videoId: null,
         landmarks: [],
         detectedLocationSecond: null,
         speedThresholdKmh: 5,
@@ -107,7 +107,7 @@ describe('useVideoSyncWorkspace', () => {
     expect(useStore.getState().manualVideoSync.landmarks).toEqual([{ id: 'landmark-1', type: VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond: 7 }])
   })
 
-  test('marks landmarks against the manual-sync target clip among several clips', () => {
+  test('marks landmarks in the selected clip, else the clip at the playhead, which then holds the sync for every clip', () => {
     useStore.setState({
       ...videoStoreState(
         [
@@ -118,15 +118,33 @@ describe('useVideoSyncWorkspace', () => {
       ),
       selectedSecond: 33,
     })
-    act(() => useStore.getState().selectVideoSyncVideo('video-2'))
     const { result } = renderHook(() => useVideoSyncWorkspace({ toolbarDrawer: createToolbarDrawer(), videoSync }))
 
-    expect(result.current.drawer).toMatchObject({ appliedOffset: 30, hasVideos: true })
-    expect(result.current.markControls).toMatchObject({ videoDurationSeconds: 10, videoOffsetSeconds: 30 })
+    expect(result.current.drawer).toMatchObject({ appliedOffset: 0, hasVideos: true, syncHeldBy: null })
+    expect(result.current.markControls).toMatchObject({ isHeldByOtherVideo: false, videoDurationSeconds: 10, videoOffsetSeconds: 30 })
 
     act(() => result.current.markControls.onMarkStop())
 
-    expect(useStore.getState().manualVideoSync.landmarks).toEqual([{ id: 'landmark-1', type: VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond: 3 }])
+    expect(useStore.getState().manualVideoSync).toMatchObject({
+      videoId: 'video-2',
+      landmarks: [{ id: 'landmark-1', type: VIDEO_SYNC_LANDMARK_TYPES.STOP, videoSecond: 3 }],
+    })
+    expect(result.current.drawer.appliedOffset).toBe(30)
+
+    act(() => useStore.getState().setSelectedSecond(8))
+    expect(result.current.drawer.syncHeldBy).toBe('second.mp4')
+    expect(result.current.markControls).toMatchObject({ isHeldByOtherVideo: true, heldByOtherVideoReason: 'Landmarks are marked in second.mp4' })
+
+    act(() => useStore.getState().selectClip({ laneId: 'video:video-2', segmentKey: 'start' }))
+    expect(result.current.drawer.syncHeldBy).toBeNull()
+    expect(result.current.markControls).toMatchObject({ isHeldByOtherVideo: false, videoOffsetSeconds: 30 })
+
+    act(() => useStore.getState().selectClip({ laneId: 'video:video-1', segmentKey: null }))
+    expect(result.current.drawer.syncHeldBy).toBe('second.mp4')
+
+    act(() => result.current.drawer.onShowSyncVideo())
+    expect(useStore.getState()).toMatchObject({ selectedSecond: 30, selectedClip: { laneId: 'video:video-2', segmentKey: null } })
+    expect(result.current.drawer.syncHeldBy).toBeNull()
   })
 
   test('keeps sensitivity drafts local until commit and scrubs landmarks through the applied offset', () => {
@@ -146,6 +164,9 @@ describe('useVideoSyncWorkspace', () => {
     const markControls = {
       hasLandmarkCapacity: true,
       hasLocationLandmark: false,
+      hasVideos: true,
+      heldByOtherVideoReason: null,
+      isHeldByOtherVideo: false,
       videoDurationSeconds: 10,
       landmarkLimitReason: 'Landmark limit',
       locationLimitReason: 'Location limit',
@@ -163,10 +184,21 @@ describe('useVideoSyncWorkspace', () => {
       canMarkLocation: true,
       markDisabledReason: null,
     })
-    expect(resolveVideoSyncMarkControls({ ...markControls, videoDurationSeconds: null }, 0.5, true)).toMatchObject({
+    expect(resolveVideoSyncMarkControls({ ...markControls, hasVideos: false, videoDurationSeconds: null }, 0.5, true)).toMatchObject({
       canMark: false,
       markDisabledReason: 'Video required',
     })
+    expect(resolveVideoSyncMarkControls({ ...markControls, videoDurationSeconds: null }, 0.5, true)).toMatchObject({
+      canMark: false,
+      markDisabledReason: 'Outside video',
+    })
+    expect(
+      resolveVideoSyncMarkControls(
+        { ...markControls, isHeldByOtherVideo: true, heldByOtherVideoReason: 'Other video', hasLocationLandmark: true },
+        0.5,
+        true,
+      ),
+    ).toMatchObject({ canMark: false, canMarkLocation: false, markDisabledReason: 'Other video', locationDisabledReason: 'Other video' })
     expect(resolveVideoSyncMarkControls(markControls, 0.5, false)).toBeNull()
   })
 })

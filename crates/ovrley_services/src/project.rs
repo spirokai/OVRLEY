@@ -970,7 +970,10 @@ fn migrate_v5_project(project: ProjectDocumentV5) -> Result<MigratedProject, Str
     });
     let manual = project.sync.manual;
     let manual = ManualVideoSync {
-        video_id: video.as_ref().map(|video| video.id.clone()),
+        video_id: video
+            .as_ref()
+            .filter(|_| !manual.landmarks.is_empty())
+            .map(|video| video.id.clone()),
         landmarks: manual.landmarks,
         detected_location_second: manual.detected_location_second,
         speed_threshold_kmh: manual.speed_threshold_kmh,

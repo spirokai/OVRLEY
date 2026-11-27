@@ -101,21 +101,22 @@ export function resolveVideoSyncMarkControls(markControls, timelineSecond, enabl
   if (!enabled || markControls === null) return null
 
   const videoSecond = timelineSecond - markControls.videoOffsetSeconds
-  const hasVideo = markControls.videoDurationSeconds !== null
-  const isInsideVideo = hasVideo && videoSecond >= 0 && videoSecond < markControls.videoDurationSeconds
-  const canMark = isInsideVideo && markControls.hasLandmarkCapacity
-  const markDisabledReason = !hasVideo
+  const isInsideVideo = markControls.videoDurationSeconds !== null && videoSecond >= 0 && videoSecond < markControls.videoDurationSeconds
+  const canMark = isInsideVideo && !markControls.isHeldByOtherVideo && markControls.hasLandmarkCapacity
+  const markDisabledReason = !markControls.hasVideos
     ? markControls.videoRequiredReason
-    : !isInsideVideo
-      ? markControls.playheadOutsideVideoReason
-      : !markControls.hasLandmarkCapacity
-        ? markControls.landmarkLimitReason
-        : null
+    : markControls.isHeldByOtherVideo
+      ? markControls.heldByOtherVideoReason
+      : !isInsideVideo
+        ? markControls.playheadOutsideVideoReason
+        : !markControls.hasLandmarkCapacity
+          ? markControls.landmarkLimitReason
+          : null
 
   return {
     canMark,
     canMarkLocation: canMark && !markControls.hasLocationLandmark,
-    locationDisabledReason: markControls.hasLocationLandmark ? markControls.locationLimitReason : markDisabledReason,
+    locationDisabledReason: markControls.hasLocationLandmark && markDisabledReason === null ? markControls.locationLimitReason : markDisabledReason,
     markDisabledReason,
     onMarkLeftTurn: markControls.onMarkLeftTurn,
     onMarkLocation: markControls.onMarkLocation,

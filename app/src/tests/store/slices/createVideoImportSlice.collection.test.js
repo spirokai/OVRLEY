@@ -5,7 +5,7 @@
  */
 
 import { produce } from 'immer'
-import { beforeEach, describe, expect, test } from 'vite-plus/test'
+import { beforeEach, describe, expect, test, vi } from 'vite-plus/test'
 import useStore from '@/store/useStore'
 import { changeVideoCollection, undoHistory } from '@/features/undo-redo/undoHistory'
 import { addVideos } from '@/lib/video-program/collection-edits'
@@ -46,7 +46,7 @@ function resetStore() {
 describe('removing a clip', () => {
   beforeEach(resetStore)
 
-  test('moves manual sync to the first remaining clip and keeps the playhead on the timeline', () => {
+  test('clears the manual sync of a removed clip and keeps the playhead on the timeline', () => {
     importVideos([
       createTestVideo({ id: 'early', path: '/videos/early.mp4', durationSeconds: 20, creationTime: '2026-07-18T08:00:00Z', timeSource: 'ffprobe' }),
     ])
@@ -61,14 +61,15 @@ describe('removing a clip', () => {
       }),
     ])
     useStore.setState({ selectedSecond: 615 })
-    useStore.getState().selectVideoSyncVideo('late')
+    vi.stubGlobal('crypto', { randomUUID: () => 'landmark-1' })
+    useStore.getState().addVideoSyncLandmark('late', 'stop', 4)
+    vi.unstubAllGlobals()
 
     useStore.getState().removeImportedVideo('late')
-    expect(useStore.getState().manualVideoSync.videoId).toBe('early')
+    expect(useStore.getState().manualVideoSync).toMatchObject({ videoId: null, landmarks: [] })
     expect(useStore.getState().selectedSecond).toBe(20)
 
     useStore.getState().removeImportedVideo('early')
-    expect(useStore.getState().manualVideoSync.videoId).toBeNull()
     expect(useStore.getState().importedVideos).toEqual([])
   })
 })

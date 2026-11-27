@@ -70,6 +70,7 @@ export function VideoSyncMarkControls({
   return (
     <div
       data-testid="video-sync-mark-controls"
+      data-keeps-clip-selection
       className="pointer-events-auto absolute bottom-4 left-1/2 z-50 grid grid-cols-4 w-max max-w-[calc(100%-2rem)] -translate-x-1/2 gap-1 [@container_(aspect-ratio<1/1)]:grid-cols-2 [@container_(aspect-ratio<1/1)]:[&>div:nth-child(2)]:order-2 [@container_(aspect-ratio<1/1)]:[&>div:nth-child(3)]:order-3"
       aria-label={t('videoSync.markControls', 'Video sync landmark controls')}
     >

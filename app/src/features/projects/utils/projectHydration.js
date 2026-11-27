@@ -49,17 +49,18 @@ export function createProjectVideoEdits(videos, projectVideos) {
 }
 
 /**
- * Restores the manual sync workspace. When its video was removed at load (an older
- * project's missing video), its landmarks go with it and the first loaded video is
- * selected. A found file shorter than the saved video keeps the landmarks inside it.
+ * Restores the manual sync workspace and the video that holds it. When that video
+ * was removed at load (an older project's missing video), its landmarks go with it.
+ * A found file shorter than the saved video keeps the landmarks inside it; with none
+ * left, no video holds the sync.
  * @param {Array<object>} videos Loaded video entities with their saved IDs.
  * @param {object} manual Saved manual sync workspace.
  * @returns {object} Manual sync workspace.
  */
 export function createProjectManualVideoSync(videos, manual) {
   const video = videos.find((candidate) => candidate.id === manual.videoId)
-  if (!video) return { ...manual, videoId: videos[0]?.id ?? null, landmarks: [] }
-  return { ...manual, landmarks: manual.landmarks.filter((landmark) => landmark.videoSecond <= video.durationSeconds) }
+  const landmarks = video ? manual.landmarks.filter((landmark) => landmark.videoSecond <= video.durationSeconds) : []
+  return { ...manual, videoId: landmarks.length > 0 ? manual.videoId : null, landmarks }
 }
 
 /**

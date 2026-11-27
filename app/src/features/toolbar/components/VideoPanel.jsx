@@ -1,4 +1,4 @@
-import { AlertTriangle, Blend, Clock3, Film, ImageOff, RefreshCw, Trash2 } from 'lucide-react'
+import { AlertTriangle, Blend, Clock3, Film, ImageOff, Link2, RefreshCw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -169,6 +169,12 @@ function VideoCard({ card }) {
       >
         <span className="relative block aspect-video w-full bg-black">
           <VideoCardPicture card={card} />
+          {card.holdsSync ? (
+            <span className="absolute left-1 top-1 flex items-center gap-1 rounded-xs bg-primary px-1 text-[0.65rem] font-bold text-primary-foreground">
+              <Link2 className="size-3" aria-hidden="true" />
+              {t('toolbar.holdsSync', 'Sync')}
+            </span>
+          ) : null}
           <span className="absolute bottom-1 right-1 rounded-xs bg-black/70 px-1 text-[0.65rem] font-bold tabular-nums text-white">
             {card.durationLabel}
           </span>
@@ -192,17 +198,19 @@ function VideoCard({ card }) {
 }
 
 /**
- * The video tab's companion panel, in place of (and as wide as) the widget sidebar:
- * the sync of every video and the default transitions above a two-column grid of video cards in timeline order.
+ * The companion panel of the video and video-sync tabs, in place of (and as wide as)
+ * the widget sidebar: a two-column grid of video cards in timeline order, below the
+ * sync of every video and the default transitions on the video tab.
  *
  * @param {object} props - Component props.
  * @param {() => void} props.onDeleteVideo - Removes every imported video.
  * @param {(videoId: string) => void} props.onRemoveVideo - Removes one imported video.
+ * @param {boolean} [props.syncMode] - Whether the panel accompanies the video-sync workspace.
  * @returns {JSX.Element} Rendered panel.
  */
-export function VideoPanel({ onDeleteVideo, onRemoveVideo }) {
+export function VideoPanel({ onDeleteVideo, onRemoveVideo, syncMode = false }) {
   const { t } = useTranslation()
-  const cards = useVideoCards({ onRemoveVideo })
+  const cards = useVideoCards({ onRemoveVideo, syncMode })
 
   return (
     <aside
@@ -211,8 +219,12 @@ export function VideoPanel({ onDeleteVideo, onRemoveVideo }) {
     >
       {cards.length > 0 ? (
         <div className="space-y-8 py-4">
-          <SyncAllVideosSection />
-          <TransitionDefaultsSection />
+          {syncMode ? null : (
+            <>
+              <SyncAllVideosSection />
+              <TransitionDefaultsSection />
+            </>
+          )}
           <section className="space-y-3" aria-label={t('toolbar.importedVideos', 'Imported videos')}>
             <SectionHeading
               icon={Film}

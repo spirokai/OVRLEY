@@ -154,7 +154,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videos: [{ ...projectVideo('ride-video', 'ride.mp4', 12), timezoneMode: 'utc' }],
       },
       sync: {
-        manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: {
+          videoId: 'ride-video',
+          landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+          detectedLocationSecond: null,
+          speedThresholdKmh: 5,
+          turnThresholdDegrees: 90,
+        },
       },
       laps: { disabled: [] },
       activityTrim: { startSecond: 10, endSecond: 80 },
@@ -545,7 +551,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         videos: [projectVideo('ride-video', 'ride.mp4')],
       },
       sync: {
-        manual: { videoId: 'ride-video', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: {
+          videoId: 'ride-video',
+          landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+          detectedLocationSecond: null,
+          speedThresholdKmh: 5,
+          turnThresholdDegrees: 90,
+        },
       },
       laps: { disabled: [] },
       activityTrim: null,
@@ -693,7 +705,13 @@ describe('useProjectLifecycle canonical load orchestration', () => {
         ],
       },
       sync: {
-        manual: { videoId: 'clip-c', landmarks: [], detectedLocationSecond: null, speedThresholdKmh: 5, turnThresholdDegrees: 90 },
+        manual: {
+          videoId: 'clip-c',
+          landmarks: [{ id: 'stop-1', type: 'stop', videoSecond: 4 }],
+          detectedLocationSecond: null,
+          speedThresholdKmh: 5,
+          turnThresholdDegrees: 90,
+        },
       },
       laps: { disabled: [] },
       activityTrim: null,
