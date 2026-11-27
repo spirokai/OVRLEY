@@ -316,7 +316,8 @@ export component RenderExportSettings inherits VerticalLayout {
             if RenderVideo.path-error != "": AppText {
                 content: RenderVideo.path-error;
                 font-size: Theme.text-xs * 1rem;
-                color: #b91c1c;
+                font-weight: Theme.font-weight-semibold;
+                color: Theme.destructive;
                 wrap: word-wrap;
             }
         }
@@ -363,7 +364,8 @@ export component RenderExportSettings inherits VerticalLayout {
             if RenderVideo.path-error != "": AppText {
                 content: RenderVideo.path-error;
                 font-size: Theme.text-xs * 1rem;
-                color: #ef4444;
+                font-weight: Theme.font-weight-semibold;
+                color: Theme.destructive;
                 wrap: word-wrap;
             }
         }

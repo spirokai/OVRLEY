@@ -126,6 +126,7 @@ export component StartupError inherits Rectangle {
         alignment: start;
         AppText {
             content: root.message;
+            font-weight: Theme.font-weight-semibold;
             color: Theme.destructive;
             wrap: word-wrap;
             accessible-role: AccessibleRole.text;

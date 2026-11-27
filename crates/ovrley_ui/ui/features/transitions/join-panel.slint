@@ -57,6 +57,7 @@ export component JoinTransitionPanel inherits VerticalLayout {
     if Player.join-error != "": AppText {
         content: Player.join-error;
         font-size: 0.65rem;
+        font-weight: Theme.font-weight-semibold;
         color: Theme.destructive;
         wrap: word-wrap;
     }

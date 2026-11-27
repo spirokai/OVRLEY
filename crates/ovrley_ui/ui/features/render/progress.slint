@@ -218,7 +218,8 @@ component QueueRow inherits VerticalLayout {
         content: root.item.error;
         uppercase: false;
         font-size: 0.7rem;
-        color: #b91c1c;
+        font-weight: Theme.font-weight-semibold;
+        color: Theme.destructive;
         wrap: char-wrap;
     }
     if root.item.show-progress: HorizontalLayout {

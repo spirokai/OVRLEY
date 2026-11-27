@@ -100,11 +100,13 @@ component ImportRow inherits TouchArea {
             }
             StatusLine {
                 content: root.entry.format-label;
-                color: root.entry.format-tone == ImportTone.red ? #b91c1c : root.entry.format-tone == ImportTone.amber ? #f59e0b : Theme.muted-foreground.transparentize(0.3);
+                font-weight: root.entry.format-tone == ImportTone.red ? Theme.font-weight-semibold : Theme.font-weight-normal;
+                color: root.entry.format-tone == ImportTone.red ? Theme.destructive : root.entry.format-tone == ImportTone.amber ? #f59e0b : Theme.muted-foreground.transparentize(0.3);
             }
             if root.entry.status != "": StatusLine {
                 content: root.entry.status;
-                color: root.entry.status-red ? #b91c1c : #f59e0b;
+                font-weight: root.entry.status-red ? Theme.font-weight-semibold : Theme.font-weight-normal;
+                color: root.entry.status-red ? Theme.destructive : #f59e0b;
             }
             if root.entry.far != "": StatusLine {
                 content: root.entry.far;
@@ -350,7 +352,8 @@ export component VideoImportDialog {
                                         }
                                         StatusLine {
                                             content: failure.message;
-                                            color: #b91c1c;
+                                            font-weight: Theme.font-weight-semibold;
+                                            color: Theme.destructive;
                                         }
                                     }
                                 }
@@ -378,7 +381,8 @@ export component VideoImportDialog {
                         content: root.loading ? "" : VideoImport.error;
                         uppercase: false;
                         font-size: Theme.text-xs * 1rem;
-                        color: #b91c1c;
+                        font-weight: Theme.font-weight-semibold;
+                        color: Theme.destructive;
                         vertical-alignment: center;
                         wrap: word-wrap;
                     }

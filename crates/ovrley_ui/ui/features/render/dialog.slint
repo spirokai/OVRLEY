@@ -13,13 +13,15 @@ component ReviewAlerts inherits VerticalLayout {
     for blocker in RenderVideo.blockers: AppText {
         content: blocker;
         font-size: Theme.text-xs * 1rem;
-        color: #b91c1c;
+        font-weight: Theme.font-weight-semibold;
+        color: Theme.destructive;
         wrap: word-wrap;
     }
     if RenderVideo.review-error != "": AppText {
         content: RenderVideo.review-error;
         font-size: Theme.text-xs * 1rem;
-        color: #b91c1c;
+        font-weight: Theme.font-weight-semibold;
+        color: Theme.destructive;
         wrap: word-wrap;
     }
 }
@@ -35,14 +37,14 @@ component MismatchScreen inherits VerticalLayout {
             Icon {
                 glyph: Icons.triangle-alert;
                 size: 2.5rem;
-                color: #ef4444;
+                color: Theme.destructive;
             }
             AppText {
                 horizontal-stretch: 1;
                 content: RenderVideo.mismatch;
                 font-size: Theme.text-sm * 1rem;
                 font-weight: Theme.font-weight-bold;
-                color: #ef4444;
+                color: Theme.destructive;
                 wrap: word-wrap;
             }
         }

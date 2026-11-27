@@ -45,9 +45,11 @@ component Stripes inherits Rectangle {
     }
 }
 
-// A video clip's icon, name and duration in a badge at the left edge of its visible part.
+// A video clip's icon, name and duration in a badge at the left edge of its visible part. The
+// duration is dropped when the visible part is too narrow for it beside the icon.
 component ClipBadge {
     in property <ClipView> view;
+    property <bool> shows-duration: root.view.badge-max-width >= 0.5rem + 0.875rem + 0.875rem + 1.5rem + duration-measure.preferred-width;
     x: root.view.badge-x;
     y: 0px;
     width: min(root.view.badge-max-width, pill.preferred-width + 0.5rem);
@@ -89,7 +91,7 @@ component ClipBadge {
                 min-width: 0px;
             }
 
-            AppText {
+            if root.shows-duration: AppText {
                 content: root.view.duration-label;
                 font-size: 0.75rem;
                 font-weight: Theme.font-weight-extrabold;
@@ -99,6 +101,12 @@ component ClipBadge {
                 min-width: self.preferred-width;
             }
         }
+    }
+    duration-measure := AppText {
+        visible: false;
+        content: root.view.duration-label;
+        font-size: 0.75rem;
+        font-weight: Theme.font-weight-extrabold;
     }
 }
 
@@ -372,6 +380,7 @@ export component ClipTooltip {
         visible: root.tooltip.warnings.length > 0;
         content: Player.tooltip-warning-text;
         font-size: 0.65rem;
+        font-weight: Theme.font-weight-semibold;
         color: Theme.destructive;
         wrap: word-wrap;
     }

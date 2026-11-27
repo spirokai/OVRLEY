@@ -49,6 +49,7 @@ component JoinControl inherits VerticalLayout {
     if root.join.error != "": AppText {
         content: root.join.error;
         font-size: 0.65rem;
+        font-weight: Theme.font-weight-semibold;
         color: Theme.destructive;
         wrap: word-wrap;
     }
@@ -217,31 +218,6 @@ export component VideoDrawer inherits ScrollArea {
                     remove-label: Toolbar.selected-video.remove-label;
                     remove => {
                         Toolbar.remove-video(Toolbar.selected-video.id);
-                    }
-                }
-
-                if Toolbar.selected-video.warnings.length > 0: VerticalLayout {
-                    padding-left: 0.5rem;
-                    padding-right: 0.5rem;
-                    spacing: 0.25rem;
-                    for warning in Toolbar.selected-video.warnings: HorizontalLayout {
-                        spacing: 0.375rem;
-                        VerticalLayout {
-                            padding-top: 0.125rem;
-                            alignment: start;
-                            Icon {
-                                glyph: Icons.triangle-alert;
-                                size: 0.75rem;
-                                color: Theme.destructive;
-                            }
-                        }
-                        AppText {
-                            horizontal-stretch: 1;
-                            content: warning;
-                            font-size: Theme.text-xs * 1rem;
-                            color: Theme.destructive;
-                            wrap: word-wrap;
-                        }
                     }
                 }
 
@@ -417,6 +393,32 @@ export component VideoDrawer inherits ScrollArea {
                                     vertical-alignment: center;
                                 }
                             }
+                        }
+                    }
+                }
+
+                if Toolbar.selected-video.warnings.length > 0: VerticalLayout {
+                    padding-left: 0.5rem;
+                    padding-right: 0.5rem;
+                    spacing: 0.25rem;
+                    for warning in Toolbar.selected-video.warnings: HorizontalLayout {
+                        spacing: 0.375rem;
+                        VerticalLayout {
+                            padding-top: 0.125rem;
+                            alignment: start;
+                            Icon {
+                                glyph: Icons.triangle-alert;
+                                size: 0.75rem;
+                                color: Theme.destructive;
+                            }
+                        }
+                        AppText {
+                            horizontal-stretch: 1;
+                            content: warning;
+                            font-size: Theme.text-xs * 1rem;
+                            font-weight: Theme.font-weight-semibold;
+                            color: Theme.destructive;
+                            wrap: word-wrap;
                         }
                     }
                 }
