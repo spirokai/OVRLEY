@@ -105,7 +105,7 @@ struct ShiftArguments {
 #[derive(Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct TimeSourceArguments {
-    /// `detected`, or `filename` (a `YYYYMMDD_HHMMSS` timestamp in the file name, read as local time).
+    /// `detected`, or `filename` (a date-then-time timestamp in the file name, such as `20240601_103000` or `2024-06-01 10.30.00`, read as local time).
     source: CreationTimeSource,
     /// One video; without it, every video.
     video_id: Option<String>,
@@ -344,8 +344,8 @@ pub(crate) fn tools() -> Vec<Tool> {
             "video_time_source_set",
             "Set where recording times come from",
             "Reads a video's recording time (or every video's) as detected, or from a \
-             YYYYMMDD_HHMMSS file name, then places it again. filename fails for a name without a \
-             timestamp. One undo step.",
+             date-then-time timestamp in the file name (e.g. 20240601_103000), then places it \
+             again. filename fails for a name without a timestamp. One undo step.",
             set_time_source,
         ),
         Tool::edit(

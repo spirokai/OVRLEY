@@ -11,7 +11,7 @@ use ovrley_core::encode::ffmpeg::transitions::TransitionProxyRequest;
 use ovrley_core::jobs::batch::BatchServiceError;
 use ovrley_core::jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
 use ovrley_core::jobs::execution::RenderAccepted;
-use ovrley_services::cache::{CacheLimit, CacheUsage, LimitedCache};
+use ovrley_services::cache::{CacheUsage, LimitedCache};
 use ovrley_services::maps::{MapAdapterSupport, MapFrameWake, MapPrepareRequest, MapStyleCatalog};
 use ovrley_services::updater::{DownloadProgress, ReleaseUpdate};
 use ovrley_services::video::{Filmstrip, FilmstripHwaccel, FilmstripRequest};
@@ -509,7 +509,8 @@ impl ServiceParts {
 /// In-memory services that record their calls.
 #[cfg(any(test, feature = "test-util"))]
 pub mod fakes {
-    use super::{FileDialogRequest, DialogReply, Dialogs, MapFrameFactory, UiPost, Clipboard, WindowControl, VideoTools, MapServices, RenderService, AppUpdate, UpdateService, Arc, SendAction, MapStyleCatalog, MapAdapterSupport, MapFrameWake, CacheUsage, MapPrepareRequest, AtomicBool, RenderAccepted, BatchAcceptance, BatchServiceError, BatchRenderRequest, BatchSnapshot, Filmstrip, FilmstripHwaccel, FilmstripRequest, TransitionProxyRequest, DownloadProgress, ServiceParts, PreferencesStore};
+    use super::{FileDialogRequest, DialogReply, Dialogs, MapFrameFactory, UiPost, Clipboard, WindowControl, VideoTools, MapServices, RenderService, AppUpdate, UpdateService, Arc, SendAction, MapStyleCatalog, MapAdapterSupport, MapFrameWake, CacheUsage, LimitedCache, MapPrepareRequest, AtomicBool, RenderAccepted, BatchAcceptance, BatchServiceError, BatchRenderRequest, BatchSnapshot, Filmstrip, FilmstripHwaccel, FilmstripRequest, TransitionProxyRequest, DownloadProgress, ServiceParts, PreferencesStore};
+    use ovrley_services::cache::CacheLimit;
     use std::cell::RefCell;
     use std::rc::Rc;
     use std::sync::Mutex;

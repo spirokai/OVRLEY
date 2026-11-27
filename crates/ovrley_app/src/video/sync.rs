@@ -6,7 +6,10 @@
 //! is unknown: it is compared as it reads, or, read as UTC, converted like a GPS time. Wall clocks
 //! are compared as milliseconds of the naive UTC date `{clock}Z`.
 
+use std::sync::LazyLock;
+
 use chrono::{DateTime, NaiveDateTime, Utc};
+use regex::Regex;
 use ovrley_core::media::edits::TimezoneMode;
 use crate::i18n::{catalog, Locale};
 
@@ -289,33 +292,23 @@ pub fn place_videos_by_creation_time(videos: &[RecordingTime]) -> Vec<Placement>
         .collect()
 }
 
-/// The `YYYYMMDD_HHMMSS` timestamp of a file name, as local
-/// clock text `YYYY-MM-DDTHH:MM:SS`, or `None` without one or for an impossible date.
+/// A date-then-time timestamp in a file name (`20240601103000`, `VID_20240601_103000`,
+/// `Screenshot_2024-06-01-10-30-00`, `Screenshot 2024-06-01 at 10.30.00`, `PXL_20240601_103000123`),
+/// as local clock text `YYYY-MM-DDTHH:MM:SS`, or `None` without one or for an impossible date.
 pub fn parse_video_filename_creation_time(path: &str) -> Option<String> {
+    // YYYY MM DD, optional date/time separator, HH MM SS, optional milliseconds; each part may
+    // be split by a separator, and the whole is not embedded in a longer run of digits.
+    static TIMESTAMP: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(
+            r"(?:^|\D)(\d{4})[-_.]?(\d{2})[-_.]?(\d{2})(?:[-_. T]| at )?(\d{2})[-_.:]?(\d{2})[-_.:]?(\d{2})(?:[.,]?\d{3})?(?:\D|$)",
+        )
+        .expect("valid filename timestamp pattern")
+    });
     let filename = path.rsplit(['/', '\\']).next()?;
-    let bytes = filename.as_bytes();
-    // 8 digits, `_`, 6 digits, not preceded or followed by a digit.
-    (0..bytes.len().saturating_sub(14)).find_map(|start| {
-        let window = &bytes[start..start + 15];
-        let shape = window[..8].iter().all(u8::is_ascii_digit)
-            && window[8] == b'_'
-            && window[9..].iter().all(u8::is_ascii_digit);
-        let bounded = (start == 0 || !bytes[start - 1].is_ascii_digit())
-            && bytes
-                .get(start + 15)
-                .is_none_or(|next| !next.is_ascii_digit());
-        if !(shape && bounded) {
-            return None;
-        }
-        let text = &filename[start..start + 15];
+    TIMESTAMP.captures_iter(filename).find_map(|parts| {
         let timestamp = format!(
             "{}-{}-{}T{}:{}:{}",
-            &text[0..4],
-            &text[4..6],
-            &text[6..8],
-            &text[9..11],
-            &text[11..13],
-            &text[13..15]
+            &parts[1], &parts[2], &parts[3], &parts[4], &parts[5], &parts[6]
         );
         NaiveDateTime::parse_from_str(&timestamp, "%Y-%m-%dT%H:%M:%S")
             .ok()
@@ -501,6 +494,19 @@ mod tests {
             parse_video_filename_creation_time("C:\\v\\20240601_103000.mov").as_deref(),
             Some("2024-06-01T10:30:00")
         );
+        for name in [
+            "DJI_20240601103000_0001_D_O001.MP4",
+            "Screenshot_2024-06-01-10-30-00.png",
+            "Screenshot from 2024-06-01 10-30-00.png",
+            "Screenshot 2024-06-01 at 10.30.00.png",
+            "PXL_20240601_103000123.mp4",
+        ] {
+            assert_eq!(
+                parse_video_filename_creation_time(name).as_deref(),
+                Some("2024-06-01T10:30:00"),
+                "{name}"
+            );
+        }
         assert_eq!(
             parse_video_filename_creation_time("/v/20240230_103000.mp4"),
             None,

@@ -31,7 +31,7 @@ pub struct CollectionDraft<'a> {
 pub enum CreationTimeSource {
     /// The time the probe detected.
     Detected,
-    /// The `YYYYMMDD_HHMMSS` timestamp of its file name, read as local time.
+    /// The date-and-time timestamp in its file name, read as local time.
     Filename,
 }
 
@@ -477,7 +477,7 @@ impl CollectionDraft<'_> {
         let video = find_video(self.videos, video_id)?;
         match source {
             CreationTimeSource::Filename => {
-                let creation_time = parse_video_filename_creation_time(&video.path).ok_or("The video filename contains no valid YYYYMMDD_HHMMSS timestamp")?;
+                let creation_time = parse_video_filename_creation_time(&video.path).ok_or("The video filename contains no valid date and time (year-month-day, then hour-minute-second)")?;
                 self.apply_filename_creation_time(video_id, creation_time);
             }
             CreationTimeSource::Detected => self.reset_creation_time(video_id),
@@ -491,7 +491,7 @@ impl CollectionDraft<'_> {
     pub fn apply_filename_creation_times(&mut self) -> Result<(), String> {
         let times: Vec<(String, Option<String>)> = self.videos.iter().map(|video| (video.id.clone(), parse_video_filename_creation_time(&video.path))).collect();
         if times.iter().all(|(_, time)| time.is_none()) {
-            return Err("No video filename contains a valid YYYYMMDD_HHMMSS timestamp".into());
+            return Err("No video filename contains a valid date and time (year-month-day, then hour-minute-second)".into());
         }
         for (video_id, time) in times {
             if let Some(time) = time {
@@ -763,7 +763,7 @@ mod tests {
         assert_eq!((owned.videos[0].creation_time.as_deref(), owned.videos[0].time_source.as_deref()), (Some(CAMERA_CLOCK.0), Some("ffprobe")));
         expect_offsets(&owned, &[("named", 1857.0), ("other", 1857.0)]);
         let error = owned.draft().set_video_creation_time_source("other", CreationTimeSource::Filename).unwrap_err();
-        assert!(error.contains("no valid YYYYMMDD_HHMMSS timestamp"));
+        assert!(error.contains("no valid date and time"));
     }
 
     #[test]

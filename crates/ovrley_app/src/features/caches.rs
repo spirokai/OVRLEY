@@ -237,6 +237,7 @@ mod tests {
         settle(&dispatcher, &fakes);
         assert!(fakes
             .maps
+            .tile_cache
             .calls
             .lock()
             .unwrap()
