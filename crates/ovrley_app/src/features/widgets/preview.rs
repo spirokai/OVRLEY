@@ -6,7 +6,9 @@
 //! - **Frames:** the reconcile step marks the host dirty when one of its inputs changed;
 //!   `ovrley_ui` then dispatches one [`preview_frame`] for the next event-loop turn, which syncs
 //!   (create, update, destroy), renders at the playhead and records what each widget presents. A
-//!   burst of actions is one frame.
+//!   burst of actions is one frame. When only the playhead moved, the frame keeps every widget's
+//!   request and only renders. Playback, pointer moves and map frames run their frame inside their
+//!   own action ([`present_pending_frame`]).
 //! - **Resources** load on workers and come back as actions. A widget is created only once its
 //!   fonts are ready; a time-dependent widget waits for the activity; a raster waits for its image;
 //!   a resource error is the canvas error. A document change destroys every widget, because ids
@@ -329,6 +331,16 @@ struct Instance {
     revision: Option<u32>,
 }
 
+/// What the next frame does.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Pending {
+    /// Only the playhead moved, or a map's frame arrived: the widgets keep their requests and draw
+    /// at the playhead.
+    Render,
+    /// An input of the widgets' requests changed, or a resource arrived: sync, then draw.
+    Sync,
+}
+
 /// The inputs a frame depends on, compared to mark the host dirty.
 #[derive(Clone, Debug, PartialEq)]
 struct FrameInputs {
@@ -343,6 +355,13 @@ struct FrameInputs {
     document_revision: u64,
     fallback_duration: f64,
     window: PreviewWindow,
+}
+
+impl FrameInputs {
+    /// Whether `next` differs from these inputs only in the playhead's second.
+    fn only_second_differs(&self, next: &Self) -> bool {
+        Self { second: self.second, ..next.clone() } == *self
+    }
 }
 
 /// The preview session's state.
@@ -363,7 +382,7 @@ pub struct PreviewHost {
     pub error: Option<String>,
     /// Whether activity covers the playhead; without it only rasters show.
     pub activity_coverage: bool,
-    dirty: bool,
+    pending: Option<Pending>,
     seen: Option<FrameInputs>,
 }
 
@@ -383,7 +402,7 @@ impl Default for PreviewHost {
             presented: BTreeMap::new(),
             error: None,
             activity_coverage: true,
-            dirty: true,
+            pending: Some(Pending::Sync),
             seen: None,
         }
     }
@@ -395,7 +414,7 @@ impl std::fmt::Debug for PreviewHost {
             .debug_struct("PreviewHost")
             .field("widgets", &self.instances.len())
             .field("error", &self.error)
-            .field("dirty", &self.dirty)
+            .field("pending", &self.pending)
             .finish()
     }
 }
@@ -403,12 +422,18 @@ impl std::fmt::Debug for PreviewHost {
 impl PreviewHost {
     /// Whether a frame should run.
     pub fn is_dirty(&self) -> bool {
-        self.dirty
+        self.pending.is_some()
     }
 
-    /// Asks for a frame although no input changed: a map's frame arrived from the map thread.
-    pub fn mark_dirty(&mut self) {
-        self.dirty = true;
+    /// Asks for a frame that draws at the playhead although no input changed: a map's frame
+    /// arrived from the map thread.
+    pub fn request_render(&mut self) {
+        self.pending = self.pending.max(Some(Pending::Render));
+    }
+
+    /// Asks for a frame that syncs every widget: a resource it waited for arrived.
+    fn request_sync(&mut self) {
+        self.pending = Some(Pending::Sync);
     }
 
     /// What each widget presents, by id.
@@ -416,7 +441,7 @@ impl PreviewHost {
         &self.presented
     }
 
-    /// A presented widget's straight-alpha RGBA pixels.
+    /// A presented widget's premultiplied RGBA pixels.
     pub fn pixels(&self, handle: u32) -> &[u8] {
         self.session.widgets[&handle].pixels()
     }
@@ -463,7 +488,8 @@ impl PreviewHost {
     }
 }
 
-/// Reconcile step: marks the host dirty when an input of the frame changed.
+/// Reconcile step: marks the host dirty when an input of the frame changed; when only the
+/// playhead moved, the frame only draws.
 pub fn reconcile_widget_preview(store: &mut Store) {
     // Sync Doctor hides the canvas, so its preview pauses.
     if crate::features::player::video_sync_mode(store) {
@@ -484,10 +510,13 @@ pub fn reconcile_widget_preview(store: &mut Store) {
         window: store_preview_window(store, &activity),
     };
     store.preview.activity_coverage = activity.coverage;
-    if store.preview.seen.as_ref() != Some(&inputs) {
-        store.preview.seen = Some(inputs);
-        store.preview.dirty = true;
-    }
+    let pending = match &store.preview.seen {
+        Some(seen) if *seen == inputs => return,
+        Some(seen) if seen.only_second_differs(&inputs) => Pending::Render,
+        _ => Pending::Sync,
+    };
+    store.preview.seen = Some(inputs);
+    store.preview.pending = store.preview.pending.max(Some(pending));
 }
 
 fn load_font(store: &mut Store, services: &mut Services, key: FontKey) {
@@ -527,7 +556,7 @@ fn load_font(store: &mut Store, services: &mut Services, key: FontKey) {
                 Err(error) => Resource::Failed(error),
             };
             store.preview.fonts.insert(key, state);
-            store.preview.dirty = true;
+            store.preview.request_sync();
         })
     });
 }
@@ -598,29 +627,31 @@ fn load_split_tables(store: &mut Store, services: &mut Services, widgets: &[Prev
                     }
                     Err(error) => store.preview.error = Some(error),
                 }
-                store.preview.dirty = true;
+                store.preview.request_sync();
             })
         });
     }
 }
 
-/// One preview frame: sync, render at the playhead and record what each widget presents. Errors
-/// become the canvas error.
+/// One preview frame: sync, render at the playhead and record what each widget presents. When only
+/// the playhead moved the widgets keep their requests and only render. A frame after a failure
+/// syncs, so that it retries what failed. Errors become the canvas error.
 pub fn preview_frame(store: &mut Store, services: &mut Services) {
-    store.preview.dirty = false;
+    let pending = store.preview.pending.take();
     if crate::features::player::video_sync_mode(store) {
         return;
     }
-    let theme = store
-        .theme
-        .clone()
-        .expect("ovrley_ui reads the theme before the first dispatch");
-    let widgets = preview_widgets(store, &theme);
-    if let Err(error) = sync(store, services, &widgets) {
-        store.preview.error = Some(error);
-        return;
-    }
-    store.preview.error = None;
+    let result = if pending == Some(Pending::Render) && store.preview.error.is_none() {
+        render(&mut store.preview)
+    } else {
+        let theme = store
+            .theme
+            .clone()
+            .expect("ovrley_ui reads the theme before the first dispatch");
+        let widgets = preview_widgets(store, &theme);
+        sync(store, services, &widgets)
+    };
+    store.preview.error = result.err();
 }
 
 /// Runs the frame an action just made pending inside that action, for an answer that reads what
@@ -821,13 +852,30 @@ fn sync(
             .render(store.editor.selected_second - preview_activity.origin_second())
             .map_err(|error| error.to_string())?;
     }
+    record_presented(&mut store.preview);
+    Ok(())
+}
 
+/// A frame where only the playhead moved (or a map's frame arrived): every widget keeps its
+/// request and draws at the playhead. The last sync succeeded, so the session holds the current
+/// activity.
+fn render(host: &mut PreviewHost) -> Result<(), String> {
+    let second = host.seen.as_ref().expect("a render follows the reconcile step that saw its inputs").second;
+    if host.instances.values().any(|instance| time_dependent(&instance.kind)) {
+        host.session.render(second).map_err(|error| error.to_string())?;
+    }
+    record_presented(host);
+    Ok(())
+}
+
+/// Records what each widget presents after its request or render changed it.
+fn record_presented(host: &mut PreviewHost) {
     let PreviewHost {
         session,
         instances,
         presented,
         ..
-    } = &mut store.preview;
+    } = host;
     for (id, instance) in instances.iter_mut() {
         let widget = &session.widgets[&instance.handle];
         let revision = widget.revision();
@@ -853,7 +901,6 @@ fn sync(
             }
         }
     }
-    Ok(())
 }
 
 /// Backdrops, maps, rasters, then profiles, then everything else.
@@ -1111,6 +1158,29 @@ mod tests {
             dispatcher.with_store(|store| store.preview.is_dirty()),
             "the playhead is"
         );
+    }
+
+    #[test]
+    fn a_playhead_move_only_renders_and_an_edit_syncs() {
+        let (dispatcher, fakes) = dispatcher();
+        with_document(
+            &dispatcher,
+            json!({"scene": {"width": 1920, "height": 1080}, "labels": [{"id": "t", "text": "A", "x": 0, "y": 0, "font_size": 40, "font": "Inter.ttf", "font_weight": 400, "italic": false, "letter_spacing": 0}]}),
+        );
+        settle(&dispatcher, &fakes);
+        let pending = || dispatcher.with_store(|store| store.preview.pending);
+        dispatcher.dispatch(|store, _| store.editor.set_selected_second(3.0));
+        assert_eq!(pending(), Some(Pending::Render), "only the playhead moved");
+        dispatcher.dispatch(|store, _| {
+            store.editor.edit_config(|config| config.labels[0].insert("text".into(), json!("B")));
+        });
+        assert_eq!(pending(), Some(Pending::Sync), "an edit outranks the pending render");
+        let request = || dispatcher.with_store(|store| store.preview.instances["t"].request["widget"]["text"].clone());
+        dispatcher.dispatch(preview_frame);
+        assert_eq!(request(), json!("B"));
+        dispatcher.dispatch(|store, _| store.editor.set_selected_second(4.0));
+        dispatcher.dispatch(preview_frame);
+        assert_eq!((pending(), request()), (None, json!("B")), "a render keeps the request");
     }
 
     #[test]

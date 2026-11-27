@@ -2,8 +2,8 @@
 //! trims and joins, and the timers that drive playback, edge auto-scroll and filmstrip requests.
 //!
 //! While the timeline clock plays, a repeating 8 ms timer checks whether the next preview frame is
-//! due and dispatches only then, so the projections run at the preview's frame rate, not at the
-//! timer's. Nothing runs while paused.
+//! due and dispatches only then, with the preview frame inside that action, so the update loop
+//! runs once per preview frame, not at the timer's rate. Nothing runs while paused.
 
 use crate::features::transitions::{transition_index, transition_options};
 use crate::platform::keys::{key_name, Modifiers};
@@ -18,6 +18,7 @@ use ovrley_app::features::player::playback::{self, player_timing};
 use ovrley_app::features::player::viewport::{self, compute_tick_strip, fit_targets, matching_fit_target, tick_placement, zoom_limits, FitTargetId, TickPlacement};
 use ovrley_app::features::player::{self as player_feature, edits};
 use ovrley_app::features::transitions;
+use ovrley_app::features::widgets::preview::present_pending_frame;
 use ovrley_app::activity::TrimEdge;
 use ovrley_app::format::format_clock_duration;
 use ovrley_app::video::segments::TrimSide;
@@ -89,8 +90,11 @@ impl Projection {
             let now = Instant::now();
             let due = dispatch.with_store(playback::next_frame_at).flatten();
             if due.is_some_and(|due| due <= now) {
-                dispatch.dispatch(move |store, _| {
+                // The frame's widgets present in this action, so they reach the same rendered
+                // frame as the playhead, in one dispatch instead of two.
+                dispatch.dispatch(move |store, services| {
                     playback::playback_tick(store, now);
+                    present_pending_frame(store, services);
                 });
             }
         });

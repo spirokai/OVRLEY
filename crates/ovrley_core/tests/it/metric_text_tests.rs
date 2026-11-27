@@ -9,7 +9,7 @@ use ovrley_widgets::activity::ActivitySampler;
 use ovrley_widgets::model::scene::validate_scene_presentation;
 use ovrley_widgets::model::catalog::{catalog, DisplayType};
 use ovrley_widgets::preview::PreviewSession;
-use ovrley_widgets::render::tile::read_surface_rgba;
+use ovrley_widgets::render::tile::read_premultiplied_rgba;
 use ovrley_widgets::render::text::validated_value_style;
 use ovrley_widgets::widgets::value::format::format_metric_parts;
 use ovrley_widgets::widgets::value::layout::{draw_metric_parts, draw_static_metric_parts_for_value};
@@ -146,7 +146,7 @@ fn every_text_metric_unit_matches_native_sampling_formatting_and_pixels() {
                     .unwrap();
                     let mut pixels = vec![0; widget.pixels().len()];
                     // Compare drawing through the canonical transport; conversion has separate tests.
-                    read_surface_rgba(&mut surface, &mut pixels).unwrap();
+                    read_premultiplied_rgba(&mut surface, &mut pixels).unwrap();
                     assert_eq!(
                         &pixels, widget.pixels(),
                         "pixels: {metric}/{unit:?}/{alignment} at {second}"

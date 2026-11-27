@@ -6,14 +6,15 @@
 //! when the frame changes. At the end of the timeline it pauses. Scrubs are dispatched as they come;
 //! the preview frame coalesces them.
 //!
-//! Inside the pieces MDK's frames are the clock: `ovrley_ui` dispatches each as
-//! [`video_clock_frame`] and the end of each shot as [`video_clock_cut`]. The timeline clock plays
-//! the rest.
+//! Inside the pieces MDK's frames are the clock: `ovrley_ui` passes each to
+//! [`video_frame_presented`], which dispatches those that move the playhead, and dispatches the end
+//! of each shot as [`video_clock_cut`]. The timeline clock plays the rest.
 
 use std::time::{Duration, Instant};
 use crate::features::shell::EditorBackgroundMode;
+use crate::features::widgets::preview::present_pending_frame;
 use crate::fps::container_fps;
-use crate::store::Store;
+use crate::store::{DispatchHandle, Store};
 use crate::store::editor::PreviewPlaybackState;
 use crate::video::{SecondsRange, TelemetryStatus};
 use crate::video::program::{resolve_playback_start, resolve_preview_target, PlaybackSource, PlaybackStart, Program};
@@ -243,25 +244,46 @@ fn video_clock_active(store: &Store) -> bool {
     store.editor.preview_playback_state == PreviewPlaybackState::Playing && store.editor.preview_playback_source == PlaybackSource::Video
 }
 
+/// The preview frame and playhead second that MDK's frame of `piece_id` at `source_second` moves
+/// to; `None` when it moves nothing: the video clock is not playing, the frame lies outside the
+/// piece, or it falls inside the preview frame already published.
+fn video_clock_step(store: &Store, piece_id: &str, source_second: f64) -> Option<(i64, f64)> {
+    if !video_clock_active(store) {
+        return None;
+    }
+    let committed = &store.player.timeline.timeline().committed;
+    let piece = committed.program.pieces.iter().find(|piece| piece.id == piece_id)?;
+    // A frame at or past half a frame before the end lies outside the piece.
+    if source_second >= piece.source_end_second - piece.fps.frames_to_seconds(1) / 2.0 {
+        return None;
+    }
+    let second = piece.timeline_start_second + (source_second - piece.source_start_second).max(0.0);
+    let frame = (second * player_timing(store).effective_fps).floor() as i64;
+    (store.player.playback.frame_index != Some(frame)).then_some((frame, second))
+}
+
 /// MDK presented `piece_id`'s frame at
 /// `source_second`. The playhead follows it once per preview frame, so that the widgets update at
 /// their own rate and not at the video's.
 pub fn video_clock_frame(store: &mut Store, piece_id: &str, source_second: f64) {
-    if !video_clock_active(store) {
-        return;
-    }
-    let committed = &store.player.timeline.timeline().committed;
-    let Some(piece) = committed.program.pieces.iter().find(|piece| piece.id == piece_id) else { return };
-    // A frame at or past half a frame before the end lies outside the piece.
-    if source_second >= piece.source_end_second - piece.fps.frames_to_seconds(1) / 2.0 {
-        return;
-    }
-    let second = piece.timeline_start_second + (source_second - piece.source_start_second).max(0.0);
-    let frame = (second * player_timing(store).effective_fps).floor() as i64;
-    if store.player.playback.frame_index != Some(frame) {
+    if let Some((frame, second)) = video_clock_step(store, piece_id, source_second) {
         store.player.playback.frame_index = Some(frame);
         store.editor.set_selected_second(second);
     }
+}
+
+/// MDK presented `piece_id`'s frame at `source_second`. Only a frame that moves the playhead is
+/// dispatched, as [`video_clock_frame`] with the preview frame it makes due, so a 60 fps video
+/// over a 30 fps preview runs the update loop 30 times a second. While another action runs the
+/// store cannot be read, and the frame is dispatched to be decided in turn.
+pub fn video_frame_presented(dispatch: &DispatchHandle, piece_id: String, source_second: f64) {
+    if dispatch.with_store(|store| video_clock_step(store, &piece_id, source_second).is_none()) == Some(true) {
+        return;
+    }
+    dispatch.dispatch(move |store, services| {
+        video_clock_frame(store, &piece_id, source_second);
+        present_pending_frame(store, services);
+    });
 }
 
 /// The playing shot ends at `source_second` of its piece. At the piece's end playback continues

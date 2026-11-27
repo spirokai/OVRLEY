@@ -35,7 +35,7 @@ pnpm benchmark:widgets:summary 1792161096230-42800
 
 The script reads available renderer JSON files from `debug/benchmarks/widgets/<run-id>/` and writes `summary.md` there. It ignores `results.json`, which may describe only one backend when runs were performed independently. Either renderer can be reported alone. Missing renderers and operations with no calls display `—`.
 
-The preview renders into widget-sized premultiplied surfaces, with the editor's sampling, fonts, unchanged-value skips, RGBA readback, alpha conversion and geometry. Export draws directly into a straight-alpha 4K frame and includes full-scene restoration only in its total. The scopes differ and must not be read as a preview/export ratio.
+The preview renders into widget-sized premultiplied surfaces, with the editor's sampling, fonts, unchanged-value skips, premultiplied RGBA readback and geometry. Export draws directly into a straight-alpha 4K frame and includes full-scene restoration only in its total. The scopes differ and must not be read as a preview/export ratio.
 
 Export's stages use the existing profiler, including full-frame restoration, surface wrapping, widget drawing, and `frame.draw`. The empty case exposes common host cost. `frame.draw` includes its child widget buckets; do not add them together. Export does not expose redraw counts.
 

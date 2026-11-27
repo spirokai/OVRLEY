@@ -109,6 +109,14 @@ pub fn rgba_image(pixels: &[u8], width: u32, height: u32) -> Image {
     ))
 }
 
+/// Premultiplied RGBA pixels (widget tiles, map frames) as an image, which Skia composites as
+/// they are.
+pub fn premultiplied_image(pixels: &[u8], width: u32, height: u32) -> Image {
+    Image::from_rgba8_premultiplied(SharedPixelBuffer::<Rgba8Pixel>::clone_from_slice(
+        pixels, width, height,
+    ))
+}
+
 /// A normalized `#rrggbb` string as a colour.
 ///
 /// # Panics

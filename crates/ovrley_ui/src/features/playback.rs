@@ -352,9 +352,7 @@ fn with_video_playback(run: impl FnOnce(&mut VideoPlayback) -> Option<Effect>) {
     let Some((dispatch, effect)) = asked else { return };
     let now = Instant::now();
     match effect {
-        Effect::Frame { piece, second } => {
-            dispatch.dispatch(move |store, _| playback::video_clock_frame(store, &piece, second))
-        }
+        Effect::Frame { piece, second } => playback::video_frame_presented(&dispatch, piece, second),
         Effect::Cut { piece, second } => {
             dispatch.dispatch(move |store, _| playback::video_clock_cut(store, &piece, second, now))
         }

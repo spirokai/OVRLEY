@@ -141,6 +141,19 @@ struct Shared {
     queue: RefCell<VecDeque<Action>>,
     running: Cell<bool>,
     ui_hook: RefCell<Option<UiHook>>,
+    #[cfg(feature = "test-util")]
+    stats: Cell<DispatchStats>,
+}
+
+/// What the update loop did, for the headless benchmarks: the dispatches and the time their
+/// actions, reconcile steps and history step took, and the projections and theirs.
+#[cfg(feature = "test-util")]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct DispatchStats {
+    pub dispatches: u64,
+    pub update: std::time::Duration,
+    pub projections: u64,
+    pub projection: std::time::Duration,
 }
 
 /// Owns the store and the services, and runs actions one at a time.
@@ -194,7 +207,15 @@ impl Dispatcher {
             queue: RefCell::new(VecDeque::new()),
             running: Cell::new(false),
             ui_hook: RefCell::new(None),
+            #[cfg(feature = "test-util")]
+            stats: Cell::default(),
         }))
+    }
+
+    /// The update loop's counts and times since the last call, which resets them.
+    #[cfg(feature = "test-util")]
+    pub fn take_stats(&self) -> DispatchStats {
+        self.0.stats.take()
     }
 
     pub fn handle(&self) -> DispatchHandle {
@@ -254,6 +275,8 @@ impl Dispatcher {
             let Some(action) = self.0.queue.borrow_mut().pop_front() else {
                 break;
             };
+            #[cfg(feature = "test-util")]
+            let started = std::time::Instant::now();
             {
                 let mut state = self.0.state.borrow_mut();
                 let State { store, services } = &mut *state;
@@ -263,6 +286,11 @@ impl Dispatcher {
                 // The history step: after the reconcile steps, before the projections.
                 crate::features::history::record(store, before);
             }
+            #[cfg(feature = "test-util")]
+            self.count(|stats| {
+                stats.dispatches += 1;
+                stats.update += started.elapsed();
+            });
             self.project();
         }
     }
@@ -270,8 +298,22 @@ impl Dispatcher {
     fn project(&self) {
         let hook = self.0.ui_hook.borrow().clone();
         if let Some(hook) = hook {
+            #[cfg(feature = "test-util")]
+            let started = std::time::Instant::now();
             hook(&self.0.state.borrow().store);
+            #[cfg(feature = "test-util")]
+            self.count(|stats| {
+                stats.projections += 1;
+                stats.projection += started.elapsed();
+            });
         }
+    }
+
+    #[cfg(feature = "test-util")]
+    fn count(&self, update: impl FnOnce(&mut DispatchStats)) {
+        let mut stats = self.0.stats.get();
+        update(&mut stats);
+        self.0.stats.set(stats);
     }
 
     /// Writes pending preferences out, before the app exits.

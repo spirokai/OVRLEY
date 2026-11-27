@@ -128,8 +128,8 @@ pub fn initialize(store: &mut Store, services: &mut Services) {
     });
 }
 
-/// The preview's map frames, starting the map thread the first time. Its wake-ups mark the preview
-/// dirty, so the next preview frame collects what arrived.
+/// The preview's map frames, starting the map thread the first time. Each wake-up is a preview
+/// frame that draws at the playhead, in the same action, and so collects what arrived.
 pub fn frame_factory(
     store: &mut Store,
     services: &mut Services,
@@ -139,7 +139,10 @@ pub fn frame_factory(
     }
     let post = services.ui_post.clone();
     let frames = services.maps.frames(Arc::new(move || {
-        post.post(Box::new(|store, _| store.preview.mark_dirty()));
+        post.post(Box::new(|store, services| {
+            store.preview.request_render();
+            crate::features::widgets::preview::present_pending_frame(store, services);
+        }));
     }))?;
     store.maps.frames = Some(frames.clone());
     Ok(frames)

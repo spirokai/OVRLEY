@@ -366,7 +366,7 @@ fn scuba_widgets_render_in_the_preview_cache_and_export_frame_with_matching_pixe
                     for channel in 0..3 {
                         difference = difference.max(
                             (a[channel] as u16 * a[3] as u16)
-                                .abs_diff(b[channel] as u16 * b[3] as u16)
+                                .abs_diff(b[channel] as u16 * 255)
                                 / 255,
                         );
                     }

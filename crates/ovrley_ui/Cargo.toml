@@ -108,6 +108,11 @@ regex = "1"
 rspolib = "0.1.2"
 serde_json = "1.0"
 
+# The playback benchmark (benchmarks/playback): the composed window on Slint's testing backend.
+[[example]]
+name = "benchmark_playback"
+path = "../../benchmarks/playback/native.rs"
+
 [[test]]
 name = "blur_input"
 required-features = ["dev-windows"]

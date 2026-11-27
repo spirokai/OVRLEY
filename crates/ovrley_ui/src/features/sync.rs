@@ -3,7 +3,7 @@
 //! Sync tabs.
 
 use crate::features::import::{sync_view, timezone_mode};
-use crate::projection::{convert_enum, dispatch_logged, models_equal, replace_if_changed, rgba_image, set_if_changed};
+use crate::projection::{convert_enum, dispatch_logged, models_equal, premultiplied_image, replace_if_changed, set_if_changed};
 use crate::{
     AppWindow, CandidateCardView, CandidateListView, Choice, ChoiceKind, EventBandView, LandmarkKind, LandmarkRowView, MatchScope, PointerPhase, TimelineLandmarkView,
     VideoSync, VideoSyncTab,
@@ -21,7 +21,7 @@ use ovrley_app::store::videos as videos;
 use ovrley_app::store::{Dispatcher, Store};
 use ovrley_core::media::sync::LandmarkKind as AppLandmarkKind;
 use ovrley_widgets::widgets::map::preview::MapFramePixels;
-use slint::{ComponentHandle, Image, ModelRc, SharedPixelBuffer, SharedString, VecModel};
+use slint::{ComponentHandle, Image, ModelRc, SharedString, VecModel};
 use std::cell::{Cell, RefCell};
 use std::time::Instant;
 
@@ -73,7 +73,7 @@ fn map_image(frame: &MapFramePixels) -> Image {
     let source = frame.image();
     let width = u32::try_from(source.width()).expect("a map frame's width fits a u32");
     let height = u32::try_from(source.height()).expect("a map frame's height fits a u32");
-    Image::from_rgba8_premultiplied(SharedPixelBuffer::clone_from_slice(frame.pixels(), width, height))
+    premultiplied_image(frame.pixels(), width, height)
 }
 
 /// The graph's inputs: the detection's address, the view, the width, the height and the language.
@@ -116,7 +116,7 @@ impl Projection {
             return;
         };
         let geometry = &frame.geometry;
-        if let Some(image) = self.speed_image.fresh(frame.revision.into(), || rgba_image(frame.pixels, geometry.width, geometry.height)) {
+        if let Some(image) = self.speed_image.fresh(frame.revision.into(), || premultiplied_image(frame.pixels, geometry.width, geometry.height)) {
             global.set_speed_image(image);
         }
         // The scene scale already lays the widget out at its screen size.

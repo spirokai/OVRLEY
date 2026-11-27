@@ -388,9 +388,13 @@ fn preview_backdrops_match_export_opacity_and_ignore_playhead_and_activity() {
         let height = geometry["height"].as_u64().unwrap() as usize;
         let left = geometry["left"].as_f64().unwrap() as usize;
         let top = geometry["top"].as_f64().unwrap() as usize;
-        // Tiles unpremultiply with integer rounding; export frames are drawn straight.
+        // Tiles stay premultiplied; export frames are drawn straight.
         let (tile, frame) = (rgba_at(&pixels, width, width / 2, height / 2), rgba_at(&native, 96, left + width / 2, top + height / 2));
-        assert!(tile.iter().zip(frame).all(|(a, b)| a.abs_diff(b) <= 1), "tile {tile:?}, export {frame:?}");
+        let premultiplied = |channel: usize| (u16::from(frame[channel]) * u16::from(frame[3]) + 127) / 255;
+        assert!(
+            tile[3].abs_diff(frame[3]) <= 1 && (0..3).all(|channel| u16::from(tile[channel]).abs_diff(premultiplied(channel)) <= 1),
+            "tile {tile:?}, export {frame:?}"
+        );
         assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] > 0));
         preview.replace_activity(br#"{"sample_elapsed_seconds":[0,1],"speed":[0,20],"trim_end_seconds":1}"#).unwrap();
         for second in [0.0, 1.0, 0.25, 100.0] {

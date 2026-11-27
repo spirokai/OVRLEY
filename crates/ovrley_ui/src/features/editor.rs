@@ -3,7 +3,7 @@
 //! and toolbar callbacks.
 
 use crate::platform::keys::Modifiers;
-use crate::projection::{convert_enum, hex_color, replace_if_changed, rgba_image, set_if_changed};
+use crate::projection::{convert_enum, hex_color, premultiplied_image, replace_if_changed, set_if_changed};
 use crate::{
     AppWindow, BackgroundMode, BadgeView, EditorCursor, GuideLabelView, HandleView, OverlayEditor,
     WidgetView,
@@ -221,7 +221,7 @@ impl Projection {
                     cached.image.clone()
                 }
                 _ => {
-                    let image = rgba_image(
+                    let image = premultiplied_image(
                         store.preview.pixels(widget.handle),
                         geometry.width,
                         geometry.height,

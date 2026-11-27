@@ -5,7 +5,7 @@ use crate::common;
 use ovrley_core::fonts::{preview_font_resource, NativeFonts};
 use ovrley_widgets::model::scene::validate_scene_presentation;
 use ovrley_widgets::preview::PreviewSession;
-use ovrley_widgets::render::tile::{read_surface_rgba, PreviewRasterScale};
+use ovrley_widgets::render::tile::{read_premultiplied_rgba, PreviewRasterScale};
 use ovrley_widgets::render::text::validated_value_style;
 use ovrley_widgets::widgets::value::validate_value_widget;
 use ovrley_widgets::widgets::value::format::{format_metric_parts, MetricSample};
@@ -79,7 +79,7 @@ fn diving_profile_preview_matches_export_during_playback_and_seeking() {
             let native = &native[((top + y) * 700 + left) * 4..((top + y) * 700 + left + w) * 4];
             for (a, b) in native.as_chunks::<4>().0.iter().zip(widget.pixels()[y * w * 4..(y + 1) * w * 4].as_chunks::<4>().0.iter()) {
                 difference = difference.max(a[3].abs_diff(b[3]) as u16);
-                for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255); }
+                for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * 255) / 255); }
             }
         }
         assert!(difference <= 8, "diving profile preview/export pixel difference: {difference}");
@@ -383,7 +383,7 @@ fn every_family_reports_layout_only_bounds_that_contain_its_drawing() {
                 let drawn = widget.draw(surface.canvas(), Some(&sampler), *second, &preview.fonts).unwrap();
                 assert_eq!(drawn, bounds, "{kind} at {second}s: drawn rectangle");
                 let mut pixels = vec![0; width as usize * height as usize * 4];
-                read_surface_rgba(&mut surface, &mut pixels).unwrap();
+                read_premultiplied_rgba(&mut surface, &mut pixels).unwrap();
                 let (right, bottom) = (bounds.left + bounds.width, bounds.top + bounds.height);
                 for (index, pixel) in pixels.as_chunks::<4>().0.iter().enumerate() {
                     if pixel[3] == 0 {
@@ -812,7 +812,7 @@ fn elevation_preview_matches_export_labels_hover_seeking_and_activity_replacemen
                 for (x, (a, b)) in native.as_chunks::<4>().0.iter().zip(pixels.as_chunks::<4>().0.iter()).enumerate() {
                     let previous = difference;
                     difference = difference.max(a[3].abs_diff(b[3]) as u16);
-                    for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255); }
+                    for c in 0..3 { difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * 255) / 255); }
                     if difference > previous { largest = (x + left, y + top, *a, *b); }
                 }
             }
@@ -1082,10 +1082,11 @@ fn route_preview_matches_export_and_keeps_marker_out_of_selection_bounds() {
                 let preview_row = &widget.pixels()[y * width * 4..(y + 1) * width * 4];
                 for (a, b) in native_row.as_chunks::<4>().0.iter().zip(preview_row.as_chunks::<4>().0.iter()) {
                     max_difference = max_difference.max(a[3].abs_diff(b[3]) as u16);
-                    // Native video draws into straight alpha; compare visible premultiplied color.
+                    // Native video draws into straight alpha and the preview keeps premultiplied
+                    // pixels; compare visible premultiplied color.
                     for channel in 0..3 {
                         let native = a[channel] as u16 * a[3] as u16;
-                        let preview = b[channel] as u16 * b[3] as u16;
+                        let preview = b[channel] as u16 * 255;
                         max_difference = max_difference.max(native.abs_diff(preview) / 255);
                     }
                 }
@@ -1208,11 +1209,11 @@ fn route_gestures_reuse_geometry_until_resize_commit_and_keep_every_opposite_cor
     }
 }
 
-/// Preview tiles are drawn premultiplied and unpremultiplied with integer rounding, export frames
-/// are drawn straight; soft shadow and anti-aliased edges round apart by a few levels.
+/// Preview tiles stay premultiplied, export frames are drawn straight; soft shadow and
+/// anti-aliased edges round apart by a few levels.
 const EXPORT_TILE_TOLERANCE: u16 = 12;
 
-/// Largest premultiplied channel difference between a straight-alpha preview tile and the same
+/// Largest premultiplied channel difference between a premultiplied preview tile and the same
 /// scene rectangle of a straight-alpha export frame `frame_width` pixels wide.
 fn export_tile_difference(frame: &[u8], frame_width: usize, geometry: &Value, tile: &[u8]) -> u16 {
     let width = geometry["width"].as_u64().unwrap() as usize;
@@ -1229,7 +1230,7 @@ fn export_tile_difference(frame: &[u8], frame_width: usize, geometry: &Value, ti
         };
         difference = difference.max(a[3].abs_diff(b[3]) as u16);
         for c in 0..3 {
-            difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * b[3] as u16) / 255);
+            difference = difference.max((a[c] as u16 * a[3] as u16).abs_diff(b[c] as u16 * 255) / 255);
         }
     }
     difference
@@ -2510,7 +2511,7 @@ fn gradient_preview_matches_native_samples_pixels_and_invalidates_continuous_tri
         .draw(canvas, &fonts)
         .unwrap();
         let mut pixels = vec![0; widget.pixels().len()];
-        read_surface_rgba(&mut surface, &mut pixels).unwrap();
+        read_premultiplied_rgba(&mut surface, &mut pixels).unwrap();
         assert_eq!(&pixels, widget.pixels(), "gradient at {second}");
         assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
         let revision = widget.revision();
@@ -2781,7 +2782,7 @@ fn time_preview_matches_native_composition_and_resize_at_the_current_second() {
                 )
                 .unwrap();
                 let mut pixels = vec![0; widget.pixels().len()];
-                read_surface_rgba(&mut surface, &mut pixels).unwrap();
+                read_premultiplied_rgba(&mut surface, &mut pixels).unwrap();
                 assert_eq!(
                     &pixels,
                     widget.pixels(),
@@ -2926,7 +2927,7 @@ fn label_pixels_match_native_and_only_config_changes_invalidate_the_static_revis
         &NativeFonts(&[common::test_config::repo_git_root().join("fonts")]),
     ).unwrap();
     let mut pixels = vec![0; widget.pixels().len()];
-    read_surface_rgba(&mut surface, &mut pixels).unwrap();
+    read_premultiplied_rgba(&mut surface, &mut pixels).unwrap();
     assert_eq!(&pixels, widget.pixels());
     assert!(pixels.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0));
     let revision = widget.revision();
@@ -3076,7 +3077,7 @@ fn standalone_preview_matches_native_cached_composition_and_replaces_state() {
             )
             .unwrap();
             let mut pixels = vec![0; widget.pixels().len()];
-            read_surface_rgba(&mut surface, &mut pixels).unwrap();
+            read_premultiplied_rgba(&mut surface, &mut pixels).unwrap();
             assert_eq!(&pixels, widget.pixels(), "{alignment}, t={second}");
             assert!(pixels.as_chunks::<4>().0.iter().any(|p| p[3] != 0));
             let revision = widget.revision();
