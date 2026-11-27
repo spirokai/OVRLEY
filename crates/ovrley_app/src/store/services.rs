@@ -11,7 +11,7 @@ use ovrley_core::encode::ffmpeg::transitions::TransitionProxyRequest;
 use ovrley_core::jobs::batch::BatchServiceError;
 use ovrley_core::jobs::contracts::{BatchAcceptance, BatchRenderRequest, BatchSnapshot};
 use ovrley_core::jobs::execution::RenderAccepted;
-use ovrley_services::cache::CacheUsage;
+use ovrley_services::cache::{CacheLimit, CacheUsage, LimitedCache};
 use ovrley_services::maps::{MapAdapterSupport, MapFrameWake, MapPrepareRequest, MapStyleCatalog};
 use ovrley_services::updater::{DownloadProgress, ReleaseUpdate};
 use ovrley_services::video::{Filmstrip, FilmstripHwaccel, FilmstripRequest};
@@ -126,10 +126,7 @@ pub trait VideoTools: Send + Sync {
     /// Renders a join's blend and returns the file's path. Blocking.
     fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String>;
     fn remove_transition_proxy(&self, path: &str) -> Result<(), String>;
-    fn filmstrip_cache_usage(&self) -> Result<CacheUsage, String>;
-    /// Applies a new limit, evicting down to it; the caller saves it.
-    fn set_filmstrip_cache_limit(&self, limit: u64) -> Result<CacheUsage, String>;
-    fn clear_filmstrip_cache(&self) -> Result<CacheUsage, String>;
+    fn filmstrip_cache(&self) -> &dyn LimitedCache;
 }
 
 /// The video tools: the filmstrip cache in the application cache directory, with its limit kept in
@@ -197,16 +194,8 @@ impl VideoTools for NativeVideoTools {
         ovrley_core::encode::ffmpeg::transitions::remove_transition_proxy(std::path::Path::new(path)).map_err(|error| error.to_string())
     }
 
-    fn filmstrip_cache_usage(&self) -> Result<CacheUsage, String> {
-        Ok(self.cache.usage())
-    }
-
-    fn set_filmstrip_cache_limit(&self, limit: u64) -> Result<CacheUsage, String> {
-        self.cache.set_limit(ovrley_services::cache::CacheLimit::new(limit)?)
-    }
-
-    fn clear_filmstrip_cache(&self) -> Result<CacheUsage, String> {
-        self.cache.clear()
+    fn filmstrip_cache(&self) -> &dyn LimitedCache {
+        &self.cache
     }
 }
 
@@ -222,10 +211,7 @@ pub trait MapServices: Send + Sync {
     /// `prepare_map_tiles`: downloads the tiles the maps will show into the disk cache. Blocking;
     /// a cancelled download ends with `Ok`.
     fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String>;
-    fn tile_cache_usage(&self) -> Result<CacheUsage, String>;
-    /// Applies a new limit, evicting down to it; the caller saves it.
-    fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String>;
-    fn clear_tile_cache(&self) -> Result<CacheUsage, String>;
+    fn tile_cache(&self) -> &dyn LimitedCache;
     /// The map data renders draw route maps with; `None` in tests.
     fn map_source(&self) -> Option<ovrley_map::gpu::MapSource>;
 }
@@ -278,16 +264,8 @@ impl MapServices for NativeMapServices {
         ovrley_services::maps::prepare_map_tiles(request, &self.data, cancelled)
     }
 
-    fn tile_cache_usage(&self) -> Result<CacheUsage, String> {
-        Ok(self.data.tiles().usage())
-    }
-
-    fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String> {
-        self.data.tiles().set_limit(ovrley_services::cache::CacheLimit::new(limit)?)
-    }
-
-    fn clear_tile_cache(&self) -> Result<CacheUsage, String> {
-        self.data.tiles().clear()
+    fn tile_cache(&self) -> &dyn LimitedCache {
+        self.data.tiles()
     }
 
     fn map_source(&self) -> Option<ovrley_map::gpu::MapSource> {
@@ -663,8 +641,43 @@ pub mod fakes {
         pub frames: Mutex<Arc<dyn MapFrameFactory>>,
         pub wake: Mutex<Option<MapFrameWake>>,
         pub prepared: Mutex<Vec<usize>>,
+        pub tile_cache: FakeCache,
+    }
+
+    /// An in-memory cache of 512 MiB that records every call.
+    pub struct FakeCache {
         pub usage: Mutex<CacheUsage>,
         pub calls: Mutex<Vec<String>>,
+    }
+
+    impl Default for FakeCache {
+        fn default() -> Self {
+            Self {
+                usage: Mutex::new(CacheUsage { used_bytes: 0, limit_bytes: 512 << 20, min_limit_bytes: 128 << 20, max_limit_bytes: 40 * (128 << 20), limit_step_bytes: 128 << 20 }),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+    }
+
+    impl LimitedCache for FakeCache {
+        fn usage(&self) -> CacheUsage {
+            self.calls.lock().unwrap().push("usage".into());
+            *self.usage.lock().unwrap()
+        }
+
+        fn set_limit(&self, limit: CacheLimit) -> Result<CacheUsage, String> {
+            self.calls.lock().unwrap().push(format!("limit {}", limit.bytes()));
+            let mut usage = self.usage.lock().unwrap();
+            usage.limit_bytes = limit.bytes();
+            Ok(*usage)
+        }
+
+        fn clear(&self) -> Result<CacheUsage, String> {
+            self.calls.lock().unwrap().push("clear".into());
+            let mut usage = self.usage.lock().unwrap();
+            usage.used_bytes = 0;
+            Ok(*usage)
+        }
     }
 
     impl Default for FakeMapServices {
@@ -681,8 +694,7 @@ pub mod fakes {
                 frames: Mutex::new(Arc::new(NoFrames)),
                 wake: Mutex::new(None),
                 prepared: Mutex::new(Vec::new()),
-                usage: Mutex::new(CacheUsage { used_bytes: 0, limit_bytes: 512 << 20, min_limit_bytes: 128 << 20, max_limit_bytes: 40 * (128 << 20), limit_step_bytes: 128 << 20 }),
-                calls: Mutex::new(Vec::new()),
+                tile_cache: FakeCache::default(),
             }
         }
     }
@@ -727,23 +739,8 @@ pub mod fakes {
             Ok(())
         }
 
-        fn tile_cache_usage(&self) -> Result<CacheUsage, String> {
-            self.calls.lock().unwrap().push("usage".into());
-            Ok(*self.usage.lock().unwrap())
-        }
-
-        fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String> {
-            self.calls.lock().unwrap().push(format!("limit {limit}"));
-            let mut usage = self.usage.lock().unwrap();
-            usage.limit_bytes = ovrley_services::cache::CacheLimit::new(limit)?.bytes();
-            Ok(*usage)
-        }
-
-        fn clear_tile_cache(&self) -> Result<CacheUsage, String> {
-            self.calls.lock().unwrap().push("clear".into());
-            let mut usage = self.usage.lock().unwrap();
-            usage.used_bytes = 0;
-            Ok(*usage)
+        fn tile_cache(&self) -> &dyn LimitedCache {
+            &self.tile_cache
         }
 
         fn map_source(&self) -> Option<ovrley_map::gpu::MapSource> {
@@ -918,6 +915,7 @@ pub mod fakes {
         pub thumbnails_peak: std::sync::atomic::AtomicUsize,
         pub telemetry: Mutex<std::collections::HashMap<String, Result<Option<ovrley_core::activity::schema::ParsedActivity>, String>>>,
         pub telemetry_calls: Mutex<Vec<String>>,
+        pub filmstrip_cache: FakeCache,
     }
 
     impl FakeVideoTools {
@@ -973,16 +971,8 @@ pub mod fakes {
             Ok(())
         }
 
-        fn filmstrip_cache_usage(&self) -> Result<CacheUsage, String> {
-            Err("the fake video tools have no filmstrip cache".into())
-        }
-
-        fn set_filmstrip_cache_limit(&self, _limit: u64) -> Result<CacheUsage, String> {
-            Err("the fake video tools have no filmstrip cache".into())
-        }
-
-        fn clear_filmstrip_cache(&self) -> Result<CacheUsage, String> {
-            Err("the fake video tools have no filmstrip cache".into())
+        fn filmstrip_cache(&self) -> &dyn LimitedCache {
+            &self.filmstrip_cache
         }
     }
 

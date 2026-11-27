@@ -6,7 +6,7 @@
 //! what the payload must be. A pair that doesn't match its metadata is refetched; a tile that
 //! cannot be revalidated is served stale; concurrent requests for one tile share one fetch.
 
-use crate::cache::{remove_dir_if_present, remove_if_present, touch, CacheLimit, CacheUsage};
+use crate::cache::{remove_dir_if_present, remove_if_present, touch, CacheLimit, CacheUsage, LimitedCache};
 use http_cache_semantics::{AfterResponse, BeforeRequest, CachePolicy};
 use reqwest::blocking::{Client, Request, Response};
 use reqwest::header::{HeaderMap, CONTENT_TYPE};
@@ -190,37 +190,6 @@ impl TileCache {
 
     fn accounting(&self) -> MutexGuard<'_, CacheAccounting> {
         self.maintenance.accounting.lock().expect("tile cache accounting lock poisoned")
-    }
-
-    #[must_use]
-    pub fn usage(&self) -> CacheUsage {
-        let accounting = self.accounting();
-        accounting.limit.usage(accounting.total_size)
-    }
-
-    /// Applies a new limit and evicts the least recently used tiles down to it.
-    ///
-    /// # Errors
-    ///
-    /// When the cache cannot be scanned or a tile cannot be removed.
-    pub fn set_limit(&self, limit: CacheLimit) -> Result<CacheUsage, String> {
-        self.accounting().limit = limit;
-        self.reconcile_and_evict()?;
-        Ok(self.usage())
-    }
-
-    /// Deletes every cached tile, waiting for running fetches first.
-    ///
-    /// # Errors
-    ///
-    /// When the cache directory cannot be removed.
-    pub fn clear(&self) -> Result<CacheUsage, String> {
-        let _maintenance = self.maintenance.gate.write().expect("tile cache gate poisoned");
-        remove_dir_if_present(&self.cache_root)?;
-        let mut accounting = self.accounting();
-        accounting.total_size = 0;
-        accounting.entries.clear();
-        Ok(accounting.limit.usage(0))
     }
 
     /// The tile at `coordinates`, from the cache or the network. A request for a tile being fetched
@@ -458,6 +427,29 @@ impl TileCache {
         accounting.total_size = total_size;
         accounting.entries = retained_entries;
         Ok(())
+    }
+}
+
+impl LimitedCache for TileCache {
+    fn usage(&self) -> CacheUsage {
+        let accounting = self.accounting();
+        accounting.limit.usage(accounting.total_size)
+    }
+
+    fn set_limit(&self, limit: CacheLimit) -> Result<CacheUsage, String> {
+        self.accounting().limit = limit;
+        self.reconcile_and_evict()?;
+        Ok(self.usage())
+    }
+
+    // Waits for running fetches first.
+    fn clear(&self) -> Result<CacheUsage, String> {
+        let _maintenance = self.maintenance.gate.write().expect("tile cache gate poisoned");
+        remove_dir_if_present(&self.cache_root)?;
+        let mut accounting = self.accounting();
+        accounting.total_size = 0;
+        accounting.entries.clear();
+        Ok(accounting.limit.usage(0))
     }
 }
 

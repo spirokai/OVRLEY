@@ -72,6 +72,23 @@ pub struct CacheUsage {
     pub limit_step_bytes: u64,
 }
 
+/// A size-limited disk cache: its usage, a new limit, and clearing it.
+pub trait LimitedCache: Send + Sync {
+    fn usage(&self) -> CacheUsage;
+    /// Applies a new limit and evicts the least recently used files down to it.
+    ///
+    /// # Errors
+    ///
+    /// When the cache cannot be scanned or a file cannot be removed.
+    fn set_limit(&self, limit: CacheLimit) -> Result<CacheUsage, String>;
+    /// Deletes every cached file.
+    ///
+    /// # Errors
+    ///
+    /// When the cache directory cannot be removed.
+    fn clear(&self) -> Result<CacheUsage, String>;
+}
+
 /// Marks a cached file as just used.
 pub(crate) fn touch(path: &Path) -> std::io::Result<()> {
     fs::File::options()
@@ -199,36 +216,6 @@ impl FilmstripCache {
         Ok(())
     }
 
-    #[must_use]
-    pub fn usage(&self) -> CacheUsage {
-        let accounting = self.lock();
-        accounting.limit.usage(accounting.used_bytes)
-    }
-
-    /// Applies a new limit and evicts the least recently used strips down to it.
-    ///
-    /// # Errors
-    ///
-    /// When the directory cannot be read or a strip cannot be removed.
-    pub fn set_limit(&self, limit: CacheLimit) -> Result<CacheUsage, String> {
-        let mut accounting = self.lock();
-        accounting.limit = limit;
-        self.reconcile_and_evict(&mut accounting)?;
-        Ok(limit.usage(accounting.used_bytes))
-    }
-
-    /// Deletes every cached strip.
-    ///
-    /// # Errors
-    ///
-    /// When the cache directory cannot be removed.
-    pub fn clear(&self) -> Result<CacheUsage, String> {
-        let mut accounting = self.lock();
-        remove_dir_if_present(&self.root)?;
-        accounting.used_bytes = 0;
-        Ok(accounting.limit.usage(0))
-    }
-
     /// Recounts the directory, deletes leftovers of interrupted writes, and deletes the least
     /// recently used strips until the cache fits its limit.
     fn reconcile_and_evict(&self, accounting: &mut Accounting) -> Result<(), String> {
@@ -274,6 +261,27 @@ impl FilmstripCache {
             });
         }
         Ok(strips)
+    }
+}
+
+impl LimitedCache for FilmstripCache {
+    fn usage(&self) -> CacheUsage {
+        let accounting = self.lock();
+        accounting.limit.usage(accounting.used_bytes)
+    }
+
+    fn set_limit(&self, limit: CacheLimit) -> Result<CacheUsage, String> {
+        let mut accounting = self.lock();
+        accounting.limit = limit;
+        self.reconcile_and_evict(&mut accounting)?;
+        Ok(limit.usage(accounting.used_bytes))
+    }
+
+    fn clear(&self) -> Result<CacheUsage, String> {
+        let mut accounting = self.lock();
+        remove_dir_if_present(&self.root)?;
+        accounting.used_bytes = 0;
+        Ok(accounting.limit.usage(0))
     }
 }
 

@@ -7,7 +7,7 @@ use crate::store::services::{
     MapServices, Services, VideoTools, FILMSTRIP_CACHE_LIMIT_KEY, MAP_TILE_CACHE_LIMIT_KEY,
 };
 use crate::store::Store;
-use ovrley_services::cache::CacheUsage;
+use ovrley_services::cache::{CacheLimit, CacheUsage, LimitedCache};
 use serde_json::Value;
 use std::collections::VecDeque;
 
@@ -82,20 +82,21 @@ enum Command {
     Clear,
 }
 
-/// Runs `command` on the service that owns `cache`. Blocking.
+/// Runs `command` on `cache`, which the map services or the video tools own. Blocking.
 fn run(
     maps: &dyn MapServices,
     video: &dyn VideoTools,
     cache: DiskCache,
     command: Command,
 ) -> Result<CacheUsage, String> {
-    match (cache, command) {
-        (DiskCache::MapTiles, Command::Usage) => maps.tile_cache_usage(),
-        (DiskCache::MapTiles, Command::SetLimit(limit)) => maps.set_tile_cache_limit(limit),
-        (DiskCache::MapTiles, Command::Clear) => maps.clear_tile_cache(),
-        (DiskCache::Filmstrips, Command::Usage) => video.filmstrip_cache_usage(),
-        (DiskCache::Filmstrips, Command::SetLimit(limit)) => video.set_filmstrip_cache_limit(limit),
-        (DiskCache::Filmstrips, Command::Clear) => video.clear_filmstrip_cache(),
+    let cache: &dyn LimitedCache = match cache {
+        DiskCache::MapTiles => maps.tile_cache(),
+        DiskCache::Filmstrips => video.filmstrip_cache(),
+    };
+    match command {
+        Command::Usage => Ok(cache.usage()),
+        Command::SetLimit(limit) => cache.set_limit(CacheLimit::new(limit)?),
+        Command::Clear => cache.clear(),
     }
 }
 
