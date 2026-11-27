@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "Nabídka Soubor"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "Mezipaměť filmových pásů"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "Náhledy videí na časové ose se ukládají na disk, aby se při dalším otevření projektu zobrazily okamžitě. Když je mezipaměť plná, nejdříve se odstraní nejdéle nepoužité filmové pásy."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "Přepnout mřížku"

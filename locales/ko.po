@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "파일 메뉴"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "필름스트립 캐시"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "타임라인의 동영상 썸네일은 디스크에 저장되어 프로젝트를 다시 열 때 바로 표시됩니다. 캐시가 가득 차면 가장 오래 사용하지 않은 필름스트립부터 삭제됩니다."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "격자 표시 전환"

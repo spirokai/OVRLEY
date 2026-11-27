@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "Dosya menüsü"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "Film şeridi önbelleği"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "Zaman çizelgesindeki video küçük resimleri, bir proje yeniden açıldığında hemen görünmeleri için diskte saklanır. Önbellek dolduğunda en uzun süredir kullanılmayan film şeritleri önce kaldırılır."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "Izgarayı aç/kapat"

@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "Arkivmeny"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "Filmremsecache"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "Tidslinjens videominiatyrer sparas på disken så att de visas direkt när ett projekt öppnas igen. När cachen är full tas de filmremsor som använts minst nyligen bort först."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "Växla rutnät"

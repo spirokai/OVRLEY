@@ -1,13 +1,11 @@
-//! Maps: the installed styles, the preview's frame thread, the GPU alert, the map view mode, the
-//! background tile download and the tile cache row.
+//! Maps: the installed styles, the preview's frame thread, the GPU alert, the map view mode and the
+//! background tile download.
 //!
 //! - **Styles** are read at startup with the map services; [`initialize`] copies their catalog into
 //!   the store for the style select and probes the adapter on a worker.
 //! - **Frames** come from one map thread, started with the preview's first map ([`frame_factory`]).
 //!   Its wake-ups mark the preview dirty, so the next frame collects what arrived.
-//! - **The tile cache row** lives here too, with the rest of the maps' services.
 
-use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use ovrley_services::maps::{MapAdapterSupport, MapStyleCatalog};
@@ -44,29 +42,6 @@ pub struct MapsState {
     pub view: MapViewState,
     /// The background route download.
     download: MapDownloadState,
-    /// Settings → Map tile cache.
-    pub tile_cache: MapTileCacheState,
-}
-
-/// The tile cache row's state.
-#[derive(Debug, Default)]
-pub struct MapTileCacheState {
-    /// The cache's usage, once loaded.
-    pub usage: Option<ovrley_services::cache::CacheUsage>,
-    /// The slider's value while it drags, and until the command it committed answers.
-    pub draft_limit: Option<u64>,
-    /// Whether a cache command is running; it disables Clear.
-    pub pending: bool,
-    /// The commands given while one runs, since the slider stays live meanwhile. They run one after
-    /// another, so the newest is also the last to reach the cache and the settings file.
-    queued: VecDeque<Option<u64>>,
-}
-
-impl MapTileCacheState {
-    /// The slider's limit: the draft while dragging, else the cache's.
-    pub fn limit(&self) -> Option<u64> {
-        self.draft_limit.or(self.usage.map(|usage| usage.limit_bytes))
-    }
 }
 
 /// What the background download last asked for, and the request waiting for the settle.
@@ -407,75 +382,6 @@ pub fn reconcile_map_view(store: &mut Store) {
     }
 }
 
-// ── Settings → Map tile cache ───────────────────────────────────────────────────────────────────
-
-/// The row showed: its usage loads on a worker. A failure goes to the error alert.
-pub fn load_tile_cache(_: &mut Store, services: &mut Services) {
-    let maps = services.maps.clone();
-    services.workers.spawn("map-tile-cache-usage", move || {
-        let usage = maps.tile_cache_usage();
-        Box::new(move |store, _| match usage {
-            Ok(usage) => store.maps.tile_cache.usage = Some(usage),
-            Err(error) => store.media.set_error_message(error),
-        })
-    });
-}
-
-/// The slider moves.
-pub fn draft_tile_cache_limit(store: &mut Store, limit: u64) {
-    store.maps.tile_cache.draft_limit = Some(limit);
-}
-
-/// Runs a cache command on a worker, after the ones given before it. Only the newest command's
-/// answer shows; a failure goes to the error alert. A limit that applied is saved.
-fn run_tile_cache_command(store: &mut Store, services: &mut Services, limit: Option<u64>) {
-    let cache = &mut store.maps.tile_cache;
-    if cache.pending {
-        cache.queued.push_back(limit);
-        return;
-    }
-    cache.pending = true;
-    start_tile_cache_command(services, limit);
-}
-
-fn start_tile_cache_command(services: &mut Services, limit: Option<u64>) {
-    let maps = services.maps.clone();
-    services.workers.spawn("map-tile-cache", move || {
-        let result = match limit {
-            Some(limit) => maps.set_tile_cache_limit(limit),
-            None => maps.clear_tile_cache(),
-        };
-        Box::new(move |store, services| {
-            if let (Ok(usage), Some(_)) = (&result, limit) {
-                services.preferences.set(crate::store::services::MAP_TILE_CACHE_LIMIT_KEY, Value::from(usage.limit_bytes));
-            }
-            let next = store.maps.tile_cache.queued.pop_front();
-            match result {
-                Ok(usage) if next.is_none() => store.maps.tile_cache.usage = Some(usage),
-                Ok(_) => {}
-                Err(error) => store.media.set_error_message(error),
-            }
-            if let Some(next) = next {
-                start_tile_cache_command(services, next);
-            } else {
-                let cache = &mut store.maps.tile_cache;
-                cache.draft_limit = None;
-                cache.pending = false;
-            }
-        })
-    });
-}
-
-/// The slider is released at `limit`.
-pub fn commit_tile_cache_limit(store: &mut Store, services: &mut Services, limit: u64) {
-    run_tile_cache_command(store, services, Some(limit));
-}
-
-/// Clear cache.
-pub fn clear_tile_cache(store: &mut Store, services: &mut Services) {
-    run_tile_cache_command(store, services, None);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -650,35 +556,6 @@ mod tests {
         assert_eq!(*fakes.maps.prepared.lock().unwrap(), [1]);
         dispatcher.dispatch(|store, _| update_download(store, &[], &Value::Null, 1.0, None));
         assert_eq!(dispatcher.with_store(next_deadline), None);
-    }
-
-    #[test]
-    fn the_tile_cache_row_applies_only_the_newest_command_and_saves_the_limit() {
-        let (dispatcher, fakes) = map_editor();
-        dispatcher.dispatch(load_tile_cache);
-        drain(&dispatcher, &fakes);
-        assert_eq!(dispatcher.with_store(|store| store.maps.tile_cache.limit()), Some(512 << 20));
-        dispatcher.dispatch(|store, _| draft_tile_cache_limit(store, 1 << 30));
-        assert_eq!(dispatcher.with_store(|store| store.maps.tile_cache.limit()), Some(1 << 30), "the slider drafts");
-        dispatcher.dispatch(|store, services| commit_tile_cache_limit(store, services, 1 << 30));
-        dispatcher.dispatch(|store, services| commit_tile_cache_limit(store, services, 768 << 20));
-        assert!(dispatcher.with_store(|store| store.maps.tile_cache.pending));
-        for _ in 0..2000 {
-            fakes.ui_post.drain(&dispatcher);
-            if !dispatcher.with_store(|store| store.maps.tile_cache.pending) {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(5));
-        }
-        dispatcher.with_store(|store| {
-            assert_eq!(store.maps.tile_cache.limit(), Some(768 << 20), "only the newest command applies");
-            assert_eq!(store.maps.tile_cache.draft_limit, None);
-        });
-        let saved = fakes.preferences.saves.borrow().last().and_then(|values| values.get(crate::store::services::MAP_TILE_CACHE_LIMIT_KEY).cloned());
-        assert_eq!(saved, Some(json!(768u64 << 20)));
-        dispatcher.dispatch(clear_tile_cache);
-        drain(&dispatcher, &fakes);
-        assert!(fakes.maps.calls.lock().unwrap().contains(&"clear".to_string()));
     }
 
     #[test]

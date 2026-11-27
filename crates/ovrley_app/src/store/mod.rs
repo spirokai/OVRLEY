@@ -92,6 +92,8 @@ pub struct Store {
     pub scene: crate::features::scene::SceneState,
     /// The maps' styles, adapter and frame thread.
     pub maps: crate::features::maps::MapsState,
+    /// Settings → the disk cache rows.
+    pub disk_caches: crate::features::caches::DiskCachesState,
     /// The template listing, save status and the cached durable state.
     pub templates: crate::features::templates::TemplatesState,
     pub i18n: I18nState,

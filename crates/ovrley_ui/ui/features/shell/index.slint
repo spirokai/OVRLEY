@@ -2,6 +2,8 @@ import { Choice, PlacementRect } from "../../components/logic.slint";
 
 // The settings dialog's sections, in the navigation's order.
 export enum SettingsSection { settings, shortcuts }
+// The disk caches the settings show a row for.
+export enum DiskCache { map-tiles, filmstrips }
 
 // One way to press a shortcut: modifier labels joined by "+", then the alternative keys.
 export struct ShortcutOptionView {
@@ -21,9 +23,9 @@ export struct ShortcutGroupView {
 
 // The app-shell feature's global: the properties its projection writes and the callbacks
 // `src/features/shell.rs` binds to dispatches. Only the shell's composition components read it.
-// Settings → Map tile cache: shown once its usage has loaded. Sizes are in MiB for the slider; the
+// A Settings disk cache row: shown once its usage has loaded. Sizes are in MiB for the slider; the
 // texts are formatted in Rust.
-export struct MapTileCacheView {
+export struct DiskCacheView {
     shown: bool,
     used: string,
     limit: string,
@@ -83,11 +85,12 @@ export global AppShell {
     callback change-language(string);
     callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
-    in property <MapTileCacheView> map-tile-cache;
-    callback map-tile-cache-opened();
-    callback map-tile-cache-draft(mib: float);
-    callback map-tile-cache-commit(mib: float);
-    callback map-tile-cache-clear();
+    in property <DiskCacheView> map-tile-cache;
+    in property <DiskCacheView> filmstrip-cache;
+    callback disk-caches-opened();
+    callback disk-cache-draft(cache: DiskCache, mib: float);
+    callback disk-cache-commit(cache: DiskCache, mib: float);
+    callback disk-cache-clear(cache: DiskCache);
     // The File menu's "Import Activity".
     callback import-activity();
     callback import-videos();

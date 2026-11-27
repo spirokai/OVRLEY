@@ -11,7 +11,7 @@ import { HelpTooltip } from "../../components/tooltip.slint";
 import { Choice, ChoiceKind, PlacementAlign } from "../../components/logic.slint";
 import { Progress } from "../../components/progress.slint";
 import { SliderField } from "../widgets/controls.slint";
-import { SettingsSection, ShortcutGroupView, MapTileCacheView } from "index.slint";
+import { SettingsSection, ShortcutGroupView, DiskCache, DiskCacheView } from "index.slint";
 
 // A dialog panel.
 export component DialogPanel inherits Rectangle {
@@ -130,8 +130,11 @@ component SettingsRow inherits HorizontalLayout {
     @children
 }
 
-component MapTileCacheSettings inherits VerticalLayout {
-    in property <MapTileCacheView> cache;
+// A disk cache row: its usage, Clear cache and the size limit slider.
+component DiskCacheSettings inherits VerticalLayout {
+    in property <string> title;
+    in property <string> help;
+    in property <DiskCacheView> cache;
     callback draft(mib: float);
     callback commit(mib: float);
     callback clear();
@@ -148,7 +151,7 @@ component MapTileCacheSettings inherits VerticalLayout {
             horizontal-stretch: 1;
             alignment: center;
             AppText {
-                content: @tr("app-shell.mapTileCache" => "Map tile cache");
+                content: root.title;
                 uppercase: false;
                 font-size: Theme.text-sm * 1rem;
                 color: Theme.foreground;
@@ -164,7 +167,7 @@ component MapTileCacheSettings inherits VerticalLayout {
                     vertical-alignment: center;
                 }
                 HelpTooltip {
-                    content: @tr("app-shell.mapTileCacheHelp" => "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first.");
+                    content: root.help;
                 }
             }
         }
@@ -206,23 +209,24 @@ component MapTileCacheSettings inherits VerticalLayout {
 }
 
 // `GeneralSettingsPanel`: the language and unit system selects, whether agents may edit, and the
-// map tile cache once its usage has loaded.
+// map tile and filmstrip caches once their usage has loaded.
 component GeneralSettingsPanel {
     in property <string> language;
     in property <[Choice]> languages;
     in property <string> unit-system;
     in property <bool> allow-agent-edits;
-    in property <MapTileCacheView> map-tile-cache;
+    in property <DiskCacheView> map-tile-cache;
+    in property <DiskCacheView> filmstrip-cache;
     callback change-language(string);
     callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
-    callback map-tile-cache-opened();
-    callback map-tile-cache-draft(mib: float);
-    callback map-tile-cache-commit(mib: float);
-    callback map-tile-cache-clear();
+    callback disk-caches-opened();
+    callback disk-cache-draft(cache: DiskCache, mib: float);
+    callback disk-cache-commit(cache: DiskCache, mib: float);
+    callback disk-cache-clear(cache: DiskCache);
 
     init => {
-        root.map-tile-cache-opened();
+        root.disk-caches-opened();
     }
 
     ScrollArea {
@@ -292,16 +296,32 @@ component GeneralSettingsPanel {
                     }
                 }
             }
-            if root.map-tile-cache.shown: MapTileCacheSettings {
+            if root.map-tile-cache.shown: DiskCacheSettings {
+                title: @tr("app-shell.mapTileCache" => "Map tile cache");
+                help: @tr("app-shell.mapTileCacheHelp" => "Map tiles downloaded for previews and renders are kept on disk so maps load faster and work offline. When the cache is full, the least recently used tiles are removed first.");
                 cache: root.map-tile-cache;
                 draft(mib) => {
-                    root.map-tile-cache-draft(mib);
+                    root.disk-cache-draft(DiskCache.map-tiles, mib);
                 }
                 commit(mib) => {
-                    root.map-tile-cache-commit(mib);
+                    root.disk-cache-commit(DiskCache.map-tiles, mib);
                 }
                 clear => {
-                    root.map-tile-cache-clear();
+                    root.disk-cache-clear(DiskCache.map-tiles);
+                }
+            }
+            if root.filmstrip-cache.shown: DiskCacheSettings {
+                title: @tr("app-shell.filmstripCache" => "Filmstrip cache");
+                help: @tr("app-shell.filmstripCacheHelp" => "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first.");
+                cache: root.filmstrip-cache;
+                draft(mib) => {
+                    root.disk-cache-draft(DiskCache.filmstrips, mib);
+                }
+                commit(mib) => {
+                    root.disk-cache-commit(DiskCache.filmstrips, mib);
+                }
+                clear => {
+                    root.disk-cache-clear(DiskCache.filmstrips);
                 }
             }
         }
@@ -430,16 +450,17 @@ export component SettingsDialog {
     in property <string> unit-system;
     in property <[ShortcutGroupView]> shortcut-groups;
     in property <bool> allow-agent-edits;
-    in property <MapTileCacheView> map-tile-cache;
+    in property <DiskCacheView> map-tile-cache;
+    in property <DiskCacheView> filmstrip-cache;
     callback close();
     callback select-section(SettingsSection);
     callback change-language(string);
     callback change-unit-system(string);
     callback set-allow-agent-edits(bool);
-    callback map-tile-cache-opened();
-    callback map-tile-cache-draft(mib: float);
-    callback map-tile-cache-commit(mib: float);
-    callback map-tile-cache-clear();
+    callback disk-caches-opened();
+    callback disk-cache-draft(cache: DiskCache, mib: float);
+    callback disk-cache-commit(cache: DiskCache, mib: float);
+    callback disk-cache-clear(cache: DiskCache);
 
     property <string> section-title: root.section == SettingsSection.settings ? @tr("app-shell.settings" => "Settings") : @tr("app-shell.shortcuts" => "Shortcuts");
 
@@ -512,17 +533,18 @@ export component SettingsDialog {
                         unit-system: root.unit-system;
                         allow-agent-edits: root.allow-agent-edits;
                         map-tile-cache: root.map-tile-cache;
-                        map-tile-cache-opened => {
-                            root.map-tile-cache-opened();
+                        filmstrip-cache: root.filmstrip-cache;
+                        disk-caches-opened => {
+                            root.disk-caches-opened();
                         }
-                        map-tile-cache-draft(mib) => {
-                            root.map-tile-cache-draft(mib);
+                        disk-cache-draft(cache, mib) => {
+                            root.disk-cache-draft(cache, mib);
                         }
-                        map-tile-cache-commit(mib) => {
-                            root.map-tile-cache-commit(mib);
+                        disk-cache-commit(cache, mib) => {
+                            root.disk-cache-commit(cache, mib);
                         }
-                        map-tile-cache-clear => {
-                            root.map-tile-cache-clear();
+                        disk-cache-clear(cache) => {
+                            root.disk-cache-clear(cache);
                         }
                         change-language(value) => {
                             root.change-language(value);

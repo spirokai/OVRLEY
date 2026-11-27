@@ -5,13 +5,13 @@ use crate::platform::keys::Modifiers;
 use crate::platform::SlintWindowControl;
 use crate::projection::{convert_enum, set_if_changed, strings};
 use crate::{
-    AlertLayer, AppShell, AppUpdates, AppWindow, Choice, ChoiceKind, SettingsSection,
-    ShortcutGroupView, ShortcutOptionView, ShortcutRowView, UndoRedo, UpdatePromptPhase,
+    AlertLayer, AppShell, AppUpdates, AppWindow, Choice, ChoiceKind, DiskCache, DiskCacheView,
+    SettingsSection, ShortcutGroupView, ShortcutOptionView, ShortcutRowView, UndoRedo, UpdatePromptPhase,
 };
 use ovrley_app::features::shell::{
     self, keyboard_shortcut_groups, AppBootstrapState, SettingsSection as AppSettingsSection, UpdatePromptView,
 };
-use ovrley_app::features::maps;
+use ovrley_app::features::caches::{self, DiskCache as AppDiskCache, DiskCacheState};
 use ovrley_app::features::history::{history_enabled, redo, undo};
 use ovrley_app::i18n::{translate_backend_error, Locale, LOCALES};
 use ovrley_app::format::format_cache_bytes;
@@ -23,6 +23,7 @@ use ovrley_widgets::model::document::UnitSystem;
 use slint::{ComponentHandle, ModelRc, VecModel};
 
 convert_enum!(SettingsSection <=> AppSettingsSection { Settings, Shortcuts });
+convert_enum!(DiskCache <=> AppDiskCache { MapTiles, Filmstrips });
 
 /// Bytes in a MiB. The cache slider runs in MiB, which a Slint float holds exactly.
 const MIB: f64 = 1024.0 * 1024.0;
@@ -103,8 +104,13 @@ pub fn project(window: &AppWindow, store: &Store) {
     );
     set_if_changed(
         shell.get_map_tile_cache(),
-        map_tile_cache_view(store),
+        disk_cache_view(store.disk_caches.get(AppDiskCache::MapTiles)),
         |value| shell.set_map_tile_cache(value),
+    );
+    set_if_changed(
+        shell.get_filmstrip_cache(),
+        disk_cache_view(store.disk_caches.get(AppDiskCache::Filmstrips)),
+        |value| shell.set_filmstrip_cache(value),
     );
     set_if_changed(
         shell.get_agent_connected(),
@@ -217,15 +223,14 @@ fn project_update_prompt(window: &AppWindow, store: &Store) {
     set_if_changed(global.get_phase(), phase, |value| global.set_phase(value));
 }
 
-/// Settings → Map tile cache, hidden until its usage has loaded.
-fn map_tile_cache_view(store: &Store) -> crate::MapTileCacheView {
-    let cache = &store.maps.tile_cache;
+/// A Settings disk cache row, hidden until its usage has loaded.
+fn disk_cache_view(cache: &DiskCacheState) -> DiskCacheView {
     let Some(usage) = cache.usage else {
-        return crate::MapTileCacheView::default();
+        return DiskCacheView::default();
     };
     let limit = cache.limit().expect("a loaded cache has a limit");
     let mib = |bytes: u64| (bytes as f64 / MIB) as f32;
-    crate::MapTileCacheView {
+    DiskCacheView {
         shown: true,
         used: format_cache_bytes(usage.used_bytes).into(),
         limit: format_cache_bytes(usage.limit_bytes).into(),
@@ -274,19 +279,23 @@ pub fn bind(window: &AppWindow, dispatcher: &Dispatcher) {
     });
 
     let d = dispatcher.handle();
-    shell.on_map_tile_cache_opened(move || d.dispatch(maps::load_tile_cache));
+    shell.on_disk_caches_opened(move || d.dispatch(caches::load_disk_caches));
     let d = dispatcher.handle();
-    shell.on_map_tile_cache_draft(move |mib| {
-        d.dispatch(move |store, _| maps::draft_tile_cache_limit(store, mib_to_bytes(mib)))
-    });
-    let d = dispatcher.handle();
-    shell.on_map_tile_cache_commit(move |mib| {
-        d.dispatch(move |store, services| {
-            maps::commit_tile_cache_limit(store, services, mib_to_bytes(mib))
+    shell.on_disk_cache_draft(move |cache, mib| {
+        d.dispatch(move |store, _| {
+            caches::draft_disk_cache_limit(store, cache.into(), mib_to_bytes(mib))
         })
     });
     let d = dispatcher.handle();
-    shell.on_map_tile_cache_clear(move || d.dispatch(maps::clear_tile_cache));
+    shell.on_disk_cache_commit(move |cache, mib| {
+        d.dispatch(move |store, services| {
+            caches::commit_disk_cache_limit(store, services, cache.into(), mib_to_bytes(mib))
+        })
+    });
+    let d = dispatcher.handle();
+    shell.on_disk_cache_clear(move |cache| {
+        d.dispatch(move |store, services| caches::clear_disk_cache(store, services, cache.into()))
+    });
     let d = dispatcher.handle();
     shell.on_set_allow_agent_edits(move |allowed| {
         d.dispatch(move |store, services| {

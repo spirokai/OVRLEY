@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "文件菜单"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "胶片条缓存"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "时间线上的视频缩略图保存在磁盘上，再次打开项目时会立即显示。缓存已满时，最久未使用的胶片条会被最先删除。"
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "显示/隐藏网格"

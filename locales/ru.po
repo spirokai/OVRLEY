@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "Меню «Файл»"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "Кэш раскадровок"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "Миниатюры видео на таймлайне хранятся на диске, чтобы сразу появляться при повторном открытии проекта. Когда кэш заполнен, первыми удаляются раскадровки, которые дольше всего не использовались."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "Переключить сетку"

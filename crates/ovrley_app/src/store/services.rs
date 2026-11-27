@@ -126,6 +126,10 @@ pub trait VideoTools: Send + Sync {
     /// Renders a join's blend and returns the file's path. Blocking.
     fn render_transition_proxy(&self, request: &TransitionProxyRequest) -> Result<String, String>;
     fn remove_transition_proxy(&self, path: &str) -> Result<(), String>;
+    fn filmstrip_cache_usage(&self) -> Result<CacheUsage, String>;
+    /// Applies a new limit, evicting down to it; the caller saves it.
+    fn set_filmstrip_cache_limit(&self, limit: u64) -> Result<CacheUsage, String>;
+    fn clear_filmstrip_cache(&self) -> Result<CacheUsage, String>;
 }
 
 /// The video tools: the filmstrip cache in the application cache directory, with its limit kept in
@@ -192,6 +196,18 @@ impl VideoTools for NativeVideoTools {
     fn remove_transition_proxy(&self, path: &str) -> Result<(), String> {
         ovrley_core::encode::ffmpeg::transitions::remove_transition_proxy(std::path::Path::new(path)).map_err(|error| error.to_string())
     }
+
+    fn filmstrip_cache_usage(&self) -> Result<CacheUsage, String> {
+        Ok(self.cache.usage())
+    }
+
+    fn set_filmstrip_cache_limit(&self, limit: u64) -> Result<CacheUsage, String> {
+        self.cache.set_limit(ovrley_services::cache::CacheLimit::new(limit)?)
+    }
+
+    fn clear_filmstrip_cache(&self) -> Result<CacheUsage, String> {
+        self.cache.clear()
+    }
 }
 
 /// The maps' data and renderer: the installed styles, the preview's frame
@@ -207,7 +223,7 @@ pub trait MapServices: Send + Sync {
     /// a cancelled download ends with `Ok`.
     fn prepare_tiles(&self, request: MapPrepareRequest, cancelled: &AtomicBool) -> Result<(), String>;
     fn tile_cache_usage(&self) -> Result<CacheUsage, String>;
-    /// Applies and saves a new limit, evicting down to it.
+    /// Applies a new limit, evicting down to it; the caller saves it.
     fn set_tile_cache_limit(&self, limit: u64) -> Result<CacheUsage, String>;
     fn clear_tile_cache(&self) -> Result<CacheUsage, String>;
     /// The map data renders draw route maps with; `None` in tests.
@@ -955,6 +971,18 @@ pub mod fakes {
 
         fn remove_transition_proxy(&self, _path: &str) -> Result<(), String> {
             Ok(())
+        }
+
+        fn filmstrip_cache_usage(&self) -> Result<CacheUsage, String> {
+            Err("the fake video tools have no filmstrip cache".into())
+        }
+
+        fn set_filmstrip_cache_limit(&self, _limit: u64) -> Result<CacheUsage, String> {
+            Err("the fake video tools have no filmstrip cache".into())
+        }
+
+        fn clear_filmstrip_cache(&self) -> Result<CacheUsage, String> {
+            Err("the fake video tools have no filmstrip cache".into())
         }
     }
 

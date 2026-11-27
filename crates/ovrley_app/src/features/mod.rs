@@ -1,5 +1,6 @@
 //! The app's features: each module holds a feature's state, its actions and the views
 //! `ovrley_ui` projects.
+pub mod caches;
 pub mod canvas;
 pub mod history;
 pub mod import;

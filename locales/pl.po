@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "Menu Plik"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "Pamięć podręczna pasków klatek"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "Miniatury wideo na osi czasu są przechowywane na dysku, aby pojawiały się od razu po ponownym otwarciu projektu. Gdy pamięć podręczna jest pełna, najpierw usuwane są najdawniej używane paski klatek."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "Przełącz siatkę"

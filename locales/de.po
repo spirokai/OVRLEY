@@ -55,6 +55,14 @@ msgctxt "app-shell.fileMenu"
 msgid "File menu"
 msgstr "Dateimenü"
 
+msgctxt "app-shell.filmstripCache"
+msgid "Filmstrip cache"
+msgstr "Filmstreifen-Cache"
+
+msgctxt "app-shell.filmstripCacheHelp"
+msgid "The timeline's video thumbnails are kept on disk so they show at once when a project opens again. When the cache is full, the least recently used filmstrips are removed first."
+msgstr "Die Videovorschaubilder der Zeitleiste werden auf der Festplatte gespeichert, damit sie beim erneuten Öffnen eines Projekts sofort erscheinen. Ist der Cache voll, werden die am längsten nicht verwendeten Filmstreifen zuerst entfernt."
+
 msgctxt "app-shell.grid"
 msgid "Toggle grid"
 msgstr "Raster ein-/ausblenden"
