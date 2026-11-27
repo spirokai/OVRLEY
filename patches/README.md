@@ -25,5 +25,17 @@ upstream crate is bumped, copy the new version here and re-apply the changes.
 - `wgpu_30_surface/dx12.rs`, `make_dx12_surface`: takes the resource state the texture is in.
   Upstream always tells Skia `PRESENT`, also for a texture `transition_to_color_target` has made a
   render target.
+- `itemrenderer.rs`, `draw_glyph_run`: the edging is LCD where the surface names a subpixel order
+  and greyscale everywhere else; LCD everywhere would turn on Core Text's font smoothing on macOS
+  and draw text heavier. The order is read with `Canvas::props`, not `top_props`, whose by-value
+  return crashes on MSVC.
+- `wgpu_30_surface/dx12.rs`, `system_text_props`, and `make_surface` / `make_swapchain_surface`:
+  the Windows window (its scene and its swapchain) carries the system's ClearType settings (on or
+  off, RGB or BGR), so its text is drawn with ClearType as the system's own is. A texture rendered
+  to stays greyscale.
+- `itemrenderer.rs`, `create_layer_target`: a layer's surface is created with default props, so text
+  in a transparent cached layer is greyscale rather than inheriting the window's subpixel order.
+- `wgpu_30_surface/dx12.rs`, `import_dx12_texture`: a texture with no Direct3D resource behind it
+  (its memory ran out) gives no image for the frame instead of panicking.
 
 `Cargo.lock`, `Cargo.toml.orig` and the registry metadata files are left out.

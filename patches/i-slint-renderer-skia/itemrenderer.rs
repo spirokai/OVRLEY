@@ -1184,7 +1184,9 @@ impl<'a> LayerRenderer<'a> for SkiaItemRenderer<'a> {
             skia_safe::ColorType::RGBA8888,
             skia_safe::AlphaType::Premul,
         );
-        self.canvas.new_surface(&image_info, None)
+        // OVRLEY: a layer starts transparent and is composited later, so its text is greyscale;
+        // with no props it would inherit the window's subpixel order and fringe where it is drawn.
+        self.canvas.new_surface(&image_info, Some(&skia_safe::SurfaceProps::default()))
     }
 
     fn render_into_layer(
@@ -1300,6 +1302,25 @@ impl GlyphRenderer for SkiaItemRenderer<'_> {
         };
         let mut font = skia_safe::Font::from_typeface(type_face, font_size.get());
         font.set_subpixel(true);
+        // OVRLEY: LCD coverage where the surface drawn into names a subpixel order (the Windows
+        // window with ClearType on, see `wgpu_30_surface/dx12.rs`) and greyscale everywhere else.
+        // Asked for only there: on a surface with no order Skia makes greyscale out of LCD
+        // rendering, which on macOS turns on Core Text's font smoothing and draws every word
+        // heavier.
+        //
+        // The surface's props, not the top layer's: `Canvas::top_props` returns a struct by value
+        // from C++, which on MSVC passes `this` and the return slot in the other order from the
+        // one Rust calls it with, and crashes on the first frame of text. `props` fills an
+        // out-parameter, which both sides agree on.
+        let lcd = self
+            .canvas
+            .props()
+            .is_some_and(|props| props.pixel_geometry() != skia_safe::PixelGeometry::Unknown);
+        font.set_edging(if lcd {
+            skia_safe::font::Edging::SubpixelAntiAlias
+        } else {
+            skia_safe::font::Edging::AntiAlias
+        });
         // OVRLEY: no hinting. Skia's default (normal) makes FreeType snap glyphs to the pixel grid,
         // which on Linux reshapes small Figtree text; Core Text on macOS ignores hinting anyway.
         font.set_hinting(skia_safe::FontHinting::None);

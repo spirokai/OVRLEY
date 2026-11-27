@@ -222,7 +222,7 @@ impl SkiaWGPU30RendererExt for SkiaWGPU30Renderer {
 
         surface.transition_to_color_target(texture)?;
         let mut skia_surface =
-            surface.backend.make_surface(gr_context, texture).ok_or_else(|| {
+            surface.backend.make_surface(gr_context, texture, false).ok_or_else(|| {
                 PlatformError::from("Failed to wrap WGPU texture as Skia render target")
             })?;
 

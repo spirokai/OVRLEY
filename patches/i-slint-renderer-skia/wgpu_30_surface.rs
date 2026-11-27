@@ -365,7 +365,7 @@ impl WGPUSurface {
         ) -> Result<Option<DirtyRegion>, PlatformError>,
     ) -> Result<(), PlatformError> {
         self.transition_to_color_target(scene)?;
-        let mut skia_surface = self.backend.make_surface(gr_context, scene).ok_or_else(|| {
+        let mut skia_surface = self.backend.make_surface(gr_context, scene, true).ok_or_else(|| {
             PlatformError::from("Failed to wrap the scene texture as a Skia render target")
         })?;
         callback(skia_surface.canvas(), Some(&mut *gr_context), back_buffer_age)?;
@@ -869,10 +869,15 @@ impl Backend {
     /// Wraps `texture` for Skia to draw into, as the color target
     /// [`WGPUSurface::transition_to_color_target`] made it.
     /// Pair every call with [`Self::release_surface`].
+    ///
+    /// OVRLEY: `window` is set for the window's scene, which takes the system's ClearType
+    /// settings on D3D12. A texture rendered to may be composited anywhere, where LCD coverage
+    /// would fringe, so it stays greyscale.
     pub(crate) fn make_surface(
         &self,
         gr_context: &mut skia_safe::gpu::DirectContext,
         texture: &wgpu::Texture,
+        #[cfg_attr(not(target_family = "windows"), allow(unused_variables))] window: bool,
     ) -> Option<skia_safe::Surface> {
         match self {
             #[cfg(target_vendor = "apple")]
@@ -883,6 +888,7 @@ impl Backend {
                     gr_context,
                     texture,
                     windows::Win32::Graphics::Direct3D12::D3D12_RESOURCE_STATE_RENDER_TARGET,
+                    window.then(dx12::system_text_props).flatten().as_ref(),
                 )
             },
             #[cfg(skia_wgpu_vulkan)]
@@ -916,6 +922,8 @@ impl Backend {
                     gr_context,
                     texture,
                     windows::Win32::Graphics::Direct3D12::D3D12_RESOURCE_STATE_PRESENT,
+                    // OVRLEY: the swapchain is the window, see `make_surface`.
+                    dx12::system_text_props().as_ref(),
                 )
             },
             #[cfg(skia_wgpu_vulkan)]
